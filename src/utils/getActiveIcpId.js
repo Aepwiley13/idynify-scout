@@ -1,22 +1,25 @@
-import { collection, query, where, limit, getDocs } from 'firebase/firestore';
-import { db } from '../firebase/config';
-import { DEFAULT_ICP_ID } from './reconSectionMap';
+import { resolveActiveIcp, isResolved } from './resolveActiveIcp';
 
 /**
- * Returns the active ICP profile ID for a user.
- * Queries icpProfiles where isActive:true and status:'active'.
- * Falls back to DEFAULT_ICP_ID if no active profile is found.
+ * Returns the active ICP profile ID for a user, or null when no ICP identity
+ * can be established.
+ *
+ * TRANSITION PATH — do not add new callers. This is a thin id-only wrapper over
+ * the canonical resolution contract in resolveActiveIcp.js, kept so the Hunter
+ * surfaces that only need an id are not forced to destructure a resolution
+ * object. New code should call resolveActiveIcp directly, which preserves the
+ * distinction between 'no-profiles', 'none-active' and 'read-failed'.
+ *
+ * End state: deleted once the four Hunter callers consume the resolution object.
+ *
+ * It previously returned DEFAULT_ICP_ID on an empty result or a thrown error,
+ * which sent callers to icpProfiles/default — a document that usually does not
+ * exist — so Barry silently generated outreach with no ICP messaging. Missing
+ * ICP identity is now null, and callers must handle it explicitly.
+ *
+ * @returns {Promise<string|null>}
  */
 export async function getActiveIcpId(userId) {
-  try {
-    const snap = await getDocs(query(
-      collection(db, 'users', userId, 'icpProfiles'),
-      where('isActive', '==', true),
-      where('status', '==', 'active'),
-      limit(1)
-    ));
-    return snap.empty ? DEFAULT_ICP_ID : snap.docs[0].id;
-  } catch {
-    return DEFAULT_ICP_ID;
-  }
+  const resolution = await resolveActiveIcp(userId);
+  return isResolved(resolution) ? resolution.icpId : null;
 }

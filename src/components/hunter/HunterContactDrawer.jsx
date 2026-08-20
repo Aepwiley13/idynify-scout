@@ -798,7 +798,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
               stepIndex: i,
               stepHistory: [],
               previousOutcome: null,
-              icpId: activeIcpId,
+              ...(activeIcpId ? { icpId: activeIcpId } : { icpAttribution: 'unresolved' }),
             })
           });
           const data = await response.json();

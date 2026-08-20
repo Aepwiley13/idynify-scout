@@ -22,8 +22,24 @@ import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { checkRelationshipGuardrail, getGuardrailPromptModifier } from './utils/barryGuardrail.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
-import { DEFAULT_ICP_ID } from './utils/reconSectionMap.js';
 import { LEGACY_HAIKU_4_5 } from './utils/models.js';
+
+/**
+ * User scope — the one line of it these surfaces need.
+ *
+ * `communicationStyle` lives on dashboards/{userId}, the document every one of
+ * these functions already loads for RECON, so this is a read of data already in
+ * hand rather than a new fetch. Message generation requires User scope
+ * (Appendix B); these surfaces were assembling Workspace, Relationship and
+ * Mission and then writing in Barry's default voice regardless of the style the
+ * user chose in RECON Section 0.
+ */
+function userStyleBlock(dashboardData) {
+  const style = dashboardData?.communicationStyle || null;
+  if (!style) return '';
+  return `\nUSER COMMUNICATION STYLE: ${String(style).replace(/_/g, ' ')}. Write in this voice.\n`;
+}
+
 
 // ── Outcome goal defaults by relationship state ──────────────────────────────
 const DEFAULT_OUTCOME_GOALS = {
@@ -107,7 +123,7 @@ function buildMissionSteps(outcomeGoal) {
  * `ReferenceError: lastSessionSummary is not defined` on every call, so the
  * whole Hunter engage path failed. See the commit message for detail.
  */
-async function generateStep1Draft(anthropic, contact, reconContext, outcomeGoal, isFirstContact, intake, barryMemoryContext = '', strategyGuidance = '', guardrailModifier = '', lastSessionSummary = null, daysSinceLastContact = null) {
+async function generateStep1Draft(anthropic, contact, reconContext, outcomeGoal, isFirstContact, intake, barryMemoryContext = '', strategyGuidance = '', guardrailModifier = '', lastSessionSummary = null, daysSinceLastContact = null, userStyle = '') {
   const name = contact.name || `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Contact';
   const firstName = contact.first_name || name.split(' ')[0];
 
@@ -138,7 +154,7 @@ Context:
 - Contact: ${name}, ${contact.title || 'unknown title'} at ${contact.company_name || 'unknown company'}
 - Relationship state: ${contact.relationship_state || 'unaware'}
 - Outcome goal: ${outcomeGoal}
-- Last interaction: ${contact.last_interaction_at ? new Date(contact.last_interaction_at).toLocaleDateString() : 'Never'}${reconContext ? `\n${reconContext}` : '\n- No RECON training data available'}${barryMemoryContext ? `\n${barryMemoryContext}` : ''}${lastInteractionBlock}${strategyGuidance}${guardrailModifier ? `\n${guardrailModifier}` : ''}${intakeContext}${limitedContextNote}
+- Last interaction: ${contact.last_interaction_at ? new Date(contact.last_interaction_at).toLocaleDateString() : 'Never'}${reconContext ? `\n${reconContext}` : '\n- No RECON training data available'}${userStyle}${barryMemoryContext ? `\n${barryMemoryContext}` : ''}${lastInteractionBlock}${strategyGuidance}${guardrailModifier ? `\n${guardrailModifier}` : ''}${intakeContext}${limitedContextNote}
 
 Rules:
 1. Every message must contain at least one specific detail from the contact or context. No generic templates.
@@ -241,7 +257,8 @@ export const handler = async (event) => {
     userId = body.userId;
     const authToken = body.authToken;
     const guardrailAction = body.guardrailAction || null;
-    const icpId = body.icpId || DEFAULT_ICP_ID;
+    // See barryGenerateSequenceStep: absent identity stays absent.
+    const icpId = body.icpId || null;
 
     if (!contactId || !userId || !authToken) {
       throw new Error('Missing required parameters: contactId, userId, authToken');
@@ -277,14 +294,18 @@ export const handler = async (event) => {
 
     // 2. Load RECON data + active ICP messaging (non-fatal)
     let reconContext = '';
+    let userStyle = '';
     try {
       const [dashboardDoc, icpDoc] = await Promise.all([
         db.collection('dashboards').doc(userId).get(),
-        db.collection('users').doc(userId).collection('icpProfiles').doc(icpId).get(),
+        icpId ? db.collection('users').doc(userId).collection('icpProfiles').doc(icpId).get() : null,
       ]);
-      const icpMessaging = icpDoc.exists ? (icpDoc.data()?.messaging || null) : null;
+      // See barryGenerateSequenceStep: a missing icpId must not cost the caller
+      // its RECON context.
+      const icpMessaging = icpDoc?.exists ? (icpDoc.data()?.messaging || null) : null;
       if (dashboardDoc.exists) {
         reconContext = compileReconForPrompt(dashboardDoc.data(), icpMessaging) || '';
+        userStyle = userStyleBlock(dashboardDoc.data());
       }
     } catch (err) {
       console.warn('[barryHunterProcessEngage] RECON load skipped:', err.message);
@@ -376,7 +397,7 @@ export const handler = async (event) => {
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const step1Draft = await generateStep1Draft(
       anthropic, contact, reconContext, outcomeGoal, isFirstContact, contact.hunter_intake, barryMemoryContext, strategyGuidance, guardrailModifier,
-      lastSessionSummary, daysSinceLastContact
+      lastSessionSummary, daysSinceLastContact, userStyle
     );
     steps[0].draft = step1Draft;
 

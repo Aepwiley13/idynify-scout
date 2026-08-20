@@ -1,0 +1,74 @@
+/* One person, what Barry knows, and the move he'd make. */
+
+.rfv {
+  max-width: 620px;
+  margin: 8px auto 0;
+  padding: 22px 24px;
+  border: 1px solid var(--border, #e2e2e8);
+  border-radius: 14px;
+  background: var(--surface, #fff);
+  line-height: 1.55;
+}
+
+.rfv-headline {
+  margin: 0 0 14px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text, #16161c);
+}
+
+.rfv-list {
+  margin: 0 0 14px;
+  padding-left: 18px;
+  font-size: 14px;
+  color: var(--text, #16161c);
+}
+
+.rfv-list li + li { margin-top: 6px; }
+
+/* Gaps are stated plainly, in the muted voice — they are information, not an
+   unfinished form the user is expected to complete. */
+.rfv-gaps {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--text-muted, #6b6b78);
+}
+
+.rfv-suggestion {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text, #16161c);
+}
+
+.rfv-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 18px;
+}
+
+.rfv-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.rfv-btn--go {
+  background: var(--accent, #6d4aff);
+  color: #fff;
+}
+
+.rfv-btn--quiet {
+  background: transparent;
+  border-color: var(--border, #e2e2e8);
+  color: var(--text, #16161c);
+}
+
+.rfv-btn:disabled { opacity: 0.55; cursor: default; }

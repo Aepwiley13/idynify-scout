@@ -565,14 +565,32 @@ export default function BarryChatPanel({
       const data = await res.json();
 
       if (data.success && data.icp_params) {
-        const newProfile = await updateIcpFromChat(userId, data.icp_params, action, contextStack?.icpProfile);
-        setContextStack(prev => ({ ...prev, icpProfile: newProfile }));
-        setMessages(prev => [...prev, {
-          role: 'assistant',
-          content: "Got it. I've updated your ICP. I'll use this for targeting going forward.",
-          has_message_angles: false,
-          angles: []
-        }]);
+        const result = await updateIcpFromChat(userId, data.icp_params, action, contextStack?.icpProfile);
+
+        // An unresolved ICP identity is recoverable, not a crash. Each of the
+        // three states gets its own answer — Barry never invents an ICP to
+        // write into, and never reports a failed read as "you have no ICP".
+        if (result?.status === 'unresolved') {
+          const explanation = result.reason === 'no-profiles'
+            ? "You don't have a target profile yet, so there's nothing for me to update. Tell me who you want to find and we'll set one up in ICP Settings."
+            : result.reason === 'none-active'
+            ? "You have more than one target profile and none is currently active. Pick the one this change applies to in ICP Settings and I'll update it."
+            : "I couldn't load your target profile just now — try that again in a moment.";
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: explanation,
+            has_message_angles: false,
+            angles: []
+          }]);
+        } else {
+          setContextStack(prev => ({ ...prev, icpProfile: result }));
+          setMessages(prev => [...prev, {
+            role: 'assistant',
+            content: "Got it. I've updated your ICP. I'll use this for targeting going forward.",
+            has_message_angles: false,
+            angles: []
+          }]);
+        }
       } else {
         setMessages(prev => [...prev, {
           role: 'assistant',

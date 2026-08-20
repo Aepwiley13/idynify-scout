@@ -2,176 +2,18 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { LEGACY_SONNET_4_5 } from './utils/models.js';
+import { APOLLO_INDUSTRIES, COMPANY_SIZE_OPTIONS, US_STATES } from '../../src/constants/targetingCanon.js';
 
-// Apollo Industries for mapping
-const APOLLO_INDUSTRIES = [
-  { name: "Accounting", id: "5567cd4773696439b10b0000" },
-  { name: "Airlines/Aviation", id: "5567cd4773696439b10b0001" },
-  { name: "Alternative Dispute Resolution", id: "5567cd4773696439b10b0002" },
-  { name: "Alternative Medicine", id: "5567cd4773696439b10b0003" },
-  { name: "Animation", id: "5567cd4773696439b10b0004" },
-  { name: "Apparel & Fashion", id: "5567cd4773696439b10b0005" },
-  { name: "Architecture & Planning", id: "5567cd4773696439b10b0006" },
-  { name: "Arts and Crafts", id: "5567cd4773696439b10b0007" },
-  { name: "Automotive", id: "5567cd4773696439b10b0008" },
-  { name: "Aviation & Aerospace", id: "5567cd4773696439b10b0009" },
-  { name: "Banking", id: "5567cd4773696439b10b000a" },
-  { name: "Biotechnology", id: "5567cd4773696439b10b000b" },
-  { name: "Broadcast Media", id: "5567cd4773696439b10b000c" },
-  { name: "Building Materials", id: "5567cd4773696439b10b000d" },
-  { name: "Business Supplies and Equipment", id: "5567cd4773696439b10b000e" },
-  { name: "Capital Markets", id: "5567cd4773696439b10b000f" },
-  { name: "Chemicals", id: "5567cd4773696439b10b0010" },
-  { name: "Civic & Social Organization", id: "5567cd4773696439b10b0011" },
-  { name: "Civil Engineering", id: "5567cd4773696439b10b0012" },
-  { name: "Commercial Real Estate", id: "5567cd4773696439b10b0013" },
-  { name: "Computer & Network Security", id: "5567cd4773696439b10b0014" },
-  { name: "Computer Games", id: "5567cd4773696439b10b0015" },
-  { name: "Computer Hardware", id: "5567cd4773696439b10b0016" },
-  { name: "Computer Networking", id: "5567cd4773696439b10b0017" },
-  { name: "Computer Software", id: "5567cd4773696439b10b0018" },
-  { name: "Construction", id: "5567cd4773696439b10b0019" },
-  { name: "Consumer Electronics", id: "5567cd4773696439b10b001a" },
-  { name: "Consumer Goods", id: "5567cd4773696439b10b001b" },
-  { name: "Consumer Services", id: "5567cd4773696439b10b001c" },
-  { name: "Cosmetics", id: "5567cd4773696439b10b001d" },
-  { name: "Dairy", id: "5567cd4773696439b10b001e" },
-  { name: "Defense & Space", id: "5567cd4773696439b10b001f" },
-  { name: "Design", id: "5567cd4773696439b10b0020" },
-  { name: "E-Learning", id: "5567cd4773696439b10b0021" },
-  { name: "Education Management", id: "5567cd4773696439b10b0022" },
-  { name: "Electrical/Electronic Manufacturing", id: "5567cd4773696439b10b0023" },
-  { name: "Entertainment", id: "5567cd4773696439b10b0024" },
-  { name: "Environmental Services", id: "5567cd4773696439b10b0025" },
-  { name: "Events Services", id: "5567cd4773696439b10b0026" },
-  { name: "Executive Office", id: "5567cd4773696439b10b0027" },
-  { name: "Facilities Services", id: "5567cd4773696439b10b0028" },
-  { name: "Farming", id: "5567cd4773696439b10b0029" },
-  { name: "Financial Services", id: "5567cd4773696439b10b002a" },
-  { name: "Fine Art", id: "5567cd4773696439b10b002b" },
-  { name: "Fishery", id: "5567cd4773696439b10b002c" },
-  { name: "Food & Beverages", id: "5567cd4773696439b10b002d" },
-  { name: "Food Production", id: "5567cd4773696439b10b002e" },
-  { name: "Fund-Raising", id: "5567cd4773696439b10b002f" },
-  { name: "Furniture", id: "5567cd4773696439b10b0030" },
-  { name: "Gambling & Casinos", id: "5567cd4773696439b10b0031" },
-  { name: "Glass, Ceramics & Concrete", id: "5567cd4773696439b10b0032" },
-  { name: "Government Administration", id: "5567cd4773696439b10b0033" },
-  { name: "Government Relations", id: "5567cd4773696439b10b0034" },
-  { name: "Graphic Design", id: "5567cd4773696439b10b0035" },
-  { name: "Health, Wellness and Fitness", id: "5567cd4773696439b10b0036" },
-  { name: "Higher Education", id: "5567cd4773696439b10b0037" },
-  { name: "Hospital & Health Care", id: "5567cd4773696439b10b0038" },
-  { name: "Hospitality", id: "5567cd4773696439b10b0039" },
-  { name: "Human Resources", id: "5567cd4773696439b10b003a" },
-  { name: "Import and Export", id: "5567cd4773696439b10b003b" },
-  { name: "Individual & Family Services", id: "5567cd4773696439b10b003c" },
-  { name: "Industrial Automation", id: "5567cd4773696439b10b003d" },
-  { name: "Information Services", id: "5567cd4773696439b10b003e" },
-  { name: "Information Technology and Services", id: "5567cd4773696439b10b003f" },
-  { name: "Insurance", id: "5567cd4773696439b10b0040" },
-  { name: "International Affairs", id: "5567cd4773696439b10b0041" },
-  { name: "International Trade and Development", id: "5567cd4773696439b10b0042" },
-  { name: "Internet", id: "5567cd4773696439b10b0043" },
-  { name: "Investment Banking", id: "5567cd4773696439b10b0044" },
-  { name: "Investment Management", id: "5567cd4773696439b10b0045" },
-  { name: "Judiciary", id: "5567cd4773696439b10b0046" },
-  { name: "Law Enforcement", id: "5567cd4773696439b10b0047" },
-  { name: "Law Practice", id: "5567cd4773696439b10b0048" },
-  { name: "Legal Services", id: "5567cd4773696439b10b0049" },
-  { name: "Legislative Office", id: "5567cd4773696439b10b004a" },
-  { name: "Leisure, Travel & Tourism", id: "5567cd4773696439b10b004b" },
-  { name: "Libraries", id: "5567cd4773696439b10b004c" },
-  { name: "Logistics and Supply Chain", id: "5567cd4773696439b10b004d" },
-  { name: "Luxury Goods & Jewelry", id: "5567cd4773696439b10b004e" },
-  { name: "Machinery", id: "5567cd4773696439b10b004f" },
-  { name: "Management Consulting", id: "5567cd4773696439b10b0050" },
-  { name: "Maritime", id: "5567cd4773696439b10b0051" },
-  { name: "Market Research", id: "5567cd4773696439b10b0052" },
-  { name: "Marketing and Advertising", id: "5567cd4773696439b10b0053" },
-  { name: "Mechanical or Industrial Engineering", id: "5567cd4773696439b10b0054" },
-  { name: "Media Production", id: "5567cd4773696439b10b0055" },
-  { name: "Medical Devices", id: "5567cd4773696439b10b0056" },
-  { name: "Medical Practice", id: "5567cd4773696439b10b0057" },
-  { name: "Mental Health Care", id: "5567cd4773696439b10b0058" },
-  { name: "Military", id: "5567cd4773696439b10b0059" },
-  { name: "Mining & Metals", id: "5567cd4773696439b10b005a" },
-  { name: "Motion Pictures and Film", id: "5567cd4773696439b10b005b" },
-  { name: "Museums and Institutions", id: "5567cd4773696439b10b005c" },
-  { name: "Music", id: "5567cd4773696439b10b005d" },
-  { name: "Nanotechnology", id: "5567cd4773696439b10b005e" },
-  { name: "Newspapers", id: "5567cd4773696439b10b005f" },
-  { name: "Non-Profit Organization Management", id: "5567cd4773696439b10b0060" },
-  { name: "Oil & Energy", id: "5567cd4773696439b10b0061" },
-  { name: "Online Media", id: "5567cd4773696439b10b0062" },
-  { name: "Outsourcing/Offshoring", id: "5567cd4773696439b10b0063" },
-  { name: "Package/Freight Delivery", id: "5567cd4773696439b10b0064" },
-  { name: "Packaging and Containers", id: "5567cd4773696439b10b0065" },
-  { name: "Paper & Forest Products", id: "5567cd4773696439b10b0066" },
-  { name: "Performing Arts", id: "5567cd4773696439b10b0067" },
-  { name: "Pharmaceuticals", id: "5567cd4773696439b10b0068" },
-  { name: "Philanthropy", id: "5567cd4773696439b10b0069" },
-  { name: "Photography", id: "5567cd4773696439b10b006a" },
-  { name: "Plastics", id: "5567cd4773696439b10b006b" },
-  { name: "Political Organization", id: "5567cd4773696439b10b006c" },
-  { name: "Primary/Secondary Education", id: "5567cd4773696439b10b006d" },
-  { name: "Printing", id: "5567cd4773696439b10b006e" },
-  { name: "Professional Training & Coaching", id: "5567cd4773696439b10b006f" },
-  { name: "Program Development", id: "5567cd4773696439b10b0070" },
-  { name: "Public Policy", id: "5567cd4773696439b10b0071" },
-  { name: "Public Relations and Communications", id: "5567cd4773696439b10b0072" },
-  { name: "Public Safety", id: "5567cd4773696439b10b0073" },
-  { name: "Publishing", id: "5567cd4773696439b10b0074" },
-  { name: "Railroad Manufacture", id: "5567cd4773696439b10b0075" },
-  { name: "Ranching", id: "5567cd4773696439b10b0076" },
-  { name: "Real Estate", id: "5567cd4773696439b10b0077" },
-  { name: "Recreational Facilities and Services", id: "5567cd4773696439b10b0078" },
-  { name: "Religious Institutions", id: "5567cd4773696439b10b0079" },
-  { name: "Renewables & Environment", id: "5567cd4773696439b10b007a" },
-  { name: "Research", id: "5567cd4773696439b10b007b" },
-  { name: "Restaurants", id: "5567cd4773696439b10b007c" },
-  { name: "Retail", id: "5567cd4773696439b10b007d" },
-  { name: "Security and Investigations", id: "5567cd4773696439b10b007e" },
-  { name: "Semiconductors", id: "5567cd4773696439b10b007f" },
-  { name: "Shipbuilding", id: "5567cd4773696439b10b0080" },
-  { name: "Sporting Goods", id: "5567cd4773696439b10b0081" },
-  { name: "Sports", id: "5567cd4773696439b10b0082" },
-  { name: "Staffing and Recruiting", id: "5567cd4773696439b10b0083" },
-  { name: "Supermarkets", id: "5567cd4773696439b10b0084" },
-  { name: "Telecommunications", id: "5567cd4773696439b10b0085" },
-  { name: "Textiles", id: "5567cd4773696439b10b0086" },
-  { name: "Think Tanks", id: "5567cd4773696439b10b0087" },
-  { name: "Tobacco", id: "5567cd4773696439b10b0088" },
-  { name: "Translation and Localization", id: "5567cd4773696439b10b0089" },
-  { name: "Transportation/Trucking/Railroad", id: "5567cd4773696439b10b008a" },
-  { name: "Utilities", id: "5567cd4773696439b10b008b" },
-  { name: "Venture Capital & Private Equity", id: "5567cd4773696439b10b008c" },
-  { name: "Veterinary", id: "5567cd4773696439b10b008d" },
-  { name: "Warehousing", id: "5567cd4773696439b10b008e" },
-  { name: "Wholesale", id: "5567cd4773696439b10b008f" },
-  { name: "Wine and Spirits", id: "5567cd4773696439b10b0090" },
-  { name: "Wireless", id: "5567cd4773696439b10b0091" },
-  { name: "Writing and Editing", id: "5567cd4773696439b10b0092" }
-];
+// The supported targeting vocabulary. These lists used to live inline here, in
+// three separate arrays, while `src/constants` carried its own copies of two of
+// them. Duplicated enumerations drift, and the copy that drifts is the one that
+// lets an unsupported value reach a query — so they now have one home that this
+// function, the normalizer and the editors all read from.
 
+// The prompt shows Claude the industry vocabulary it may choose from. Derived
+// from the canonical list rather than written out again.
 const INDUSTRY_NAMES = APOLLO_INDUSTRIES.map(i => i.name).join(', ');
 
-const COMPANY_SIZE_OPTIONS = [
-  "1-10", "11-20", "21-50", "51-100", "101-200", "201-500",
-  "501-1,000", "1,001-2,000", "2,001-5,000", "5,001-10,000", "10,001+"
-];
-
-const US_STATES = [
-  "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado",
-  "Connecticut", "Delaware", "Florida", "Georgia", "Hawaii", "Idaho",
-  "Illinois", "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana",
-  "Maine", "Maryland", "Massachusetts", "Michigan", "Minnesota", "Mississippi",
-  "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire", "New Jersey",
-  "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio", "Oklahoma",
-  "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
-  "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington",
-  "West Virginia", "Wisconsin", "Wyoming"
-];
 
 // Industries where lookalike disambiguation is critical
 const BROAD_INDUSTRIES = [
@@ -684,13 +526,21 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     }
   }
 
-  // Backend enforcement: targetTitles is required — never allow confirming without them
-  const hasExtractedTitles = barryResponse.understood?.targetTitles && barryResponse.understood.targetTitles.length > 0;
-  if (!hasExtractedTitles && !barryResponse.needsClarification) {
-    barryResponse.needsClarification = true;
-    barryResponse.followUpQuestion = barryResponse.followUpQuestion || 'Who should I be finding at these companies? What titles or roles are you going after?';
-    barryResponse.followUpType = barryResponse.followUpType || 'titles';
-  }
+  // targetTitles are useful but do not gate the proposal.
+  //
+  // This block used to force a clarification turn whenever no titles had been
+  // extracted, on the reasoning that Barry should never confirm without them.
+  // But titles are a person filter: `mixed_companies/search` never receives
+  // them, so a definition missing titles is not a definition that cannot
+  // search. Blocking on one contradicts the locked quality floor — a single
+  // supported retrieval constraint is enough to start — and turns the last
+  // step into the questionnaire this phase exists to remove.
+  //
+  // Titles are still asked for, just not as a gate: they are surfaced as
+  // something Barry does not know yet, and they matter at the moment he goes
+  // looking for people at a company rather than at the moment he finds it.
+  barryResponse.missingTargetTitles =
+    !(barryResponse.understood?.targetTitles?.length > 0);
 
   // Determine next step based on whether we need lookalike
   let nextStep = 'clarifying';
@@ -852,16 +702,14 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
       : { minAge, maxAge };
   }
 
-  // Backend enforcement: targetTitles is required — never allow confirming without them
-  const hasFollowupTitles = barryResponse.understood?.targetTitles && barryResponse.understood.targetTitles.length > 0;
-  // Also check pending ICP in case titles were set in an earlier turn
-  const hasPendingTitles = pendingICP?.targetTitles && pendingICP.targetTitles.length > 0;
-  if (!hasFollowupTitles && !hasPendingTitles && barryResponse.readyToConfirm) {
-    barryResponse.readyToConfirm = false;
-    barryResponse.needsMoreInfo = true;
-    barryResponse.followUpQuestion = barryResponse.followUpQuestion || 'Who should I be finding at these companies? What titles or roles are you going after?';
-    barryResponse.followUpType = barryResponse.followUpType || 'titles';
-  }
+  // Same rule on this path: titles are reported, never used to withdraw a
+  // proposal Barry can otherwise defend. Titles are a person filter and the
+  // company search never receives them, so their absence is not a reason the
+  // search cannot run. See the initial-input path for the full reasoning.
+  const hasFollowupTitles = barryResponse.understood?.targetTitles?.length > 0;
+  // Titles may have been given in an earlier turn and carried in pendingICP.
+  const hasPendingTitles = pendingICP?.targetTitles?.length > 0;
+  barryResponse.missingTargetTitles = !hasFollowupTitles && !hasPendingTitles;
 
   // Determine next step
   let nextStep = 'clarifying';
@@ -985,15 +833,11 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
       : { minAge, maxAge };
   }
 
-  // Backend enforcement: targetTitles is required — never allow confirming without them
-  const hasExampleTitles = barryResponse.understood?.targetTitles && barryResponse.understood.targetTitles.length > 0;
-  const hasPendingExTitles = pendingICP?.targetTitles && pendingICP.targetTitles.length > 0;
-  if (!hasExampleTitles && !hasPendingExTitles && barryResponse.readyToConfirm) {
-    barryResponse.readyToConfirm = false;
-    barryResponse.needsMoreInfo = true;
-    barryResponse.followUpQuestion = barryResponse.followUpQuestion || 'Who should I be finding at these companies? What titles or roles are you going after?';
-    barryResponse.followUpType = barryResponse.followUpType || 'titles';
-  }
+  // Same rule on the follow-up path: titles are reported as missing, never
+  // used to withdraw a proposal Barry can otherwise defend. See above.
+  const hasExampleTitles = barryResponse.understood?.targetTitles?.length > 0;
+  const hasPendingExTitles = pendingICP?.targetTitles?.length > 0;
+  barryResponse.missingTargetTitles = !hasExampleTitles && !hasPendingExTitles;
 
   return {
     barryResponse,

@@ -13,8 +13,14 @@ import { getFitTier, getCompanyName, getMatchReasons } from '../../utils/company
 
 export default function MobileCompanyCard({ company, onSelect, T }) {
   const name = getCompanyName(company);
-  const score = Math.round(company.fit_score || 0);
-  const tier = getFitTier(score);
+  // null = no ICP resolved, so no Company × ICP judgment exists for this
+  // company. Rounding it to 0 would render "0 · Low Fit" for something that
+  // was never scored.
+  const unattributed = company.fit_score == null;
+  const score = unattributed ? null : Math.round(company.fit_score);
+  const tier = unattributed
+    ? { color: T.textMuted || '#888', label: 'No active ICP' }
+    : getFitTier(score);
   const reasons = getMatchReasons(company).slice(0, 2);
   const contact = company.recommendedContact;
 
@@ -33,7 +39,7 @@ export default function MobileCompanyCard({ company, onSelect, T }) {
 
       {/* Fit score + tier label on one line: "83 · Strong Fit" */}
       <div style={{ fontSize: 14, fontWeight: 700, color: tier.color, marginTop: 6 }}>
-        {score} · {tier.label}
+        {unattributed ? tier.label : `${score} · ${tier.label}`}
       </div>
 
       {/* Top 2 match reasons, each prefixed with a check */}

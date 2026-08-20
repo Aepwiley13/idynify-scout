@@ -12,6 +12,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { db } from './firebase-admin.js';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { computeReconState } from './utils/reconCapability.js';
+import { resolveActiveIcp, isResolved } from './utils/resolveActiveIcp.js';
 import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 
 async function verifyAuthToken(authToken, userId) {
@@ -138,6 +139,27 @@ export const handler = async (event) => {
     const dashboardData = dashboardDoc.exists ? dashboardDoc.data() : null;
     const { score: reconScore, missingNames } = computeReconState(dashboardData);
 
+    // User scope. `communicationStyle` was already on the dashboard document
+    // this function fetches; it simply was not read, so the brief was written in
+    // Barry's default voice regardless of the style the user chose.
+    const userStyle = dashboardData?.communicationStyle || null;
+
+    // ICP scope, "if ICP exists" (Appendix B, v0.4-amend). The brief talks about
+    // companies "matching ICP" and high-fit counts, so which ICP it is talking
+    // about is part of the decision. A zero-ICP Workspace is valid: the line is
+    // omitted rather than the surface being treated as incomplete.
+    const icpResolution = await resolveActiveIcp(db, userId);
+    const icpLine = isResolved(icpResolution)
+      ? `Active ICP: ${icpResolution.profile?.name || icpResolution.icpId}` +
+        (icpResolution.profile?.industries?.length
+          ? ` — targeting ${icpResolution.profile.industries.slice(0, 3).join(', ')}`
+          : '')
+      : icpResolution.reason === 'none-active'
+        ? 'Active ICP: none selected — the user has target profiles but has not chosen one'
+        : icpResolution.reason === 'read-failed'
+          ? 'Active ICP: could not be determined'
+          : 'Active ICP: none yet — this user has not defined a target profile';
+
     const missions = missionsSnap.docs.map(d => {
       const m = d.data();
       return {
@@ -199,6 +221,7 @@ CURRENT PLATFORM STATE:
 - Total companies matching ICP: ${dashboardContext.totalMatches ?? 'unknown'}
 - High confidence matches (75%+ fit): ${dashboardContext.highFit ?? 'unknown'}
 - Total replies received: ${dashboardContext.totalReplies ?? 'unknown'}
+- ${icpLine}
 - ${reconLine}
 - ${missionsLine}
 - ${leadsLine}
@@ -220,6 +243,10 @@ RULES:
 - Confident and direct. Field commander reading the board.
 - End with a clear nudge toward the highest-priority next move.
 - 2-3 sentences maximum. No bullet points.
+${userStyle ? `- Write in the user's chosen communication style: ${String(userStyle).replace(/_/g, ' ')}.` : ''}
+- When no active ICP exists, do not treat that as a fault or an error. Most of
+  Idynify works without one; mention it only if discovery is the strongest
+  available signal, and then as a next step rather than a problem.
 
 Return valid JSON only:
 {

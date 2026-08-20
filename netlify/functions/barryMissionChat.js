@@ -241,6 +241,58 @@ function detectModeShift(contextStack, intent, currentMode) {
   return currentMode || 'SUGGEST';
 }
 
+// ── First Experience intent classification ────────────────────────────────────
+//
+// B3a. Reuses this endpoint's mode surface rather than adding a service, and
+// deliberately not `barryICPConversation`: that prompt embeds 147 canonical
+// Apollo industry names and targeting instructions, so classifying through it
+// would run ICP extraction over every turn — including the ones that must never
+// touch targeting. This branch carries no ICP vocabulary at all.
+//
+// The nine categories are internal. The user answers one open question in free
+// text and never sees a taxonomy.
+
+function buildFirstExperienceClassifierPrompt(knownName = null) {
+  const who = knownName ? `The user's name is ${knownName}.` : 'The user has not given a name.';
+
+  return `You classify one sentence into exactly one of nine categories. You do not chat, advise, or sell.
+
+${who}
+
+CATEGORIES
+
+EXPLORATION — orienting. "what does this do", "just looking", "where do I start", "show me around", "not sure yet what I need".
+COMMUNICATION — something already in their inbox needs answering. "I have emails I haven't replied to", "someone wrote back", "help me clear my inbox".
+OUTREACH — write to a specific named person or company they already have in mind. "I need to email Dana at Acme", "draft a note to my contact at Northwind".
+PIPELINE — status of deals or people already in motion. "where do things stand", "what's happening with the Acme deal", "who's gone quiet".
+ENGAGEMENT — reconnect with someone they already know, after time has passed. "I should check in with old clients", "reach back out to people I've lost touch with".
+PREPARATION — get ready for a specific upcoming meeting or call. "I have a call with Acme Thursday", "meeting tomorrow, what should I know".
+REFERRAL — ask someone they know for an introduction to someone else. "who could introduce me to", "ask my contacts for intros".
+PROSPECTING — find NEW companies or people they do not yet know. "find me manufacturers in Texas", "I sell to hospitals", "I need more leads", "who should I be targeting".
+UNCLEAR — you genuinely cannot tell, the message is empty, or it is off-topic.
+
+RULES
+
+1. PROSPECTING means finding people they do NOT already know. If they name someone specific they already have a relationship with, it is OUTREACH, ENGAGEMENT, PREPARATION or PIPELINE — never PROSPECTING.
+2. Do not guess. If two readings are equally plausible and one is PROSPECTING, choose the other or UNCLEAR. Wrongly starting a targeting conversation is the worst outcome available to you.
+3. If the sentence carries two distinct goals, set intent to the primary and secondaryIntent to the second. Otherwise secondaryIntent is null.
+4. confidence is your own honest probability, 0 to 1. Use values below 0.6 freely — a low score makes the assistant read the intent back to the user instead of acting on it, which is the correct behaviour when you are unsure.
+5. restatement: one short sentence, plain language, saying back what they want. No category names, no product jargon, no invented detail. Written to be read aloud to the user.
+6. clarifyingQuestion: exactly one question, only when intent is UNCLEAR. Otherwise null. Ask what they want to get done, not which feature they want.
+7. subject: the person, company or meeting they named, verbatim, if any. Otherwise null. Never invent one.
+8. Never state or imply that anything is known about the user's contacts, inbox, calendar or market. You are reading one sentence and nothing else.
+
+Return valid JSON only, no prose, no code fences:
+{
+  "intent": "ONE_CATEGORY",
+  "secondaryIntent": null,
+  "confidence": 0.0,
+  "restatement": "One sentence.",
+  "clarifyingQuestion": null,
+  "subject": null
+}`;
+}
+
 // ── ICP reclarification prompt ────────────────────────────────────────────────
 
 function buildIcpReclarificationPrompt(icpProfile, swipeNotes = null, reconScore = 0) {
@@ -529,7 +581,11 @@ ${buildNavigationContextBlock(navigationContext)}
 ${icpBlock}
 Reference this when discussing prospecting or targeting. Use the formal filter fields when saved; use RECON intelligence as the targeting baseline when formal fields are absent but RECON is complete.
 
-━━━ SCOUT SWIPE INTELLIGENCE (user-rated company signals) ━━━
+━━━ SCOUT SWIPE INTELLIGENCE — USER JUDGMENT, NOT COMPUTED MATCH ━━━
+These 1-10 ratings are the USER's own judgment of companies they reviewed. They are
+a different intelligence type from Match, the 0-100 score IDYNIFY computes for a
+company against a specific ICP. Never compare the two scales, never average them
+together, and never describe a 1-10 user rating as a fit or match score.
 ${swipeFeedback
   ? `${swipeFeedback.avg != null ? `Based on ${swipeFeedback.total} rated companies — avg score: ${swipeFeedback.avg}/10.` : ''}
 Top-rated (8+): ${swipeFeedback.top.length > 0 ? swipeFeedback.top.join('; ') : 'none yet'}
@@ -800,6 +856,11 @@ export const handler = async (event) => {
     const barryMode = body.barryMode || body.mode || 'SUGGEST';
     const contextStack = body.contextStack || null;
     const isIcpMode = body.icpMode === true;
+    // B3a. A First Experience turn is classified, not conversed with. No
+    // existing caller sends this flag, so every established path below is
+    // unreachable from here and unchanged by it.
+    const isFirstExperience = body.firstExperience === true;
+    const knownName = typeof body.knownName === 'string' ? body.knownName.trim().slice(0, 60) || null : null;
     const icpProfile = body.icpProfile || null;
     const moduleContext = body.moduleContext && Object.keys(body.moduleContext).length > 0
       ? body.moduleContext
@@ -823,6 +884,83 @@ export const handler = async (event) => {
     await verifyAuthToken(authToken, userId);
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+
+    if (isFirstExperience) {
+      // ── First Experience Classification Path ───────────────────────────────
+      //
+      // Deliberately ahead of every load below. Classifying one sentence needs
+      // no dashboard, no RECON, no capability block and no context stack, and a
+      // first turn is the moment in the product where latency is least
+      // affordable. Reading a workspace to decide what the user meant would
+      // also be backwards: intent comes from the user, not from their data.
+      console.log('[barryMissionChat] First Experience intent classification...');
+
+      const turn = typeof message === 'string' ? message.trim() : '';
+      if (!turn) {
+        // Nothing to classify. Answered without a model call so an empty
+        // submission costs nothing and still routes to a question.
+        return {
+          statusCode: 200,
+          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+          body: JSON.stringify({ success: true, mode: 'FIRST_EXPERIENCE', classification: null })
+        };
+      }
+
+      const feController = new AbortController();
+      const feTimeout = setTimeout(() => feController.abort(), 8000);
+      let classification = null;
+
+      try {
+        const feResponse = await anthropic.messages.create(
+          {
+            model: LEGACY_HAIKU_4_5,
+            max_tokens: 300,
+            system: buildFirstExperienceClassifierPrompt(knownName),
+            messages: [{ role: 'user', content: turn.slice(0, 2000) }]
+          },
+          { signal: feController.signal }
+        );
+
+        aiUsage = feResponse.usage || null;
+        classification = extractJson(feResponse.content[0].text);
+        if (!classification?.intent) throw new Error('Invalid classification structure');
+      } catch (err) {
+        if (feController.signal.aborted) console.warn('[barryMissionChat] Classification timed out');
+        else console.warn('[barryMissionChat] Classification failed:', err.message);
+        // No fallback category is invented here. The client's contract turns a
+        // null classification into UNCLEAR, which asks the user a question — a
+        // failed classifier must never become a silent routing decision, and
+        // least of all a Prospecting one.
+        classification = null;
+      } finally {
+        clearTimeout(feTimeout);
+      }
+
+      await logApiUsage(userId, 'barryMissionChat', classification ? 'success' : 'error', {
+        provider: 'anthropic',
+        model: LEGACY_HAIKU_4_5,
+        usage: aiUsage,
+        traceId,
+        responseTime: Date.now() - startTime,
+        // The turn itself is not logged here. It is the user's own words about
+        // what they want, and it is already persisted in their conversation
+        // transcript; copying it into API telemetry serves nothing.
+        metadata: { type: 'first_experience_intent', classified: Boolean(classification) }
+      });
+
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify({
+          success: true,
+          mode: 'FIRST_EXPERIENCE',
+          // Nothing is written. Intent is transient routing context (P-5): it
+          // lives in the caller's component state for this session and nowhere
+          // else — no field, no collection, no history.
+          classification
+        })
+      };
+    }
 
     // ── Load RECON server-side (for additional context / security) ────────────
     let reconContext = '';

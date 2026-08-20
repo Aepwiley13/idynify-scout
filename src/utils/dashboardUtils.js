@@ -277,9 +277,47 @@ export async function getDashboardState(userId) {
       let activeProfileData = {};
 
       if (icpSnap.empty) {
-        // No profiles yet — create default from companyProfile/current
+        // No profiles yet. Two sub-cases, and they are NOT the same thing.
+        //
+        // (a) Nothing to promote — a brand-new account. This branch used to
+        //     write icpProfiles/default from {} and stamp it active, inventing
+        //     an ICP out of nothing on every new account before the user had
+        //     said anything about who they want to find. An ICP must originate
+        //     from an explicit creation or confirmation event, never because a
+        //     migration ran. We create nothing and still stamp the migration so
+        //     it does not re-run. Zero ICPs is a valid workspace state.
+        //
+        // (b) Something to promote — a legacy account whose real, user-authored
+        //     criteria live in the bridge with no icpProfiles document behind
+        //     them. Promoting recovers intelligence the user actually authored;
+        //     removing it would strip live users of the ICP backing their
+        //     working discovery. Preserved unchanged as LEGACY TRANSITION DEBT.
+        //     End state: replaced by the explicit confirmation event once that
+        //     experience exists. Do not extend this path to new accounts.
         const cpSnap = await getDoc(doc(db, 'users', userId, 'companyProfile', 'current'));
         const cpData = cpSnap.exists() ? cpSnap.data() : {};
+        const hasPromotableCriteria =
+          (cpData.industries?.length > 0) ||
+          (cpData.companySizes?.length > 0) ||
+          (cpData.locations?.length > 0) ||
+          (cpData.targetTitles?.length > 0) ||
+          (cpData.companyKeywords?.length > 0) ||
+          Boolean(cpData.lookalikeSeed);
+
+        if (!hasPromotableCriteria) {
+          // (a) — no fabrication. Stamp the flags and leave the workspace at zero ICPs.
+          batch.update(dashboardRef, {
+            ...(needsModuleUpdate ? { modules } : {}),
+            ...(!data.migratedV2 ? { migratedV2: true } : {}),
+            migratedMultiICP: true,
+            lastUpdatedAt: new Date().toISOString(),
+          });
+          await batch.commit();
+          console.log('✅ Multi-ICP migration complete (no ICP created — nothing to promote)');
+          return { ...data, modules, migratedV2: true, migratedMultiICP: true };
+        }
+
+        // (b) — legacy transition debt.
         activeProfileData = cpData;
         batch.set(doc(db, 'users', userId, 'icpProfiles', DEFAULT_ICP_ID), {
           ...cpData,
@@ -339,9 +377,12 @@ export async function getDashboardState(userId) {
         }
       }
 
-      // Step 4: overwrite bridge cache with active profile data
+      // Step 4: overwrite bridge cache with active profile data, carrying the
+      // identity of the ICP it projects.
       batch.set(doc(db, 'users', userId, 'companyProfile', 'current'), {
         ...activeProfileData,
+        icpId: activeProfileId,
+        icpIdSource: 'multi-icp-migration',
         updatedAt: serverTimestamp(),
       });
 

@@ -45,6 +45,43 @@ import { getActiveUserId } from '../context/ImpersonationContext';
 export const EVENTS = Object.freeze({
   OPEN_CONTACT: 'open_contact',
   OPEN_COMPANY: 'open_company',
+
+  // External retrieval. These exist so the cost boundary can be measured
+  // before anyone designs a service level around it: whether a lookup was
+  // tried, on what kind of identifier, and how it came out.
+  //
+  // Deliberately NOT recorded: the person's name, email, phone number,
+  // company, the Apollo payload, or anything the lookup returned. Telemetry
+  // that recreates user intelligence is a second copy of the data with none
+  // of the protections, and answering "did Barry deliver value" never
+  // requires knowing who it was delivered about.
+  ENRICHMENT_ATTEMPTED: 'enrichment_attempted',
+  ENRICHMENT_SUCCEEDED: 'enrichment_succeeded',
+  ENRICHMENT_FAILED: 'enrichment_failed',
+
+  // B11 — First Experience lifecycle. Categorical state only; no names,
+  // emails, free text, ICP criteria, or conversation content.
+  FIRST_EXPERIENCE_STARTED: 'first_experience_started',
+  WHO_RESOLVED: 'who_resolved',
+  WHO_ASKED: 'who_asked',
+  WHO_PROVIDED: 'who_provided',
+  INTENT_CLASSIFICATION_ATTEMPTED: 'intent_classification_attempted',
+  INTENT_CLASSIFIED: 'intent_classified',
+  INTENT_CLARIFICATION_REQUESTED: 'intent_clarification_requested',
+  FIRST_VALUE_BRANCH_SELECTED: 'first_value_branch_selected',
+  FIRST_VALUE_ATTEMPTED: 'first_value_attempted',
+  FIRST_VALUE_DELIVERED: 'first_value_delivered',
+  FIRST_VALUE_BLOCKED: 'first_value_blocked',
+  TARGETING_PROPOSAL_CREATED: 'targeting_proposal_created',
+  TARGETING_CONFIRMATION_REQUESTED: 'targeting_confirmation_requested',
+  TARGETING_CONFIRMED: 'targeting_confirmed',
+  TARGETING_CLARIFICATION_REQUESTED: 'targeting_clarification_requested',
+  FIRST_DISCOVERY_STARTED: 'first_discovery_started',
+  FIRST_DISCOVERY_COMPLETED: 'first_discovery_completed',
+  WEBSITE_ANALYSIS_ATTEMPTED: 'website_analysis_attempted',
+  WEBSITE_ANALYSIS_SUCCEEDED: 'website_analysis_succeeded',
+  WEBSITE_ANALYSIS_FAILED: 'website_analysis_failed',
+  WEBSITE_TARGETING_NORMALIZED: 'website_targeting_normalized',
 });
 
 /**

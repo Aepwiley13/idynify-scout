@@ -4,6 +4,7 @@ import { auth, db } from '../../firebase/config';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { APOLLO_INDUSTRIES } from '../../constants/apolloIndustries';
 import { US_STATES } from '../../constants/usStates';
+import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 
 export default function CompanyQuestionnaire() {
   const navigate = useNavigate();
@@ -171,7 +172,15 @@ export default function CompanyQuestionnaire() {
       console.log('👥 Company sizes selected:', formData.companySizes);
       console.log('📍 Locations selected:', formData.locations);
 
-      // Save company profile
+      // Save company profile.
+      //
+      // RECONCILIATION DEBT — deliberately unchanged in Tier 1. This writes the
+      // bridge as if it were durable ICP state, without reading or writing
+      // icpProfiles. It cannot be made to carry an icpId without deciding
+      // whether this questionnaire is an authorized ICP-creation event, and
+      // where un-attributed collected targeting intelligence lives. Both are
+      // deferred semantic decisions. What Tier 1 does fix is below: the search
+      // this triggers no longer claims an ICP identity it does not have.
       const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
       await setDoc(profileRef, {
         ...formData,
@@ -195,66 +204,30 @@ export default function CompanyQuestionnaire() {
     }
   };
 
+  /**
+   * This questionnaire cannot run an honestly attributed search, so it does not
+   * run one.
+   *
+   * It has no authorized way to create an ICP (see the write in handleSubmit),
+   * so the only identity available is whichever ICP is already active — while
+   * the criteria are the ones just typed into this form, which that ICP does not
+   * hold. Sending both would tag discovered companies as belonging to ICP A
+   * while having searched for something A never asked for, dropping foreign
+   * results into a real ICP's queue. Sending the active ICP's own criteria
+   * instead would ignore everything the user just entered.
+   *
+   * Targeting flows acquisition → authoritative ICP → search. This form is
+   * acquisition that never reaches an ICP, so the search waits on the deferred
+   * decision about what this questionnaire creates. The answers are still saved.
+   */
   const triggerApolloSearch = async (userId) => {
-    try {
-      console.log('🔍 Triggering Apollo company search...');
-      console.log('📤 Sending to backend:', JSON.stringify(formData, null, 2));
-
-      const authToken = await auth.currentUser.getIdToken();
-
-      const payload = {
-        userId,
-        authToken,
-        companyProfile: formData
-      };
-
-      console.log('📦 Full payload to backend:', JSON.stringify(payload, null, 2));
-
-      const response = await fetch('/.netlify/functions/search-companies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      let data;
-      try {
-        data = await response.json();
-      } catch (jsonError) {
-        console.error('❌ Failed to parse JSON response:', jsonError);
-        const text = await response.text();
-        console.error('❌ Raw response:', text);
-        throw new Error(`Backend returned invalid JSON (Status ${response.status}). Check Netlify function logs for details.`);
-      }
-
-      console.log('📥 Backend response:', data);
-
-      if (!response.ok) {
-        console.error('❌ Backend error response:', data);
-        console.error('❌ Response status:', response.status);
-        throw new Error(data.error || `Backend error: ${response.status} ${response.statusText}`);
-      }
-
-      console.log(`✅ Found ${data.companiesFound} companies!`);
-
-      // Show debug info if 0 companies found
-      if (data.companiesFound === 0 && data.debug) {
-        console.error('\n❌ ZERO COMPANIES FOUND - DEBUG INFO:');
-        console.error('   Search service returned:', data.debug.apolloReturnedCount, 'companies');
-        console.error('   Requested industries:', data.debug.requestedIndustries);
-        console.error('   Query sent:', data.debug.apolloQuery);
-        console.error('   Sample industries returned:');
-        data.debug.sampleIndustriesFromApollo.forEach(c => {
-          console.error(`      - ${c.name}: ${c.industry}`);
-        });
-        console.error('\n   ⚠️  Search service may not be filtering industries correctly!');
-      }
-
-    } catch (error) {
-      console.error('❌ Company search error:', error);
-      console.error('❌ Error details:', error.message);
-      // Don't block user flow on search error - user can still proceed to Scout
-      alert(`Warning: Company search encountered an error:\n\n${error.message}\n\nYou can still access Scout, but you may not have any companies yet.\n\nPlease check the browser console for details or contact support.`);
-    }
+    const resolution = await resolveActiveIcp(userId);
+    console.warn(
+      '[CompanyQuestionnaire] search not started — questionnaire criteria have no ICP to be attributed to' +
+      (isResolved(resolution)
+        ? ` (active ICP ${resolution.icpId} holds different criteria)`
+        : ` (${resolution.reason})`)
+    );
   };
 
   const filteredIndustries = APOLLO_INDUSTRIES.filter(ind =>

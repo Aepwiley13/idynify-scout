@@ -32,8 +32,12 @@ export async function setActiveIcpProfile(userId, targetIcpId, additionalData = 
     });
   });
 
+  // The bridge is a projection, not an authority. It carries the identity of
+  // the ICP it represents so no consumer has to guess which ICP it came from.
   batch.set(doc(db, 'users', userId, 'companyProfile', 'current'), {
     ...targetData,
+    icpId: targetIcpId,
+    icpIdSource: 'active-selection',
     isActive: true,
     status: 'active',
     updatedAt: new Date().toISOString(),

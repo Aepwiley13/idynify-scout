@@ -147,7 +147,7 @@ export default function SequencePanel({ contact, mission, missionId, onStepSent 
           stepIndex,
           stepHistory: state?.stepHistory || [],
           previousOutcome: state?.lastOutcome || null,
-          icpId: activeIcpId,
+          ...(activeIcpId ? { icpId: activeIcpId } : { icpAttribution: 'unresolved' }),
         })
       });
 

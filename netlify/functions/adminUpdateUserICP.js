@@ -14,6 +14,7 @@ import { db, admin } from './firebase-admin.js';
 import { checkAdminAccess } from './utils/adminAuth.js';
 import { extractAuthToken } from './utils/extractAuthToken.js';
 import { logAuditEvent, getIpAddress, getUserAgent, AUDIT_ACTIONS } from './utils/auditLog.js';
+import { resolveActiveIcp, isResolved } from './utils/resolveActiveIcp.js';
 
 // Allowed ICP fields — guards against arbitrary field injection
 const ALLOWED_ICP_FIELDS = [
@@ -152,24 +153,23 @@ export const handler = async (event) => {
     // Write to Firestore via Admin SDK (bypasses security rules)
     await icpRef.set(sanitized, { merge: true });
 
-    // If this is the first ICP profile, also sync to legacy companyProfile/current
-    const allProfilesSnap = await db
-      .collection('users')
-      .doc(targetUserId)
-      .collection('icpProfiles')
-      .get();
+    // Sync the bridge projection only when the edited ICP is the ACTIVE one.
+    // This previously keyed off the OLDEST profile, so editing an inactive ICP
+    // that happened to be created first overwrote the active ICP's projection
+    // with another ICP's criteria.
+    const icpResolution = await resolveActiveIcp(db, targetUserId);
 
-    const allProfiles = allProfilesSnap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-
-    if (allProfiles.length > 0 && allProfiles[0].id === icpId) {
+    if (isResolved(icpResolution) && icpResolution.icpId === icpId) {
       await db
         .collection('users')
         .doc(targetUserId)
         .collection('companyProfile')
         .doc('current')
-        .set(sanitized, { merge: true });
+        .set({ ...sanitized, icpId, icpIdSource: 'admin-update' }, { merge: true });
+    } else if (!isResolved(icpResolution)) {
+      console.log(
+        `[adminUpdateUserICP] bridge not synced — ICP unresolved (${icpResolution.reason})`
+      );
     }
 
     console.log(`✅ Admin ${adminEmail} updated ICP ${icpId} for user ${targetUserEmail}`);

@@ -10,6 +10,8 @@ import {
 } from 'firebase/firestore';
 import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
 import { calculateICPScore, DEFAULT_WEIGHTS, generateMatchReasons } from '../../utils/icpScoring';
+import { ARRIVAL_REVIEW_ICP } from '../../utils/firstExperienceMode';
+import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
 import { getFitTier } from '../../utils/companyDisplay';
 import useOnboardingState from '../../hooks/useOnboardingState';
 import AnimatedCounter from '../../components/AnimatedCounter';
@@ -66,16 +68,21 @@ function FitBadge({ score }) {
   // Threshold/color logic lives in the shared getFitTier util so the desktop
   // table and the mobile card can never diverge. Output is byte-identical to
   // the previous inline logic (green ≥75, amber ≥50, grey below).
-  const { color } = getFitTier(score);
+  // null = no ICP resolved, so there is no Company × ICP judgment to show. It
+  // is not a low score, and getFitTier would round it to a grey "Low Fit".
+  const unattributed = score === null || score === undefined;
+  const { color } = unattributed ? { color: '#888' } : getFitTier(score);
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-      padding: '4px 12px', borderRadius: 20, minWidth: 42,
-      background: `${color}18`, border: `1px solid ${color}40`,
-      fontSize: 13, fontWeight: 700, color,
-      fontVariantNumeric: 'tabular-nums',
-    }}>
-      {Math.round(score)}
+    <span
+      title={unattributed ? 'No active ICP — Match not scored' : undefined}
+      style={{
+        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        padding: '4px 12px', borderRadius: 20, minWidth: 42,
+        background: `${color}18`, border: `1px solid ${color}40`,
+        fontSize: unattributed ? 11 : 13, fontWeight: 700, color,
+        fontVariantNumeric: 'tabular-nums',
+      }}>
+      {unattributed ? '—' : Math.round(score)}
     </span>
   );
 }
@@ -91,7 +98,8 @@ function CompanyDetailPanel({ company, onClose, onApprove, T }) {
   const size = company.employee_count || company.employeeCount || '';
   const location = company.location || company.city || '';
   const website = company.website || company.url || '';
-  const score = company.fit_score || 0;
+  // null = no ICP resolved, so no current Match. Never rendered as a zero.
+  const score = company.fit_score ?? null;
   const reasons = company.fit_reasons || company.matchReasons || company.match_reasons || [];
   const matchReason = company.matchReason || company.match_reason || '';
   const contact = company.recommendedContact || company.recommended_contact || null;
@@ -326,6 +334,9 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
   const isSearching = barryState === 'SEARCHING' || barryState === null;
   const isReady = barryState === 'READY';
   const isError = barryState === 'ERROR';
+  // The user confirmed a target profile, but it carries nothing that narrows an
+  // Apollo query — so no search was started. That is not a failed search.
+  const needsTargeting = barryState === 'NEEDS_TARGETING';
 
   useEffect(() => {
     if (!isSearching) return;
@@ -357,13 +368,25 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
         barryState: 'SEARCHING',
         companiesFoundCount: 0,
       }, { merge: true });
+      // An ICP-targeted retry needs an explicit ICP identity. Without one it
+      // does not run — it never falls back to a manufactured 'default'.
+      const resolution = await resolveActiveIcp(user.uid);
+      if (!isResolved(resolution)) {
+        console.warn(`[MissionControlV2] retry skipped — ICP unresolved (${resolution.reason})`);
+        setCtaDisabled(false);
+        setCtaError(explainUnresolved(resolution));
+        return;
+      }
       const authToken = await user.getIdToken();
-      const profileDoc = await getDoc(doc(db, 'users', user.uid, 'companyProfile', 'current'));
-      const companyProfile = profileDoc.exists() ? profileDoc.data() : {};
       fetch('/.netlify/functions/search-companies', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, authToken, companyProfile }),
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          companyProfile: resolution.profile,
+          icpId: resolution.icpId,
+        }),
       }).catch(() => {});
     } catch { /* best effort */ }
   };
@@ -377,6 +400,7 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
     {
       label: isSearching ? 'Finding and ranking companies...'
         : isReady ? 'Prospect list ready'
+        : needsTargeting ? 'Add an industry, location or company size to start finding companies'
         : 'Search failed',
       done: isReady,
       active: isSearching,
@@ -425,6 +449,7 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
           {isSearching && 'Barry is connecting the dots'}
           {isReady && 'Barry found your first matches'}
           {isError && 'Barry ran into a problem'}
+          {needsTargeting && 'Barry has your ICP — it needs one more detail to search'}
         </h1>
 
         {/* Progress List */}
@@ -564,7 +589,50 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
                 Try Again
               </button>
               <button
-                onClick={() => navigate('/onboarding/barry')}
+                onClick={() => navigate('/onboarding', { state: { arrival: ARRIVAL_REVIEW_ICP } })}
+                style={{
+                  padding: '10px 20px', borderRadius: 10,
+                  background: T.surface, border: `1px solid ${T.border}`,
+                  color: T.text, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                }}
+              >
+                Review ICP with Barry
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* NEEDS_TARGETING — an ICP exists and nothing failed. Scout simply has no
+            constraint it can send to Apollo yet, so no search was started. This
+            is deliberately not the ERROR panel: no red, no "try again", and the
+            next step is the existing targeting path, not a retry. */}
+        {needsTargeting && (
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            gap: 14, padding: '28px 0',
+          }}>
+            <Target size={32} color={T.accent} />
+            <p style={{ fontSize: 14, color: T.text, textAlign: 'center', margin: 0, maxWidth: 420, lineHeight: 1.5 }}>
+              Your ICP is saved. Scout needs at least one thing it can search on —
+              an industry, a location, or a company size — before it can go and find companies.
+            </p>
+            <p style={{ fontSize: 12.5, color: T.textMuted, textAlign: 'center', margin: 0, maxWidth: 420 }}>
+              Job titles help Barry pick the right people once companies are found, but they
+              can&apos;t narrow the search itself.
+            </p>
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => navigate('/scout', { state: { activeTab: 'icp-settings' } })}
+                style={{
+                  padding: '10px 20px', borderRadius: 10,
+                  background: T.accent, color: '#fff', border: 'none',
+                  fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                Add Targeting Detail
+              </button>
+              <button
+                onClick={() => navigate('/onboarding', { state: { arrival: ARRIVAL_REVIEW_ICP } })}
                 style={{
                   padding: '10px 20px', borderRadius: 10,
                   background: T.surface, border: `1px solid ${T.border}`,
@@ -623,10 +691,10 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
 function FirstRunCompanyCard({ company, T }) {
   const name = company.name || company.company_name || 'Unknown';
   const industry = company.industry || '';
-  const score = Math.round(company.fit_score || 0);
+  const score = company.fit_score == null ? null : Math.round(company.fit_score);
   const reasons = company.fit_reasons || company.matchReasons || company.match_reasons || [];
-  const topReason = reasons[0] || 'Matches your ICP profile';
-  const color = score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : '#888';
+  const topReason = reasons[0] || (score === null ? 'No active ICP to match against' : 'Matches your ICP profile');
+  const color = score === null ? '#888' : score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : '#888';
 
   return (
     <div style={{
@@ -652,9 +720,9 @@ function FirstRunCompanyCard({ company, T }) {
         display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
         padding: '4px 10px', borderRadius: 16, minWidth: 36,
         background: `${color}18`, border: `1px solid ${color}40`,
-        fontSize: 12, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums',
+        fontSize: score === null ? 10 : 12, fontWeight: 700, color, fontVariantNumeric: 'tabular-nums',
       }}>
-        {score}
+        {score === null ? '—' : score}
       </span>
     </div>
   );
@@ -742,20 +810,20 @@ export default function MissionControlDashboardV2() {
       const userId = activeUserId || auth.currentUser?.uid;
       if (!userId) return;
 
-      // Load ICP profiles from icpProfiles subcollection (matches DailyLeads pattern)
-      const icpProfilesSnap = await getDocs(collection(db, 'users', userId, 'icpProfiles'));
-      let icps = icpProfilesSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-      icps.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-
-      // Fallback to legacy companyProfile/current
-      const profileDoc = await getDoc(doc(db, 'users', userId, 'companyProfile', 'current'));
-      let activeProfile = profileDoc.exists() ? profileDoc.data() : null;
+      // Resolve the active ICP through the canonical contract. Zero ICPs is a
+      // valid state: the company list still renders, it is simply not scored
+      // against a targeting definition that does not exist.
+      const resolution = await resolveActiveIcp(userId);
+      let activeProfile = null;
       let activeICPId = null;
 
-      if (icps.length > 0) {
-        const firstICP = icps.find(i => i.isActive && i.status === 'active') || icps[0];
-        activeICPId = firstICP.id;
-        activeProfile = firstICP;
+      if (isResolved(resolution)) {
+        activeICPId = resolution.icpId;
+        activeProfile = resolution.profile;
+      } else if (resolution.reason === 'none-active' && resolution.candidates.length > 0) {
+        // Continuity only — shown so the surface keeps working, never treated
+        // as the active ICP, never persisted, never searched against.
+        activeProfile = resolution.candidates[0];
       }
 
       // Load companies (accepted + pending)
@@ -770,16 +838,19 @@ export default function MissionControlDashboardV2() {
 
       // Score and sort. Reasons come from the SAME shared scorer that produces
       // the score, so the "why it's a match" text is specific per company.
+      // With an ICP in hand, Match is derived against it. Without one there is
+      // no Company × ICP judgment to make: the stored fit_score carries no
+      // reliable ICP attribution, so falling back to it would present some other
+      // ICP's Match as this one's. null is the explicit unattributed state.
       const scored = filtered.map(c => ({
         ...c,
         fit_score: activeProfile
           ? calculateICPScore(c, activeProfile, activeProfile.scoringWeights || DEFAULT_WEIGHTS)
-          : (c.fit_score || c.icpScore || 0),
-        fit_reasons: activeProfile
-          ? generateMatchReasons(c, activeProfile)
-          : (c.fit_reasons || c.matchReasons || c.match_reasons || []),
+          : null,
+        fit_reasons: activeProfile ? generateMatchReasons(c, activeProfile) : [],
+        match_attributed: Boolean(activeProfile),
       }));
-      scored.sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0));
+      scored.sort((a, b) => (b.fit_score ?? -1) - (a.fit_score ?? -1));
 
       // Try loading recommended contacts from contacts subcollection
       for (const company of scored.slice(0, 20)) {
@@ -815,9 +886,12 @@ export default function MissionControlDashboardV2() {
 
   const filtered = companies.filter(c => {
     if (industryFilter && c.industry !== industryFilter) return false;
-    if (scoreFilter === '90+' && (c.fit_score || 0) < 90) return false;
-    if (scoreFilter === '70-89' && ((c.fit_score || 0) < 70 || (c.fit_score || 0) >= 90)) return false;
-    if (scoreFilter === '<70' && (c.fit_score || 0) >= 70) return false;
+    // A company with no attributed Match belongs in no Match band — it is not a
+    // zero, and putting it in "<70" would be a judgment we cannot support.
+    if (scoreFilter !== 'all' && c.fit_score == null) return false;
+    if (scoreFilter === '90+' && c.fit_score < 90) return false;
+    if (scoreFilter === '70-89' && (c.fit_score < 70 || c.fit_score >= 90)) return false;
+    if (scoreFilter === '<70' && c.fit_score >= 70) return false;
     return true;
   });
 
@@ -826,7 +900,7 @@ export default function MissionControlDashboardV2() {
 
   // ── KPIs ───────────────────────────────────────────────────────────────────
   const totalMatches = companies.length;
-  const highFit = companies.filter(c => (c.fit_score || 0) >= 75).length;
+  const highFit = companies.filter(c => c.fit_score != null && c.fit_score >= 75).length;
   const repliedThisWeek = cadenceReplies;
 
   // Report KPI readiness up to the shell so the globally-mounted Barry panel can
@@ -1044,7 +1118,7 @@ export default function MissionControlDashboardV2() {
 
                     {/* Fit Score */}
                     <div style={{ textAlign: 'center' }}>
-                      <FitBadge score={Math.round(company.fit_score || 0)} />
+                      <FitBadge score={company.fit_score == null ? null : Math.round(company.fit_score)} />
                     </div>
 
                     {/* Recommended Contact */}

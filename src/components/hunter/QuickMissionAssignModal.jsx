@@ -158,7 +158,7 @@ export default function QuickMissionAssignModal({ contact, onClose, onNavigateCr
               stepIndex: i,
               stepHistory: [],
               previousOutcome: null,
-              icpId: activeIcpId,
+              ...(activeIcpId ? { icpId: activeIcpId } : { icpAttribution: 'unresolved' }),
             }),
           });
           const data = await res.json();

@@ -18,7 +18,8 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../firebase/config';
 import { calculateReconConfidence } from './reconConfidence';
-import { RECON_SECTION_MAP, DEFAULT_ICP_ID } from './reconSectionMap';
+import { RECON_SECTION_MAP } from './reconSectionMap';
+import { resolveActiveIcp, isResolved } from './resolveActiveIcp';
 
 async function getAllContacts(userId) {
   try {
@@ -56,25 +57,34 @@ async function getAllContacts(userId) {
 }
 
 /**
- * Returns the active ICP profile from icpProfiles where isActive:true + status:'active'.
- * Falls back to companyProfile/current if no active profile exists (pre-migration users).
+ * Returns the active ICP profile via the canonical resolution contract.
+ *
+ * When no ICP identity resolves, the bridge cache is still read so Barry keeps
+ * the user's targeting criteria as compatibility context — but it is returned
+ * with `id: null` and an explicit `icpAttribution` marker. It previously came
+ * back labelled `id: DEFAULT_ICP_ID`, which attached a fabricated ICP identity
+ * to a document that has none.
+ *
+ * A null id here is not an error. Barry does not require ICP context for
+ * relationship-oriented work; only ICP-dependent decisions need an identity.
  */
 async function getActiveMessagingProfile(userId) {
+  const resolution = await resolveActiveIcp(userId);
+  if (isResolved(resolution)) {
+    return { id: resolution.icpId, ...resolution.profile };
+  }
+
   try {
-    const snap = await getDocs(query(
-      collection(db, 'users', userId, 'icpProfiles'),
-      where('isActive', '==', true),
-      where('status', '==', 'active'),
-      limit(1)
-    ));
-    if (!snap.empty) {
-      return { id: snap.docs[0].id, ...snap.docs[0].data() };
-    }
-    // Pre-migration fallback: read bridge cache directly
     const cpDoc = await getDoc(doc(db, 'users', userId, 'companyProfile', 'current'));
-    return cpDoc.exists() ? { id: DEFAULT_ICP_ID, ...cpDoc.data() } : null;
+    if (!cpDoc.exists()) return null;
+    return {
+      id: null,
+      icpAttribution: 'unverified-projection',
+      icpUnresolvedReason: resolution.reason,
+      ...cpDoc.data(),
+    };
   } catch (err) {
-    console.warn('[barryContextStack] Failed to load active ICP profile:', err.message);
+    console.warn('[barryContextStack] Failed to load bridge projection:', err.message);
     return null;
   }
 }

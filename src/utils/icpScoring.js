@@ -445,6 +445,52 @@ export function passesAllFilters(company, icpProfile) {
 }
 
 /**
+ * Coverage — the evidentiary completeness of a Match judgment.
+ *
+ * Coverage answers a different question from Match. Match says how well this
+ * company fits this ICP; Coverage says how much was actually known when that
+ * judgment was made. A Match of 85 with four dimensions observed and a Match of
+ * 85 with one observed and three defaulted to UNKNOWN are not the same claim.
+ *
+ * It is deliberately NOT a percentage and NOT part of the score. Returning the
+ * dimension names preserves *what* was and was not known, which a single number
+ * would destroy. Nothing here is persisted, and nothing here modifies Match.
+ *
+ * Derived entirely from the existing evaluateDimensions output — no additional
+ * data collection, no new evaluation pass.
+ *
+ * @param {Object} company
+ * @param {Object} icpProfile
+ * @returns {{relevant: string[], observed: string[], unknown: string[], complete: boolean}}
+ *   relevant — dimensions this ICP actually configures, so they bear on the Match
+ *   observed — of those, the ones the company had data for
+ *   unknown  — of those, the ones that defaulted to UNKNOWN rather than being evaluated
+ *   complete — true when nothing relevant was unknown
+ */
+export function computeCoverage(company, icpProfile) {
+  if (!company || !icpProfile) {
+    return { relevant: [], observed: [], unknown: [], complete: false };
+  }
+
+  const dims = evaluateDimensions(company, icpProfile);
+  const relevant = [];
+  const observed = [];
+  const unknown = [];
+
+  for (const key of ['industry', 'location', 'employeeSize', 'revenue']) {
+    const dim = dims[key];
+    // An unconfigured dimension is not "missing evidence" — it is not part of
+    // this Match at all, so it belongs in none of the three lists.
+    if (!dim.active) continue;
+    relevant.push(key);
+    if (dim.unknown) unknown.push(key);
+    else observed.push(key);
+  }
+
+  return { relevant, observed, unknown, complete: relevant.length > 0 && unknown.length === 0 };
+}
+
+/**
  * Validate that weights total 100%
  */
 export function validateWeights(weights) {

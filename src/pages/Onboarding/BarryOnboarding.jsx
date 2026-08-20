@@ -4,7 +4,12 @@ import { auth, db } from '../../firebase/config';
 import { doc, getDoc, setDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { Brain, ArrowRight, ArrowLeft, Check, RefreshCw } from 'lucide-react';
 import BarryTyping from '../../components/onboarding/BarryTyping';
-import ICPConfirmationCard from '../../components/onboarding/ICPConfirmationCard';
+import TargetingProposal from '../../components/onboarding/TargetingProposal';
+import { buildProposal, hasRetrievalConstraint, retrievalConstraints } from '../../utils/targetingProposal';
+import { readWebsite, acceleratorQuestion } from '../../utils/websiteAccelerator';
+import { logEvent, EVENTS } from '../../services/analytics';
+import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
+import { setActiveIcpProfile } from '../../utils/setActiveIcpProfile';
 import './BarryOnboarding.css';
 
 const DEFAULT_WEIGHTS = {
@@ -65,7 +70,7 @@ function buildReturnGreeting(icpData) {
   return `${strategyLine}${sizeContext}${locationContext}.${strategyExplanation}${contextSummary}${refreshNote}${actionPrompt}`;
 }
 
-export default function BarryOnboarding() {
+export default function BarryOnboarding({ knownName = null, goal = null } = {}) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState('welcome'); // welcome, asking, clarifying, confirming, saving
@@ -78,6 +83,14 @@ export default function BarryOnboarding() {
   const [followUpCount, setFollowUpCount] = useState(0);
   const [error, setError] = useState(null);
   const [savedICP, setSavedICP] = useState(null); // populated when step === 'saving'
+  // The website accelerator. Optional in the strongest sense: nothing below is
+  // gated on it, and a user who ignores the field reaches exactly the same
+  // places by talking. `reading` holds what Barry got from the site for this
+  // session only — the analysis itself is persisted by the function, in RECON,
+  // where it already went before this phase.
+  const [siteUrl, setSiteUrl] = useState('');
+  const [reading, setReading] = useState(null);
+  const [readingSite, setReadingSite] = useState(false);
   const inputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
@@ -124,7 +137,7 @@ export default function BarryOnboarding() {
           setBarryMessage("I'm Barry. Your profile is started, but I don't have a target yet — tell me that once and Scout and Hunter will know who matters to you.\n\nWho are you hunting?");
         }
       } else {
-        setBarryMessage("I'm Barry. I use the context you give IDYNIFY so Scout and Hunter know who matters to you — you only tell me once.\n\nWho are you hunting?");
+        setBarryMessage(`${knownName ? `Good to meet you, ${knownName}. ` : ''}I'm Barry. I use the context you give IDYNIFY so Scout and Hunter know who matters to you — you only tell me once.\n\nWho are you hunting?`);
       }
 
       // Check for existing in-progress conversation
@@ -254,10 +267,22 @@ export default function BarryOnboarding() {
       // Save conversation state
       await saveConversationState(user.uid, updatedHistory, barryResponse.understood, newStep);
 
-      // Update step
-      if (newStep === 'confirming' || barryResponse.readyToConfirm) {
+      // Update step.
+      //
+      // Barry proposes the moment he has one defensible retrieval constraint,
+      // rather than waiting for the extraction to declare itself finished. The
+      // quality floor is locked at one constraint; continuing to ask after
+      // that is the questionnaire this phase is removing. The user can always
+      // say "let me adjust", which is a cheaper correction than another turn
+      // of questions they did not ask for.
+      const merged = { ...extractedICP, ...barryResponse.understood };
+      if (newStep === 'confirming' || barryResponse.readyToConfirm || hasRetrievalConstraint(merged)) {
+        const constraints = retrievalConstraints(merged);
+        logEvent(EVENTS.TARGETING_PROPOSAL_CREATED, { constraint_count: constraints.length, constraint_types: constraints, website_contributed: Boolean(reading?.ok) });
+        logEvent(EVENTS.TARGETING_CONFIRMATION_REQUESTED);
         setStep('confirming');
       } else {
+        logEvent(EVENTS.TARGETING_CLARIFICATION_REQUESTED, { follow_up_count: followUpCount + 1 });
         setStep('clarifying');
       }
 
@@ -273,6 +298,87 @@ export default function BarryOnboarding() {
       setBarryMessage(barryErrorMsg);
     } finally {
       setIsProcessing(false);
+    }
+  }
+
+  /**
+   * Barry reads the site and says what he found.
+   *
+   * What comes back is free text, so the two fields that describe who the user
+   * sells to go through T-1. Whatever it can support becomes proposed
+   * targeting; whatever it cannot is simply absent, and Barry asks one short
+   * question about the business rather than showing the user a field that
+   * failed to map. Nothing here is authoritative — this is a proposal, and the
+   * confirmation event is still the only thing that makes targeting real.
+   */
+  async function analyzeSite(e) {
+    e?.preventDefault?.();
+    const url = siteUrl.trim();
+    if (!url || readingSite) return;
+
+    setReadingSite(true);
+    setError(null);
+    logEvent(EVENTS.WEBSITE_ANALYSIS_ATTEMPTED);
+
+    let result;
+    try {
+      const user = auth.currentUser;
+      const authToken = await user.getIdToken();
+      const response = await fetch('/.netlify/functions/analyze-website', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, userId: user.uid, authToken }),
+      });
+      result = readWebsite(response.ok ? await response.json() : null);
+    } catch (err) {
+      console.warn('[BarryOnboarding] website read failed:', err.message);
+      result = readWebsite(null);
+    }
+
+    setReading(result);
+    setReadingSite(false);
+
+    if (!result.ok) {
+      logEvent(EVENTS.WEBSITE_ANALYSIS_FAILED, { reason: result.message ? 'unreadable' : 'request_failed' });
+      setBarryMessage(
+        `${result.message || "I couldn't get much from that site."}\n\nNo problem — tell me who you're trying to reach and I'll work from that.`
+      );
+      setStep('asking');
+      return;
+    }
+
+    logEvent(EVENTS.WEBSITE_ANALYSIS_SUCCEEDED, { fields_read: result.proposed ? Object.keys(result.proposed).filter(k => result.proposed[k] != null && result.proposed[k] !== '').length : 0 });
+
+    // What Barry learned becomes proposed targeting, exactly as if the user had
+    // said it out loud. It is merged, not substituted: anything already
+    // established in conversation wins.
+    const prior = extractedICP || {};
+    const next = {
+      ...prior,
+      industries: prior.industries?.length ? prior.industries : result.proposed.industries,
+      companySizes: prior.companySizes?.length ? prior.companySizes : result.proposed.companySizes,
+      locations: prior.locations?.length ? prior.locations : result.proposed.locations,
+      isNationwide: Boolean(prior.isNationwide || result.proposed.isNationwide),
+    };
+    setExtractedICP(next);
+
+    const normalizedCount = retrievalConstraints(next).length;
+    if (normalizedCount > 0) {
+      logEvent(EVENTS.WEBSITE_TARGETING_NORMALIZED, { constraint_count: normalizedCount, constraint_types: retrievalConstraints(next) });
+    }
+
+    const opener = [
+      `I looked at ${result.companyName || 'your website'}.`,
+      result.recognition,
+    ].filter(Boolean).join(' ');
+
+    if (hasRetrievalConstraint(next)) {
+      setBarryMessage(`${opener}\n\nIs that still accurate?`);
+      setStep('confirming');
+    } else {
+      const question = acceleratorQuestion(result) || "Who are you trying to reach?";
+      setBarryMessage(`${opener}\n\n${question}`);
+      setStep('asking');
     }
   }
 
@@ -302,6 +408,8 @@ export default function BarryOnboarding() {
 
     setStep('saving');
     setIsProcessing(true);
+    const constraints = retrievalConstraints(extractedICP);
+    logEvent(EVENTS.TARGETING_CONFIRMED, { constraint_count: constraints.length, constraint_types: constraints });
 
     try {
       const user = auth.currentUser;
@@ -331,10 +439,57 @@ export default function BarryOnboarding() {
       // Show confirmation screen before redirect
       setSavedICP(icpProfile);
 
-      // Save to companyProfile/current
+      // ── The authorized ICP creation/confirmation event ────────────────────
+      //
+      // Onboarding does not create an ICP because onboarding ran. It creates
+      // one because the user has just explicitly confirmed the targeting
+      // definition Barry proposed — this function IS that confirmation. Only
+      // the targeting fields above become ICP criteria; nothing else collected
+      // during onboarding is reinterpreted as ICP intelligence.
+      //
+      // The authoritative icpProfiles document is written first. The bridge is
+      // written afterward as a projection carrying that identity.
+      const resolution = await resolveActiveIcp(user.uid);
+
+      if (resolution.status === 'unresolved' && resolution.reason === 'read-failed') {
+        // A transient read failure must not cause a duplicate ICP. It is not
+        // evidence that the user has none.
+        throw new Error('Could not confirm your existing target profile. Please try again.');
+      }
+
+      let icpId;
+      if (isResolved(resolution)) {
+        // An ICP already exists and is active — write through to it rather
+        // than creating a second one.
+        icpId = resolution.icpId;
+        await setDoc(
+          doc(db, 'users', user.uid, 'icpProfiles', icpId),
+          { ...resolution.profile, ...icpProfile, isActive: true, status: 'active' },
+          { merge: true }
+        );
+      } else {
+        // 'no-profiles', or ICPs exist but none is active. Either way the user
+        // has explicitly confirmed this definition, so it becomes a new ICP and
+        // that confirmation activates it. No existing candidate is silently
+        // promoted on their behalf.
+        icpId = `icp_${Date.now()}`;
+        await setDoc(doc(db, 'users', user.uid, 'icpProfiles', icpId), {
+          ...icpProfile,
+          name: 'My ICP',
+          isActive: true,
+          status: 'active',
+          messaging: null,
+          messagingProgress: 0,
+          source: 'barry_onboarding_confirmed',
+          createdAt: new Date().toISOString(),
+        });
+        await setActiveIcpProfile(user.uid, icpId);
+      }
+
+      // Projection of the ICP just confirmed, carrying its identity.
       await setDoc(
         doc(db, 'users', user.uid, 'companyProfile', 'current'),
-        icpProfile
+        { ...icpProfile, icpId, icpIdSource: 'barry_onboarding_confirmed' }
       );
 
       // Update conversation as completed
@@ -348,6 +503,16 @@ export default function BarryOnboarding() {
         { merge: true }
       );
 
+      // A search may only be called ICP-targeted when at least one retrieval
+      // constraint derived from the ICP actually narrows the result set. The
+      // rule itself now lives in targetingProposal.js, so the floor Barry
+      // proposes against and the floor the search is gated on cannot drift
+      // apart — and the field list behind it is unchanged: targetTitles do not
+      // constrain a company search, revenue is never sent to Apollo, and
+      // lookalikeSeed is received and logged by the query builder but never
+      // becomes a query parameter.
+      const canSearch = hasRetrievalConstraint(icpProfile);
+
       // Mark onboarding complete on the user doc and set Barry's initial
       // execution state so Mission Control can read where Barry is. The
       // search-companies function flips barryState to READY (or ERROR) once
@@ -358,24 +523,44 @@ export default function BarryOnboarding() {
           onboardingComplete: true,
           onboardingCompletedAt: serverTimestamp(),
           onboardingSource: 'barry_onboarding',
-          barryState: 'SEARCHING',
+          barryState: canSearch ? 'SEARCHING' : 'NEEDS_TARGETING',
           companiesFoundCount: 0,
           hasSeenMCWelcome: false
         },
         { merge: true }
       );
 
-      // Trigger immediate lead search in the background
-      const authToken = await user.getIdToken();
-      fetch('/.netlify/functions/search-companies', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          authToken,
-          companyProfile: icpProfile
-        })
-      }).catch(err => console.error('Background search failed:', err));
+      // Trigger immediate lead search in the background, carrying the identity
+      // of the ICP the user just confirmed.
+      if (canSearch) {
+        logEvent(EVENTS.FIRST_DISCOVERY_STARTED, { constraint_count: retrievalConstraints(icpProfile).length });
+        const authToken = await user.getIdToken();
+        fetch('/.netlify/functions/search-companies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.uid,
+            authToken,
+            companyProfile: icpProfile,
+            icpId
+          })
+        }).then(res => {
+          if (!res.ok) throw new Error(`search failed (${res.status})`);
+          return res.json();
+        }).then(data => {
+          const added = data.companiesAdded || 0;
+          const band = added === 0 ? 'zero' : added <= 3 ? 'low' : 'meaningful';
+          logEvent(EVENTS.FIRST_DISCOVERY_COMPLETED, { outcome: 'success', result_band: band });
+          if (added > 0) {
+            logEvent(EVENTS.FIRST_VALUE_DELIVERED, { intent: 'PROSPECTING', branch: 'in-place', result_band: band });
+          }
+        }).catch(err => {
+          console.error('Background search failed:', err);
+          logEvent(EVENTS.FIRST_DISCOVERY_COMPLETED, { outcome: 'error', result_band: 'zero' });
+        });
+      } else {
+        console.warn('[BarryOnboarding] confirmed ICP carries no retrieval constraint — search not started');
+      }
 
       // Build Barry's "work in progress" message
       const strategyContext = extractedICP.lookalikeSeed?.name
@@ -515,10 +700,26 @@ export default function BarryOnboarding() {
         {/* Confirmation Card */}
         {step === 'confirming' && extractedICP && !isProcessing && (
           <div className="confirmation-section">
-            <ICPConfirmationCard
-              icp={extractedICP}
+            <TargetingProposal
+              proposal={buildProposal({
+                icp: extractedICP,
+                goal,
+                name: knownName,
+                website: reading?.ok
+                  ? {
+                      summary: reading.summary ? `Your site frames it as: ${reading.summary}` : null,
+                      uncertain: [
+                        ...(reading.lowConfidence ? ['There wasn\u2019t much on the site to go on, so this is a rough read.'] : []),
+                        ...reading.dropped
+                          .filter(d => d.field === 'industry')
+                          .map(d => `I couldn\u2019t place \u201c${d.input}\u201d against anything I can search on, so I\u2019ve left it out.`),
+                      ],
+                    }
+                  : null,
+              })}
               onConfirm={handleConfirm}
               onRefine={handleRefine}
+              onAnswer={handleRefine}
             />
           </div>
         )}
@@ -590,6 +791,30 @@ export default function BarryOnboarding() {
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Optional accelerator — offered once, before the conversation starts.
+          Skipping it is not a lesser path: everything it produces is reachable
+          by typing a sentence instead. */}
+      {step === 'asking' && conversationHistory.length === 0 && !reading && !isProcessing && (
+        <form onSubmit={analyzeSite} className="barry-accelerator">
+          <span className="barry-accelerator-label">
+            Or give me your website and I&rsquo;ll do the reading.
+          </span>
+          <div className="barry-accelerator-row">
+            <input
+              value={siteUrl}
+              onChange={(e) => setSiteUrl(e.target.value)}
+              placeholder="yourcompany.com"
+              aria-label="Your website"
+              className="barry-accelerator-input"
+              disabled={readingSite}
+            />
+            <button type="submit" className="barry-accelerator-btn" disabled={!siteUrl.trim() || readingSite}>
+              {readingSite ? 'Reading\u2026' : 'Have a look'}
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* Input Area */}
       {(step === 'asking' || step === 'clarifying') && !isProcessing && (

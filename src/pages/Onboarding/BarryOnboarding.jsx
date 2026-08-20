@@ -6,6 +6,7 @@ import { Brain, ArrowRight, ArrowLeft, Check, RefreshCw } from 'lucide-react';
 import BarryTyping from '../../components/onboarding/BarryTyping';
 import TargetingProposal from '../../components/onboarding/TargetingProposal';
 import { buildProposal, hasRetrievalConstraint } from '../../utils/targetingProposal';
+import { readWebsite, acceleratorQuestion } from '../../utils/websiteAccelerator';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { setActiveIcpProfile } from '../../utils/setActiveIcpProfile';
 import './BarryOnboarding.css';
@@ -81,6 +82,14 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
   const [followUpCount, setFollowUpCount] = useState(0);
   const [error, setError] = useState(null);
   const [savedICP, setSavedICP] = useState(null); // populated when step === 'saving'
+  // The website accelerator. Optional in the strongest sense: nothing below is
+  // gated on it, and a user who ignores the field reaches exactly the same
+  // places by talking. `reading` holds what Barry got from the site for this
+  // session only — the analysis itself is persisted by the function, in RECON,
+  // where it already went before this phase.
+  const [siteUrl, setSiteUrl] = useState('');
+  const [reading, setReading] = useState(null);
+  const [readingSite, setReadingSite] = useState(false);
   const inputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
@@ -284,6 +293,82 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
       setBarryMessage(barryErrorMsg);
     } finally {
       setIsProcessing(false);
+    }
+  }
+
+  /**
+   * Barry reads the site and says what he found.
+   *
+   * What comes back is free text, so the two fields that describe who the user
+   * sells to go through T-1. Whatever it can support becomes proposed
+   * targeting; whatever it cannot is simply absent, and Barry asks one short
+   * question about the business rather than showing the user a field that
+   * failed to map. Nothing here is authoritative — this is a proposal, and the
+   * confirmation event is still the only thing that makes targeting real.
+   */
+  async function analyzeSite(e) {
+    e?.preventDefault?.();
+    const url = siteUrl.trim();
+    if (!url || readingSite) return;
+
+    setReadingSite(true);
+    setError(null);
+
+    let result;
+    try {
+      const user = auth.currentUser;
+      const authToken = await user.getIdToken();
+      const response = await fetch('/.netlify/functions/analyze-website', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, userId: user.uid, authToken }),
+      });
+      result = readWebsite(response.ok ? await response.json() : null);
+    } catch (err) {
+      console.warn('[BarryOnboarding] website read failed:', err.message);
+      result = readWebsite(null);
+    }
+
+    setReading(result);
+    setReadingSite(false);
+
+    if (!result.ok) {
+      // A blocked or JavaScript-rendered site is a normal outcome, not an
+      // error the user has to fix. Barry says so and carries on in words.
+      setBarryMessage(
+        `${result.message || "I couldn't get much from that site."}\n\nNo problem — tell me who you're trying to reach and I'll work from that.`
+      );
+      setStep('asking');
+      return;
+    }
+
+    // What Barry learned becomes proposed targeting, exactly as if the user had
+    // said it out loud. It is merged, not substituted: anything already
+    // established in conversation wins.
+    const prior = extractedICP || {};
+    const next = {
+      ...prior,
+      industries: prior.industries?.length ? prior.industries : result.proposed.industries,
+      companySizes: prior.companySizes?.length ? prior.companySizes : result.proposed.companySizes,
+      locations: prior.locations?.length ? prior.locations : result.proposed.locations,
+      isNationwide: Boolean(prior.isNationwide || result.proposed.isNationwide),
+    };
+    setExtractedICP(next);
+
+    const opener = [
+      `I looked at ${result.companyName || 'your website'}.`,
+      result.recognition,
+    ].filter(Boolean).join(' ');
+
+    if (hasRetrievalConstraint(next)) {
+      setBarryMessage(`${opener}\n\nIs that still accurate?`);
+      setStep('confirming');
+    } else {
+      // The site said something, but nothing it said can narrow a search. One
+      // question about the business — never a list of the fields that failed.
+      const question = acceleratorQuestion(result) || "Who are you trying to reach?";
+      setBarryMessage(`${opener}\n\n${question}`);
+      setStep('asking');
     }
   }
 
@@ -590,7 +675,22 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
         {step === 'confirming' && extractedICP && !isProcessing && (
           <div className="confirmation-section">
             <TargetingProposal
-              proposal={buildProposal({ icp: extractedICP, goal, name: knownName })}
+              proposal={buildProposal({
+                icp: extractedICP,
+                goal,
+                name: knownName,
+                website: reading?.ok
+                  ? {
+                      summary: reading.summary ? `Your site frames it as: ${reading.summary}` : null,
+                      uncertain: [
+                        ...(reading.lowConfidence ? ['There wasn\u2019t much on the site to go on, so this is a rough read.'] : []),
+                        ...reading.dropped
+                          .filter(d => d.field === 'industry')
+                          .map(d => `I couldn\u2019t place \u201c${d.input}\u201d against anything I can search on, so I\u2019ve left it out.`),
+                      ],
+                    }
+                  : null,
+              })}
               onConfirm={handleConfirm}
               onRefine={handleRefine}
               onAnswer={handleRefine}
@@ -665,6 +765,30 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Optional accelerator — offered once, before the conversation starts.
+          Skipping it is not a lesser path: everything it produces is reachable
+          by typing a sentence instead. */}
+      {step === 'asking' && conversationHistory.length === 0 && !reading && !isProcessing && (
+        <form onSubmit={analyzeSite} className="barry-accelerator">
+          <span className="barry-accelerator-label">
+            Or give me your website and I&rsquo;ll do the reading.
+          </span>
+          <div className="barry-accelerator-row">
+            <input
+              value={siteUrl}
+              onChange={(e) => setSiteUrl(e.target.value)}
+              placeholder="yourcompany.com"
+              aria-label="Your website"
+              className="barry-accelerator-input"
+              disabled={readingSite}
+            />
+            <button type="submit" className="barry-accelerator-btn" disabled={!siteUrl.trim() || readingSite}>
+              {readingSite ? 'Reading\u2026' : 'Have a look'}
+            </button>
+          </div>
+        </form>
+      )}
 
       {/* Input Area */}
       {(step === 'asking' || step === 'clarifying') && !isProcessing && (

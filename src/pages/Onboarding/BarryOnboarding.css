@@ -462,3 +462,52 @@
     padding-left: 0;
   }
 }
+
+/* Optional website accelerator. Presented as an aside, not a step: it sits
+   under the conversation rather than in front of it, because a user who
+   ignores it must not feel they skipped something. */
+.barry-accelerator {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 4px auto 0;
+  padding: 0 16px 12px;
+  max-width: 720px;
+  width: 100%;
+}
+
+.barry-accelerator-label {
+  font-size: 13px;
+  color: var(--text-muted, #6b6b78);
+}
+
+.barry-accelerator-row {
+  display: flex;
+  gap: 8px;
+}
+
+.barry-accelerator-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #e2e2e8);
+  border-radius: 9px;
+  background: var(--surface, #fff);
+  color: var(--text, #16161c);
+  font-size: 14px;
+}
+
+.barry-accelerator-btn {
+  padding: 10px 16px;
+  border: 1px solid var(--border, #e2e2e8);
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text, #16161c);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.barry-accelerator-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

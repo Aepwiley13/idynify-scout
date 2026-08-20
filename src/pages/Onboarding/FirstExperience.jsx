@@ -48,8 +48,10 @@ import {
   ROUTE_NAVIGATE,
   ROUTE_CONFIRM,
   ROUTE_CLARIFY,
+  ROUTE_RELATIONSHIP,
 } from '../../utils/firstValueRouting';
 import BarryOnboarding from './BarryOnboarding';
+import RelationshipFirstValue from '../../components/onboarding/RelationshipFirstValue';
 
 /**
  * Barry asks for a name at most once per session, and only when none is known.
@@ -308,6 +310,14 @@ export default function FirstExperience() {
     // rather than with a field list. Transient by construction: it is derived
     // from this session's classification and is never written anywhere.
     return <BarryOnboarding knownName={who?.name || null} goal={pending?.restatement || null} />;
+  }
+
+  // Engagement and Preparation are served here, about one named person, from
+  // what IDYNIFY already holds. Deliberately a different kind from in-place:
+  // in-place means the targeting conversation, and relationship work must
+  // never widen the set of things that can reach an ICP.
+  if (decision?.kind === ROUTE_RELATIONSHIP) {
+    return <RelationshipFirstValue decision={decision} knownName={who?.name || null} />;
   }
 
   // Barry read the intent back and is waiting to be told it is right.

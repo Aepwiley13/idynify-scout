@@ -45,6 +45,19 @@ import { getActiveUserId } from '../context/ImpersonationContext';
 export const EVENTS = Object.freeze({
   OPEN_CONTACT: 'open_contact',
   OPEN_COMPANY: 'open_company',
+
+  // External retrieval. These exist so the cost boundary can be measured
+  // before anyone designs a service level around it: whether a lookup was
+  // tried, on what kind of identifier, and how it came out.
+  //
+  // Deliberately NOT recorded: the person's name, email, phone number,
+  // company, the Apollo payload, or anything the lookup returned. Telemetry
+  // that recreates user intelligence is a second copy of the data with none
+  // of the protections, and answering "did Barry deliver value" never
+  // requires knowing who it was delivered about.
+  ENRICHMENT_ATTEMPTED: 'enrichment_attempted',
+  ENRICHMENT_SUCCEEDED: 'enrichment_succeeded',
+  ENRICHMENT_FAILED: 'enrichment_failed',
 });
 
 /**

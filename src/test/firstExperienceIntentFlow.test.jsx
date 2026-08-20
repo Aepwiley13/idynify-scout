@@ -33,6 +33,8 @@ vi.mock('firebase/firestore', () => ({
   collection: (_db, ...path) => ({ __path: path.join('/') }),
   query: (c) => c,
   limit: () => ({}),
+  where: () => ({}),
+  orderBy: () => ({}),
   setDoc: async () => {},
   serverTimestamp: () => 'ts',
 }));
@@ -43,6 +45,24 @@ vi.mock('../context/ImpersonationContext', () => ({
   useActiveUserId: () => 'u1',
   useImpersonation: () => ({ isReadOnly: false }),
   ImpersonationProvider: ({ children }) => children,
+}));
+
+// B8's relationship branch reads the user's own contacts through the local
+// people search. What that branch produces is asserted in its own test; here
+// it only has to exist so the routing can be driven end to end.
+let peopleInWorkspace = [];
+vi.mock('../services/peopleService', () => ({
+  searchPeople: async (_uid, term) => (term && term.trim().length >= 2 ? peopleInWorkspace : []),
+  loadPeopleForLens: async () => ({ people: peopleInWorkspace, hasMore: false, total: peopleInWorkspace.length }),
+}));
+
+vi.mock('../services/analytics', () => ({
+  logEvent: vi.fn(),
+  EVENTS: {
+    ENRICHMENT_ATTEMPTED: 'enrichment_attempted',
+    ENRICHMENT_SUCCEEDED: 'enrichment_succeeded',
+    ENRICHMENT_FAILED: 'enrichment_failed',
+  },
 }));
 
 vi.mock('../theme/ThemeContext', () => ({
@@ -80,6 +100,7 @@ function mockClassifier() {
 beforeEach(() => {
   contactsEmpty = true;
   gmailStatus = null;
+  peopleInWorkspace = [];
   classification = null;
   sessionStorage.clear();
   mockClassifier();
@@ -232,28 +253,61 @@ describe('each intent reaches something real', () => {
     expect(await screen.findByTestId('hunter')).toBeTruthy();
   });
 
-  it('engagement is understood and answered honestly, not simulated', async () => {
+  it('engagement answers about a named person from records already owned', async () => {
     contactsEmpty = false;
+    peopleInWorkspace = [{
+      id: 'c1', name: 'Dana Whitfield', company: 'Acme Roofing', email: 'd@acme.com',
+      engagement_summary: { last_contact_at: new Date(Date.now() - 120 * 864e5).toISOString() },
+    }];
+    classification = { intent: 'ENGAGEMENT', confidence: 0.9, subject: 'Dana at Acme Roofing' };
+    const user = userEvent.setup();
+    mount();
+
+    await converse(user, 'I should reconnect with Dana at Acme Roofing');
+
+    expect(await screen.findByText(/where things stand with Dana Whitfield/)).toBeTruthy();
+    expect(screen.queryByTestId('targeting-conversation')).toBeNull();
+  });
+
+  it('engagement with nobody named surfaces who has gone quiet', async () => {
+    contactsEmpty = false;
+    peopleInWorkspace = [{
+      id: 'c1', name: 'Dana Whitfield', company: 'Acme Roofing',
+      engagement_summary: { last_contact_at: new Date(Date.now() - 200 * 864e5).toISOString() },
+    }];
     classification = { intent: 'ENGAGEMENT', confidence: 0.9, subject: 'old clients' };
     const user = userEvent.setup();
     mount();
 
     await converse(user, 'I should reconnect with old clients');
 
-    expect(await screen.findByText(/not from here yet/)).toBeTruthy();
-    expect(screen.queryByTestId('targeting-conversation')).toBeNull();
+    expect(await screen.findByText(/longest with/i)).toBeTruthy();
   });
 
-  it('preparation is understood and answered honestly, not simulated', async () => {
+  it('preparation is bounded to what the platform holds', async () => {
     contactsEmpty = false;
-    classification = { intent: 'PREPARATION', confidence: 0.9, subject: 'the Acme call' };
+    peopleInWorkspace = [{ id: 'c2', name: 'Sam Okafor', company: 'Acme' }];
+    classification = { intent: 'PREPARATION', confidence: 0.9, subject: 'Sam at Acme' };
     const user = userEvent.setup();
     mount();
 
-    await converse(user, 'I have a call with Acme on Thursday');
+    await converse(user, 'I have a call with Sam at Acme on Thursday');
 
-    expect(await screen.findByText(/the Acme call/)).toBeTruthy();
-    expect(await screen.findByText(/not from here yet/)).toBeTruthy();
+    const panel = await screen.findByText(/what I have on Sam Okafor/);
+    expect(panel).toBeTruthy();
+    expect(screen.queryByText(/news|competitor|brief/i)).toBeNull();
+  });
+
+  it('a named person who is not in the workspace is said so plainly', async () => {
+    contactsEmpty = false;
+    peopleInWorkspace = [];
+    classification = { intent: 'ENGAGEMENT', confidence: 0.9, subject: 'Riley Chen' };
+    const user = userEvent.setup();
+    mount();
+
+    await converse(user, 'reconnect with Riley Chen');
+
+    expect(await screen.findByText(/don.t have Riley Chen in your workspace/)).toBeTruthy();
   });
 
   it('referral drafts the ask without claiming to see who knows whom', async () => {

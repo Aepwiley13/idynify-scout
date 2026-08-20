@@ -43,6 +43,14 @@ export const ROUTE_CLARIFY = 'clarify';
 export const ROUTE_BLOCKED = 'blocked';
 /** Understood, and the branch that serves it has not been built yet. */
 export const ROUTE_DEFERRED = 'deferred';
+/**
+ * Served here, about one named person, from what IDYNIFY already knows.
+ *
+ * A separate kind from ROUTE_IN_PLACE on purpose: in-place means the targeting
+ * conversation, and the assertion that only Prospecting can reach the ICP path
+ * is written against that kind. Relationship work must never widen it.
+ */
+export const ROUTE_RELATIONSHIP = 'relationship';
 
 /**
  * Destinations, all of which exist today.
@@ -187,28 +195,36 @@ export function routeIntent(classification, readiness = {}) {
     // whole point: the alternative is inventing an outcome, and Barry
     // inventing things is the failure this phase exists to prevent.
 
+    // ── Served here, from what IDYNIFY already knows ────────────────────────
+    //
+    // Both are about one person, and both are answered from the record before
+    // anything external is considered. What Barry can honestly produce — where
+    // things stand, what was tried, what to say next — needs no outside call,
+    // and the parts he cannot know (what is new at their company, who they are
+    // connected to) are absent rather than invented.
+
     case INTENT_ENGAGEMENT:
-      return decision(ROUTE_DEFERRED, intent, {
-        reason: 'branch-not-wired',
+      if (!hasContacts) {
+        return needsSomeone(intent, `Reconnecting means reconnecting with somebody.`);
+      }
+      return decision(ROUTE_RELATIONSHIP, intent, {
+        mode: 'engagement',
+        subject,
         headline: subject
-          ? `Reconnecting with ${subject} — I can help with that, but not from here yet.`
-          : `Reconnecting with people you've lost touch with — I can help with that, but not from here yet.`,
-        detail: hasContacts
-          ? `Open anyone in Hunter and I'll give you what I have on them and a way back in.`
-          : `Once there are people in your workspace I'll be able to tell you who's gone cold.`,
-        options: hasContacts ? [OFFER_LOOK_AROUND] : [OFFER_FIND_PEOPLE, OFFER_LOOK_AROUND],
+          ? `Let's pick things back up with ${subject}.`
+          : `Let's find who's gone quiet.`,
       });
 
     case INTENT_PREPARATION:
-      return decision(ROUTE_DEFERRED, intent, {
-        reason: 'branch-not-wired',
+      if (!hasContacts) {
+        return needsSomeone(intent, `I can only prepare you for someone I know about.`);
+      }
+      return decision(ROUTE_RELATIONSHIP, intent, {
+        mode: 'preparation',
+        subject,
         headline: subject
-          ? `Getting you ready for ${subject} — I can pull that together, but not from here yet.`
-          : `Getting you ready for a meeting — I can pull that together, but not from here yet.`,
-        detail: hasContacts
-          ? `Open the person in Hunter and I'll show you everything I have on them and their company.`
-          : `I'd need the person in your workspace first.`,
-        options: hasContacts ? [OFFER_LOOK_AROUND] : [OFFER_FIND_PEOPLE, OFFER_LOOK_AROUND],
+          ? `Let me pull together what I have for ${subject}.`
+          : `Who are you meeting?`,
       });
 
     default:
@@ -229,6 +245,8 @@ export const FULLY_ROUTED = [
   INTENT_PIPELINE,
   INTENT_REFERRAL,
   INTENT_PROSPECTING,
+  INTENT_ENGAGEMENT,
+  INTENT_PREPARATION,
 ];
 
 /**

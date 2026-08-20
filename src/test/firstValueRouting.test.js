@@ -32,7 +32,7 @@ import {
   ROUTE_CONFIRM,
   ROUTE_CLARIFY,
   ROUTE_BLOCKED,
-  ROUTE_DEFERRED,
+  ROUTE_RELATIONSHIP,
 } from '../utils/firstValueRouting.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -148,13 +148,27 @@ describe('2 — a missing precondition is stated, not routed around', () => {
   });
 });
 
-describe('3 — unbuilt branches say so rather than inventing an outcome', () => {
-  it.each([INTENT_ENGAGEMENT, INTENT_PREPARATION])('%s is recognized and deferred', (intent) => {
-    const d = routeIntent(sure(intent), WORKING);
-    expect(d.kind).toBe(ROUTE_DEFERRED);
-    expect(d.reason).toBe('branch-not-wired');
-    // Deferred means no handoff is offered as if it were the outcome.
+describe('3 — relationship intents are served here, about one named person', () => {
+  // B8 replaced the deferral these tests originally asserted. The honesty
+  // rules they existed to protect did not go anywhere — they moved down, and
+  // the snapshot itself is asserted in relationshipFirstValue.test.
+  it.each([INTENT_ENGAGEMENT, INTENT_PREPARATION])('%s is served in place', (intent) => {
+    const d = routeIntent(sure(intent, { subject: 'Dana at Acme' }), WORKING);
+    expect(d.kind).toBe(ROUTE_RELATIONSHIP);
+    expect(d.subject).toBe('Dana at Acme');
+    // Not a handoff: the answer is produced here, from records already owned.
     expect(d.destination).toBeNull();
+  });
+
+  it('carries which of the two it is, since they read differently', () => {
+    expect(routeIntent(sure(INTENT_ENGAGEMENT), WORKING).mode).toBe('engagement');
+    expect(routeIntent(sure(INTENT_PREPARATION), WORKING).mode).toBe('preparation');
+  });
+
+  it.each([INTENT_ENGAGEMENT, INTENT_PREPARATION])('%s with nobody in the workspace blocks', (intent) => {
+    const d = routeIntent(sure(intent), EMPTY);
+    expect(d.kind).toBe(ROUTE_BLOCKED);
+    expect(d.reason).toBe('no-contacts');
   });
 
   it('Engagement never claims to know what is new at a company', () => {
@@ -162,20 +176,20 @@ describe('3 — unbuilt branches say so rather than inventing an outcome', () =>
     // of the claim is the only thing standing between honesty and a plausible
     // sentence a future edit could add.
     const d = routeIntent(sure(INTENT_ENGAGEMENT, { subject: 'Acme' }), WORKING);
-    const copy = `${d.headline} ${d.detail}`;
+    const copy = `${d.headline} ${d.detail || ''}`;
     expect(copy).not.toMatch(/news|announced|in the press|recently raised|headline/i);
   });
 
-  it('Preparation never claims a meeting briefing was produced', () => {
+  it('Preparation never claims a briefing was produced', () => {
     const d = routeIntent(sure(INTENT_PREPARATION, { subject: 'the Acme call' }), WORKING);
-    const copy = `${d.headline} ${d.detail}`;
-    expect(copy).not.toMatch(/here's your brief|I've prepared|I've put together/i);
+    const copy = `${d.headline} ${d.detail || ''}`;
+    expect(copy).not.toMatch(/here's your brief|I've prepared|briefing/i);
   });
 
-  it('names the subject back without pretending to have acted on it', () => {
+  it('names the subject back without claiming to have acted on it yet', () => {
     const d = routeIntent(sure(INTENT_PREPARATION, { subject: 'the Acme call' }), WORKING);
     expect(d.headline).toContain('the Acme call');
-    expect(d.headline).toMatch(/not from here yet/);
+    expect(d.headline).toMatch(/what I have/i);
   });
 });
 
@@ -226,6 +240,14 @@ describe('5 — only prospecting reaches the ICP conversation', () => {
           expect(reachesIcpConversation(d)).toBe(false);
         }
       }
+    }
+  });
+
+  it('the relationship branch is a different kind, so it can never widen it', () => {
+    for (const intent of [INTENT_ENGAGEMENT, INTENT_PREPARATION]) {
+      const d = routeIntent(sure(intent, { subject: 'Dana' }), WORKING);
+      expect(d.kind).toBe(ROUTE_RELATIONSHIP);
+      expect(reachesIcpConversation(d)).toBe(false);
     }
   });
 

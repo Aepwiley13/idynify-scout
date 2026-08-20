@@ -88,9 +88,14 @@ describe('Which ICP fields become real Apollo constraints', () => {
 describe('D7 — the first-search gate matches the real constraint set', () => {
   const onboarding = read('../pages/Onboarding/BarryOnboarding.jsx');
 
+  // B5 moved the rule out of the component and into targetingProposal.js, so
+  // the proposal Barry makes and the gate the search runs behind are the same
+  // rule rather than two copies of it. These read it where it now lives.
+  const gateModule = read('../utils/targetingProposal.js');
+
   it('the gate counts only fields that produce a constraint', () => {
-    const at = onboarding.indexOf('const hasRetrievalConstraint =');
-    const gate = onboarding.slice(at, onboarding.indexOf(';', at));
+    const at = gateModule.indexOf('export function retrievalConstraints');
+    const gate = gateModule.slice(at, gateModule.indexOf('\n}', at));
 
     for (const field of ['industries', 'companyKeywords', 'companySizes', 'locations', 'isNationwide', 'foundedAgeRange']) {
       expect(gate, `gate omits ${field}`).toMatch(new RegExp(field));
@@ -98,10 +103,15 @@ describe('D7 — the first-search gate matches the real constraint set', () => {
   });
 
   it('the gate no longer counts lookalikeSeed', () => {
-    const at = onboarding.indexOf('const hasRetrievalConstraint =');
-    const gate = onboarding.slice(at, onboarding.indexOf(';', at));
+    const at = gateModule.indexOf('export function retrievalConstraints');
+    const gate = gateModule.slice(at, gateModule.indexOf('\n}', at));
 
     expect(gate).not.toMatch(/lookalikeSeed/);
+  });
+
+  it('and the component is wired to it rather than carrying its own', () => {
+    expect(onboarding).toMatch(/const canSearch = hasRetrievalConstraint\(icpProfile\)/);
+    expect(onboarding).not.toMatch(/const hasRetrievalConstraint =/);
   });
 });
 

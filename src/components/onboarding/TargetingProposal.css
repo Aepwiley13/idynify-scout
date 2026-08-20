@@ -1,0 +1,115 @@
+/* Barry's proposal reads as something he said, not as a record he filled in. */
+
+.targeting-proposal {
+  max-width: 620px;
+  margin: 8px 0 0;
+  padding: 22px 24px;
+  border: 1px solid var(--border, #e2e2e8);
+  border-radius: 14px;
+  background: var(--surface, #fff);
+  line-height: 1.55;
+}
+
+.tp-greeting {
+  margin: 0 0 14px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text, #16161c);
+}
+
+.tp-line {
+  margin: 0 0 10px;
+  font-size: 15px;
+  color: var(--text, #16161c);
+}
+
+.tp-line--target {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.tp-lead {
+  color: var(--text-muted, #6b6b78);
+  font-weight: 500;
+}
+
+.tp-block {
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--surface-alt, #f6f6f9);
+}
+
+.tp-block--unsure {
+  background: transparent;
+  border: 1px dashed var(--border, #e2e2e8);
+}
+
+.tp-block-label {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted, #6b6b78);
+}
+
+.tp-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+  color: var(--text, #16161c);
+}
+
+.tp-list li + li { margin-top: 6px; }
+
+.tp-plan {
+  margin: 18px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text, #16161c);
+}
+
+.tp-broad {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: var(--text-muted, #6b6b78);
+}
+
+.tp-question {
+  margin: 0;
+  font-size: 16px;
+  color: var(--text, #16161c);
+}
+
+.tp-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+
+.tp-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 11px 18px;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.tp-btn--go {
+  background: var(--accent, #6d4aff);
+  color: #fff;
+}
+
+.tp-btn--quiet {
+  background: transparent;
+  border-color: var(--border, #e2e2e8);
+  color: var(--text, #16161c);
+}
+
+.targeting-proposal--asking .tp-btn--quiet { margin-top: 14px; }

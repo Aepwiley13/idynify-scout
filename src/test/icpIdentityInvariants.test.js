@@ -115,7 +115,7 @@ describe('2 — onboarding creates an ICP only on explicit confirmation', () => 
 
   it('does not search when the confirmed ICP carries no retrieval constraint', () => {
     expect(src).toMatch(/hasRetrievalConstraint/);
-    expect(src).toMatch(/if \(hasRetrievalConstraint\) \{[\s\S]{0,400}search-companies/);
+    expect(src).toMatch(/if \(canSearch\) \{[\s\S]{0,400}search-companies/);
   });
 });
 

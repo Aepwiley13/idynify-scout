@@ -303,7 +303,11 @@ export default function FirstExperience() {
   // ICP flow work is intact behind it — extraction, the clarify loop, the
   // confirmation card, and the confirmation event that creates the ICP.
   if (decision?.kind === ROUTE_IN_PLACE) {
-    return <BarryOnboarding knownName={who?.name || null} />;
+    // The goal is Barry's own restatement of the intent turn, passed down so
+    // the proposal can open with what he thinks the user is trying to do
+    // rather than with a field list. Transient by construction: it is derived
+    // from this session's classification and is never written anywhere.
+    return <BarryOnboarding knownName={who?.name || null} goal={pending?.restatement || null} />;
   }
 
   // Barry read the intent back and is waiting to be told it is right.

@@ -113,7 +113,7 @@ describe('V-2 — the rendered body', () => {
 describe('V-2 — nothing else changed', () => {
   it('the producer still writes the state on the one condition', () => {
     const onboarding = readFileSync(resolve(here, '../pages/Onboarding/BarryOnboarding.jsx'), 'utf8');
-    expect(onboarding).toMatch(/barryState: hasRetrievalConstraint \? 'SEARCHING' : 'NEEDS_TARGETING'/);
+    expect(onboarding).toMatch(/barryState: canSearch \? 'SEARCHING' : 'NEEDS_TARGETING'/);
   });
 
   it('no new Barry state was introduced', () => {

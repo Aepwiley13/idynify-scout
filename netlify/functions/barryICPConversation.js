@@ -684,13 +684,21 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     }
   }
 
-  // Backend enforcement: targetTitles is required — never allow confirming without them
-  const hasExtractedTitles = barryResponse.understood?.targetTitles && barryResponse.understood.targetTitles.length > 0;
-  if (!hasExtractedTitles && !barryResponse.needsClarification) {
-    barryResponse.needsClarification = true;
-    barryResponse.followUpQuestion = barryResponse.followUpQuestion || 'Who should I be finding at these companies? What titles or roles are you going after?';
-    barryResponse.followUpType = barryResponse.followUpType || 'titles';
-  }
+  // targetTitles are useful but do not gate the proposal.
+  //
+  // This block used to force a clarification turn whenever no titles had been
+  // extracted, on the reasoning that Barry should never confirm without them.
+  // But titles are a person filter: `mixed_companies/search` never receives
+  // them, so a definition missing titles is not a definition that cannot
+  // search. Blocking on one contradicts the locked quality floor — a single
+  // supported retrieval constraint is enough to start — and turns the last
+  // step into the questionnaire this phase exists to remove.
+  //
+  // Titles are still asked for, just not as a gate: they are surfaced as
+  // something Barry does not know yet, and they matter at the moment he goes
+  // looking for people at a company rather than at the moment he finds it.
+  barryResponse.missingTargetTitles =
+    !(barryResponse.understood?.targetTitles?.length > 0);
 
   // Determine next step based on whether we need lookalike
   let nextStep = 'clarifying';
@@ -852,16 +860,14 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
       : { minAge, maxAge };
   }
 
-  // Backend enforcement: targetTitles is required — never allow confirming without them
-  const hasFollowupTitles = barryResponse.understood?.targetTitles && barryResponse.understood.targetTitles.length > 0;
-  // Also check pending ICP in case titles were set in an earlier turn
-  const hasPendingTitles = pendingICP?.targetTitles && pendingICP.targetTitles.length > 0;
-  if (!hasFollowupTitles && !hasPendingTitles && barryResponse.readyToConfirm) {
-    barryResponse.readyToConfirm = false;
-    barryResponse.needsMoreInfo = true;
-    barryResponse.followUpQuestion = barryResponse.followUpQuestion || 'Who should I be finding at these companies? What titles or roles are you going after?';
-    barryResponse.followUpType = barryResponse.followUpType || 'titles';
-  }
+  // Same rule on this path: titles are reported, never used to withdraw a
+  // proposal Barry can otherwise defend. Titles are a person filter and the
+  // company search never receives them, so their absence is not a reason the
+  // search cannot run. See the initial-input path for the full reasoning.
+  const hasFollowupTitles = barryResponse.understood?.targetTitles?.length > 0;
+  // Titles may have been given in an earlier turn and carried in pendingICP.
+  const hasPendingTitles = pendingICP?.targetTitles?.length > 0;
+  barryResponse.missingTargetTitles = !hasFollowupTitles && !hasPendingTitles;
 
   // Determine next step
   let nextStep = 'clarifying';
@@ -985,15 +991,11 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
       : { minAge, maxAge };
   }
 
-  // Backend enforcement: targetTitles is required — never allow confirming without them
-  const hasExampleTitles = barryResponse.understood?.targetTitles && barryResponse.understood.targetTitles.length > 0;
-  const hasPendingExTitles = pendingICP?.targetTitles && pendingICP.targetTitles.length > 0;
-  if (!hasExampleTitles && !hasPendingExTitles && barryResponse.readyToConfirm) {
-    barryResponse.readyToConfirm = false;
-    barryResponse.needsMoreInfo = true;
-    barryResponse.followUpQuestion = barryResponse.followUpQuestion || 'Who should I be finding at these companies? What titles or roles are you going after?';
-    barryResponse.followUpType = barryResponse.followUpType || 'titles';
-  }
+  // Same rule on the follow-up path: titles are reported as missing, never
+  // used to withdraw a proposal Barry can otherwise defend. See above.
+  const hasExampleTitles = barryResponse.understood?.targetTitles?.length > 0;
+  const hasPendingExTitles = pendingICP?.targetTitles?.length > 0;
+  barryResponse.missingTargetTitles = !hasExampleTitles && !hasPendingExTitles;
 
   return {
     barryResponse,

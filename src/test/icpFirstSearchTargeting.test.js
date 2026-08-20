@@ -23,19 +23,19 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
+import { hasRetrievalConstraint } from '../utils/targetingProposal.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const onboarding = readFileSync(resolve(here, '../pages/Onboarding/BarryOnboarding.jsx'), 'utf8');
 const searchFn = readFileSync(resolve(here, '../../netlify/functions/search-companies.js'), 'utf8');
 
-/** Lift the predicate out of the source and make it callable. */
-function hasRetrievalConstraint(icpProfile) {
-  const at = onboarding.indexOf('const hasRetrievalConstraint =');
-  if (at === -1) throw new Error('hasRetrievalConstraint gate not found in BarryOnboarding');
-  const expr = onboarding.slice(at + 'const hasRetrievalConstraint ='.length);
-  const body = expr.slice(0, expr.indexOf(';'));
-  return new Function('icpProfile', `return (${body});`)(icpProfile);
-}
+// The predicate used to be an inline expression in BarryOnboarding, and this
+// test lifted it out of the source and eval'd it so the gate could not drift
+// from the fields Apollo constrains on. B5 gave it a real home, shared with the
+// proposal that has to respect the same floor, so the test now imports it —
+// which is the stronger version of the same guarantee. The assertion that the
+// gate is actually wired to this import lives at the bottom of the file.
+
 
 const BASE = { targetTitles: ['VP Sales'], revenueRanges: ['$1M-$2M'], scoringWeights: {} };
 
@@ -121,5 +121,16 @@ describe('D7 — the confirmed identity is what reaches the search', () => {
 
   it('search-companies rejects the request if that identity is ever missing', () => {
     expect(searchFn).toMatch(/if \(!icpId\)[\s\S]{0,400}statusCode: 400/);
+  });
+});
+
+describe('the gate the search is wired to is the one tested above', () => {
+  it('BarryOnboarding imports the shared predicate rather than restating it', () => {
+    expect(onboarding).toContain("from '../../utils/targetingProposal'");
+    expect(onboarding).toMatch(/const canSearch = hasRetrievalConstraint\(icpProfile\)/);
+  });
+
+  it('and no second copy of the rule survives in the component', () => {
+    expect(onboarding).not.toMatch(/const hasRetrievalConstraint =/);
   });
 });

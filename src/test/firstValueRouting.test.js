@@ -324,7 +324,7 @@ describe('8 — the route wires classification to routing and writes nothing', (
     // Two: the ROUTE_IN_PLACE branch, and the final fallback that exists so a
     // decision-less render can never be a blank screen.
     expect(renders).toBe(2);
-    expect(shell).toMatch(/decision\?\.kind === ROUTE_IN_PLACE[\s\S]{0,120}<BarryOnboarding/);
+    expect(shell).toMatch(/decision\?\.kind === ROUTE_IN_PLACE[\s\S]{0,600}<BarryOnboarding/);
   });
 
   it('a failed classifier asks rather than routing', () => {

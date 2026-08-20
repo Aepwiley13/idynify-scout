@@ -121,7 +121,11 @@ describe('the delegated conversation stays intact', () => {
   const barry = read('../pages/Onboarding/BarryOnboarding.jsx');
 
   it('accepts the name additively, defaulting to previous behaviour', () => {
-    expect(barry).toMatch(/function BarryOnboarding\(\{ knownName = null \} = \{\}\)/);
+    // B5 added `goal` — the transient restatement of the intent turn, so the
+    // proposal can open with what Barry thinks the user wants rather than a
+    // field list. Both props default to null, so the component still behaves
+    // exactly as before when neither is supplied.
+    expect(barry).toMatch(/function BarryOnboarding\(\{ knownName = null, goal = null \} = \{\}\)/);
   });
 
   it('greets by name when one is known', () => {

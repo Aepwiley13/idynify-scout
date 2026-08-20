@@ -4,7 +4,8 @@ import { auth, db } from '../../firebase/config';
 import { doc, getDoc, setDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { Brain, ArrowRight, ArrowLeft, Check, RefreshCw } from 'lucide-react';
 import BarryTyping from '../../components/onboarding/BarryTyping';
-import ICPConfirmationCard from '../../components/onboarding/ICPConfirmationCard';
+import TargetingProposal from '../../components/onboarding/TargetingProposal';
+import { buildProposal, hasRetrievalConstraint } from '../../utils/targetingProposal';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { setActiveIcpProfile } from '../../utils/setActiveIcpProfile';
 import './BarryOnboarding.css';
@@ -67,7 +68,7 @@ function buildReturnGreeting(icpData) {
   return `${strategyLine}${sizeContext}${locationContext}.${strategyExplanation}${contextSummary}${refreshNote}${actionPrompt}`;
 }
 
-export default function BarryOnboarding({ knownName = null } = {}) {
+export default function BarryOnboarding({ knownName = null, goal = null } = {}) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState('welcome'); // welcome, asking, clarifying, confirming, saving
@@ -256,8 +257,16 @@ export default function BarryOnboarding({ knownName = null } = {}) {
       // Save conversation state
       await saveConversationState(user.uid, updatedHistory, barryResponse.understood, newStep);
 
-      // Update step
-      if (newStep === 'confirming' || barryResponse.readyToConfirm) {
+      // Update step.
+      //
+      // Barry proposes the moment he has one defensible retrieval constraint,
+      // rather than waiting for the extraction to declare itself finished. The
+      // quality floor is locked at one constraint; continuing to ask after
+      // that is the questionnaire this phase is removing. The user can always
+      // say "let me adjust", which is a cheaper correction than another turn
+      // of questions they did not ask for.
+      const merged = { ...extractedICP, ...barryResponse.understood };
+      if (newStep === 'confirming' || barryResponse.readyToConfirm || hasRetrievalConstraint(merged)) {
         setStep('confirming');
       } else {
         setStep('clarifying');
@@ -398,25 +407,14 @@ export default function BarryOnboarding({ knownName = null } = {}) {
       );
 
       // A search may only be called ICP-targeted when at least one retrieval
-      // constraint derived from the ICP actually narrows the result set.
-      // targetTitles do not constrain a company search, and revenue ranges are
-      // not currently sent to Apollo — so a confirmed definition carrying only
-      // those would produce an unfiltered global query wearing an ICP label.
-      // We report that state rather than inventing criteria to fill it.
-      // lookalikeSeed is deliberately absent. buildApolloQuery receives it and
-      // logs it, but never turns it into a query parameter — the seed company's
-      // name is explicitly not added to the keyword tags. Counting it here let a
-      // confirmed ICP whose only targeting was a seed pass this gate and then run
-      // a completely unfiltered search, which is the exact thing D7 forbids: a
-      // search called ICP-targeted when no ICP constraint reached the query.
-      // Every field below does produce a demonstrable Apollo constraint.
-      const hasRetrievalConstraint =
-        (icpProfile.industries?.length > 0) ||
-        (icpProfile.companyKeywords?.length > 0) ||
-        (icpProfile.companySizes?.length > 0) ||
-        (icpProfile.locations?.length > 0) ||
-        Boolean(icpProfile.isNationwide) ||
-        Boolean(icpProfile.foundedAgeRange);
+      // constraint derived from the ICP actually narrows the result set. The
+      // rule itself now lives in targetingProposal.js, so the floor Barry
+      // proposes against and the floor the search is gated on cannot drift
+      // apart — and the field list behind it is unchanged: targetTitles do not
+      // constrain a company search, revenue is never sent to Apollo, and
+      // lookalikeSeed is received and logged by the query builder but never
+      // becomes a query parameter.
+      const canSearch = hasRetrievalConstraint(icpProfile);
 
       // Mark onboarding complete on the user doc and set Barry's initial
       // execution state so Mission Control can read where Barry is. The
@@ -428,7 +426,7 @@ export default function BarryOnboarding({ knownName = null } = {}) {
           onboardingComplete: true,
           onboardingCompletedAt: serverTimestamp(),
           onboardingSource: 'barry_onboarding',
-          barryState: hasRetrievalConstraint ? 'SEARCHING' : 'NEEDS_TARGETING',
+          barryState: canSearch ? 'SEARCHING' : 'NEEDS_TARGETING',
           companiesFoundCount: 0,
           hasSeenMCWelcome: false
         },
@@ -437,7 +435,7 @@ export default function BarryOnboarding({ knownName = null } = {}) {
 
       // Trigger immediate lead search in the background, carrying the identity
       // of the ICP the user just confirmed.
-      if (hasRetrievalConstraint) {
+      if (canSearch) {
         const authToken = await user.getIdToken();
         fetch('/.netlify/functions/search-companies', {
           method: 'POST',
@@ -591,10 +589,11 @@ export default function BarryOnboarding({ knownName = null } = {}) {
         {/* Confirmation Card */}
         {step === 'confirming' && extractedICP && !isProcessing && (
           <div className="confirmation-section">
-            <ICPConfirmationCard
-              icp={extractedICP}
+            <TargetingProposal
+              proposal={buildProposal({ icp: extractedICP, goal, name: knownName })}
               onConfirm={handleConfirm}
               onRefine={handleRefine}
+              onAnswer={handleRefine}
             />
           </div>
         )}

@@ -72,6 +72,18 @@ describe('2 — Entry and WHO events are emitted by FirstExperience', () => {
     expect(firstExp).toContain('EVENTS.WHO_PROVIDED');
   });
 
+  it('who_asked fires only on presentation, not on skip', () => {
+    expect(firstExp).toContain('EVENTS.WHO_ASKED');
+    const matches = firstExp.match(/EVENTS\.WHO_ASKED/g);
+    expect(matches).toHaveLength(1);
+    const surrounding = firstExp.slice(
+      Math.max(0, firstExp.indexOf('EVENTS.WHO_ASKED') - 30),
+      firstExp.indexOf('EVENTS.WHO_ASKED') + 40
+    );
+    expect(surrounding).toContain('wantsName');
+    expect(surrounding).not.toContain('skipped');
+  });
+
   it('who_resolved records source, not the name', () => {
     const calls = [...firstExp.matchAll(/logEvent\(EVENTS\.WHO_RESOLVED[^;]+\);/g)];
     expect(calls.length).toBeGreaterThan(0);
@@ -140,6 +152,25 @@ describe('4 — Prospecting events are emitted by BarryOnboarding', () => {
 
   it('first_value_delivered for Prospecting', () => {
     expect(barryOnb).toContain('EVENTS.FIRST_VALUE_DELIVERED');
+  });
+
+  it('first_value_delivered fires only after discovery completes', () => {
+    const deliveredIdx = barryOnb.indexOf('EVENTS.FIRST_VALUE_DELIVERED');
+    const completedIdx = barryOnb.indexOf('EVENTS.FIRST_DISCOVERY_COMPLETED');
+    expect(deliveredIdx).toBeGreaterThan(completedIdx);
+  });
+
+  it('first_value_delivered fires exactly once in Prospecting', () => {
+    const matches = barryOnb.match(/EVENTS\.FIRST_VALUE_DELIVERED/g);
+    expect(matches).toHaveLength(1);
+  });
+
+  it('first_discovery_completed carries result_band', () => {
+    const calls = [...barryOnb.matchAll(/logEvent\(EVENTS\.FIRST_DISCOVERY_COMPLETED[^;]+\);/g)];
+    expect(calls.length).toBeGreaterThan(0);
+    for (const m of calls) {
+      expect(m[0]).toContain('result_band');
+    }
   });
 
   it('proposal carries constraint count and types, not ICP text', () => {

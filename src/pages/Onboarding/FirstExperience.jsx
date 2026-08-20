@@ -155,7 +155,7 @@ export default function FirstExperience() {
       const alreadyAsked = sessionStorage.getItem(ASKED_KEY) === '1';
       const wantsName = resolved.shouldAsk && !alreadyAsked && shouldIntroduce(mode);
       setAskingName(wantsName);
-      if (wantsName) logEvent(EVENTS.WHO_ASKED, { outcome: 'presented' });
+      if (wantsName) logEvent(EVENTS.WHO_ASKED);
 
       // The intent question belongs to a genuine first conversation only.
       // Someone resuming an unfinished targeting conversation, or arriving to
@@ -180,10 +180,7 @@ export default function FirstExperience() {
     setAskingName(false);
     setAskingIntent(true);
 
-    if (!answered || !user) {
-      logEvent(EVENTS.WHO_ASKED, { outcome: 'skipped' });
-      return;
-    }
+    if (!answered || !user) return;
 
     logEvent(EVENTS.WHO_PROVIDED, { source: 'conversational' });
     // Optimistic: the conversation continues whether or not the write lands.
@@ -195,7 +192,6 @@ export default function FirstExperience() {
     sessionStorage.setItem(ASKED_KEY, '1');
     setAskingName(false);
     setAskingIntent(true);
-    logEvent(EVENTS.WHO_ASKED, { outcome: 'skipped' });
   }
 
   /** Classify one turn and act on it. One round trip, nothing written. */

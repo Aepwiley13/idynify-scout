@@ -544,11 +544,19 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
             companyProfile: icpProfile,
             icpId
           })
-        }).then(() => {
-          logEvent(EVENTS.FIRST_DISCOVERY_COMPLETED, { outcome: 'success' });
+        }).then(res => {
+          if (!res.ok) throw new Error(`search failed (${res.status})`);
+          return res.json();
+        }).then(data => {
+          const added = data.companiesAdded || 0;
+          const band = added === 0 ? 'zero' : added <= 3 ? 'low' : 'meaningful';
+          logEvent(EVENTS.FIRST_DISCOVERY_COMPLETED, { outcome: 'success', result_band: band });
+          if (added > 0) {
+            logEvent(EVENTS.FIRST_VALUE_DELIVERED, { intent: 'PROSPECTING', branch: 'in-place', result_band: band });
+          }
         }).catch(err => {
           console.error('Background search failed:', err);
-          logEvent(EVENTS.FIRST_DISCOVERY_COMPLETED, { outcome: 'error' });
+          logEvent(EVENTS.FIRST_DISCOVERY_COMPLETED, { outcome: 'error', result_band: 'zero' });
         });
       } else {
         console.warn('[BarryOnboarding] confirmed ICP carries no retrieval constraint — search not started');
@@ -578,8 +586,6 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
         }
       ];
       setConversationHistory(finalHistory);
-
-      logEvent(EVENTS.FIRST_VALUE_DELIVERED, { intent: 'PROSPECTING', branch: 'in-place' });
 
       // Navigate to Mission Control after a brief delay — users watch Barry
       // work (barryState) from there.

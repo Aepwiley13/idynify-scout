@@ -5,8 +5,9 @@ import { doc, getDoc, setDoc, collection, serverTimestamp } from 'firebase/fires
 import { Brain, ArrowRight, ArrowLeft, Check, RefreshCw } from 'lucide-react';
 import BarryTyping from '../../components/onboarding/BarryTyping';
 import TargetingProposal from '../../components/onboarding/TargetingProposal';
-import { buildProposal, hasRetrievalConstraint } from '../../utils/targetingProposal';
+import { buildProposal, hasRetrievalConstraint, retrievalConstraints } from '../../utils/targetingProposal';
 import { readWebsite, acceleratorQuestion } from '../../utils/websiteAccelerator';
+import { logEvent, EVENTS } from '../../services/analytics';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { setActiveIcpProfile } from '../../utils/setActiveIcpProfile';
 import './BarryOnboarding.css';
@@ -276,8 +277,12 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
       // of questions they did not ask for.
       const merged = { ...extractedICP, ...barryResponse.understood };
       if (newStep === 'confirming' || barryResponse.readyToConfirm || hasRetrievalConstraint(merged)) {
+        const constraints = retrievalConstraints(merged);
+        logEvent(EVENTS.TARGETING_PROPOSAL_CREATED, { constraint_count: constraints.length, constraint_types: constraints, website_contributed: Boolean(reading?.ok) });
+        logEvent(EVENTS.TARGETING_CONFIRMATION_REQUESTED);
         setStep('confirming');
       } else {
+        logEvent(EVENTS.TARGETING_CLARIFICATION_REQUESTED, { follow_up_count: followUpCount + 1 });
         setStep('clarifying');
       }
 
@@ -313,6 +318,7 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
 
     setReadingSite(true);
     setError(null);
+    logEvent(EVENTS.WEBSITE_ANALYSIS_ATTEMPTED);
 
     let result;
     try {
@@ -333,14 +339,15 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
     setReadingSite(false);
 
     if (!result.ok) {
-      // A blocked or JavaScript-rendered site is a normal outcome, not an
-      // error the user has to fix. Barry says so and carries on in words.
+      logEvent(EVENTS.WEBSITE_ANALYSIS_FAILED, { reason: result.message ? 'unreadable' : 'request_failed' });
       setBarryMessage(
         `${result.message || "I couldn't get much from that site."}\n\nNo problem — tell me who you're trying to reach and I'll work from that.`
       );
       setStep('asking');
       return;
     }
+
+    logEvent(EVENTS.WEBSITE_ANALYSIS_SUCCEEDED, { fields_read: result.proposed ? Object.keys(result.proposed).filter(k => result.proposed[k] != null && result.proposed[k] !== '').length : 0 });
 
     // What Barry learned becomes proposed targeting, exactly as if the user had
     // said it out loud. It is merged, not substituted: anything already
@@ -355,6 +362,11 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
     };
     setExtractedICP(next);
 
+    const normalizedCount = retrievalConstraints(next).length;
+    if (normalizedCount > 0) {
+      logEvent(EVENTS.WEBSITE_TARGETING_NORMALIZED, { constraint_count: normalizedCount, constraint_types: retrievalConstraints(next) });
+    }
+
     const opener = [
       `I looked at ${result.companyName || 'your website'}.`,
       result.recognition,
@@ -364,8 +376,6 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
       setBarryMessage(`${opener}\n\nIs that still accurate?`);
       setStep('confirming');
     } else {
-      // The site said something, but nothing it said can narrow a search. One
-      // question about the business — never a list of the fields that failed.
       const question = acceleratorQuestion(result) || "Who are you trying to reach?";
       setBarryMessage(`${opener}\n\n${question}`);
       setStep('asking');
@@ -398,6 +408,8 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
 
     setStep('saving');
     setIsProcessing(true);
+    const constraints = retrievalConstraints(extractedICP);
+    logEvent(EVENTS.TARGETING_CONFIRMED, { constraint_count: constraints.length, constraint_types: constraints });
 
     try {
       const user = auth.currentUser;
@@ -521,6 +533,7 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
       // Trigger immediate lead search in the background, carrying the identity
       // of the ICP the user just confirmed.
       if (canSearch) {
+        logEvent(EVENTS.FIRST_DISCOVERY_STARTED, { constraint_count: retrievalConstraints(icpProfile).length });
         const authToken = await user.getIdToken();
         fetch('/.netlify/functions/search-companies', {
           method: 'POST',
@@ -531,7 +544,12 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
             companyProfile: icpProfile,
             icpId
           })
-        }).catch(err => console.error('Background search failed:', err));
+        }).then(() => {
+          logEvent(EVENTS.FIRST_DISCOVERY_COMPLETED, { outcome: 'success' });
+        }).catch(err => {
+          console.error('Background search failed:', err);
+          logEvent(EVENTS.FIRST_DISCOVERY_COMPLETED, { outcome: 'error' });
+        });
       } else {
         console.warn('[BarryOnboarding] confirmed ICP carries no retrieval constraint — search not started');
       }
@@ -560,6 +578,8 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
         }
       ];
       setConversationHistory(finalHistory);
+
+      logEvent(EVENTS.FIRST_VALUE_DELIVERED, { intent: 'PROSPECTING', branch: 'in-place' });
 
       // Navigate to Mission Control after a brief delay — users watch Barry
       // work (barryState) from there.

@@ -48,8 +48,10 @@ import {
   ROUTE_NAVIGATE,
   ROUTE_CONFIRM,
   ROUTE_CLARIFY,
+  ROUTE_BLOCKED,
   ROUTE_RELATIONSHIP,
 } from '../../utils/firstValueRouting';
+import { logEvent, EVENTS } from '../../services/analytics';
 import BarryOnboarding from './BarryOnboarding';
 import RelationshipFirstValue from '../../components/onboarding/RelationshipFirstValue';
 
@@ -146,9 +148,14 @@ export default function FirstExperience() {
       // mid-conversation is the tell of a flow that does not know you have been
       // here, so the question belongs to a genuine first conversation.
       const { mode } = resolveFirstExperienceMode(conversation, icpResolution, arrival);
+
+      logEvent(EVENTS.FIRST_EXPERIENCE_STARTED, { mode: mode === MODE_BEGIN ? 'begin' : 'resume' });
+      logEvent(EVENTS.WHO_RESOLVED, { source: resolved.source });
+
       const alreadyAsked = sessionStorage.getItem(ASKED_KEY) === '1';
       const wantsName = resolved.shouldAsk && !alreadyAsked && shouldIntroduce(mode);
       setAskingName(wantsName);
+      if (wantsName) logEvent(EVENTS.WHO_ASKED, { outcome: 'presented' });
 
       // The intent question belongs to a genuine first conversation only.
       // Someone resuming an unfinished targeting conversation, or arriving to
@@ -173,8 +180,12 @@ export default function FirstExperience() {
     setAskingName(false);
     setAskingIntent(true);
 
-    if (!answered || !user) return;
+    if (!answered || !user) {
+      logEvent(EVENTS.WHO_ASKED, { outcome: 'skipped' });
+      return;
+    }
 
+    logEvent(EVENTS.WHO_PROVIDED, { source: 'conversational' });
     // Optimistic: the conversation continues whether or not the write lands.
     setWho(prev => ({ ...prev, name: answered, shouldAsk: false }));
     await rememberName(user.uid, answered);
@@ -184,6 +195,7 @@ export default function FirstExperience() {
     sessionStorage.setItem(ASKED_KEY, '1');
     setAskingName(false);
     setAskingIntent(true);
+    logEvent(EVENTS.WHO_ASKED, { outcome: 'skipped' });
   }
 
   /** Classify one turn and act on it. One round trip, nothing written. */
@@ -193,6 +205,7 @@ export default function FirstExperience() {
 
     setClassifying(true);
     setTurn('');
+    logEvent(EVENTS.INTENT_CLASSIFICATION_ATTEMPTED);
 
     let classification;
     try {
@@ -214,11 +227,15 @@ export default function FirstExperience() {
         ? normalizeClassification(data.classification)
         : unclearClassification('unclassified');
     } catch (err) {
-      // A classifier that cannot be reached asks a question. It never becomes a
-      // silent routing decision, and least of all a Prospecting one.
       console.warn('[FirstExperience] classification failed:', err.message);
       classification = unclearClassification('request-failed');
     }
+
+    logEvent(EVENTS.INTENT_CLASSIFIED, {
+      intent: classification.intent,
+      confidence_band: classification.confidence >= 0.6 ? 'high' : 'low',
+      has_secondary: Boolean(classification.secondaryIntent),
+    });
 
     applyClassification(classification);
     setClassifying(false);
@@ -230,7 +247,17 @@ export default function FirstExperience() {
     const [first, second] = orderCompound(classification.intent, classification.secondaryIntent);
     setHeld(second);
     setPending({ ...classification, intent: first });
-    setDecision(routeIntent({ ...classification, intent: first }, readiness));
+    const routed = routeIntent({ ...classification, intent: first }, readiness);
+    setDecision(routed);
+
+    if (routed.kind === ROUTE_CLARIFY) {
+      logEvent(EVENTS.INTENT_CLARIFICATION_REQUESTED, { intent: first });
+    } else {
+      logEvent(EVENTS.FIRST_VALUE_BRANCH_SELECTED, { intent: first, branch: routed.kind });
+      if (routed.kind === ROUTE_BLOCKED) {
+        logEvent(EVENTS.FIRST_VALUE_BLOCKED, { intent: first, reason: routed.reason });
+      }
+    }
   }
 
   /** The user said yes to Barry's restatement. */
@@ -353,6 +380,10 @@ export default function FirstExperience() {
   // three render the same way, because all three are Barry telling the user
   // exactly what is about to happen or exactly why it is not.
   if (decision) {
+    const handleNavigate = () => {
+      logEvent(EVENTS.FIRST_VALUE_DELIVERED, { intent: decision.intent, branch: decision.kind });
+      navigate(decision.destination.path);
+    };
     const offers = held
       ? [...decision.options, { id: 'held', label: `Then ${intentLabel(held)}`, intent: held }]
       : decision.options;
@@ -360,7 +391,7 @@ export default function FirstExperience() {
     return (
       <Panel T={T} headline={decision.headline} detail={decision.detail}>
         {decision.destination && (
-          <button style={primaryBtn(T)} onClick={() => navigate(decision.destination.path)}>
+          <button style={primaryBtn(T)} onClick={handleNavigate}>
             {decision.kind === ROUTE_NAVIGATE ? 'Take me there' : 'Set that up'}
           </button>
         )}

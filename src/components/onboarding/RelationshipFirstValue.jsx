@@ -82,6 +82,14 @@ export default function RelationshipFirstValue({ decision, knownName = null }) {
       setContact(result.contact);
       setQuiet(quietList);
       setLoading(false);
+
+      logEvent(EVENTS.FIRST_VALUE_ATTEMPTED, { intent, match_status: result.status, has_quiet: quietList.length > 0 });
+
+      if (result.status === FOUND || (result.status === UNNAMED && quietList.length > 0)) {
+        logEvent(EVENTS.FIRST_VALUE_DELIVERED, { intent, branch: 'relationship', outcome: result.status === FOUND ? 'snapshot' : 'quiet_list' });
+      } else if (result.status === NONE) {
+        logEvent(EVENTS.FIRST_VALUE_BLOCKED, { intent, reason: 'person_not_found' });
+      }
     })();
 
     return () => { cancelled = true; };

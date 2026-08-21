@@ -31,6 +31,14 @@ function replacePersonalizeTags(template, replacement) {
   return template.replace(/\{\{personalize\}\}/gi, replacement);
 }
 
+function replaceContactTags(text, contact) {
+  const firstName = contact.firstName || contact.name?.split(' ')[0] || '';
+  const company = contact.company_name || contact.company || '';
+  return text
+    .replace(/\{\{first_name\}\}/gi, firstName)
+    .replace(/\{\{company\}\}/gi, company);
+}
+
 export default function BulkComposeModal({
   contacts: initialContacts, allContacts = [], onClose,
   initialSubject = '', initialBody = '', initialPath = 'write_your_own',
@@ -85,6 +93,7 @@ export default function BulkComposeModal({
   const dropZoneRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
   const p2BodyRef = useRef(null);
+  const bodyRef = useRef(null);
 
   // ─── Gmail connection status ───
   const [gmailConnected, setGmailConnected] = useState(false);
@@ -195,19 +204,22 @@ export default function BulkComposeModal({
     setSelectedContacts(prev => prev.filter(c => c.id !== contactId));
   }
 
-  // ─── Insert {{personalize}} at cursor ───
-  function insertPersonalizeTag() {
-    const textarea = p2BodyRef.current;
+  // ─── Insert template tag at cursor ───
+  function insertTag(tag, ref, value, setter) {
+    const textarea = ref.current;
     if (!textarea) return;
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
-    const tag = '{{personalize}}';
-    const newBody = p2Body.slice(0, start) + tag + p2Body.slice(end);
-    setP2Body(newBody);
+    const newBody = value.slice(0, start) + tag + value.slice(end);
+    setter(newBody);
     requestAnimationFrame(() => {
       textarea.focus();
       textarea.setSelectionRange(start + tag.length, start + tag.length);
     });
+  }
+
+  function insertPersonalizeTag() {
+    insertTag('{{personalize}}', p2BodyRef, p2Body, setP2Body);
   }
 
   // ─── PDF upload handling ───
@@ -376,9 +388,11 @@ export default function BulkComposeModal({
         .map(p => {
           let finalBody = p2Body;
           if (hasTag && p.openingLine) {
-            finalBody = replacePersonalizeTags(p2Body, p.openingLine);
+            finalBody = replacePersonalizeTags(finalBody, p.openingLine);
           }
-          const item = { contact: p.contact, subject: p2Subject, body: finalBody, cadenceName };
+          finalBody = replaceContactTags(finalBody, p.contact);
+          const finalSubject = replaceContactTags(p2Subject, p.contact);
+          const item = { contact: p.contact, subject: finalSubject, body: finalBody, cadenceName };
           if (attachment) {
             item.attachment = { data: attachment.base64, filename: attachment.filename, mimeType: 'application/pdf' };
           }
@@ -392,8 +406,9 @@ export default function BulkComposeModal({
           const greeting = `Hi ${getFirstName(p.contact)},`;
           const parts = [greeting];
           if (p.openingLine) parts.push(p.openingLine);
-          parts.push(body);
-          return { contact: p.contact, subject, body: parts.join('\n\n'), cadenceName };
+          parts.push(replaceContactTags(body, p.contact));
+          const finalSubject = replaceContactTags(subject, p.contact);
+          return { contact: p.contact, subject: finalSubject, body: parts.join('\n\n'), cadenceName };
         });
     }
     setSendPayload(payload);
@@ -539,8 +554,9 @@ export default function BulkComposeModal({
       const hasTag = hasPersonalizeTag(p2Body);
       let displayBody = p2Body;
       if (hasTag && p.openingLine) {
-        displayBody = replacePersonalizeTags(p2Body, p.openingLine);
+        displayBody = replacePersonalizeTags(displayBody, p.openingLine);
       }
+      displayBody = replaceContactTags(displayBody, p.contact);
       return <div style={{ whiteSpace: 'pre-wrap', color: T.textMuted }}>{displayBody}</div>;
     }
     return (
@@ -570,7 +586,7 @@ export default function BulkComposeModal({
             />
           </div>
         )}
-        <div style={{ whiteSpace: 'pre-wrap', color: T.textMuted }}>{body}</div>
+        <div style={{ whiteSpace: 'pre-wrap', color: T.textMuted }}>{replaceContactTags(body, p.contact)}</div>
       </>
     );
   }
@@ -671,11 +687,39 @@ export default function BulkComposeModal({
                   <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Email subject line" style={inputStyle} />
 
                   <label style={{ ...sectionLabel, marginTop: 18 }}>Email Body</label>
+                  <div style={{ fontSize: 11, color: T.textFaint, marginBottom: 6, lineHeight: 1.5 }}>
+                    Type your message. Use the buttons below to insert template tags that auto-fill for each contact.
+                  </div>
                   <textarea
+                    ref={bodyRef}
                     value={body} onChange={e => setBody(e.target.value)}
                     placeholder="Write the shared email body that all contacts will receive..."
                     rows={8} style={{ ...inputStyle, resize: 'vertical', minHeight: 120, fontFamily: 'inherit' }}
                   />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => insertTag('{{first_name}}', bodyRef, body, setBody)}
+                      style={{
+                        padding: '4px 10px', borderRadius: 6, border: `1px solid ${BRAND.cyan}40`,
+                        background: `${BRAND.cyan}08`, color: BRAND.cyan,
+                        fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 4,
+                      }}
+                    >
+                      <Plus size={10} />First Name
+                    </button>
+                    <button
+                      onClick={() => insertTag('{{company}}', bodyRef, body, setBody)}
+                      style={{
+                        padding: '4px 10px', borderRadius: 6, border: `1px solid ${BRAND.cyan}40`,
+                        background: `${BRAND.cyan}08`, color: BRAND.cyan,
+                        fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                        display: 'flex', alignItems: 'center', gap: 4,
+                      }}
+                    >
+                      <Plus size={10} />Company
+                    </button>
+                  </div>
 
                   <div style={{
                     marginTop: 18, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -730,7 +774,7 @@ export default function BulkComposeModal({
                   <div style={{ marginTop: 18 }}>
                     <label style={sectionLabel}>Message</label>
                     <div style={{ fontSize: 11, color: T.textFaint, marginBottom: 6, lineHeight: 1.5 }}>
-                      Type your message. Where you want Barry to personalize, type <code style={{ background: `${BRAND.cyan}15`, padding: '1px 5px', borderRadius: 4, fontSize: 11 }}>{'{{personalize}}'}</code> — Barry will replace it with something specific to each person.
+                      Type your message. Use the buttons below to insert template tags — <code style={{ background: `${BRAND.cyan}15`, padding: '1px 5px', borderRadius: 4, fontSize: 11 }}>{'{{first_name}}'}</code> and <code style={{ background: `${BRAND.cyan}15`, padding: '1px 5px', borderRadius: 4, fontSize: 11 }}>{'{{company}}'}</code> auto-fill per contact. <code style={{ background: `${BRAND.cyan}15`, padding: '1px 5px', borderRadius: 4, fontSize: 11 }}>{'{{personalize}}'}</code> lets Barry generate something unique for each person.
                     </div>
                     <div style={{
                       fontSize: 11, color: T.textFaint, fontStyle: 'italic', marginBottom: 8,
@@ -744,7 +788,7 @@ export default function BulkComposeModal({
                       placeholder="Write your message..."
                       rows={6} style={{ ...inputStyle, resize: 'vertical', minHeight: 100, fontFamily: 'inherit' }}
                     />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
                       <button
                         onClick={insertPersonalizeTag}
                         style={{
@@ -755,6 +799,28 @@ export default function BulkComposeModal({
                         }}
                       >
                         <Plus size={10} />Personalize
+                      </button>
+                      <button
+                        onClick={() => insertTag('{{first_name}}', p2BodyRef, p2Body, setP2Body)}
+                        style={{
+                          padding: '4px 10px', borderRadius: 6, border: `1px solid ${BRAND.cyan}40`,
+                          background: `${BRAND.cyan}08`, color: BRAND.cyan,
+                          fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 4,
+                        }}
+                      >
+                        <Plus size={10} />First Name
+                      </button>
+                      <button
+                        onClick={() => insertTag('{{company}}', p2BodyRef, p2Body, setP2Body)}
+                        style={{
+                          padding: '4px 10px', borderRadius: 6, border: `1px solid ${BRAND.cyan}40`,
+                          background: `${BRAND.cyan}08`, color: BRAND.cyan,
+                          fontSize: 11, fontWeight: 600, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 4,
+                        }}
+                      >
+                        <Plus size={10} />Company
                       </button>
                       {hasPersonalizeTag(p2Body) && (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>

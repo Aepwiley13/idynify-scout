@@ -11,7 +11,7 @@ import { randomUUID } from 'node:crypto';
 import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
+import { getGmailSignatureHtml, appendSignatureHtml } from './utils/gmailSignature.js';
 
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {
@@ -101,12 +101,10 @@ export function buildTrackingPixel({ baseUrl, userId, contactId, cadenceId, mess
  * for the body and an application/pdf part with Content-Disposition: attachment.
  * Exported for testing.
  */
-export function buildRawEmail({ toEmail, recipientName, subject, bodyText, ccHeader, attachment, trackingPixel }) {
+export function buildRawEmail({ toEmail, recipientName, subject, bodyText, ccHeader, attachment, trackingPixel, signatureHtml }) {
   const lines = [`To: ${recipientName} <${toEmail}>`];
   if (ccHeader) lines.push(`Cc: ${ccHeader}`);
-  // The body is always sent as text/html, so the tracking pixel (when present)
-  // is appended to the end of the HTML body. Absent → byte-identical output.
-  const htmlBody = toHtml(bodyText) + (trackingPixel || '');
+  const htmlBody = appendSignatureHtml(toHtml(bodyText), signatureHtml || '') + (trackingPixel || '');
 
   if (!attachment) {
     lines.push(
@@ -345,10 +343,9 @@ export const handler = async (event) => {
       }
     }
 
-    // Fetch and append Gmail signature (non-blocking — falls back to no signature)
+    // Fetch Gmail signature as HTML (non-blocking — falls back to no signature)
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-    const signature = await getGmailSignature(gmail);
-    const bodyWithSignature = appendSignature(body, signature);
+    const signatureHtml = await getGmailSignatureHtml(gmail);
 
     // Open tracking (Phase 2): embed a pixel only for cadence sends — those
     // carrying both contactId and cadenceId. Requires the deploy's public base
@@ -377,10 +374,11 @@ export const handler = async (event) => {
       toEmail,
       recipientName,
       subject,
-      bodyText: bodyWithSignature,
+      bodyText: body,
       ccHeader,
       attachment: attachmentPart,
       trackingPixel,
+      signatureHtml,
     });
 
     // Encode email in base64url format (required by Gmail API)

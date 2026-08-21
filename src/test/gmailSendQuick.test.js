@@ -25,8 +25,8 @@ vi.mock('firebase-admin/firestore', () => ({
   FieldValue: {},
 }));
 vi.mock('../../netlify/functions/utils/gmailSignature.js', () => ({
-  getGmailSignature: vi.fn(),
-  appendSignature: (body) => body,
+  getGmailSignatureHtml: vi.fn(),
+  appendSignatureHtml: (body) => body,
 }));
 
 import { buildRawEmail, prepareAttachment } from '../../netlify/functions/gmail-send-quick.js';

@@ -1,8 +1,9 @@
 /**
  * Gmail Signature Utility
  *
- * Fetches the user's Gmail signature from the Gmail settings API and
- * converts it to plain text for use in text/plain emails.
+ * Fetches the user's Gmail signature from the Gmail settings API.
+ * Returns both the original HTML and a plain-text fallback so callers
+ * sending text/html emails can preserve the user's rich signature.
  *
  * Requires gmail.readonly or gmail.settings.basic OAuth scope (both of which
  * are already requested during Gmail OAuth init).
@@ -41,7 +42,6 @@ export async function getGmailSignature(gmail) {
     const res = await gmail.users.settings.sendAs.list({ userId: 'me' });
     const sendAsEntries = res.data.sendAs || [];
 
-    // Prefer the default send-as address; fall back to the first entry
     const primary = sendAsEntries.find(s => s.isDefault) || sendAsEntries[0];
 
     if (primary && primary.signature) {
@@ -51,6 +51,30 @@ export async function getGmailSignature(gmail) {
     return '';
   } catch (err) {
     console.warn('⚠️ Could not fetch Gmail signature (non-blocking):', err.message);
+    return '';
+  }
+}
+
+/**
+ * Fetch the primary Gmail signature as raw HTML for use in HTML emails.
+ *
+ * @param {import('googleapis').gmail_v1.Gmail} gmail  Authenticated Gmail client
+ * @returns {Promise<string>} HTML signature, or empty string if none / on error
+ */
+export async function getGmailSignatureHtml(gmail) {
+  try {
+    const res = await gmail.users.settings.sendAs.list({ userId: 'me' });
+    const sendAsEntries = res.data.sendAs || [];
+
+    const primary = sendAsEntries.find(s => s.isDefault) || sendAsEntries[0];
+
+    if (primary && primary.signature) {
+      return primary.signature;
+    }
+
+    return '';
+  } catch (err) {
+    console.warn('⚠️ Could not fetch Gmail signature HTML (non-blocking):', err.message);
     return '';
   }
 }
@@ -66,4 +90,17 @@ export async function getGmailSignature(gmail) {
 export function appendSignature(body, signature) {
   if (!signature) return body;
   return `${body}\n\n-- \n${signature}`;
+}
+
+/**
+ * Append the raw HTML Gmail signature to an HTML body.
+ * Uses the standard Gmail separator convention.
+ *
+ * @param {string} htmlBody
+ * @param {string} signatureHtml  Raw HTML signature (may be empty)
+ * @returns {string}
+ */
+export function appendSignatureHtml(htmlBody, signatureHtml) {
+  if (!signatureHtml) return htmlBody;
+  return `${htmlBody}<br><div class="gmail_signature_container"><div dir="ltr" class="gmail_signature">${signatureHtml}</div></div>`;
 }

@@ -39,8 +39,8 @@ vi.mock('firebase-admin/firestore', () => ({
 // gmail-send-quick's extra side-effect imports
 vi.mock('googleapis', () => ({ google: { auth: { OAuth2: class {} }, gmail: vi.fn() } }));
 vi.mock('../../netlify/functions/utils/gmailSignature.js', () => ({
-  getGmailSignature: vi.fn(),
-  appendSignature: (body) => body,
+  getGmailSignatureHtml: vi.fn(),
+  appendSignatureHtml: (body) => body,
 }));
 
 const { handler } = await import('../../netlify/functions/track-open.js');

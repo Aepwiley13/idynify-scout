@@ -12,6 +12,7 @@ import { useActiveUserId, useImpersonation } from '../../context/ImpersonationCo
 import { calculateICPScore, DEFAULT_WEIGHTS, generateMatchReasons } from '../../utils/icpScoring';
 import { ARRIVAL_REVIEW_ICP } from '../../utils/firstExperienceMode';
 import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
+import { retrievalConstraints } from '../../utils/targetingProposal';
 import { getFitTier } from '../../utils/companyDisplay';
 import useOnboardingState from '../../hooks/useOnboardingState';
 import AnimatedCounter from '../../components/AnimatedCounter';
@@ -326,7 +327,7 @@ const BARRY_NARRATIONS = [
 ];
 
 // ─── First-Run View ─────────────────────────────────────────────────────────
-function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate }) {
+function FirstRunView({ barryState, companiesFoundCount, companies, activeIcpProfile, T, navigate }) {
   const [ctaDisabled, setCtaDisabled] = useState(false);
   const [ctaError, setCtaError] = useState(null);
   const [narrationIndex, setNarrationIndex] = useState(0);
@@ -394,9 +395,20 @@ function FirstRunView({ barryState, companiesFoundCount, companies, T, navigate 
   const topThree = companies.slice(0, 3);
   const counterTarget = companiesFoundCount > 0 ? companiesFoundCount : companies.length;
 
+  // P0-B: derive "Business Understood" and "ICP Created" from actual
+  // intelligence rather than hardcoding done:true. An active ICP with at
+  // least 2 retrieval constraints is evidence Barry has enough context to
+  // claim understanding. A single constraint is the search floor but not
+  // enough to call the business "understood". No active profile at all, or
+  // one with insufficient constraints, means the milestone is incomplete —
+  // that is not an error, it is honest.
+  const icpConstraints = retrievalConstraints(activeIcpProfile);
+  const businessUnderstood = icpConstraints.length >= 2;
+  const icpCreated = activeIcpProfile != null && icpConstraints.length >= 1;
+
   const progressItems = [
-    { label: 'Business Understood', done: true },
-    { label: 'Ideal Customer Profile Created', done: true },
+    { label: 'Business Understood', done: businessUnderstood },
+    { label: 'Ideal Customer Profile Created', done: icpCreated },
     {
       label: isSearching ? 'Finding and ranking companies...'
         : isReady ? 'Prospect list ready'
@@ -763,6 +775,7 @@ export default function MissionControlDashboardV2() {
 
   const [loading, setLoading] = useState(true);
   const [companies, setCompanies] = useState([]);
+  const [activeIcpProfile, setActiveIcpProfile] = useState(null);
   const [industryFilter, setIndustryFilter] = useState('');
   const [scoreFilter, setScoreFilter] = useState('all');
   const [page, setPage] = useState(0);
@@ -820,10 +833,14 @@ export default function MissionControlDashboardV2() {
       if (isResolved(resolution)) {
         activeICPId = resolution.icpId;
         activeProfile = resolution.profile;
+        setActiveIcpProfile(resolution.profile);
       } else if (resolution.reason === 'none-active' && resolution.candidates.length > 0) {
         // Continuity only — shown so the surface keeps working, never treated
         // as the active ICP, never persisted, never searched against.
         activeProfile = resolution.candidates[0];
+        setActiveIcpProfile(null);
+      } else {
+        setActiveIcpProfile(null);
       }
 
       // Load companies (accepted + pending)
@@ -973,6 +990,7 @@ export default function MissionControlDashboardV2() {
           barryState={barryState}
           companiesFoundCount={companiesFoundCount}
           companies={companies}
+          activeIcpProfile={activeIcpProfile}
           T={T}
           navigate={navigate}
         />

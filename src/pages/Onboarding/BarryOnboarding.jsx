@@ -275,14 +275,23 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
       // that is the questionnaire this phase is removing. The user can always
       // say "let me adjust", which is a cheaper correction than another turn
       // of questions they did not ask for.
+      //
+      // Gate 0 (P0-A): ambiguity must be resolved before proposal. When the
+      // backend flags isAmbiguous, Barry must ask his clarification question
+      // before the merged targeting can be proposed — even if the merged
+      // result already passes the one-constraint quality floor. Without this
+      // gate, "SaaS sales people in Utah" would jump to a proposal whose
+      // interpretation may be wrong, persist an incorrect ICP, and start
+      // discovery against it.
       const merged = { ...extractedICP, ...barryResponse.understood };
-      if (newStep === 'confirming' || barryResponse.readyToConfirm || hasRetrievalConstraint(merged)) {
+      const isAmbiguous = Boolean(barryResponse.isAmbiguous);
+      if (!isAmbiguous && (newStep === 'confirming' || barryResponse.readyToConfirm || hasRetrievalConstraint(merged))) {
         const constraints = retrievalConstraints(merged);
         logEvent(EVENTS.TARGETING_PROPOSAL_CREATED, { constraint_count: constraints.length, constraint_types: constraints, website_contributed: Boolean(reading?.ok) });
         logEvent(EVENTS.TARGETING_CONFIRMATION_REQUESTED);
         setStep('confirming');
       } else {
-        logEvent(EVENTS.TARGETING_CLARIFICATION_REQUESTED, { follow_up_count: followUpCount + 1 });
+        logEvent(EVENTS.TARGETING_CLARIFICATION_REQUESTED, { follow_up_count: followUpCount + 1, is_ambiguous: isAmbiguous });
         setStep('clarifying');
       }
 

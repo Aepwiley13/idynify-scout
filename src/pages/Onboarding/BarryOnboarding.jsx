@@ -156,11 +156,28 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
           setConversationHistory(data.messages);
           setExtractedICP(data.extractedICP || null);
           setFollowUpCount(data.followUpCount || 0);
-          setStep(data.currentStep || 'asking');
-          if (data.extractedICP) {
-            setBarryMessage('Welcome back. Let me show you where we left off.');
+          // Gate 0 (P0-A): the persisted step already reflects the gated
+          // decision (C0-1), so restoring it preserves the ambiguity
+          // boundary. Legacy documents written before Gate 0 may carry
+          // currentStep='confirming' with no isAmbiguous field. Without
+          // proof that ambiguity was resolved, fail safe to 'clarifying' —
+          // one extra clarification turn is preferable to allowing
+          // potentially ambiguous targeting to become authoritative.
+          let resumeStep = data.currentStep || 'asking';
+          if (resumeStep === 'confirming' && data.isAmbiguous !== false) {
+            resumeStep = 'clarifying';
           }
-          console.log('[Barry] Conversation restored. step:', data.currentStep, 'messages:', data.messages.length);
+          setStep(resumeStep);
+          if (data.extractedICP) {
+            if (resumeStep === 'clarifying' && data.currentStep === 'confirming') {
+              setBarryMessage("Welcome back. Let me confirm I have the right picture before we move forward.");
+            } else if (data.isAmbiguous && resumeStep === 'clarifying') {
+              setBarryMessage("Welcome back. I still need a bit of clarification before I can put together a targeting proposal.");
+            } else {
+              setBarryMessage('Welcome back. Let me show you where we left off.');
+            }
+          }
+          console.log('[Barry] Conversation restored. step:', data.currentStep, 'isAmbiguous:', data.isAmbiguous, 'messages:', data.messages.length);
         } else {
           console.log('[Barry] Conversation doc exists but not resumable. status:', data.status);
         }
@@ -264,27 +281,31 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
       setConversationHistory(updatedHistory);
       setBarryMessage(barryMsg);
 
-      // Save conversation state
-      await saveConversationState(user.uid, updatedHistory, barryResponse.understood, newStep);
-
-      // Update step.
-      //
-      // Barry proposes the moment he has one defensible retrieval constraint,
-      // rather than waiting for the extraction to declare itself finished. The
-      // quality floor is locked at one constraint; continuing to ask after
-      // that is the questionnaire this phase is removing. The user can always
-      // say "let me adjust", which is a cheaper correction than another turn
-      // of questions they did not ask for.
+      // Determine the gated step — the step Barry actually allows the user
+      // to enter. The backend may return newStep='confirming' while flagging
+      // isAmbiguous; the gate prevents that from reaching the user or being
+      // persisted. One authoritative progression: what we persist is what we
+      // show.
       const merged = { ...extractedICP, ...barryResponse.understood };
-      if (newStep === 'confirming' || barryResponse.readyToConfirm || hasRetrievalConstraint(merged)) {
+      const isAmbiguous = Boolean(barryResponse.isAmbiguous);
+      let gatedStep;
+      if (!isAmbiguous && (newStep === 'confirming' || barryResponse.readyToConfirm || hasRetrievalConstraint(merged))) {
         const constraints = retrievalConstraints(merged);
         logEvent(EVENTS.TARGETING_PROPOSAL_CREATED, { constraint_count: constraints.length, constraint_types: constraints, website_contributed: Boolean(reading?.ok) });
         logEvent(EVENTS.TARGETING_CONFIRMATION_REQUESTED);
-        setStep('confirming');
+        gatedStep = 'confirming';
       } else {
-        logEvent(EVENTS.TARGETING_CLARIFICATION_REQUESTED, { follow_up_count: followUpCount + 1 });
-        setStep('clarifying');
+        logEvent(EVENTS.TARGETING_CLARIFICATION_REQUESTED, { follow_up_count: followUpCount + 1, is_ambiguous: isAmbiguous });
+        gatedStep = 'clarifying';
       }
+
+      // Persist the gated step and ambiguity state. The persisted step must
+      // represent the state Barry actually allowed the user to enter, so a
+      // reload restores the same boundary. isAmbiguous is carried so resume
+      // can distinguish "clarifying because ambiguous" from "clarifying
+      // because not enough constraints."
+      await saveConversationState(user.uid, updatedHistory, barryResponse.understood, gatedStep, isAmbiguous);
+      setStep(gatedStep);
 
     } catch (error) {
       console.error('Error processing input:', error);
@@ -382,7 +403,7 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
     }
   }
 
-  async function saveConversationState(userId, history, icp, currentStep) {
+  async function saveConversationState(userId, history, icp, currentStep, isAmbiguous) {
     try {
       await setDoc(
         doc(db, 'users', userId, 'barryConversations', 'icp'),
@@ -392,6 +413,11 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
           messages: history,
           extractedICP: icp,
           followUpCount,
+          // Gate 0 (P0-A): persist unresolved ambiguity so a reload cannot
+          // erase the fact that Barry is waiting for clarification. Cleared
+          // on the next turn where isAmbiguous is false — it cannot become
+          // stale authority because every backend response re-evaluates it.
+          isAmbiguous: Boolean(isAmbiguous),
           startedAt: history[0]?.timestamp || new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           source: 'barry_onboarding'

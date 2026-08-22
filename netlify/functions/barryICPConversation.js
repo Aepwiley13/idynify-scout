@@ -409,6 +409,28 @@ HARD RULES:
 - Re-entry sessions: open by referencing the user's existing ICP. Example: "You're currently targeting [summary]. Want to refine anything, or should I keep searching?"
 - After each user message, briefly reflect what you understood and what is still missing — 2 sentences max.
 
+TARGETING AMBIGUITY — MUST CHECK BEFORE EXTRACTING:
+When the user's input could describe EITHER companies to sell to OR individuals/roles to find,
+you MUST set isAmbiguous:true, needsClarification:true, and ask ONE bounded clarification question.
+
+Examples of ambiguous input:
+- "SaaS sales people in Utah" — could mean SaaS companies in Utah (to sell to), or individual sales professionals at SaaS companies in Utah (to recruit/reach)
+- "marketing consultants in Texas" — could mean marketing consulting firms, or individual marketing consultants
+- "tech recruiters in California" — could mean recruiting agencies, or individual recruiters at tech companies
+- "insurance agents in Florida" — could mean insurance agencies, or individual insurance agents
+
+When ambiguous, ask something like:
+"Are you looking for [company interpretation] to sell to, or [individual interpretation]?"
+
+Do NOT set isAmbiguous for clearly unambiguous input:
+- "Roofing companies in Utah with 10-50 employees" — clearly companies
+- "Find me SaaS startups in Texas" — clearly companies
+- "I sell to marketing agencies" — clearly companies
+
+The test: is the OBJECT of the user's intended action a type of company, or a type of person, or is that still unclear? The mere presence of the word "companies" does not resolve ambiguity when the sentence structure makes a role or profession the primary subject. For example, "sales people at SaaS companies in Utah" is AMBIGUOUS — the user may want to discover SaaS companies to sell to, or they may want to find individual sales professionals who work at SaaS companies. The word "companies" appears, but it modifies the workplace, not the target. Unambiguous input names the company type as the direct object: "Find me SaaS companies", "I sell to marketing agencies."
+
+When isAmbiguous is true, still extract what you can into "understood" but set needsClarification:true and provide the clarification question as followUpQuestion. Set followUpType to "industry".
+
 CONFIDENCE SCORING:
   95%+   all 6 fields confirmed including lookalike
   80-94% missing lookalike only, everything else confirmed
@@ -542,11 +564,12 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
   barryResponse.missingTargetTitles =
     !(barryResponse.understood?.targetTitles?.length > 0);
 
-  // Determine next step based on whether we need lookalike
+  // Determine next step — ambiguity blocks confirmation even when the
+  // extraction has enough fields.
   let nextStep = 'clarifying';
   if (barryResponse.needsLookalike) {
     nextStep = 'awaiting_example';
-  } else if (!barryResponse.needsClarification) {
+  } else if (!barryResponse.needsClarification && !barryResponse.isAmbiguous) {
     nextStep = 'confirming';
   }
 
@@ -603,6 +626,26 @@ HARD RULES:
 - Ask ONE clarifying question per turn. Never stack questions.
 - After each user message, briefly reflect what you understood and what is still missing — 2 sentences max.
 
+TARGETING AMBIGUITY — MUST CHECK BEFORE EXTRACTING:
+When the user's input could describe EITHER companies to sell to OR individuals/roles to find,
+you MUST set isAmbiguous:true, needsMoreInfo:true, and ask ONE bounded clarification question.
+
+Examples of ambiguous input:
+- "SaaS sales people in Utah" — could mean SaaS companies in Utah, or individual sales professionals at SaaS companies
+- "marketing consultants in Texas" — could mean marketing consulting firms, or individual consultants
+- "tech recruiters in California" — could mean recruiting agencies, or individual recruiters
+
+When ambiguous, ask: "Are you looking for [company interpretation] to sell to, or [individual interpretation]?"
+
+Do NOT flag clearly unambiguous input as ambiguous:
+- "Roofing companies in Utah with 10-50 employees" — clearly companies
+- "Find me SaaS startups in Texas" — clearly companies
+- "I sell to marketing agencies" — clearly companies
+
+The test: is the OBJECT of the user's intended action a type of company, or a type of person, or is that still unclear? The mere presence of the word "companies" does not resolve ambiguity when the sentence structure makes a role or profession the primary subject. For example, "sales people at SaaS companies in Utah" is AMBIGUOUS — the user may want SaaS companies to sell to, or individual sales professionals at those companies. Unambiguous input names the company type as the direct object.
+
+When isAmbiguous is true, still extract what you can into "understood" but set needsMoreInfo:true, provide the clarification as followUpQuestion, and set followUpType to "industry".
+
 CONFIDENCE SCORING:
   95%+   all 6 fields confirmed including lookalike
   80-94% missing lookalike only, everything else confirmed
@@ -650,7 +693,9 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
   "followUpType": "lookalike" | "industry" | "size" | "location" | "titles" | "foundedAge" | null,
   "searchStrategy": "lookalike" | "industry_only" | "hybrid",
   "confidenceScore": 0.0 to 1.0,
-  "readyToConfirm": true/false
+  "readyToConfirm": true/false,
+  "isAmbiguous": true/false,
+  "ambiguityDetails": "what's ambiguous" or null
 }`;
 
   const response = await anthropic.messages.create({
@@ -711,11 +756,14 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
   const hasPendingTitles = pendingICP?.targetTitles?.length > 0;
   barryResponse.missingTargetTitles = !hasFollowupTitles && !hasPendingTitles;
 
-  // Determine next step
+  // Determine next step — ambiguity must block confirmation on this path
+  // too. A followup that remains materially ambiguous cannot become
+  // 'confirming' merely because the extracted targeting contains enough
+  // fields or readyToConfirm happens to be true.
   let nextStep = 'clarifying';
   if (barryResponse.needsLookalike && !barryResponse.understood?.lookalikeSeed) {
     nextStep = 'awaiting_example';
-  } else if (barryResponse.readyToConfirm) {
+  } else if (barryResponse.readyToConfirm && !barryResponse.isAmbiguous && !barryResponse.needsMoreInfo) {
     nextStep = 'confirming';
   }
 

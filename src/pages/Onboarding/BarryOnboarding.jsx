@@ -529,6 +529,26 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
         { merge: true }
       );
 
+      // Gate 1 continuity bridge: seed the canonical conversation so shell
+      // Barry and the Scout sidecar see the First Experience as the beginning
+      // of the ongoing relationship, not a separate orphaned conversation.
+      const bridgeMessages = conversationHistory
+        .filter(msg => msg.role === 'barry' || msg.role === 'user')
+        .map(msg => ({
+          role: msg.role === 'barry' ? 'assistant' : 'user',
+          content: msg.content,
+        }));
+      await setDoc(
+        doc(db, 'users', user.uid, 'barryConversations', 'missionControl'),
+        {
+          messages: bridgeMessages.slice(-30),
+          conversationHistory: bridgeMessages.slice(-20),
+          mode: 'SUGGEST',
+          updatedAt: serverTimestamp(),
+          bridgedFrom: 'barry_onboarding',
+        }
+      );
+
       // A search may only be called ICP-targeted when at least one retrieval
       // constraint derived from the ICP actually narrows the result set. The
       // rule itself now lives in targetingProposal.js, so the floor Barry

@@ -27,6 +27,7 @@ import { buildContextStack } from '../../utils/barryContextStack';
 import { updateIcpFromChat } from '../../utils/updateIcpFromChat';
 import MessageAngleBlock from '../shared/MessageAngleBlock';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { useShell } from '../../context/ShellContext';
 import { BRAND, STATUS } from '../../theme/tokens';
 
 const DEFAULT_TOKENS = {
@@ -353,6 +354,8 @@ export default function BarryChatPanel({
   const modeRef = useRef(mode);
   const sessionIdRef = useRef(null);
 
+  const { barryOpen } = useShell();
+
   useEffect(() => { conversationHistoryRef.current = conversationHistory; }, [conversationHistory]);
   useEffect(() => { modeRef.current = mode; }, [mode]);
 
@@ -375,6 +378,33 @@ export default function BarryChatPanel({
 
     initPanel();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Gate 1: re-sync from canonical conversation when panel opens ────────
+  // The sidecar or onboarding may have written to missionControl while this
+  // panel was hidden (inert). A single-doc read on open is cheap and keeps
+  // the conversation continuous across renderers.
+  const prevBarryOpenRef = useRef(false);
+  useEffect(() => {
+    if (barryOpen && !prevBarryOpenRef.current && !loading) {
+      syncFromCanonical();
+    }
+    prevBarryOpenRef.current = barryOpen;
+  }, [barryOpen, loading]);
+
+  async function syncFromCanonical() {
+    const user = getEffectiveUser();
+    if (!user) return;
+    try {
+      const saved = await loadConversation(user.uid);
+      if (saved?.messages?.length > 0) {
+        setMessages(saved.messages);
+        setConversationHistory(saved.conversationHistory || []);
+        if (saved.mode) setMode(saved.mode);
+      }
+    } catch (err) {
+      console.warn('[BarryChatPanel] canonical sync failed (non-fatal):', err.message);
+    }
+  }
 
   // ── Gate orientation brief on KPI readiness ──────────────────────────────
 

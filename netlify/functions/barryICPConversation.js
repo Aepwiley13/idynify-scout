@@ -426,9 +426,8 @@ Do NOT set isAmbiguous for clearly unambiguous input:
 - "Roofing companies in Utah with 10-50 employees" — clearly companies
 - "Find me SaaS startups in Texas" — clearly companies
 - "I sell to marketing agencies" — clearly companies
-- "Find me CEOs at fintech companies" — clearly companies (with a title preference)
 
-The test: if the words describe a ROLE or PROFESSION that could be either the user's customer (a company) or a type of person (an individual), it is ambiguous. If the words clearly describe a type of company or use words like "companies", "firms", "businesses", "startups", it is unambiguous.
+The test: is the OBJECT of the user's intended action a type of company, or a type of person, or is that still unclear? The mere presence of the word "companies" does not resolve ambiguity when the sentence structure makes a role or profession the primary subject. For example, "sales people at SaaS companies in Utah" is AMBIGUOUS — the user may want to discover SaaS companies to sell to, or they may want to find individual sales professionals who work at SaaS companies. The word "companies" appears, but it modifies the workplace, not the target. Unambiguous input names the company type as the direct object: "Find me SaaS companies", "I sell to marketing agencies."
 
 When isAmbiguous is true, still extract what you can into "understood" but set needsClarification:true and provide the clarification question as followUpQuestion. Set followUpType to "industry".
 
@@ -565,11 +564,12 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
   barryResponse.missingTargetTitles =
     !(barryResponse.understood?.targetTitles?.length > 0);
 
-  // Determine next step based on whether we need lookalike
+  // Determine next step — ambiguity blocks confirmation even when the
+  // extraction has enough fields.
   let nextStep = 'clarifying';
   if (barryResponse.needsLookalike) {
     nextStep = 'awaiting_example';
-  } else if (!barryResponse.needsClarification) {
+  } else if (!barryResponse.needsClarification && !barryResponse.isAmbiguous) {
     nextStep = 'confirming';
   }
 
@@ -641,6 +641,8 @@ Do NOT flag clearly unambiguous input as ambiguous:
 - "Roofing companies in Utah with 10-50 employees" — clearly companies
 - "Find me SaaS startups in Texas" — clearly companies
 - "I sell to marketing agencies" — clearly companies
+
+The test: is the OBJECT of the user's intended action a type of company, or a type of person, or is that still unclear? The mere presence of the word "companies" does not resolve ambiguity when the sentence structure makes a role or profession the primary subject. For example, "sales people at SaaS companies in Utah" is AMBIGUOUS — the user may want SaaS companies to sell to, or individual sales professionals at those companies. Unambiguous input names the company type as the direct object.
 
 When isAmbiguous is true, still extract what you can into "understood" but set needsMoreInfo:true, provide the clarification as followUpQuestion, and set followUpType to "industry".
 
@@ -754,11 +756,14 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
   const hasPendingTitles = pendingICP?.targetTitles?.length > 0;
   barryResponse.missingTargetTitles = !hasFollowupTitles && !hasPendingTitles;
 
-  // Determine next step
+  // Determine next step — ambiguity must block confirmation on this path
+  // too. A followup that remains materially ambiguous cannot become
+  // 'confirming' merely because the extracted targeting contains enough
+  // fields or readyToConfirm happens to be true.
   let nextStep = 'clarifying';
   if (barryResponse.needsLookalike && !barryResponse.understood?.lookalikeSeed) {
     nextStep = 'awaiting_example';
-  } else if (barryResponse.readyToConfirm) {
+  } else if (barryResponse.readyToConfirm && !barryResponse.isAmbiguous && !barryResponse.needsMoreInfo) {
     nextStep = 'confirming';
   }
 

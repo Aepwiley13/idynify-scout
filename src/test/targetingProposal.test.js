@@ -260,7 +260,8 @@ describe('7 — titles no longer hold up a defensible proposal', () => {
 
   it('the client proposes as soon as the floor is met', () => {
     const onboarding = read('../pages/Onboarding/BarryOnboarding.jsx');
-    expect(onboarding).toMatch(/hasRetrievalConstraint\(merged\)[\s\S]{0,500}setStep\('confirming'\)/);
+    expect(onboarding).toMatch(/hasRetrievalConstraint\(merged\)[\s\S]{0,500}gatedStep = 'confirming'/);
+    expect(onboarding).toContain('setStep(gatedStep)');
   });
 
   it('and the canonical validation the server does keep is untouched', () => {

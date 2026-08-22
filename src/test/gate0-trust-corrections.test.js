@@ -118,7 +118,6 @@ describe('Case A — "SaaS sales people in Utah" end-to-end ambiguity', () => {
 // Must not silently become company targeting merely because "companies" appears.
 
 describe('Case B — "sales people at SaaS companies" must not auto-resolve', () => {
-  const onboardingSrc = read('../pages/Onboarding/BarryOnboarding.jsx');
   const serverSrc = read('../../netlify/functions/barryICPConversation.js');
 
   it('the prompt does not teach that "at [type] companies" is unambiguous', () => {
@@ -318,13 +317,63 @@ describe('C0-1 — persisted step is the gated step', () => {
 describe('C0-2 — ambiguity survives reload', () => {
   const onboardingSrc = read('../pages/Onboarding/BarryOnboarding.jsx');
 
-  it('resume reads the persisted currentStep (which is already gated)', () => {
-    expect(onboardingSrc).toContain("setStep(data.currentStep || 'asking')");
+  it('resume applies the legacy-safe step derivation', () => {
+    expect(onboardingSrc).toContain("data.isAmbiguous !== false");
   });
 
   it('resume checks isAmbiguous for appropriate messaging', () => {
     expect(onboardingSrc).toContain('data.isAmbiguous');
     expect(onboardingSrc).toContain('clarification');
+  });
+});
+
+// ─── Legacy conversation compatibility ──────────────────────────────────────
+// A document written by the pre-Gate-0 build may carry currentStep='confirming'
+// with no isAmbiguous field. The resume rule must fail safe to 'clarifying'.
+//
+// resumeStep logic mirrors BarryOnboarding.jsx:
+//   let resumeStep = data.currentStep || 'asking';
+//   if (resumeStep === 'confirming' && data.isAmbiguous !== false) {
+//     resumeStep = 'clarifying';
+//   }
+
+function resumeStep(data) {
+  let step = data.currentStep || 'asking';
+  if (step === 'confirming' && data.isAmbiguous !== false) {
+    step = 'clarifying';
+  }
+  return step;
+}
+
+describe('Legacy resume — confirming without ambiguity proof fails safe', () => {
+
+  it('legacy confirming + missing isAmbiguous → clarifying', () => {
+    expect(resumeStep({ currentStep: 'confirming' })).toBe('clarifying');
+  });
+
+  it('legacy confirming + isAmbiguous:undefined → clarifying', () => {
+    expect(resumeStep({ currentStep: 'confirming', isAmbiguous: undefined })).toBe('clarifying');
+  });
+
+  it('legacy confirming + isAmbiguous:true → clarifying', () => {
+    expect(resumeStep({ currentStep: 'confirming', isAmbiguous: true })).toBe('clarifying');
+  });
+
+  it('current confirming + isAmbiguous:false → confirming', () => {
+    expect(resumeStep({ currentStep: 'confirming', isAmbiguous: false })).toBe('confirming');
+  });
+
+  it('clarifying + isAmbiguous:true → clarifying', () => {
+    expect(resumeStep({ currentStep: 'clarifying', isAmbiguous: true })).toBe('clarifying');
+  });
+
+  it('clarifying + isAmbiguous:false → clarifying', () => {
+    expect(resumeStep({ currentStep: 'clarifying', isAmbiguous: false })).toBe('clarifying');
+  });
+
+  it('asking (default) is unaffected', () => {
+    expect(resumeStep({ currentStep: 'asking' })).toBe('asking');
+    expect(resumeStep({})).toBe('asking');
   });
 });
 

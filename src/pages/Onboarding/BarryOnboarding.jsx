@@ -158,12 +158,20 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
           setFollowUpCount(data.followUpCount || 0);
           // Gate 0 (P0-A): the persisted step already reflects the gated
           // decision (C0-1), so restoring it preserves the ambiguity
-          // boundary. If isAmbiguous was true when we saved, the persisted
-          // step is 'clarifying' — not 'confirming' — and the user returns
-          // to the clarification they were in.
-          setStep(data.currentStep || 'asking');
+          // boundary. Legacy documents written before Gate 0 may carry
+          // currentStep='confirming' with no isAmbiguous field. Without
+          // proof that ambiguity was resolved, fail safe to 'clarifying' —
+          // one extra clarification turn is preferable to allowing
+          // potentially ambiguous targeting to become authoritative.
+          let resumeStep = data.currentStep || 'asking';
+          if (resumeStep === 'confirming' && data.isAmbiguous !== false) {
+            resumeStep = 'clarifying';
+          }
+          setStep(resumeStep);
           if (data.extractedICP) {
-            if (data.isAmbiguous && data.currentStep === 'clarifying') {
+            if (resumeStep === 'clarifying' && data.currentStep === 'confirming') {
+              setBarryMessage("Welcome back. Let me confirm I have the right picture before we move forward.");
+            } else if (data.isAmbiguous && resumeStep === 'clarifying') {
               setBarryMessage("Welcome back. I still need a bit of clarification before I can put together a targeting proposal.");
             } else {
               setBarryMessage('Welcome back. Let me show you where we left off.');

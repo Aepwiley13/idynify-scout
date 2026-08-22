@@ -6,12 +6,15 @@
  *        the frontend must NOT advance to the 'confirming' step — even if
  *        the merged targeting passes the one-constraint quality floor.
  *
- * P0-B: "Business Understood" must derive from actual intelligence, not
- *        from a hardcoded `done: true`. An active ICP with >= 2 retrieval
- *        constraints qualifies; anything less does not.
+ * P0-B: "Business Understood" removed — no defensible derivation exists.
+ *        "ICP Created" remains, truthfully derived from an active ICP with
+ *        at least one supported retrieval constraint.
  */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import {
   retrievalConstraints,
   hasRetrievalConstraint,
@@ -127,73 +130,86 @@ describe('P0-A — ambiguity must block proposal', () => {
 });
 
 
-// ─── P0-B: Business Understood derivation ────────────────────────────────────
-// The derivation in MissionControlDashboardV2.jsx:
-//   const icpConstraints = retrievalConstraints(activeIcpProfile);
-//   const businessUnderstood = icpConstraints.length >= 2;
-//   const icpCreated = activeIcpProfile != null && icpConstraints.length >= 1;
+// ─── P0-B: "Business Understood" removed, ICP Created truthfully derived ────
+//
+// The MissionControlDashboardV2 FirstRunView progressItems no longer contain a
+// "Business Understood" milestone at all. No defensible derivation exists today
+// that separates "some business context" from "genuine understanding," so the
+// truthful Gate 0 behavior is: do not make the claim.
+//
+// "ICP Created" remains, derived from:
+//   activeIcpProfile != null && retrievalConstraints(activeIcpProfile).length >= 1
+//
+// We verify the derivation logic and the absence of any "understood" concept.
 
-function deriveBusinessUnderstood(activeIcpProfile) {
-  const icpConstraints = retrievalConstraints(activeIcpProfile);
-  return icpConstraints.length >= 2;
-}
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const mcDashSource = readFileSync(
+  resolve(__dirname, '../pages/Scout/MissionControlDashboardV2.jsx'), 'utf8'
+);
 
 function deriveIcpCreated(activeIcpProfile) {
-  const icpConstraints = retrievalConstraints(activeIcpProfile);
-  return activeIcpProfile != null && icpConstraints.length >= 1;
+  return activeIcpProfile != null && retrievalConstraints(activeIcpProfile).length >= 1;
 }
 
-describe('P0-B — Business Understood is derived, never hardcoded', () => {
+describe('P0-B — "Business Understood" is not presented as a completed milestone', () => {
 
-  it('null profile → Business Understood is false', () => {
-    expect(deriveBusinessUnderstood(null)).toBe(false);
+  it('the source does not contain a "Business Understood" progress item with done:true', () => {
+    // The original defect was: { label: 'Business Understood', done: true }
+    // Verify that exact pattern is gone.
+    expect(mcDashSource).not.toMatch(/['"]Business Understood['"].*done:\s*true/);
   });
+
+  it('the source does not contain any "Business Understood" milestone at all', () => {
+    // The milestone was removed entirely, not replaced with a derived version.
+    // Check the progressItems array region — no label references "Business Understood".
+    const progressRegion = mcDashSource.match(/const progressItems\s*=\s*\[[\s\S]*?\];/);
+    expect(progressRegion).not.toBeNull();
+    expect(progressRegion[0]).not.toContain('Business Understood');
+  });
+
+  it('no substitute "understood" or "complete" boolean was introduced', () => {
+    // Verify no variable named businessUnderstood, businessComplete, or
+    // understood exists in the progressItems derivation region.
+    const fromIcpCreated = mcDashSource.indexOf('const icpCreated');
+    const toProgressItems = mcDashSource.indexOf('const progressItems', fromIcpCreated);
+    const region = mcDashSource.slice(fromIcpCreated, toProgressItems + 200);
+    expect(region).not.toMatch(/businessUnderstood/i);
+    expect(region).not.toMatch(/businessComplete/i);
+    // icpCreated is expected — it is the ICP existence check, not an understanding claim.
+    expect(region).toContain('icpCreated');
+  });
+});
+
+describe('P0-B — ICP Created remains derived from actual authoritative ICP state', () => {
 
   it('null profile → ICP Created is false', () => {
     expect(deriveIcpCreated(null)).toBe(false);
   });
 
-  it('profile with 0 constraints → Business Understood is false', () => {
-    expect(deriveBusinessUnderstood({ targetTitles: ['CEO'] })).toBe(false);
+  it('undefined profile → ICP Created is false', () => {
+    expect(deriveIcpCreated(undefined)).toBe(false);
   });
 
-  it('profile with 1 constraint → Business Understood is false, ICP Created is true', () => {
-    const profile = { industries: ['Construction'] };
-    expect(deriveBusinessUnderstood(profile)).toBe(false);
-    expect(deriveIcpCreated(profile)).toBe(true);
+  it('profile with 0 retrieval constraints → ICP Created is false', () => {
+    expect(deriveIcpCreated({ targetTitles: ['CEO'] })).toBe(false);
   });
 
-  it('profile with 2 constraints → Business Understood is true', () => {
-    const profile = { industries: ['Construction'], locations: ['Utah'] };
-    expect(deriveBusinessUnderstood(profile)).toBe(true);
-    expect(deriveIcpCreated(profile)).toBe(true);
+  it('profile with 1 constraint → ICP Created is true', () => {
+    expect(deriveIcpCreated({ industries: ['Construction'] })).toBe(true);
   });
 
-  it('profile with many constraints → Business Understood is true', () => {
+  it('profile with many constraints → ICP Created is true', () => {
     const profile = {
       industries: ['Construction'],
       companyKeywords: ['roofing'],
       companySizes: ['11-20'],
       locations: ['Utah'],
-      foundedAgeRange: { minAge: null, maxAge: 10 },
     };
-    expect(deriveBusinessUnderstood(profile)).toBe(true);
-    expect(retrievalConstraints(profile).length).toBe(5);
+    expect(deriveIcpCreated(profile)).toBe(true);
   });
 
-  it('failed website analysis + weak context → no Business Understood', () => {
-    // User only provided a vague title, no company-level constraints
+  it('failed website analysis + only non-retrieval fields → ICP Created is false', () => {
     const profile = { targetTitles: ['VP Sales'], lookalikeSeed: { name: 'Acme' } };
-    expect(deriveBusinessUnderstood(profile)).toBe(false);
-  });
-
-  it('sufficient supported intelligence → Business Understood can truthfully complete', () => {
-    const profile = {
-      industries: ['Computer Software'],
-      companyKeywords: ['saas'],
-      companySizes: ['51-200'],
-      locations: ['California'],
-    };
-    expect(deriveBusinessUnderstood(profile)).toBe(true);
+    expect(deriveIcpCreated(profile)).toBe(false);
   });
 });

@@ -395,19 +395,18 @@ function FirstRunView({ barryState, companiesFoundCount, companies, activeIcpPro
   const topThree = companies.slice(0, 3);
   const counterTarget = companiesFoundCount > 0 ? companiesFoundCount : companies.length;
 
-  // P0-B: derive "Business Understood" and "ICP Created" from actual
-  // intelligence rather than hardcoding done:true. An active ICP with at
-  // least 2 retrieval constraints is evidence Barry has enough context to
-  // claim understanding. A single constraint is the search floor but not
-  // enough to call the business "understood". No active profile at all, or
-  // one with insufficient constraints, means the milestone is incomplete —
-  // that is not an error, it is honest.
-  const icpConstraints = retrievalConstraints(activeIcpProfile);
-  const businessUnderstood = icpConstraints.length >= 2;
-  const icpCreated = activeIcpProfile != null && icpConstraints.length >= 1;
+  // P0-B: "Business Understood" removed — no defensible derivation exists
+  // today that cleanly separates "some business context" from "genuine
+  // understanding." The claim will be revisited when Barry Workspace can
+  // compose conversation history, website analysis and RECON into a
+  // grounded understanding model. Until then, we do not make the claim.
+  //
+  // "ICP Created" is derived from an active, resolved ICP with at least
+  // one supported retrieval constraint. ICP existence is not the same
+  // concept as business understanding — they remain separate.
+  const icpCreated = activeIcpProfile != null && retrievalConstraints(activeIcpProfile).length >= 1;
 
   const progressItems = [
-    { label: 'Business Understood', done: businessUnderstood },
     { label: 'Ideal Customer Profile Created', done: icpCreated },
     {
       label: isSearching ? 'Finding and ranking companies...'

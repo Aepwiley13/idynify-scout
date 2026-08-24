@@ -28,6 +28,7 @@ import { updateIcpFromChat } from '../../utils/updateIcpFromChat';
 import MessageAngleBlock from '../shared/MessageAngleBlock';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { useShell } from '../../context/ShellContext';
+import { appendTurn, loadOrSeedRecentTurns } from '../../utils/barryCanonical';
 import { BRAND, STATUS } from '../../theme/tokens';
 
 const DEFAULT_TOKENS = {
@@ -55,26 +56,30 @@ const DEFAULT_TOKENS = {
 
 // ── Conversation persistence helpers ───────────────────────────────────────────
 
-async function saveConversation(userId, messages, conversationHistory, mode) {
+async function saveMissionControlState(userId, mode) {
   try {
     await setDoc(
       doc(db, 'users', userId, 'barryConversations', 'missionControl'),
-      {
-        messages: messages.slice(-30),
-        conversationHistory: conversationHistory.slice(-20),
-        mode,
-        updatedAt: serverTimestamp()
-      }
+      { mode, updatedAt: serverTimestamp() },
+      { merge: true }
     );
   } catch (err) {
-    console.warn('[BarryChatPanel] Could not save conversation:', err.message);
+    console.warn('[BarryChatPanel] Could not save MC state:', err.message);
   }
 }
 
 async function loadConversation(userId) {
   try {
-    const snap = await getDoc(doc(db, 'users', userId, 'barryConversations', 'missionControl'));
-    if (snap.exists()) return snap.data();
+    const turns = await loadOrSeedRecentTurns(db, userId, 30);
+    if (turns.length > 0) {
+      const mcSnap = await getDoc(doc(db, 'users', userId, 'barryConversations', 'missionControl'));
+      const mode = mcSnap.exists() ? mcSnap.data().mode : null;
+      return {
+        messages: turns.map(t => ({ role: t.role, content: t.content })),
+        conversationHistory: turns.map(t => ({ role: t.role, content: t.content })),
+        mode,
+      };
+    }
   } catch (err) {
     console.warn('[BarryChatPanel] Could not load conversation:', err.message);
   }
@@ -379,10 +384,6 @@ export default function BarryChatPanel({
     initPanel();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Gate 1: re-sync from canonical conversation when panel opens ────────
-  // The sidecar or onboarding may have written to missionControl while this
-  // panel was hidden (inert). A single-doc read on open is cheap and keeps
-  // the conversation continuous across renderers.
   const prevBarryOpenRef = useRef(false);
   useEffect(() => {
     if (barryOpen && !prevBarryOpenRef.current && !loading) {
@@ -421,7 +422,7 @@ export default function BarryChatPanel({
   useEffect(() => {
     if (messages.length === 0 || !userId) return;
     const timer = setTimeout(() => {
-      saveConversation(userId, messages, conversationHistoryRef.current, modeRef.current);
+      saveMissionControlState(userId, modeRef.current);
       if (sessionIdRef.current) {
         updateSessionDoc(userId, sessionIdRef.current, messages, null);
       }
@@ -967,6 +968,9 @@ export default function BarryChatPanel({
       const user = getEffectiveUser();
       if (!user) { setSending(false); return; }
 
+      appendTurn(db, user.uid, { role: 'user', content: userMessage, surface: 'workspace' })
+        .catch(err => console.warn('[BarryChatPanel] canonical append failed:', err.message));
+
       let authToken;
       try { authToken = await user.getIdToken(); } catch (tokenErr) {
         console.warn('[BarryChatPanel] getIdToken failed (sendMessage):', tokenErr.message);
@@ -1149,6 +1153,9 @@ export default function BarryChatPanel({
 
         setMessages(prev => [...prev, assistantMsg]);
         setConversationHistory(data.updatedHistory || []);
+
+        appendTurn(db, user.uid, { role: 'assistant', content: assistantMsg.content, surface: 'workspace' })
+          .catch(err => console.warn('[BarryChatPanel] canonical append failed:', err.message));
       } else {
         setMessages(prev => [...prev, {
           role: 'assistant',

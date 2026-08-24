@@ -3,13 +3,14 @@
  * Used by DailyLeads (swipe view) and ICPSettings (manual edit view).
  */
 import { useState, useEffect, useRef } from 'react';
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { ArrowRight, Loader } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, ASSETS } from '../../theme/tokens';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
+import { appendTurn, loadOrSeedRecentTurns } from '../../utils/barryCanonical';
 
 // ─── BarryAvatar ──────────────────────────────────────────────────────────────
 export function BarryAvatar({ size = 20, style = {} }) {
@@ -75,62 +76,18 @@ export default function BarryICPPanel({ userId, icpProfile, onClose, onSearchCom
       }
 
       try {
-        let priorHistory = null;
-        let sessionLabel = null;
-
-        // Gate 1: read canonical conversation first, so the sidecar shows
-        // the same thread the user sees in full Barry and First Experience.
-        const canonRef = doc(db, 'users', user.uid, 'barryConversations', 'missionControl');
-        const canonDoc = await getDoc(canonRef);
-        if (!cancelled && canonDoc.exists()) {
-          const saved = canonDoc.data();
-          if ((saved.messages || []).length > 0) {
-            priorHistory = saved.messages;
-            sessionLabel = saved.bridgedFrom === 'barry_onboarding'
-              ? 'onboarding'
-              : saved.updatedAt?.toDate
-                ? saved.updatedAt.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-                : 'previous session';
-          }
-        }
-
-        if (!priorHistory) {
-          const chatRef = doc(db, 'users', user.uid, 'barryConversations', 'icpChat');
-          const chatDoc = await getDoc(chatRef);
-          if (!cancelled && chatDoc.exists()) {
-            const saved = chatDoc.data();
-            if ((saved.messages || []).length > 0) {
-              priorHistory = saved.messages;
-              sessionLabel = saved.updatedAt?.toDate
-                ? saved.updatedAt.toDate().toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
-                : 'previous session';
-            }
-          }
-        }
-
-        if (!priorHistory) {
-          const icpRef = doc(db, 'users', user.uid, 'barryConversations', 'icp');
-          const icpDoc = await getDoc(icpRef);
-          if (!cancelled && icpDoc.exists()) {
-            const saved = icpDoc.data();
-            if ((saved.messages || []).length > 0) {
-              priorHistory = saved.messages;
-              sessionLabel = 'ICP setup';
-            }
-          }
-        }
-
-        if (!cancelled && priorHistory) {
-          const displayMsgs = priorHistory.map(h => ({
-            role: (h.role === 'assistant' || h.role === 'barry') ? 'barry' : 'user',
-            content: h.content,
+        const turns = await loadOrSeedRecentTurns(db, user.uid, 30);
+        if (!cancelled && turns.length > 0) {
+          const displayMsgs = turns.map(t => ({
+            role: t.role === 'assistant' ? 'barry' : 'user',
+            content: t.content,
           }));
-          const apiHistory = priorHistory.map(h => ({
-            role: h.role === 'user' ? 'user' : 'assistant',
-            content: h.content,
+          const apiHistory = turns.map(t => ({
+            role: t.role,
+            content: t.content,
           }));
           setMessages([
-            { role: 'system', content: `— Resumed from ${sessionLabel} —` },
+            { role: 'system', content: '— Resumed from previous session —' },
             ...displayMsgs,
           ]);
           setConversationHistory(apiHistory);
@@ -176,14 +133,6 @@ export default function BarryICPPanel({ userId, icpProfile, onClose, onSearchCom
       });
       const data = await res.json();
       if (data.success) {
-        // Reconstruct the full message list for the canonical save. The user
-        // message was added in sendMessage via a pending functional setState,
-        // so the `messages` closure is stale and must be patched here.
-        const updatedMessages = [
-          ...messages,
-          ...(msg !== '__ICP_RECLARIFICATION__' ? [{ role: 'user', content: msg }] : []),
-          { role: 'barry', content: data.response_text },
-        ];
         setMessages(prev => [...prev, { role: 'barry', content: data.response_text }]);
         const newHistory = data.updatedHistory || [
           ...history,
@@ -193,24 +142,13 @@ export default function BarryICPPanel({ userId, icpProfile, onClose, onSearchCom
         setConversationHistory(newHistory);
         if (data.has_enough_context) { setHasEnoughContext(true); setIcpParams(data.icp_params); }
 
-        // Gate 1: persist to the canonical conversation so full Barry
-        // picks up sidecar exchanges without a separate conversation.
         try {
-          const canonMessages = updatedMessages
-            .filter(m => m.role !== 'system')
-            .map(m => ({ role: m.role === 'barry' ? 'assistant' : m.role, content: m.content }));
-          await setDoc(
-            doc(db, 'users', user.uid, 'barryConversations', 'missionControl'),
-            {
-              messages: canonMessages.slice(-30),
-              conversationHistory: newHistory.slice(-20),
-              mode: 'SUGGEST',
-              updatedAt: serverTimestamp(),
-            },
-            { merge: true }
-          );
+          if (msg !== '__ICP_RECLARIFICATION__') {
+            await appendTurn(db, user.uid, { role: 'user', content: msg, surface: 'sidecar' });
+          }
+          await appendTurn(db, user.uid, { role: 'assistant', content: data.response_text, surface: 'sidecar' });
         } catch (persistErr) {
-          console.warn('[BarryICPPanel] canonical save failed (non-fatal):', persistErr.message);
+          console.warn('[BarryICPPanel] canonical append failed (non-fatal):', persistErr.message);
         }
       }
     } catch (err) {

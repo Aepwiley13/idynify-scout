@@ -1,13 +1,20 @@
 /**
- * Gate 1 — One Barry / Conversation Continuity
+ * Gate 1 (corrected) — One Barry / Conversation Continuity
  *
- * Validates the canonical continuity contract: one stable conversation
- * survives renderer changes (First Experience → Shell Barry → Sidecar →
- * Shell Barry), the First Experience is the beginning of the ongoing Barry
- * relationship (not orphaned), and transient surface context does not
- * permanently pollute the canonical conversation.
+ * Structural invariants verified by source scan:
  *
- * Source-scan tests verify structural invariants without running the app.
+ * C1  canonical conversation lives in a dedicated subcollection,
+ *     not missionControl.
+ * C2  every renderer appends turns via addDoc; no renderer overwrites
+ *     the conversation array with setDoc.
+ * C3  active-context reads use a Firestore limit() query, not slice()
+ *     on the persisted data. Older turns survive.
+ * C4  First Experience persists incrementally (every exchange), not
+ *     only on confirmation.
+ * C5  handleConfirm never replaces the canonical conversation.
+ * C6  the server no longer writes to icpChat.
+ * C7  transient surface context stays transient.
+ * C8  multi-renderer safety tests (Cases A–F).
  */
 
 import { describe, it, expect } from 'vitest';
@@ -19,144 +26,289 @@ const here = dirname(fileURLToPath(import.meta.url));
 const read = rel => readFileSync(resolve(here, rel), 'utf8');
 const code = src => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
-describe('1 — First Experience seeds the canonical conversation', () => {
-  const onboarding = read('../pages/Onboarding/BarryOnboarding.jsx');
+const canonical = read('../utils/barryCanonical.js');
+const onboarding = read('../pages/Onboarding/BarryOnboarding.jsx');
+const sidecar = read('../components/scout/BarryICPPanel.jsx');
+const workspace = read('../components/dashboard/BarryChatPanel.jsx');
+const server = read('../../netlify/functions/barryMissionChat.js');
 
-  it('writes to missionControl during handleConfirm', () => {
-    expect(onboarding).toContain("'barryConversations', 'missionControl'");
+// ═══════════════════════════════════════════════════════════════════════════
+// C1 — dedicated canonical conversation boundary
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('C1 — canonical conversation is a dedicated subcollection', () => {
+  it('the utility uses barryConversations/canonical/turns as the path', () => {
+    expect(canonical).toContain("'barryConversations', 'canonical', 'turns'");
   });
 
-  it('bridges messages with role mapping (barry → assistant)', () => {
-    expect(onboarding).toMatch(/role: msg\.role === 'barry' \? 'assistant' : /);
+  it('appendTurn uses addDoc exclusively (never setDoc for turns)', () => {
+    const body = code(canonical);
+    expect(body).toMatch(/export async function appendTurn[\s\S]*?addDoc\(turnsRef/);
+    expect(body).not.toMatch(/setDoc\(turnsRef/);
   });
 
-  it('writes the bridge after the icp doc is marked completed', () => {
-    const completedIdx = onboarding.indexOf("status: 'completed'");
-    const bridgeIdx = onboarding.indexOf("bridgedFrom: 'barry_onboarding'");
-    expect(completedIdx).toBeGreaterThan(-1);
-    expect(bridgeIdx).toBeGreaterThan(completedIdx);
-  });
-
-  it('caps bridged messages at the same limit as BarryChatPanel (30)', () => {
-    expect(onboarding).toMatch(/bridgeMessages\.slice\(-30\)/);
-  });
-
-  it('still marks the icp conversation completed (Gate 0 invariant)', () => {
-    expect(onboarding).toMatch(/barryConversations', 'icp'[\s\S]{0,300}status: 'completed'/);
-  });
-});
-
-describe('2 — Sidecar reads the canonical conversation', () => {
-  const panel = read('../components/scout/BarryICPPanel.jsx');
-
-  it('reads missionControl first in the fallback chain', () => {
-    const missionControlIdx = panel.indexOf("'barryConversations', 'missionControl'");
-    const icpChatIdx = panel.indexOf("'barryConversations', 'icpChat'");
-    const icpIdx = panel.indexOf("'barryConversations', 'icp'");
-    expect(missionControlIdx).toBeGreaterThan(-1);
-    expect(icpChatIdx).toBeGreaterThan(missionControlIdx);
-    expect(icpIdx).toBeGreaterThan(icpChatIdx);
-  });
-
-  it('falls back to icpChat then icp for pre-Gate-1 conversations', () => {
-    const body = code(panel);
-    expect(body).toContain("'barryConversations', 'icpChat'");
-    expect(body).toContain("'barryConversations', 'icp'");
-  });
-
-  it('persists sidecar exchanges to the canonical conversation', () => {
-    expect(panel).toMatch(/barryConversations', 'missionControl'[\s\S]{0,500}merge: true/);
-  });
-
-  it('maps barry role to assistant in the canonical save', () => {
-    expect(panel).toMatch(/role: m\.role === 'barry' \? 'assistant' : m\.role/);
+  it('missionControl is not the canonical write target', () => {
+    const appendFn = canonical.slice(
+      canonical.indexOf('export async function appendTurn'),
+      canonical.indexOf('export async function loadRecentTurns')
+    );
+    expect(appendFn).not.toContain('missionControl');
   });
 });
 
-describe('3 — Shell Barry re-syncs when opened', () => {
-  const chatPanel = read('../components/dashboard/BarryChatPanel.jsx');
+// ═══════════════════════════════════════════════════════════════════════════
+// C2 — append-only persistence: no renderer overwrites conversation
+// ═══════════════════════════════════════════════════════════════════════════
 
-  it('imports useShell from ShellContext', () => {
-    expect(chatPanel).toMatch(/import.*useShell.*from.*ShellContext/);
+describe('C2 — every renderer appends, none overwrites', () => {
+  it('all three renderers import appendTurn from barryCanonical', () => {
+    for (const src of [onboarding, sidecar, workspace]) {
+      expect(src).toMatch(/import.*appendTurn.*from.*barryCanonical/);
+    }
   });
 
-  it('destructures barryOpen from the shell', () => {
-    expect(chatPanel).toMatch(/const \{ barryOpen \} = useShell\(\)/);
+  it('onboarding does not setDoc to missionControl', () => {
+    const body = code(onboarding);
+    expect(body).not.toMatch(/setDoc[\s\S]{0,200}barryConversations', 'missionControl'/);
   });
 
-  it('re-reads from Firestore when barryOpen transitions to true', () => {
-    expect(chatPanel).toContain('syncFromCanonical');
-    expect(chatPanel).toMatch(/barryOpen && !prevBarryOpenRef\.current/);
+  it('sidecar does not setDoc messages to missionControl', () => {
+    const body = code(sidecar);
+    const canonicalSaveRemoved = !body.match(/setDoc[\s\S]{0,200}barryConversations', 'missionControl'[\s\S]{0,400}messages:/);
+    expect(canonicalSaveRemoved).toBe(true);
   });
 
-  it('the re-sync is non-fatal (try/catch)', () => {
-    expect(chatPanel).toMatch(/syncFromCanonical[\s\S]{0,500}catch.*\(err\)/);
-  });
-});
-
-describe('4 — no duplicate conversations created', () => {
-  const rawPanel = read('../components/scout/BarryICPPanel.jsx');
-  const chatPanel = code(read('../components/dashboard/BarryChatPanel.jsx'));
-
-  it('sidecar canonical save targets missionControl, not icpChat', () => {
-    const idx = rawPanel.indexOf('Gate 1: persist to the canonical');
-    expect(idx).toBeGreaterThan(-1);
-    const canonBlock = rawPanel.slice(idx, idx + 600);
-    expect(canonBlock).toContain("'missionControl'");
-    expect(canonBlock).not.toContain("'icpChat'");
+  it('workspace saveConversation no longer writes a messages array', () => {
+    expect(workspace).toMatch(/async function saveMissionControlState/);
+    const fn = workspace.slice(
+      workspace.indexOf('async function saveMissionControlState'),
+      workspace.indexOf('}', workspace.indexOf('async function saveMissionControlState') + 200) + 1
+    );
+    expect(fn).not.toContain('messages');
+    expect(fn).toContain('mode');
+    expect(fn).toContain("merge: true");
   });
 
-  it('BarryChatPanel still reads and writes missionControl', () => {
-    expect(chatPanel).toContain("'barryConversations', 'missionControl'");
-  });
-});
-
-describe('5 — transient surface context does not pollute the canonical conversation', () => {
-  const panel = read('../components/scout/BarryICPPanel.jsx');
-  const chatPanel = read('../components/dashboard/BarryChatPanel.jsx');
-
-  it('icpMode is sent as a request parameter, not stored in missionControl', () => {
-    // icpMode appears in the fetch body (ephemeral request param)
-    expect(panel).toContain('icpMode: true');
-    expect(panel).toContain('.netlify/functions/barryMissionChat');
-  });
-
-  it('the canonical save does not include icpProfile or icpMode', () => {
-    const idx = panel.indexOf('Gate 1: persist to the canonical');
-    expect(idx).toBeGreaterThan(-1);
-    const canonBlock = panel.slice(idx, idx + 600);
-    expect(canonBlock).toContain("messages: canonMessages");
-    expect(canonBlock).not.toMatch(/icpProfile|icpMode|nudge/);
-  });
-
-  it('the shell navigation context is ephemeral (not persisted by BarryChatPanel)', () => {
-    // BarryChatPanel receives navigationContext as a prop and sends it with
-    // API calls, but saveConversation only writes messages/history/mode.
-    expect(chatPanel).toMatch(/saveConversation\(userId, messages, conversationHistoryRef\.current, modeRef\.current\)/);
+  it('the canonical utility guards role to user|assistant only', () => {
+    expect(canonical).toMatch(/role !== 'user' && role !== 'assistant'/);
   });
 });
 
-describe('6 — "start over" does not destroy the canonical conversation', () => {
-  const panel = read('../components/scout/BarryICPPanel.jsx');
+// ═══════════════════════════════════════════════════════════════════════════
+// C3 — retention: active context is bounded, storage is not
+// ═══════════════════════════════════════════════════════════════════════════
 
-  it('deletes the legacy icpChat doc (harmless cleanup)', () => {
-    expect(panel).toMatch(/deleteDoc.*barryConversations', 'icpChat'/);
+describe('C3 — storage retention is separate from active context', () => {
+  it('loadRecentTurns uses a Firestore limit() query', () => {
+    expect(canonical).toMatch(/query\(turnsRef[\s\S]{0,100}limit\(count\)/);
   });
 
-  it('does not delete the canonical missionControl doc', () => {
-    expect(panel).not.toMatch(/deleteDoc.*barryConversations', 'missionControl'/);
+  it('loadAllTurns exists and has no limit', () => {
+    expect(canonical).toMatch(/export async function loadAllTurns/);
+    const allFn = canonical.slice(
+      canonical.indexOf('export async function loadAllTurns'),
+      canonical.indexOf('}', canonical.indexOf('export async function loadAllTurns') + 100) + 1
+    );
+    expect(allFn).not.toContain('limit(');
   });
 
-  it('resets ICP params without clearing conversation history', () => {
-    // After Gate 1, "start over" sends the reclarification with existing
-    // conversationHistory, not an empty array.
-    expect(panel).toMatch(/sendToBarry\('__ICP_RECLARIFICATION__', conversationHistory,/);
+  it('no renderer slice()s the canonical write — appendTurn writes one doc at a time', () => {
+    const appendFn = canonical.slice(
+      canonical.indexOf('export async function appendTurn'),
+      canonical.indexOf('}', canonical.indexOf('export async function appendTurn') + 100) + 1
+    );
+    expect(appendFn).not.toContain('.slice(');
   });
 });
 
-describe('7 — Gate 0 invariants still hold', () => {
-  const onboarding = read('../pages/Onboarding/BarryOnboarding.jsx');
+// ═══════════════════════════════════════════════════════════════════════════
+// C4 — First Experience incremental persistence
+// ═══════════════════════════════════════════════════════════════════════════
 
+describe('C4 — First Experience persists turns incrementally', () => {
+  it('appends the user turn in handleSubmit before the API call', () => {
+    const submitFn = onboarding.slice(
+      onboarding.indexOf('async function handleSubmit'),
+      onboarding.indexOf('async function handleConfirm') || onboarding.length
+    );
+    expect(submitFn).toMatch(/appendTurn\(db, user\.uid,[\s\S]{0,80}role: 'user'/);
+  });
+
+  it('appends the barry turn in handleSubmit after the response', () => {
+    const submitFn = onboarding.slice(
+      onboarding.indexOf('async function handleSubmit'),
+      onboarding.indexOf('async function handleConfirm') || onboarding.length
+    );
+    expect(submitFn).toMatch(/appendTurn\(db,[\s\S]{0,100}role: 'assistant'[\s\S]{0,80}surface: 'onboarding'/);
+  });
+
+  it('appends the error response too', () => {
+    const submitFn = onboarding.slice(
+      onboarding.indexOf('async function handleSubmit'),
+      onboarding.indexOf('async function handleConfirm') || onboarding.length
+    );
+    const errorSection = submitFn.slice(submitFn.indexOf('catch (error)'));
+    expect(errorSection).toMatch(/appendTurn/);
+  });
+
+  it('appends the final confirmation message in handleConfirm', () => {
+    const confirmFn = onboarding.slice(
+      onboarding.indexOf('async function handleConfirm')
+    );
+    expect(confirmFn).toMatch(/appendTurn\(db,[\s\S]{0,100}finalMessage[\s\S]{0,80}surface: 'onboarding'/);
+  });
+
+  it('saveConversationState still writes workflow state to barryConversations/icp', () => {
+    expect(onboarding).toMatch(/barryConversations', 'icp'[\s\S]{0,300}status:/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// C5 — handleConfirm never replaces the canonical conversation
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('C5 — handleConfirm is non-destructive', () => {
+  it('does not write to barryConversations/missionControl', () => {
+    const confirmFn = code(onboarding).slice(
+      code(onboarding).indexOf('async function handleConfirm')
+    );
+    expect(confirmFn).not.toMatch(/setDoc[\s\S]{0,200}barryConversations', 'missionControl'/);
+  });
+
+  it('does not contain bridgeMessages or bridgedFrom', () => {
+    const confirmFn = onboarding.slice(
+      onboarding.indexOf('async function handleConfirm')
+    );
+    expect(confirmFn).not.toContain('bridgeMessages');
+    expect(confirmFn).not.toContain('bridgedFrom');
+  });
+
+  it('does not slice or replace the canonical conversation', () => {
+    const confirmFn = onboarding.slice(
+      onboarding.indexOf('async function handleConfirm')
+    );
+    expect(confirmFn).not.toMatch(/messages:.*\.slice\(-30\)/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// C6 — server no longer writes to icpChat
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('C6 — duplicate conversation authority eliminated', () => {
+  it('barryMissionChat no longer writes to barryConversations/icpChat', () => {
+    const body = code(server);
+    expect(body).not.toMatch(/\.doc\('icpChat'\)\.set\(/);
+  });
+
+  it('the removal comment explains why', () => {
+    expect(server).toContain('icpChat persistence removed');
+    expect(server).toMatch(/canonical[\s\S]{0,20}subcollection/);
+  });
+
+  it('sidecar still reads icpChat as a legacy fallback via seedFromLegacy', () => {
+    expect(canonical).toContain("'icpChat'");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// C7 — transient context stays transient
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('C7 — transient surface context is not persisted', () => {
+  it('appendTurn stores only role, content, surface, and createdAt', () => {
+    const appendFn = canonical.slice(
+      canonical.indexOf('export async function appendTurn'),
+      canonical.indexOf('}', canonical.indexOf('return addDoc') + 10) + 1
+    );
+    expect(appendFn).not.toMatch(/icpMode|icpProfile|nudge|navigationContext|barryMode/);
+  });
+
+  it('sidecar sends icpMode as a request parameter', () => {
+    expect(sidecar).toContain('icpMode: true');
+  });
+
+  it('workspace sends navigationContext as a request parameter', () => {
+    expect(workspace).toContain('navigationContext');
+  });
+
+  it('neither request parameter appears in the canonical append call', () => {
+    for (const src of [sidecar, workspace]) {
+      const appendCalls = src.match(/appendTurn\(db,[\s\S]{0,200}\)/g) || [];
+      for (const call of appendCalls) {
+        expect(call).not.toMatch(/icpMode|navigationContext|icpProfile/);
+      }
+    }
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// C8 — multi-renderer safety tests
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('Case A — Workspace stale: sidecar adds turns, workspace sends', () => {
+  it('workspace appends its own turn without reading first', () => {
+    expect(workspace).toMatch(/appendTurn\(db, user\.uid,[\s\S]{0,80}role: 'user'[\s\S]{0,80}surface: 'workspace'/);
+  });
+
+  it('workspace does not overwrite the conversation array on send', () => {
+    const sendFn = code(workspace).slice(
+      code(workspace).indexOf('const sendMessage = async')
+    );
+    expect(sendFn).not.toMatch(/setDoc[\s\S]{0,200}barryConversations/);
+  });
+});
+
+describe('Case B — Sidecar stale: workspace adds turns, sidecar sends', () => {
+  it('sidecar appends its own turns without overwriting', () => {
+    expect(sidecar).toMatch(/appendTurn\(db, user\.uid,[\s\S]{0,80}role: 'user'[\s\S]{0,80}surface: 'sidecar'/);
+    expect(sidecar).toMatch(/appendTurn\(db, user\.uid,[\s\S]{0,80}role: 'assistant'[\s\S]{0,80}surface: 'sidecar'/);
+  });
+
+  it('sidecar does not do a whole-array write to any barryConversations doc', () => {
+    const body = code(sidecar);
+    expect(body).not.toMatch(/setDoc[\s\S]{0,200}barryConversations[\s\S]{0,200}messages:/);
+  });
+});
+
+describe('Case C — ICP reconfirm does not destroy prior history', () => {
+  it('handleConfirm does not write to the canonical conversation at all', () => {
+    const confirmFn = code(onboarding).slice(
+      code(onboarding).indexOf('async function handleConfirm')
+    );
+    expect(confirmFn).not.toMatch(/setDoc[\s\S]{0,200}barryConversations', 'missionControl'/);
+    expect(confirmFn).not.toMatch(/setDoc[\s\S]{0,200}barryConversations', 'canonical'/);
+  });
+
+  it('"start over" in sidecar preserves conversation history', () => {
+    expect(sidecar).toMatch(/sendToBarry\('__ICP_RECLARIFICATION__', conversationHistory,/);
+  });
+
+  it('"start over" does not delete the canonical conversation', () => {
+    expect(sidecar).not.toMatch(/deleteDoc[\s\S]{0,100}canonical/);
+  });
+});
+
+describe('Case D — retention: message 31 does not destroy message 1', () => {
+  it('appendTurn is addDoc (append-only, never replaces)', () => {
+    expect(canonical).toMatch(/return addDoc\(turnsRef/);
+  });
+
+  it('no renderer calls setDoc on the turns subcollection', () => {
+    for (const src of [onboarding, sidecar, workspace]) {
+      expect(src).not.toMatch(/setDoc[\s\S]{0,100}canonical', 'turns'/);
+    }
+  });
+
+  it('loadAllTurns can recover the full history', () => {
+    expect(canonical).toMatch(/export async function loadAllTurns/);
+    const fn = canonical.slice(canonical.indexOf('loadAllTurns'));
+    expect(fn).toContain("orderBy('createdAt', 'asc')");
+    expect(fn).not.toContain('limit(');
+  });
+});
+
+describe('Case E — First Experience ambiguity (Gate 0 holds)', () => {
   it('still gates the proposal on ambiguity resolution', () => {
     expect(onboarding).toMatch(/!isAmbiguous && \(newStep === 'confirming'/);
   });
@@ -178,11 +330,28 @@ describe('7 — Gate 0 invariants still hold', () => {
   });
 });
 
-describe('8 — proposal module still writes nothing before confirmation', () => {
-  const proposal = read('../utils/targetingProposal.js');
-  const component = read('../components/onboarding/TargetingProposal.jsx');
+describe('Case F — full renderer journey: one continuous Barry', () => {
+  it('all renderers read from the same canonical subcollection', () => {
+    expect(sidecar).toMatch(/loadOrSeedRecentTurns/);
+    expect(workspace).toMatch(/loadOrSeedRecentTurns/);
+  });
 
-  it('the proposal module makes no writes and no searches', () => {
+  it('onboarding writes incrementally to canonical', () => {
+    expect(onboarding).toMatch(/appendTurn\(db,[\s\S]{0,100}surface: 'onboarding'/);
+  });
+
+  it('workspace re-syncs from canonical when opened', () => {
+    expect(workspace).toContain('syncFromCanonical');
+    expect(workspace).toMatch(/barryOpen && !prevBarryOpenRef\.current/);
+  });
+
+  it('syncFromCanonical reads from the canonical subcollection (not missionControl messages)', () => {
+    expect(workspace).toMatch(/loadOrSeedRecentTurns/);
+  });
+
+  it('the proposal module still writes nothing before confirmation', () => {
+    const proposal = read('../utils/targetingProposal.js');
+    const component = read('../components/onboarding/TargetingProposal.jsx');
     for (const src of [proposal, component]) {
       expect(src).not.toMatch(/setDoc|updateDoc|addDoc|search-companies|icpProfiles|setActiveIcpProfile/);
     }

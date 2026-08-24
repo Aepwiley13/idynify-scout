@@ -1174,16 +1174,10 @@ Return valid JSON only:
             { role: 'assistant', content: icpParsed.response_text },
           ];
 
-      // Persist conversation to Firestore (non-fatal)
-      try {
-        await db.collection('users').doc(userId).collection('barryConversations').doc('icpChat').set({
-          messages: updatedIcpHistory,
-          updatedAt: FieldValue.serverTimestamp(),
-          icpProfile: resolvedIcpProfile || null,
-        });
-      } catch (persistErr) {
-        console.warn('[barryMissionChat] Could not persist ICP conversation:', persistErr.message);
-      }
+      // icpChat persistence removed — the client-side canonical
+      // subcollection (barryConversations/canonical/turns) is the single
+      // authoritative conversation store. Legacy icpChat docs remain
+      // readable for backward compatibility but receive no new writes.
 
       await logApiUsage(userId, 'barryMissionChat', 'success', {
         provider: 'anthropic',

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
-import { doc, getDoc, setDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Brain, ArrowRight, ArrowLeft, Check, RefreshCw } from 'lucide-react';
 import BarryTyping from '../../components/onboarding/BarryTyping';
 import TargetingProposal from '../../components/onboarding/TargetingProposal';
@@ -10,6 +10,7 @@ import { readWebsite, acceleratorQuestion } from '../../utils/websiteAccelerator
 import { logEvent, EVENTS } from '../../services/analytics';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { setActiveIcpProfile } from '../../utils/setActiveIcpProfile';
+import { appendTurn } from '../../utils/barryCanonical';
 import './BarryOnboarding.css';
 
 const DEFAULT_WEIGHTS = {
@@ -216,6 +217,10 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
 
     try {
       const user = auth.currentUser;
+
+      appendTurn(db, user.uid, { role: 'user', content: input, surface: 'onboarding' })
+        .catch(err => console.warn('[BarryOnboarding] canonical append failed:', err.message));
+
       const authToken = await user.getIdToken();
 
       const action = conversationHistory.length === 0 ? 'process_initial_input' : 'process_followup';
@@ -281,6 +286,9 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
       setConversationHistory(updatedHistory);
       setBarryMessage(barryMsg);
 
+      appendTurn(db, user.uid, { role: 'assistant', content: barryMsg, surface: 'onboarding' })
+        .catch(err => console.warn('[BarryOnboarding] canonical append failed:', err.message));
+
       // Determine the gated step — the step Barry actually allows the user
       // to enter. The backend may return newStep='confirming' while flagging
       // isAmbiguous; the gate prevents that from reaching the user or being
@@ -317,6 +325,12 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
       ];
       setConversationHistory(errorHistory);
       setBarryMessage(barryErrorMsg);
+
+      const errUser = auth.currentUser;
+      if (errUser) {
+        appendTurn(db, errUser.uid, { role: 'assistant', content: barryErrorMsg, surface: 'onboarding' })
+          .catch(() => {});
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -612,6 +626,9 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
         }
       ];
       setConversationHistory(finalHistory);
+
+      appendTurn(db, user.uid, { role: 'assistant', content: finalMessage, surface: 'onboarding' })
+        .catch(err => console.warn('[BarryOnboarding] canonical append failed:', err.message));
 
       // Navigate to Mission Control after a brief delay — users watch Barry
       // work (barryState) from there.

@@ -13,8 +13,10 @@
  * The composer calls barryMissionChat — the same reasoning path as the
  * Sidecar. One Barry, one conversation, different presentations.
  *
- * During First Experience, the shell shows simplified navigation — just
- * Barry and a wordmark. After onboarding completes, the full nav appears.
+ * During First Experience, the conversation UI renders the same header,
+ * thread, and composer as post-onboarding — Barry is already here. The
+ * useFirstExperienceController drives the WHO → INTENT conversation,
+ * then hands off to FirstExperience for First Value rendering.
  */
 
 import { useState, useEffect, useRef } from 'react';
@@ -23,41 +25,24 @@ import { auth, db } from '../../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { useShell } from '../../context/ShellContext';
+import { useLocation } from 'react-router-dom';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, ASSETS } from '../../theme/tokens';
 import { appendTurn, loadOrSeedRecentTurns } from '../../utils/barryCanonical';
-import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { resolveWho } from '../../utils/resolveWho';
 import { buildContextStack } from '../../utils/barryContextStack';
 import ConversationCard from '../../components/conversation/ConversationCard';
+import useFirstExperienceController from '../../hooks/useFirstExperienceController';
 import FirstExperience from '../Onboarding/FirstExperience';
 import './BarryWorkspace.css';
 
-const SOFT_PROGRESS_STATES = {
-  prospecting: ['Understanding', 'Refining', 'Searching', 'First results'],
-  engagement: ['Understanding', 'Finding context', 'Helping you act'],
-  general: ['Getting started', 'Building context', 'Ready'],
-};
-
-function deriveSoftProgress(onboardingData, icpResolution, conversationData) {
-  const hasIcp = icpResolution && isResolved(icpResolution);
-  const hasConversation = conversationData?.currentStep === 'confirming' || conversationData?.currentStep === 'saving';
-  const isAsking = conversationData?.currentStep === 'asking' || conversationData?.currentStep === 'clarifying';
-
-  const states = SOFT_PROGRESS_STATES.prospecting;
-
-  if (hasIcp) return { states, current: 3, label: states[3] };
-  if (hasConversation) return { states, current: 2, label: states[2] };
-  if (isAsking) return { states, current: 1, label: states[1] };
-  return { states, current: 0, label: states[0] };
-}
-
 export default function BarryWorkspace() {
   const T = useT();
+  const location = useLocation();
+  const arrival = location.state?.arrival || null;
   const { closeBarry, setFirstExperience } = useShell();
   const [loading, setLoading] = useState(true);
   const [isFirstExperience, setIsFirstExperienceLocal] = useState(false);
-  const [softProgress, setSoftProgress] = useState(null);
   const [conversationTurns, setConversationTurns] = useState([]);
   const [who, setWho] = useState(null);
   const [inputValue, setInputValue] = useState('');
@@ -69,15 +54,15 @@ export default function BarryWorkspace() {
   const threadRef = useRef(null);
   const inputRef = useRef(null);
 
+  const feCtrl = useFirstExperienceController(arrival);
+
   async function init() {
     const user = getEffectiveUser() || auth.currentUser;
     if (!user) { setLoading(false); return; }
 
     try {
-      const [userSnap, convSnap, icpResolution, turns, mcSnap] = await Promise.all([
+      const [userSnap, turns, mcSnap] = await Promise.all([
         getDoc(doc(db, 'users', user.uid)).catch(() => null),
-        getDoc(doc(db, 'users', user.uid, 'barryConversations', 'icp')).catch(() => null),
-        resolveActiveIcp(user.uid),
         loadOrSeedRecentTurns(db, user.uid, 30),
         getDoc(doc(db, 'users', user.uid, 'barryConversations', 'missionControl')).catch(() => null),
       ]);
@@ -86,17 +71,11 @@ export default function BarryWorkspace() {
       if (persistedMode) setBarryMode(persistedMode);
 
       const userData = userSnap?.exists() ? userSnap.data() : null;
-      const convData = convSnap?.exists() ? convSnap.data() : null;
       const onboardingComplete = userData?.onboardingComplete || userData?.onboarding?.completed;
 
       const firstExp = !onboardingComplete;
       setIsFirstExperienceLocal(firstExp);
       setFirstExperience?.(firstExp);
-
-      if (firstExp) {
-        const progress = deriveSoftProgress(userData?.onboarding, icpResolution, convData);
-        setSoftProgress(progress);
-      }
 
       setConversationTurns(turns);
       setConversationHistory(turns.map(t => ({ role: t.role, content: t.content })));
@@ -126,7 +105,7 @@ export default function BarryWorkspace() {
     if (threadRef.current) {
       threadRef.current.scrollTop = threadRef.current.scrollHeight;
     }
-  }, [conversationTurns, sending]);
+  }, [conversationTurns, sending, feCtrl.turns, feCtrl.classifying]);
 
   useEffect(() => {
     return () => { setFirstExperience?.(false); };
@@ -229,8 +208,18 @@ export default function BarryWorkspace() {
   function handleKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage(inputValue);
+      if (isFirstExperience && feCtrl.phase !== 'handoff') {
+        handleFirstExperienceSubmit();
+      } else {
+        sendMessage(inputValue);
+      }
     }
+  }
+
+  function handleFirstExperienceSubmit() {
+    if (!inputValue.trim() || feCtrl.classifying) return;
+    feCtrl.handleUserInput(inputValue.trim());
+    setInputValue('');
   }
 
   if (loading) {
@@ -246,46 +235,153 @@ export default function BarryWorkspace() {
     );
   }
 
-  if (isFirstExperience) {
+  // First Experience — handoff phase: render FirstExperience with pre-set decision
+  if (isFirstExperience && feCtrl.phase === 'handoff') {
     return (
       <div className="barry-workspace barry-workspace--first-experience">
-        {softProgress && (
-          <div className="barry-workspace-progress" style={{ borderColor: T.border }}>
-            <div className="barry-workspace-progress-track">
-              {softProgress.states.map((label, i) => {
-                const isActive = i === softProgress.current;
-                const isDone = i < softProgress.current;
-                return (
-                  <div
-                    key={label}
-                    className={`barry-progress-step ${isDone ? 'done' : ''} ${isActive ? 'active' : ''}`}
-                  >
-                    <div
-                      className="barry-progress-dot"
-                      style={{
-                        background: isDone ? BRAND.cyan : isActive ? BRAND.pink : T.surface2,
-                        borderColor: isActive ? BRAND.pink : 'transparent',
-                      }}
-                    />
-                    <span
-                      className="barry-progress-label"
-                      style={{ color: isActive ? T.text : T.textMuted }}
-                    >
-                      {label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
         <div className="barry-workspace-content">
-          <FirstExperience />
+          <FirstExperience
+            presetDecision={feCtrl.decision}
+            presetWho={feCtrl.who}
+            presetPending={feCtrl.pending}
+            presetHeld={feCtrl.held}
+          />
         </div>
       </div>
     );
   }
 
+  // First Experience — conversational phases: render the same conversation UI
+  // as post-onboarding, but driven by the controller.
+  if (isFirstExperience && feCtrl.phase !== 'loading') {
+    const fePhase = feCtrl.phase;
+    const feTurns = feCtrl.turns;
+    const isWhoPhase = fePhase === 'who';
+    const isBusy = feCtrl.classifying;
+    const placeholder = isWhoPhase ? 'Your name' : 'Type your answer...';
+
+    return (
+      <div className="barry-workspace">
+        <div className="barry-workspace-header" style={{ borderColor: T.border }}>
+          <div className="barry-workspace-header-left">
+            <img
+              src={ASSETS.barryAvatar}
+              alt="Barry"
+              className="barry-workspace-avatar"
+              width={40}
+              height={40}
+            />
+            <div>
+              <h1 className="barry-workspace-title" style={{ color: T.text }}>Barry</h1>
+              <span className="barry-workspace-subtitle" style={{ color: T.textMuted }}>
+                Your sales intelligence co-pilot
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="barry-workspace-thread" ref={threadRef}>
+          {feTurns.map((turn, i) => (
+            <div
+              key={i}
+              className={`barry-workspace-message ${turn.role === 'user' ? 'user' : 'assistant'}`}
+            >
+              {turn.role === 'assistant' && (
+                <img
+                  src={ASSETS.barryAvatar}
+                  alt=""
+                  className="barry-workspace-msg-avatar"
+                  width={28}
+                  height={28}
+                />
+              )}
+              <div
+                className="barry-workspace-msg-bubble"
+                style={{
+                  background: turn.role === 'user' ? `${BRAND.pink}18` : T.surface,
+                  borderColor: turn.role === 'user' ? `${BRAND.pink}30` : T.border,
+                  color: T.text,
+                }}
+              >
+                <p>{turn.content}</p>
+              </div>
+            </div>
+          ))}
+
+          {isWhoPhase && (
+            <div className="barry-workspace-fe-skip">
+              <button
+                onClick={feCtrl.skipName}
+                className="barry-workspace-skip-btn"
+                style={{ color: T.textMuted }}
+              >
+                Skip
+              </button>
+            </div>
+          )}
+
+          {isBusy && (
+            <div className="barry-workspace-message assistant">
+              <img
+                src={ASSETS.barryAvatar}
+                alt=""
+                className="barry-workspace-msg-avatar"
+                width={28}
+                height={28}
+              />
+              <div
+                className="barry-workspace-msg-bubble barry-workspace-typing"
+                style={{ background: T.surface, borderColor: T.border }}
+              >
+                <span className="barry-typing-dot" />
+                <span className="barry-typing-dot" />
+                <span className="barry-typing-dot" />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="barry-workspace-composer" style={{ borderColor: T.border }}>
+          <div className="barry-workspace-composer-row">
+            <textarea
+              ref={inputRef}
+              value={inputValue}
+              rows={1}
+              onChange={(e) => {
+                setInputValue(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder={placeholder}
+              disabled={isBusy}
+              aria-label={isWhoPhase ? 'Your name' : 'Message Barry'}
+              className="barry-workspace-input"
+              style={{
+                background: T.surface,
+                borderColor: T.border,
+                color: T.text,
+              }}
+            />
+            <button
+              onClick={handleFirstExperienceSubmit}
+              disabled={isBusy || !inputValue.trim()}
+              aria-label="Send"
+              className="barry-workspace-send"
+              style={{
+                background: inputValue.trim() ? BRAND.pink : T.surface2,
+                color: inputValue.trim() ? '#fff' : T.textMuted,
+              }}
+            >
+              Send
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Post-onboarding (or first-experience controller still loading): conversation UI
   return (
     <div className="barry-workspace">
       <div className="barry-workspace-header" style={{ borderColor: T.border }}>

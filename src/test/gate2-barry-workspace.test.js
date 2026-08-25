@@ -82,7 +82,7 @@ describe('W3 — FirstExperience composition', () => {
   });
 
   it('BarryWorkspace renders <FirstExperience /> when isFirstExperience is true', () => {
-    expect(workspace).toMatch(/<FirstExperience\s*\/>/);
+    expect(workspace).toMatch(/<FirstExperience/);
   });
 
   it('BarryWorkspace checks onboardingComplete to determine first experience', () => {
@@ -409,26 +409,26 @@ describe('C6 — failed seeding is recoverable', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// C7 — Soft progress derives from currentStep, not status
+// C7 — First Experience uses controller (replaced soft progress stepper)
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('C7 — deriveSoftProgress uses currentStep', () => {
-  it('reads currentStep from conversationData', () => {
-    expect(workspaceClean).toMatch(/conversationData\?\.currentStep/);
+describe('C7 — First Experience uses controller instead of stepper', () => {
+  it('imports useFirstExperienceController', () => {
+    expect(workspace).toMatch(/import useFirstExperienceController/);
   });
 
-  it('does not read status from conversationData', () => {
-    expect(workspaceClean).not.toMatch(/conversationData\?\.status/);
+  it('does not use SOFT_PROGRESS_STATES or deriveSoftProgress', () => {
+    expect(workspaceClean).not.toMatch(/SOFT_PROGRESS_STATES/);
+    expect(workspaceClean).not.toMatch(/deriveSoftProgress/);
   });
 
-  it('checks for confirming/saving step values', () => {
-    expect(workspaceClean).toMatch(/currentStep\s*===\s*'confirming'/);
-    expect(workspaceClean).toMatch(/currentStep\s*===\s*'saving'/);
+  it('does not render progress stepper markup', () => {
+    expect(workspaceClean).not.toMatch(/barry-workspace-progress/);
+    expect(workspaceClean).not.toMatch(/barry-progress-step/);
   });
 
-  it('checks for asking/clarifying step values', () => {
-    expect(workspaceClean).toMatch(/currentStep\s*===\s*'asking'/);
-    expect(workspaceClean).toMatch(/currentStep\s*===\s*'clarifying'/);
+  it('routes composer to controller during First Experience', () => {
+    expect(workspaceClean).toMatch(/feCtrl\.handleUserInput/);
   });
 });
 

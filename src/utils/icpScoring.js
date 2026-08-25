@@ -321,19 +321,31 @@ export function calculateICPScore(company, icpProfile, weights = DEFAULT_WEIGHTS
   const dims = evaluateDimensions(company, icpProfile);
 
   let weightedSum = 0;
-  let activeWeight = 0;
+  let evaluatedWeight = 0;
+  let configuredWeight = 0;
   for (const key of ['industry', 'location', 'employeeSize', 'revenue']) {
     const dim = dims[key];
-    if (!dim.active) continue;
+    if (!dim.active) continue;                 // ICP does not configure it
+    configuredWeight += weights[key] || 0;
+    // GATE 1 (G1-06) TRUST REQUIREMENT: a dimension with no company data was not
+    // evaluated, so it must not contribute to the score at all. Previously it
+    // scored UNKNOWN (50) — half credit for something never checked, which made
+    // the number imply an evaluation that did not happen.
+    if (dim.unknown) continue;                 // out of numerator AND denominator
     weightedSum += dim.match * (weights[key] || 0);
-    activeWeight += weights[key] || 0;
+    evaluatedWeight += weights[key] || 0;
   }
 
   // No configured criteria → nothing to score against; return a neutral 50
   // rather than a misleading 0 so the UI shows "moderate, unscored".
-  if (activeWeight === 0) return UNKNOWN;
+  if (configuredWeight === 0) return UNKNOWN;
 
-  return Math.round(weightedSum / activeWeight);
+  // Configured, but nothing measurable. Deliberately null, not 0: 0 renders as
+  // "Low Fit", which is a claim we cannot support. Callers that need a number
+  // coerce with `?? 0`; callers that care read computeCoverage().complete.
+  if (evaluatedWeight === 0) return null;
+
+  return Math.round(weightedSum / evaluatedWeight);
 }
 
 /**
@@ -507,18 +519,58 @@ export function getScoreBreakdown(company, icpProfile, weights = DEFAULT_WEIGHTS
     ? evaluateDimensions(company, icpProfile)
     : { industry: { match: 0 }, location: { match: 0 }, employeeSize: { match: 0 }, revenue: { match: 0 } };
 
-  const row = (key) => ({
-    match: dims[key].match,
-    weight: weights[key],
-    contribution: Math.round(dims[key].match * (weights[key] / 100))
-  });
+  // `match` stays in {0,50,100} so existing tooltips keep working. `state` is the
+  // Gate 1 addition: it separates "no data" from "evaluated and did not match",
+  // which the score alone can no longer express now that unknowns are excluded.
+  const row = (key) => {
+    const d = dims[key];
+    const active = !!d.active;
+    const unknown = !!d.unknown;
+    const state = !active ? 'not_configured'
+      : unknown ? 'unknown'
+      : d.match === 100 ? 'matched'
+      : d.match === 50 ? 'partial'
+      : 'missed';
+    return {
+      match: d.match,
+      weight: weights[key],
+      active,
+      unknown,
+      state,
+      value: d.value ?? null,
+      // An unknown dimension contributes nothing — showing 0 here previously read
+      // as "scored zero" when the truth was "never measured".
+      contribution: (!active || unknown) ? null : Math.round(d.match * (weights[key] / 100))
+    };
+  };
 
-  return {
+  const rows = {
     industry: row('industry'),
     location: row('location'),
     employeeSize: row('employeeSize'),
-    revenue: row('revenue'),
-    totalScore: calculateICPScore(company, icpProfile, weights)
+    revenue: row('revenue')
+  };
+
+  let evaluatedWeight = 0, totalConfiguredWeight = 0;
+  for (const k of ['industry', 'location', 'employeeSize', 'revenue']) {
+    if (!rows[k].active) continue;
+    totalConfiguredWeight += rows[k].weight || 0;
+    if (!rows[k].unknown) evaluatedWeight += rows[k].weight || 0;
+  }
+
+  const totalScore = calculateICPScore(company, icpProfile, weights);
+
+  return {
+    ...rows,
+    totalScore,
+    scored: totalScore !== null,
+    evaluatedWeight,
+    totalConfiguredWeight,
+    // "we measured N% of what this ICP asks for" — drives the card's
+    // "N of M factors measured" line so a score never overstates its basis.
+    confidence: totalConfiguredWeight > 0
+      ? Math.round((evaluatedWeight / totalConfiguredWeight) * 100)
+      : 0
   };
 }
 

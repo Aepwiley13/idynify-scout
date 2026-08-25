@@ -84,7 +84,14 @@ async function findPrecedingGuardrail(userId, contactId, outcomeBefore) {
       warning_message: latest.metadata?.warning_message || null
     };
   } catch (error) {
-    console.error('[OutcomeAttribution] Error finding guardrail:', error.message);
+    // G1-10: distinguish a missing timeline(type, timestamp) composite index
+    // from a genuine empty result — both previously logged the same line.
+    const missingIndex = error?.code === 9 || /FAILED_PRECONDITION|requires an index/i.test(error?.message || '');
+    console.error('[OutcomeAttribution] findPrecedingGuardrail failed', {
+      reason: missingIndex ? 'missing_composite_index' : 'query_failed',
+      code: error?.code,
+      message: (error?.message || '').slice(0, 300),
+    });
     return null;
   }
 }

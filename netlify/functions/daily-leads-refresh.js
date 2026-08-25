@@ -3,6 +3,12 @@
 // Tops off company queue for active users and sends email notifications
 
 import { schedule } from '@netlify/functions';
+import { admin, db } from './firebase-admin.js';
+
+/** Typed failure so a discovery error can never be laundered into a clean zero. */
+class DiscoveryError extends Error {
+  constructor(code, detail) { super(code); this.name = 'DiscoveryError'; this.code = code; this.detail = detail; }
+}
 
 const handler = async (event) => {
   const startTime = Date.now();
@@ -25,16 +31,23 @@ const handler = async (event) => {
       };
     }
 
-    // Get Firebase credentials
-    const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
-    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
-
-    if (!firebaseApiKey || !projectId) {
-      throw new Error('Firebase credentials not configured');
+    // Kill switch — halt the unattended job without a deploy (see rollback plan).
+    if (String(process.env.DISCOVERY_CRON_ENABLED).toLowerCase() === 'false') {
+      console.warn('discovery.scheduled.disabled — DISCOVERY_CRON_ENABLED=false');
+      return { statusCode: 200, body: JSON.stringify({ success: true, disabled: true, reason: 'DISCOVERY_CRON_ENABLED=false' }) };
     }
 
-    // Get all active users (users with companyProfile/current)
-    const activeUsers = await getActiveUsers(projectId);
+    const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+    if (!firebaseApiKey) throw new DiscoveryError('missing_api_key');
+
+    let activeUsers;
+    try {
+      activeUsers = await getActiveUsers();
+    } catch (err) {
+      // Enumeration failure is fatal and must NEVER present as "0 eligible users".
+      console.error('discovery.scheduled.failed', { failureCode: 'enumeration_failed', message: err.message });
+      return { statusCode: 500, body: JSON.stringify({ success: false, failureCode: 'enumeration_failed', error: err.message }) };
+    }
 
     console.log(`📊 Found ${activeUsers.length} active users with ICP profiles`);
 
@@ -53,8 +66,7 @@ const handler = async (event) => {
       try {
         results.processed++;
 
-        // Get user's auth token (use service account for scheduled jobs)
-        const authToken = await getServiceAccountToken();
+        const authToken = await mintUserIdToken(user.userId);
 
         // A background job has no greater authority to infer ICP identity than
         // an interactive caller. If this user's ICP cannot be resolved, skip
@@ -97,8 +109,11 @@ const handler = async (event) => {
         results.failed++;
         results.errors.push({
           userId: user.userId,
-          error: userError.message
+          code: userError.code || 'unknown',
+          error: userError.message,
+          detail: userError.detail || null
         });
+        console.error('discovery.scheduled.user_failed', { userId: user.userId, failureCode: userError.code || 'unknown' });
         console.error(`❌ Error processing user ${user.userId}:`, userError);
         // Continue with next user
       }
@@ -108,13 +123,16 @@ const handler = async (event) => {
 
     console.log(`✅ Daily refresh complete: ${results.refreshed}/${results.processed} users refreshed, ${results.skipped} skipped (${JSON.stringify(results.skippedReasons)}), ${results.emailed} emails sent in ${duration}s`);
 
+    // 207 on partial failure is the alertable signal: a 200 must mean every
+    // eligible user succeeded. An honest zero (no Apollo matches) still returns 200.
+    const allOk = results.failed === 0 && results.errors.length === 0;
+    console.log(allOk ? 'discovery.scheduled.ok' : 'discovery.scheduled.partial_failure', {
+      usersEligible: activeUsers.length, usersProcessed: results.processed,
+      usersFailed: results.failed, companiesAdded: results.refreshed, durationMs: Date.now() - startTime,
+    });
     return {
-      statusCode: 200,
-      body: JSON.stringify({
-        success: true,
-        results,
-        duration
-      })
+      statusCode: allOk ? 200 : 207,
+      body: JSON.stringify({ success: allOk, results, duration })
     };
 
   } catch (error) {
@@ -198,87 +216,72 @@ async function resolveActiveIcpViaRest(projectId, userId) {
 /**
  * Get all active users with ICP profiles
  */
-async function getActiveUsers(projectId) {
-  try {
-    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+async function getActiveUsers() {
+  // G1-08 CHANGE A — this used to GET the Firestore REST endpoint for /users with
+  // NO Authorization header. firestore.rules is owner-only and permits no list of
+  // /users, so the request was denied, the error was caught, and the function
+  // returned []. The job's real production signature was
+  //   "Found 0 active users with ICP profiles"
+  // and it never reached the token bug below it. Enumeration must use the Admin
+  // SDK, which bypasses rules legitimately and is already used by 20+ functions.
+  const usersSnap = await db.collection('users').select('email').get();
+  const active = [];
 
-    // Get all users
-    const usersResponse = await fetch(`${firestoreUrl}/users`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!usersResponse.ok) {
-      throw new Error('Failed to fetch users');
+  for (const userDoc of usersSnap.docs) {
+    const profileSnap = await db.doc(`users/${userDoc.id}/companyProfile/current`).get();
+    if (!profileSnap.exists) continue;
+    const p = profileSnap.data() || {};
+    const profile = {
+      industries: p.industries || [],
+      companySizes: p.companySizes || [],
+      revenueRanges: p.revenueRanges || [],
+      locations: p.locations || [],
+      isNationwide: !!p.isNationwide,
+      skipRevenue: !!p.skipRevenue,
+    };
+    if (profile.industries.length || profile.companySizes.length || profile.locations.length) {
+      active.push({ userId: userDoc.id, email: userDoc.get('email') ?? null, profile });
     }
-
-    const usersData = await usersResponse.json();
-    const users = usersData.documents || [];
-
-    const activeUsers = [];
-
-    // For each user, check if they have a companyProfile
-    for (const userDoc of users) {
-      try {
-        const userId = userDoc.name.split('/').pop();
-
-        // Get user's email from profile
-        const userEmail = userDoc.fields?.email?.stringValue || null;
-
-        // Get company profile
-        const profileResponse = await fetch(`${firestoreUrl}/users/${userId}/companyProfile/current`, {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        });
-
-        if (profileResponse.ok) {
-          const profileData = await profileResponse.json();
-
-          // Extract profile fields
-          const profile = {
-            industries: profileData.fields?.industries?.arrayValue?.values?.map(v => v.stringValue) || [],
-            companySizes: profileData.fields?.companySizes?.arrayValue?.values?.map(v => v.stringValue) || [],
-            revenueRanges: profileData.fields?.revenueRanges?.arrayValue?.values?.map(v => v.stringValue) || [],
-            locations: profileData.fields?.locations?.arrayValue?.values?.map(v => v.stringValue) || [],
-            isNationwide: profileData.fields?.isNationwide?.booleanValue || false,
-            skipRevenue: profileData.fields?.skipRevenue?.booleanValue || false
-          };
-
-          // Only include users with at least one ICP criterion defined
-          if (profile.industries.length > 0 || profile.companySizes.length > 0 || profile.locations.length > 0) {
-            activeUsers.push({
-              userId,
-              email: userEmail,
-              profile
-            });
-          }
-        }
-      } catch (profileError) {
-        // Skip users without profiles
-        continue;
-      }
-    }
-
-    return activeUsers;
-
-  } catch (error) {
-    console.error('Error fetching active users:', error);
-    return [];
   }
+  return active;   // throws on real infrastructure failure — the handler reports it
 }
 
 /**
- * Get service account token for Firestore API calls
+ * G1-08 CHANGE B — mint a REAL Firebase ID token for the user.
+ *
+ * This previously returned FIREBASE_API_KEY, which search-companies then posted
+ * to identitytoolkit accounts:lookup as `idToken`. An API key is not an ID
+ * token, so verification failed with 'Invalid authentication token'.
+ *
+ * Admin signs a custom token; Identity Toolkit exchanges it for a genuine ID
+ * token for that uid. search-companies is UNCHANGED and its auth is NOT
+ * weakened — it verifies this token exactly as it verifies a browser's.
+ *
+ * Requires the service account to hold Service Account Token Creator
+ * (iam.serviceAccounts.signBlob).
  */
-async function getServiceAccountToken() {
-  // For now, return a placeholder
-  // In production, this would use Firebase Admin SDK or service account credentials
-  // Since we're calling public Firestore REST API, we can use the API key
-  return process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+async function mintUserIdToken(userId) {
+  const apiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
+  if (!apiKey) throw new DiscoveryError('missing_api_key');
+
+  let customToken;
+  try {
+    customToken = await admin.auth().createCustomToken(userId);
+  } catch (err) {
+    throw new DiscoveryError('custom_token_failed', err.message);
+  }
+
+  const res = await fetch(
+    `https://identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=${apiKey}`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: customToken, returnSecureToken: true }) }
+  );
+  if (!res.ok) {
+    throw new DiscoveryError('token_exchange_failed', `${res.status}: ${(await res.text()).slice(0, 200)}`);
+  }
+  const data = await res.json();
+  if (!data.idToken) throw new DiscoveryError('token_exchange_failed', 'no idToken in response');
+  return data.idToken;
 }
 
 /**
@@ -303,7 +306,7 @@ async function refreshUserQueue(userId, authToken, companyProfile, icpId) {
     });
 
     if (!searchResponse.ok) {
-      throw new Error('Search companies request failed');
+      throw new DiscoveryError('search_failed', `${searchResponse.status}: ${(await searchResponse.text()).slice(0, 200)}`);
     }
 
     const result = await searchResponse.json();
@@ -315,12 +318,11 @@ async function refreshUserQueue(userId, authToken, companyProfile, icpId) {
     };
 
   } catch (error) {
-    console.error('Error refreshing user queue:', error);
-    return {
-      companiesFound: 0,
-      companiesAdded: 0,
-      currentQueueSize: 0
-    };
+    // G1-08 CHANGE C — this used to convert ANY failure into all-zeros, which the
+    // caller's `companiesAdded > 0 || currentQueueSize > 0` guard then read as
+    // "nothing to do". A total auth failure and a genuinely empty result were
+    // indistinguishable, and the cron logged a clean success either way.
+    throw error instanceof DiscoveryError ? error : new DiscoveryError('search_failed', error.message);
   }
 }
 

@@ -1321,6 +1321,17 @@ function extractStateFromLocation(location) {
   return parts[0];
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// G1-07 — DEAD CODE. DO NOT BIND NEW CALLERS TO THIS.
+// This is a SECOND, incompatible scoring model: flat 30/25/20/25 (vs the
+// canonical configurable 50/25/15/10), and it awards full revenue points merely
+// for `skipRevenue` being set. Its only caller is enrichCompanyData(), which is
+// itself never called — the whole chain is unreachable, and companies are saved
+// with no fit_score.
+// THE CANONICAL SCORER IS src/utils/icpScoring.js. It was left in place rather
+// than deleted only because removing it means removing enrichCompanyData() too,
+// which is outside the authorised Gate 1 change set.
+// ─────────────────────────────────────────────────────────────────────────────
 function calculateFitScore(company, companyProfile) {
   let score = 0;
   let maxScore = 0;

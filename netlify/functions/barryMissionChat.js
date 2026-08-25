@@ -212,7 +212,18 @@ async function loadSwipeFeedback(userId) {
       low,
       notes: { toward: notestoward, away: notesaway },
     };
-  } catch {
+  } catch (error) {
+    // G1-10: this was a bare `catch { return null }`. The companies(status,
+    // swipedAt) composite index does not exist in production, so this query has
+    // always thrown FAILED_PRECONDITION and swipe feedback has NEVER reached
+    // Barry's prompt — silently. A missing index and an empty result must not
+    // look the same.
+    const missingIndex = error?.code === 9 || /FAILED_PRECONDITION|requires an index/i.test(error?.message || '');
+    console.error('[barryMissionChat] loadSwipeFeedback failed', {
+      reason: missingIndex ? 'missing_composite_index' : 'query_failed',
+      code: error?.code,
+      message: (error?.message || '').slice(0, 300),
+    });
     return null;
   }
 }

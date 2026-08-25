@@ -210,7 +210,9 @@ export const handler = async (event) => {
                 gmailThreadId: reply.gmailThreadId,
                 repliedAt: now,
               },
-              timestamp: now,
+              // G1-04: `now` is an ISO string. Firestore orders strings AFTER timestamps,
+              // so in a desc query these pinned themselves above every real event.
+              timestamp: FieldValue.serverTimestamp(),
               createdAt: FieldValue.serverTimestamp(),
             });
         } catch (writeErr) {

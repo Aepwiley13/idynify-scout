@@ -18,6 +18,7 @@
 import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { writeTimelineEvent, ACTORS } from './utils/timelineWrite.js';
 
 if (getApps().length === 0) {
   const privateKey = process.env.FIREBASE_PRIVATE_KEY
@@ -224,23 +225,22 @@ export const handler = async (event) => {
         }
 
         // Log timeline event
-        await db
-          .collection('users').doc(userId)
-          .collection('contacts').doc(contact.id)
-          .collection('timeline')
-          .add({
-            type: 'message_received',
-            actor: 'contact',
-            preview: subjectHeader || 'Reply received',
-            metadata: {
-              gmailMessageId: gmailReplyId,
-              gmailThreadId: contact.gmail_thread_id,
-              fromAddress: fromHeader,
-              autoDetected: true,
-            },
-            timestamp: receivedAt,
-            createdAt: FieldValue.serverTimestamp(),
-          });
+        // G1-04: 'message_received' was in neither client allowlist; it now
+        // validates against the shared contract like every other event.
+        await writeTimelineEvent(db, {
+          userId,
+          contactId: contact.id,
+          type: 'message_received',
+          actor: ACTORS.CONTACT,
+          preview: subjectHeader || 'Reply received',
+          metadata: {
+            gmailMessageId: gmailReplyId,
+            gmailThreadId: contact.gmail_thread_id,
+            fromAddress: fromHeader,
+            autoDetected: true,
+            receivedAt: typeof receivedAt === 'string' ? receivedAt : null,
+          },
+        });
 
         transitioned.push({
           contactId: contact.id,

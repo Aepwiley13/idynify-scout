@@ -257,7 +257,9 @@ export default function PersistentEngageBar({ contact, onEngageClick, collapsed,
       const timelineRef = collection(
         db, 'users', user.uid, 'contacts', contact.id, 'timeline'
       );
-      const q = query(timelineRef, orderBy('timestamp', 'desc'), limit(10));
+      // G1-05: createdAt, not timestamp — see ContactProfile.jsx. This window feeds
+      // deriveEngageState(), so a poisoned sort produced a wrong engage state.
+      const q = query(timelineRef, orderBy('createdAt', 'desc'), limit(10));
       const snap = await getDocs(q);
       const events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       setLastEvents(events);

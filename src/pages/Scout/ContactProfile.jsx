@@ -215,7 +215,11 @@ export default function ContactProfile({
       const [contactDoc, referralAnalytics, timelineSnap] = await Promise.all([
         getDoc(doc(db, 'users', userId, 'contacts', contactId)),
         getContactReferralAnalytics(userId, contactId).catch(() => null),
-        getDocs(query(timelineRef, orderBy('timestamp', 'desc'), limit(30))).catch(() => null),
+        // G1-05: ordered by createdAt, not timestamp. Production audit: createdAt has
+        // 100% coverage (2196/2196) and is always a real Timestamp; `timestamp` was
+        // missing on 256 docs and stored as an ISO STRING on 39, which sorted them
+        // above every real event. Ordering here needs no backfill and loses nothing.
+        getDocs(query(timelineRef, orderBy('createdAt', 'desc'), limit(30))).catch(() => null),
       ]);
 
       if (!contactDoc.exists()) {

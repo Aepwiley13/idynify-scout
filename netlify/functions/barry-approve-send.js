@@ -430,7 +430,14 @@ export const handler = async (event) => {
         updatedAt: FieldValue.serverTimestamp(),
       });
 
+      // G1-04: was written with `eventType` and no `timestamp`, so it carried no
+      // recognised type and was invisible to every orderBy('timestamp') read.
+      // `messageRecordId` MUST stay top-level — process-barry-inbox-queue.js
+      // queries the timeline on it directly.
       await contactRef.collection('timeline').add({
+        type: 'reply_sent',
+        actor: 'user',
+        timestamp: FieldValue.serverTimestamp(),
         eventType: 'reply_sent',
         contactId,
         messageRecordId,

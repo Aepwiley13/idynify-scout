@@ -36,11 +36,19 @@ describe('calculateICPScore — differentiation (the core bug)', () => {
     expect(calculateICPScore(company, FULL_ICP)).toBeGreaterThanOrEqual(90);
   });
 
-  it('scores a partial match (industry only, size/location unknown) in the 60-80 band', () => {
+  // UPDATED BY GATE 1 (G1-06). Previously asserted a 60-80 band, which existed
+  // only because unknown dimensions scored a neutral 50 and dragged the total
+  // down. That blend is exactly what Gate 1 forbids: it let the number imply a
+  // partial evaluation of dimensions that were never evaluated. The honest
+  // model is "100 of what we could measure, and we measured half of it" —
+  // differentiation moves from the score into the score/confidence pair.
+  it('scores industry-only as a full match of what was measurable, with reduced confidence', () => {
     const company = { industry: 'Credit Unions' }; // no size/location/revenue data
-    const score = calculateICPScore(company, FULL_ICP);
-    expect(score).toBeGreaterThanOrEqual(60);
-    expect(score).toBeLessThanOrEqual(80);
+    const b = getScoreBreakdown(company, FULL_ICP);
+    expect(b.totalScore).toBe(100);
+    expect(b.confidence).toBeLessThan(100);
+    expect(b.employeeSize.state).toBe('unknown');
+    expect(b.location.state).toBe('unknown');
   });
 
   it('scores a weak match (wrong industry) below 50', () => {
@@ -56,9 +64,16 @@ describe('calculateICPScore — differentiation (the core bug)', () => {
       { industry: 'Banking & Credit Unions' }, // partial industry
       { industry: 'Fast Food' },
     ];
+    // UPDATED BY GATE 1 (G1-06): differentiation is now carried by the
+    // (score, confidence) pair — confidence is what separates a fully-evaluated
+    // match from a half-evaluated one, and it is what the queue sorts on as a
+    // tie-break. The original intent (no collapse to a two-value score) is kept.
+    const pairs = companies.map((c) => {
+      const b = getScoreBreakdown(c, FULL_ICP);
+      return `${b.totalScore}/${b.confidence}`;
+    });
+    expect(new Set(pairs).size).toBeGreaterThanOrEqual(4); // clearly differentiated
     const scores = companies.map((c) => calculateICPScore(c, FULL_ICP));
-    const unique = new Set(scores);
-    expect(unique.size).toBeGreaterThanOrEqual(4); // clearly differentiated
     expect(scores.every((s) => s === 0 || s === 50)).toBe(false); // not the old bug
   });
 });
@@ -81,13 +96,18 @@ describe('calculateICPScore — field-name resolution', () => {
     expect(calculateICPScore({ state: 'NY' }, icp)).toBe(0);
   });
 
-  it('treats a configured-but-missing dimension as neutral, not a hard miss', () => {
-    // Industry matches; size configured but company has no size data → 50 neutral.
+  // REPLACED BY GATE 1 (G1-06). The old rule ("missing → neutral 50") is the
+  // precise behaviour the gate removes: a score must never imply evaluation of a
+  // dimension that was not evaluated. Missing data is now excluded from the
+  // score entirely and reported as `unknown` — neither a miss nor a half-match.
+  it('excludes a configured-but-missing dimension instead of scoring it', () => {
     const icp = { industries: ['SaaS'], companySizes: ['51-100'] };
-    const score = calculateICPScore({ industry: 'SaaS' }, icp);
-    // industry(100)*50 + size(50)*15, normalized over 65 weight → ~88.5 → not 100, not 50.
-    expect(score).toBeGreaterThan(50);
-    expect(score).toBeLessThan(100);
+    const b = getScoreBreakdown({ industry: 'SaaS' }, icp);
+    expect(b.employeeSize.state).toBe('unknown');
+    expect(b.employeeSize.unknown).toBe(true);
+    expect(b.employeeSize.contribution).toBeNull();   // contributes nothing
+    expect(b.evaluatedWeight).toBeLessThan(b.totalConfiguredWeight);
+    expect(b.totalScore).toBe(100);                   // 100% of what was measured
   });
 });
 
@@ -99,11 +119,13 @@ describe('calculateICPScore — graceful with missing fields (DECISION 2)', () =
     expect(score).toBeGreaterThanOrEqual(75);
   });
 
-  it('does not throw and returns a finite score for a company with no usable fields', () => {
-    const score = calculateICPScore({ name: 'Mystery Co' }, FULL_ICP);
-    expect(Number.isFinite(score)).toBe(true);
-    expect(score).toBeGreaterThanOrEqual(0);
-    expect(score).toBeLessThanOrEqual(100);
+  // UPDATED BY GATE 1 (G1-06): a company with nothing measurable is now
+  // explicitly unscoreable (null) rather than a finite number. Returning 0 would
+  // render as "Low Fit" — a claim about a company we know nothing about.
+  it('returns null, not a number, for a company with no usable fields', () => {
+    expect(() => calculateICPScore({ name: 'Mystery Co' }, FULL_ICP)).not.toThrow();
+    expect(calculateICPScore({ name: 'Mystery Co' }, FULL_ICP)).toBeNull();
+    expect(getScoreBreakdown({ name: 'Mystery Co' }, FULL_ICP).scored).toBe(false);
   });
 
   it('keeps an out-of-industry company below the Good Fit threshold even with missing data', () => {

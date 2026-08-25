@@ -232,7 +232,9 @@ export default function NextBestStep({ contact, onEngageClick, onStepConfirmed }
       }
 
       // Log to timeline
-      await logTimelineEvent(user.uid, contact.id, {
+      await logTimelineEvent({
+        userId: user.uid,
+        contactId: contact.id,
         type: 'next_step_queued',
         actor: ACTORS.BARRY,
         preview: proposal.suggestion,

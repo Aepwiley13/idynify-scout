@@ -16,7 +16,7 @@ import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
 import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
 import BarryICPPanel, { BarryAvatar } from '../../components/scout/BarryICPPanel';
-import { getScoreBreakdown, DEFAULT_WEIGHTS, calculateICPScore, generateMatchReasons } from '../../utils/icpScoring';
+import { getScoreBreakdown, DEFAULT_WEIGHTS, calculateICPScore, generateMatchReasons, computeCoverage } from '../../utils/icpScoring';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 import { RECORD_STATUS } from '../../constants/statusModel';
@@ -256,27 +256,37 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
   const handleSendRejectionFeedback = () => { setGone('l'); setTimeout(() => onReject({ reasons: rejectionReasons, note: rejectionNote }), 280); };
 
   const tx = gone === 'r' ? 700 : gone === 'l' ? -700 : dx;
-  const score = company.fit_score || company.score || 0;
-  const sc = score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : STATUS.red;
-  const scoreLabel = score >= 75 ? 'Strong Fit' : score >= 50 ? 'Good Match' : 'Low Fit';
+  // G1-06: a null score means "configured criteria, but nothing measurable on
+  // this company". That is NOT 0 / "Low Fit" — it is an absence of evidence, and
+  // labelling it as a poor match is the exact dishonesty Gate 1 removes.
+  const rawScore = company.fit_score ?? company.score ?? null;
+  const isScored = rawScore !== null && rawScore !== undefined;
+  const score = isScored ? rawScore : 0;
+  const sc = !isScored ? T.textFaint : score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : STATUS.red;
+  const scoreLabel = !isScored ? 'Not enough data'
+    : score >= 75 ? 'Strong Fit' : score >= 50 ? 'Good Match' : 'Low Fit';
   const barryText = company.barry_intel || company.barry_context || company.barryIntel
     || `${company.name} is a ${company.industry || 'company'} — review their profile to assess fit.`;
 
   // ICP factor breakdown (calculated live from stored profile)
   const breakdown = (icpProfile && company) ? getScoreBreakdown(company, icpProfile, icpWeights || DEFAULT_WEIGHTS) : null;
 
-  const configuredFactors = icpProfile ? {
-    industry: (icpProfile.industries || []).length > 0,
-    location: (icpProfile.locations || []).length > 0 || icpProfile.isNationwide,
-    employeeSize: (icpProfile.companySizes || []).length > 0,
-    revenue: (icpProfile.revenueRanges || []).length > 0,
-  } : {};
+  // G1-06: pills are driven by what was ACTUALLY EVALUATED (breakdown.state),
+  // not by what the ICP happens to configure. The old version filtered on ICP
+  // configuration alone, so a dimension the company had no data for rendered as
+  // "0%" — presenting "never measured" as "measured and did not match".
   const factorPills = breakdown ? [
     { key: 'industry', label: 'Industry', data: breakdown.industry },
     { key: 'location', label: 'Location', data: breakdown.location },
     { key: 'employeeSize', label: 'Size', data: breakdown.employeeSize },
     { key: 'revenue', label: 'Revenue', data: breakdown.revenue },
-  ].filter(f => configuredFactors[f.key]) : [];
+  ].filter(f => f.data && f.data.active) : [];
+
+  // "2 of 4 factors measured" — keeps the score from overstating its own basis.
+  const measuredCount = factorPills.filter(f => !f.data.unknown).length;
+  const coverageNote = factorPills.length > 0
+    ? `${measuredCount} of ${factorPills.length} factor${factorPills.length === 1 ? '' : 's'} measured`
+    : null;
 
   // HQ and CEO — try multiple Apollo field names
   const hqLocation = company.hq_location
@@ -456,30 +466,43 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
             display: 'flex', flexWrap: 'wrap', gap: 5,
           }}>
             {factorPills.map(({ key, label, data }) => {
-              const pillColor = data.match === 100 ? STATUS.green
+              // G1-06: three visual states. `unknown` is deliberately NOT red —
+              // we did not evaluate this dimension, so showing it as a failed
+              // match would assert something we never checked.
+              const pillColor = data.unknown ? T.textFaint
+                : data.match === 100 ? STATUS.green
                 : data.match === 50 ? STATUS.amber
                 : STATUS.red;
-              const symbol = data.match === 100 ? '✓'
+              const symbol = data.unknown ? '–'
+                : data.match === 100 ? '✓'
                 : data.match === 50 ? '≈'
                 : '✗';
               return (
                 <span
                   key={key}
+                  title={data.unknown
+                    ? `${label}: no data available for this company — not included in the score`
+                    : `${label}: ${data.match}% match`}
                   style={{
                     fontSize: 9,
                     fontWeight: 600,
                     padding: '2px 7px',
                     borderRadius: 7,
-                    background: `${pillColor}18`,
-                    border: `1px solid ${pillColor}30`,
+                    background: data.unknown ? 'transparent' : `${pillColor}18`,
+                    border: `1px ${data.unknown ? 'dashed' : 'solid'} ${pillColor}${data.unknown ? '55' : '30'}`,
                     color: pillColor,
                     whiteSpace: 'nowrap',
                   }}
                 >
-                  {label} {symbol}
+                  {label} {symbol}{data.unknown ? ' n/a' : ''}
                 </span>
               );
             })}
+            {coverageNote && (
+              <span style={{ fontSize: 9, color: T.textFaint, alignSelf: 'center', marginLeft: 2 }}>
+                {coverageNote}
+              </span>
+            )}
           </div>
         )}
 
@@ -1428,9 +1451,17 @@ export default function DailyLeads({ onNavigate }) {
       const scoredData = companiesData.map(c => ({
         ...c,
         fit_score: calculateICPScore(c, activeProfile, activeProfile.scoringWeights || DEFAULT_WEIGHTS),
+        // % of the configured model that was actually measurable on this company
+        fit_confidence: computeCoverage(c, activeProfile).complete ? 100
+          : Math.round((computeCoverage(c, activeProfile).observed.length
+              / Math.max(1, computeCoverage(c, activeProfile).relevant.length)) * 100),
         fit_reasons: generateMatchReasons(c, activeProfile),
       }));
-      scoredData.sort((a, b) => (b.fit_score || 0) - (a.fit_score || 0));
+      // G1-06: tie-break on how much of the model was actually measured, so a
+      // fully-evaluated match outranks a half-evaluated one at the same score.
+      scoredData.sort((a, b) =>
+        ((b.fit_score ?? 0) - (a.fit_score ?? 0))
+        || ((b.fit_confidence ?? 0) - (a.fit_confidence ?? 0)));
 
       // Save the full unfiltered pool so ICP switching can re-filter without re-fetching
       allCompaniesRef.current = allPendingData;
@@ -1590,9 +1621,14 @@ export default function DailyLeads({ onNavigate }) {
     const rescored = filtered.map(c => ({
       ...c,
       fit_score: calculateICPScore(c, selectedICP, selectedICP.scoringWeights || DEFAULT_WEIGHTS),
+      fit_confidence: computeCoverage(c, selectedICP).complete ? 100
+        : Math.round((computeCoverage(c, selectedICP).observed.length
+            / Math.max(1, computeCoverage(c, selectedICP).relevant.length)) * 100),
       fit_reasons: generateMatchReasons(c, selectedICP),
     }));
-    rescored.sort((a, b) => b.fit_score - a.fit_score);
+    rescored.sort((a, b) =>
+      ((b.fit_score ?? 0) - (a.fit_score ?? 0))
+      || ((b.fit_confidence ?? 0) - (a.fit_confidence ?? 0)));
     setCompanies(rescored);
     setCurrentIndex(0);
   }, [activeICPId, icpList, companies]);
@@ -1877,7 +1913,11 @@ export default function DailyLeads({ onNavigate }) {
       const newConsecutive = consecutiveZeroBatches + 1;
       setConsecutiveZeroBatches(newConsecutive);
       if (newConsecutive >= 2) {
-        setFeedbackImpactMsg(`Barry has noted ${newConsecutive} batches with no matches — adjusting your targeting now.`);
+        // G1-11 (C1): the old copy claimed "adjusting your targeting now".
+        // Nothing on this path adjusts targeting — handleNextBatch only
+        // increments a counter. Reinstate the original wording only once
+        // adaptive signals are persisted to icpProfiles and read server-side.
+        setFeedbackImpactMsg(`Barry has noted ${newConsecutive} batches with no matches. Adjust your ICP in Settings to change what Scout finds.`);
         setTimeout(() => setFeedbackImpactMsg(null), 6000);
       }
     } else {

@@ -53,122 +53,25 @@
  *   sequence_completed
  */
 
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
-import { db } from '../firebase/config';
 
-// ── All event types (original + new) ────────────────────
 
-const ALL_TIMELINE_EVENT_TYPES = [
-  // Original events (from timelineLogger.js)
-  'message_generated',
-  'message_sent',
-  'mission_assigned',
-  'campaign_assigned',
-  'lead_status_changed',
-  'contact_status_changed',
-  'sequence_step_proposed',
-  'sequence_step_approved',
-  'sequence_step_sent',
-  'sequence_step_skipped',
-  'sequence_completed',
-
-  // Engage Module Events
-  'engage_session_started',
-  'engage_session_completed',
-  'engage_session_abandoned',
-  'engage_session_pivoted',
-  'message_generated_all_types',
-  'channel_blocked',
-  'channel_pivot_started',
-
-  // Next Best Step Events
-  // Canonical name used by integration checks and Beta's UI: next_step_queued
-  // next_best_step_proposed is kept as an alias for backward compatibility
-  'next_step_queued',             // Canonical: NBS proposed by Barry and saved to queue
-  'next_step_confirmed',          // Canonical: User confirmed the NBS
-  'next_step_completed',          // Canonical: User took the action
-  'next_step_dismissed',          // Canonical: User dismissed without acting
-  'next_best_step_proposed',      // Legacy alias → maps to next_step_queued
-  'next_best_step_confirmed',     // Legacy alias → maps to next_step_confirmed
-  'next_best_step_completed',     // Legacy alias → maps to next_step_completed
-  'next_best_step_dismissed',     // Legacy alias → maps to next_step_dismissed
-
-  // Brigade Events
-  'brigade_assigned',
-  'brigade_transition_suggested',
-  'brigade_transition_confirmed',
-  'brigade_transition_dismissed',
-
-  // Referral Events
-  'referral_received',
-  'referral_sent',
-  'referral_converted',
-  'referral_opportunity_flagged',
-
-  // Person Type Events
-  'person_type_changed'
-];
-
-// Actor constants
-export const ACTORS = {
-  USER: 'user',
-  BARRY: 'barry',
-  SYSTEM: 'system'
-};
+// Actors come from the shared contract so both loggers agree.
+export { ACTORS } from '../constants/timelineEvents';
+import { ACTORS } from '../constants/timelineEvents';
 
 // ── Core Logger ──────────────────────────────────────────
 
 /**
- * Log a structured timeline event to the contact's timeline subcollection.
- * This is the single entry point for all timeline event creation.
+ * Scout Gate 1 (G1-03): this module used to carry a SECOND logTimelineEvent
+ * implementation with its own allowlist that diverged from timelineLogger's.
+ * Neither list was a superset, so events valid in one were dropped by the other
+ * — referral_ask_sent was emitted here against a list that lacked it.
  *
- * Non-blocking — never throws. Returns event ID or null on failure.
- *
- * @param {Object} params
- * @param {string} params.userId       - Authenticated user ID
- * @param {string} params.contactId    - Contact document ID
- * @param {string} params.type         - One of ALL_TIMELINE_EVENT_TYPES
- * @param {string} params.actor        - 'user' | 'barry' | 'system'
- * @param {string} [params.preview]    - Short preview snippet shown in the timeline
- * @param {Object} [params.metadata]   - Type-specific structured metadata
- *
- * @returns {Promise<string|null>} Document ID of the created event, or null
+ * There is now one implementation and one allowlist. The typed helpers below are
+ * unchanged and keep their existing call signatures.
  */
-export async function logTimelineEvent({ userId, contactId, type, actor, preview, metadata }) {
-  if (!userId || !contactId || !type || !actor) {
-    console.error('[EngagementHistory] Missing required fields:', { userId, contactId, type, actor });
-    return null;
-  }
-
-  if (!ALL_TIMELINE_EVENT_TYPES.includes(type)) {
-    console.error('[EngagementHistory] Invalid event type:', type);
-    return null;
-  }
-
-  try {
-    const timelineRef = collection(db, 'users', userId, 'contacts', contactId, 'timeline');
-
-    // DUAL-WRITE: Both createdAt (legacy reads) and timestamp (ordered queries).
-    // This matches Beta's PersistentEngageBar which queries by timestamp.
-    // Historical docs missing timestamp are backfilled by:
-    //   src/scripts/backfillTimelineTimestamp.js
-    const now = Timestamp.now();
-    const event = {
-      type,
-      actor,
-      createdAt: now,
-      timestamp: now,             // Required for orderBy('timestamp') queries
-      ...(preview ? { preview } : {}),
-      ...(metadata ? { metadata } : {})
-    };
-
-    const docRef = await addDoc(timelineRef, event);
-    return docRef.id;
-  } catch (error) {
-    console.error('[EngagementHistory] Failed to log event:', error);
-    return null;
-  }
-}
+export { logTimelineEvent, TimelineContractError } from './timelineLogger';
+import { logTimelineEvent } from './timelineLogger';
 
 // ── Typed Logger Helpers ─────────────────────────────────
 // Convenience functions for common event patterns.
@@ -370,6 +273,7 @@ export async function logPersonTypeChanged(userId, contactId, { fromType, toType
   });
 }
 
-// ── Export event type list for validation ────────────────
+// ── Event type list — re-exported from the single canonical contract ──────
+// (was ALL_TIMELINE_EVENT_TYPES, a second divergent list; see G1-03)
 
-export { ALL_TIMELINE_EVENT_TYPES as TIMELINE_EVENT_TYPES };
+export { TIMELINE_EVENT_TYPES } from '../constants/timelineEvents';

@@ -429,6 +429,55 @@ export async function logActivity({ userId, contactId, type, details }) {
  * This is the single entry point for all communication actions.
  * It automatically chooses Option A (real send) or Option B (native handoff).
  */
+/**
+ * SEND GUARD — Scout Gate 1 (G1-12)
+ *
+ * Every outbound path must clear this before anything leaves the product.
+ *
+ * The clause that matters is `content_not_generated`. Go To War used to send
+ * `microSequence.steps[n].action` — a PLAN INSTRUCTION ("Send personalized email
+ * introducing value proposition") — as the email body. A length check would have
+ * passed it. So message content is a TAGGED object produced only by a real
+ * generator or by the user typing; a bare string lifted out of a plan object
+ * cannot satisfy the guard by construction, which is what stops this class of
+ * bug recurring on a future surface.
+ */
+export class SendGuardError extends Error {
+  constructor(code, message) {
+    super(message || code);
+    this.name = 'SendGuardError';
+    this.code = code;
+  }
+}
+
+/** Mark text as real, customer-facing content. Only generators/user input call this. */
+export function asGeneratedContent(body, { generatedBy, subject = null } = {}) {
+  if (typeof body !== 'string' || !body.trim()) return null;
+  return { body, subject, generatedBy: generatedBy || 'unknown', generatedAt: new Date().toISOString(), __generated: true };
+}
+
+export function isGeneratedContent(v) {
+  return !!(v && typeof v === 'object' && v.__generated === true && typeof v.body === 'string' && v.body.trim());
+}
+
+/**
+ * @throws {SendGuardError} with a specific code the UI can turn into a real message.
+ */
+export function assertSendable({ recipient, subject, content, channel, integration, explicitSend }) {
+  if (!recipient || !String(recipient).trim()) throw new SendGuardError('no_recipient', 'No recipient address.');
+  if (channel === CHANNELS.EMAIL && !String(subject || '').trim()) throw new SendGuardError('no_subject', 'Email needs a subject.');
+  if (!content) throw new SendGuardError('no_content', 'There is no message to send.');
+  if (!isGeneratedContent(content)) {
+    throw new SendGuardError('content_not_generated',
+      'This text was not produced by a message generator and may be plan or instruction text.');
+  }
+  if (integration && integration !== 'connected') {
+    throw new SendGuardError('integration_unavailable', 'That channel is not connected.');
+  }
+  if (explicitSend !== true) throw new SendGuardError('not_confirmed', 'Send was not explicitly confirmed.');
+  return true;
+}
+
 export async function executeSendAction({
   channel,
   userId,

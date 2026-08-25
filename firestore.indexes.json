@@ -4,59 +4,152 @@
       "collectionGroup": "contacts",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "contact_status", "order": "ASCENDING" },
-        { "fieldPath": "contact_status_updated_at", "order": "ASCENDING" }
+        {
+          "fieldPath": "contact_status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "contact_status_updated_at",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "contacts",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "strategic_value", "order": "ASCENDING" },
-        { "fieldPath": "contact_status", "order": "ASCENDING" }
+        {
+          "fieldPath": "strategic_value",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "contact_status",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "missions",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "status", "order": "ASCENDING" },
-        { "fieldPath": "updatedAt", "order": "ASCENDING" }
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "contacts",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "contact_status", "order": "ASCENDING" },
-        { "fieldPath": "snoozed_until", "order": "ASCENDING" }
+        {
+          "fieldPath": "contact_status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "snoozed_until",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "contacts",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "is_archived", "order": "ASCENDING" },
-        { "fieldPath": "name", "order": "ASCENDING" }
+        {
+          "fieldPath": "is_archived",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "name",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "notifications",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "read", "order": "ASCENDING" },
-        { "fieldPath": "type", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "read",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "createdAt",
+          "order": "DESCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "communication_records",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "idynifyUserId", "order": "ASCENDING" },
-        { "fieldPath": "contactId", "order": "ASCENDING" },
-        { "fieldPath": "direction", "order": "ASCENDING" },
-        { "fieldPath": "receivedAt", "order": "DESCENDING" }
+        {
+          "fieldPath": "idynifyUserId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "contactId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "direction",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "receivedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "companies",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "swipedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "missions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "status",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "updatedAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "timeline",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "type",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "timestamp",
+          "order": "DESCENDING"
+        }
       ]
     }
   ],
@@ -65,10 +158,22 @@
       "collectionGroup": "integrations",
       "fieldPath": "status",
       "indexes": [
-        { "order": "ASCENDING", "queryScope": "COLLECTION" },
-        { "order": "DESCENDING", "queryScope": "COLLECTION" },
-        { "arrayConfig": "CONTAINS", "queryScope": "COLLECTION" },
-        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "DESCENDING",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "arrayConfig": "CONTAINS",
+          "queryScope": "COLLECTION"
+        },
+        {
+          "order": "ASCENDING",
+          "queryScope": "COLLECTION_GROUP"
+        }
       ]
     }
   ]

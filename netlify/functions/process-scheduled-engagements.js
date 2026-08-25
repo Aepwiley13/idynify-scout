@@ -21,6 +21,7 @@ import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
+import { writeTimelineEvent, ACTORS } from './utils/timelineWrite.js';
 
 // Initialize Firebase Admin (singleton guard)
 if (getApps().length === 0) {
@@ -227,26 +228,23 @@ async function sendScheduledEmail(userId, docRef, eng, results) {
 
   // Log timeline event
   if (contactId) {
-    await db.collection('users').doc(userId)
-      .collection('contacts').doc(contactId)
-      .collection('timeline')
-      .add({
-        type: 'message_sent',
-        actor: 'user',
-        timestamp: FieldValue.serverTimestamp(),
-        createdAt: FieldValue.serverTimestamp(),
-        preview: subject || (body ? body.substring(0, 120) : null),
-        metadata: {
-          channel: 'email',
-          method: 'real',
-          sendResult: 'sent',
-          scheduledSend: true,
-          gmailMessageId,
-          subject: subject || null,
-          engagementIntent: eng.engagementIntent || null,
-          strategy: eng.strategy || null
-        }
-      }).catch(() => {});
+    await writeTimelineEvent(db, {
+      userId,
+      contactId,
+      type: 'message_sent',
+      actor: ACTORS.USER,
+      preview: subject || (body ? body.substring(0, 120) : null),
+      metadata: {
+        channel: 'email',
+        method: 'real',
+        sendResult: 'sent',
+        scheduledSend: true,
+        gmailMessageId,
+        subject: subject || null,
+        engagementIntent: eng.engagementIntent || null,
+        strategy: eng.strategy || null
+      }
+    });
   }
 
   // Mark scheduled doc as sent
@@ -481,11 +479,11 @@ async function sendScheduledWave(userId, waveRef, wave, results) {
       }).catch(() => {});
 
       // Log timeline event
-      await contactDoc.ref.collection('timeline').add({
+      await writeTimelineEvent(db, {
+        userId,
+        contactId: contactDoc.id,
         type: 'message_sent',
-        actor: 'user',
-        timestamp: FieldValue.serverTimestamp(),
-        createdAt: FieldValue.serverTimestamp(),
+        actor: ACTORS.USER,
         preview: waveSubject,
         metadata: {
           channel: 'email',
@@ -496,7 +494,7 @@ async function sendScheduledWave(userId, waveRef, wave, results) {
           gmailMessageId,
           subject: waveSubject,
         }
-      }).catch(() => {});
+      });
 
       console.log(`✅ Wave email sent to ${contact.email} for user ${userId}`);
       results.wavesSent++;

@@ -617,7 +617,11 @@ export default function BarryChatPanel({
           setContextStack(prev => ({ ...prev, icpProfile: result }));
           setMessages(prev => [...prev, {
             role: 'assistant',
-            content: "Got it. I've updated your ICP. I'll use this for targeting going forward.",
+            // G1-11 (C2): the ICP write is real, but no search follows — all three
+          // search-companies call sites are GUI handlers. The queue keeps serving
+          // companies found under the previous profile until the user refreshes.
+          // Restore the original wording when discovery becomes a Barry action.
+          content: "Got it — your ICP is updated. Open Scout and hit Refresh to pull new companies against it.",
             has_message_angles: false,
             angles: []
           }]);

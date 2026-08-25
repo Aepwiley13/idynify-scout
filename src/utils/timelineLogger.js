@@ -1,137 +1,102 @@
 /**
- * TIMELINE LOGGER
+ * TIMELINE LOGGER — the single client-side entry point for timeline events.
  *
- * Writes structured engagement events to the contact timeline subcollection.
  * Path: users/{userId}/contacts/{contactId}/timeline/{eventId}
  *
- * This is the single entry point for all timeline event creation.
- * It does NOT touch the legacy activity_log array.
+ * Scout Gate 1 (G1-03): this file previously carried its own 26-type allowlist
+ * while engagementHistoryLogger.js carried a different 35-type list. Neither was
+ * a superset, so four legitimate emitted events were validated, rejected and
+ * dropped in silence. Both now validate against ONE list:
+ *     src/constants/timelineEvents.js
+ * engagementHistoryLogger.js re-exports this implementation; its typed helpers
+ * are unchanged and keep working.
  *
- * Event Types:
- *   - message_generated        (Barry returns strategies)
- *   - message_sent             (Gmail confirmed or native handoff)
- *   - mission_assigned         (Contact added to a mission)
- *   - campaign_assigned        (Contact added to a campaign)
- *   - lead_status_changed      (Lead status updated)
- *   - contact_status_changed   (Contact state machine transition)
+ * RETURN CONTRACT (changed in Gate 1):
+ *   Returns { ok, id, reason } — never a bare null.
+ *   The old signature returned `string | null`, which meant a caller could not
+ *   distinguish "written" from "silently rejected". Existing callers ignore the
+ *   return value, so this is source-compatible; new callers can check `ok`.
  *
- * Step 5 — Sequence Event Types:
- *   - sequence_step_proposed   (Barry proposes a sequence step for approval)
- *   - sequence_step_approved   (User approved a sequence step)
- *   - sequence_step_sent       (Approved step was executed/sent)
- *   - sequence_step_skipped    (User skipped a sequence step)
- *   - sequence_completed       (All steps in sequence finished)
- *
- * Operation People First — Next Best Step Events:
- *   - next_step_queued         (Barry proposes a next step; user confirms timing)
- *   - next_step_completed      (User marks the queued next step as done)
- *   - next_step_dismissed      (User dismisses Barry's next step proposal)
+ * FAILURE BEHAVIOUR:
+ *   development → throws on an unknown type, so a bad type fails the test run.
+ *   production  → logs and returns { ok:false }. A timeline write must never
+ *                 break an engagement flow.
  */
 
 import { collection, addDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { TIMELINE_EVENT_TYPES, ACTORS } from '../constants/timelineEvents';
 
-// DUAL-WRITE NOTE (Operation People First):
-// All new timeline documents write BOTH createdAt and timestamp.
-// This ensures backward-compatible reads (createdAt) and ordered queries (timestamp).
-// Historical documents with only createdAt must be backfilled via:
-//   src/scripts/backfillTimelineTimestamp.js
+export class TimelineContractError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'TimelineContractError';
+  }
+}
 
-// Allowed event types — enforced at write time
-const TIMELINE_EVENT_TYPES = [
-  'message_generated',
-  'message_sent',
-  'mission_assigned',
-  'campaign_assigned',
-  'lead_status_changed',
-  'contact_status_changed',
-  // Step 5: Sequence events
-  'sequence_step_proposed',
-  'sequence_step_approved',
-  'sequence_step_sent',
-  'sequence_step_skipped',
-  'sequence_completed',
-  // Operation People First: Next Best Step events
-  'next_step_queued',
-  'next_step_completed',
-  'next_step_dismissed',
-  // Hunter → Sniper stage transition
-  'stage_moved',
-  // Operation People First: Brigade System events
-  'brigade_changed',
-  // Barry Intelligence Upgrade: Relationship guardrail events
-  'barry_guardrail_shown',
-  'barry_guardrail_response',
-  // Scheduled engagement events
-  'message_scheduled',
-  'message_schedule_cancelled',
-  // CSM: Intervention Playbook events
-  'playbook_abandoned',
-  'playbook_completed',
-  // Reinforcements playbook events
-  'referral_thank_you_sent',
-  'referral_ask_sent',
-  'keep_warm_sent',
-  'recognition_sent',
-];
-
-// Actor types
-const ACTORS = {
-  USER: 'user',
-  BARRY: 'barry',
-  SYSTEM: 'system'
-};
+// Vite exposes import.meta.env (and vitest sets DEV too), so this is the single
+// source of truth. Deliberately does NOT reference `process` — this module runs
+// in the browser bundle, where `process` is undefined.
+function isDev() {
+  try {
+    return !!(import.meta && import.meta.env && import.meta.env.DEV);
+  } catch {
+    return false;
+  }
+}
 
 /**
- * Log a structured timeline event to the contact's timeline subcollection.
+ * Log a structured timeline event.
  *
- * @param {Object} params
- * @param {string} params.userId       - Authenticated user ID
- * @param {string} params.contactId    - Contact document ID
- * @param {string} params.type         - One of TIMELINE_EVENT_TYPES
- * @param {string} params.actor        - 'user' | 'barry' | 'system'
- * @param {string} [params.preview]    - Short preview snippet (message subject, status label, etc.)
- * @param {Object} [params.metadata]   - Type-specific structured metadata
- *
- * @returns {Promise<string|null>} Document ID of the created event, or null on failure
+ * @param {Object}  params
+ * @param {string}  params.userId
+ * @param {string}  params.contactId
+ * @param {string}  params.type      - must be in TIMELINE_EVENT_TYPES
+ * @param {string}  params.actor     - 'user' | 'barry' | 'system' | 'contact'
+ * @param {string}  [params.preview]
+ * @param {Object}  [params.metadata]
+ * @returns {Promise<{ok: boolean, id: string|null, reason: string|null}>}
  */
-export async function logTimelineEvent({ userId, contactId, type, actor, preview, metadata }) {
-  // Validate required fields
+export async function logTimelineEvent({ userId, contactId, type, actor, preview, metadata } = {}) {
   if (!userId || !contactId || !type || !actor) {
-    console.error('[Timeline] Missing required fields:', { userId, contactId, type, actor });
-    return null;
+    // Guards a real historical bug: NextBestStep.jsx called this positionally,
+    // so destructuring a string yielded undefined for every field and every
+    // event from that surface was discarded.
+    const msg = `[Timeline] Missing required fields (type=${type ?? 'undefined'})`;
+    console.error(msg, { hasUserId: !!userId, hasContactId: !!contactId, actor });
+    if (isDev()) throw new TimelineContractError(msg);
+    return { ok: false, id: null, reason: 'missing_fields' };
   }
 
-  // Validate event type
   if (!TIMELINE_EVENT_TYPES.includes(type)) {
-    console.error('[Timeline] Invalid event type:', type);
-    return null;
+    const msg = `[Timeline] Unknown event type: ${type}`;
+    console.error(msg, { contactId, actor });
+    if (isDev()) throw new TimelineContractError(msg);
+    return { ok: false, id: null, reason: 'invalid_type' };
   }
 
   try {
     const timelineRef = collection(db, 'users', userId, 'contacts', contactId, 'timeline');
 
-    // Dual-write: createdAt (legacy reads) + timestamp (ordered queries)
+    // Dual-write. `timestamp` is canonical for ordered reads; `createdAt` is kept
+    // for pre-migration documents. Both must be real Timestamps — an ISO string
+    // in `timestamp` sorts ABOVE every Timestamp in a desc query, which is how
+    // calendar events used to pin themselves to the top of every timeline.
     const now = Timestamp.now();
     const event = {
       type,
       actor,
-      // Write both fields during migration period.
-      // 'timestamp' is the canonical read field (used by all query orderBy calls).
-      // 'createdAt' kept for backward compatibility with pre-sprint documents.
-      // Squad Alpha: remove 'createdAt' once all legacy docs are backfilled.
-      timestamp: Timestamp.now(),
-      createdAt: Timestamp.now(),
+      timestamp: now,
+      createdAt: now,
       ...(preview ? { preview } : {}),
-      ...(metadata ? { metadata } : {})
+      ...(metadata ? { metadata } : {}),
     };
 
     const docRef = await addDoc(timelineRef, event);
-    return docRef.id;
+    return { ok: true, id: docRef.id, reason: null };
   } catch (error) {
-    console.error('[Timeline] Failed to log event:', error);
-    // Non-blocking — never throw
-    return null;
+    console.error('[Timeline] Write failed:', { type, contactId, code: error?.code, message: error?.message });
+    return { ok: false, id: null, reason: 'write_failed' };
   }
 }
 

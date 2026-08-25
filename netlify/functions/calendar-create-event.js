@@ -1,6 +1,7 @@
 import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { writeTimelineEvent, ACTORS } from './utils/timelineWrite.js';
 
 if (getApps().length === 0) {
   const privateKey = process.env.FIREBASE_PRIVATE_KEY
@@ -155,27 +156,25 @@ export const handler = async (event) => {
 
     // Log to contact timeline if contactId provided
     if (contactId) {
-      await db
-        .collection('users')
-        .doc(userId)
-        .collection('contacts')
-        .doc(contactId)
-        .collection('timeline')
-        .add({
-          timestamp: new Date().toISOString(),
-          actor: 'user',
-          activityType: 'meeting_scheduled',
+      // G1-04: was a typeless doc with an ISO-string timestamp and no createdAt,
+      // which sorted above every real event and was invisible to createdAt reads.
+      await writeTimelineEvent(db, {
+        userId,
+        contactId,
+        type: 'meeting_scheduled',
+        actor: ACTORS.USER,
+        preview: title || 'Meeting scheduled',
+        metadata: {
           channel: 'calendar',
           outcome: 'meeting_booked',
-          metadata: {
-            eventId: createdEvent.id,
-            eventLink: createdEvent.htmlLink,
-            title: title,
-            startDateTime,
-            endDateTime,
-            attendeeEmail: attendeeEmail || null
-          }
-        });
+          eventId: createdEvent.id,
+          eventLink: createdEvent.htmlLink,
+          title,
+          startDateTime,
+          endDateTime,
+          attendeeEmail: attendeeEmail || null
+        }
+      });
 
       // Update contact's next_step fields
       await db

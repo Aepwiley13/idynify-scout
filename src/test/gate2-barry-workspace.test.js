@@ -217,3 +217,284 @@ describe('W10 — Workspace reads from the same canonical store', () => {
     expect(canonical).toContain("'barryConversations', 'canonical', 'turns'");
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════
+// C1 — G2-C1: /barry has a functional composer after First Experience
+// ═══════════════════════════════════════════════════════════════════════════
+
+const workspaceClean = code(workspace);
+
+describe('C1 — /barry has a functional composer', () => {
+  it('BarryWorkspace has a textarea input for composing messages', () => {
+    expect(workspace).toMatch(/<textarea[\s\S]*?className="barry-workspace-input"/);
+  });
+
+  it('BarryWorkspace has a Send button', () => {
+    expect(workspace).toMatch(/<button[\s\S]*?className="barry-workspace-send"/);
+  });
+
+  it('sendMessage calls barryMissionChat endpoint', () => {
+    expect(workspaceClean).toMatch(/barryMissionChat/);
+    expect(workspaceClean).toMatch(/fetch\(.*barryMissionChat/);
+  });
+
+  it('sendMessage appends user turn to canonical via appendTurn', () => {
+    expect(workspaceClean).toMatch(/await appendTurn\(db,\s*user\.uid,\s*\{.*role:\s*'user'/s);
+  });
+
+  it('sendMessage appends assistant turn to canonical via appendTurn', () => {
+    expect(workspaceClean).toMatch(/await appendTurn\(db,\s*user\.uid,\s*\{.*role:\s*'assistant'/s);
+  });
+
+  it('composer sends conversationHistory and contextStack to barryMissionChat', () => {
+    expect(workspaceClean).toMatch(/conversationHistory/);
+    expect(workspaceClean).toMatch(/contextStack/);
+  });
+
+  it('Enter key triggers sendMessage', () => {
+    expect(workspaceClean).toMatch(/handleKeyDown/);
+    expect(workspaceClean).toMatch(/e\.key\s*===\s*'Enter'/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// C2 — Workspace ↔ Sidecar continuity through same canonical conversation
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('C2 — Workspace and Sidecar share canonical conversation', () => {
+  it('both import appendTurn from barryCanonical', () => {
+    expect(workspace).toMatch(/import.*appendTurn.*from.*barryCanonical/);
+    expect(chatPanel).toMatch(/import.*appendTurn.*from.*barryCanonical/);
+  });
+
+  it('both import loadOrSeedRecentTurns from barryCanonical', () => {
+    expect(workspace).toMatch(/import.*loadOrSeedRecentTurns.*from.*barryCanonical/);
+    expect(chatPanel).toMatch(/import.*loadOrSeedRecentTurns.*from.*barryCanonical/);
+  });
+
+  it('all surfaces write through the same appendTurn function', () => {
+    const appendFn = canonical.slice(
+      canonical.indexOf('export async function appendTurn'),
+      canonical.indexOf('export async function loadRecentTurns')
+    );
+    expect(appendFn).toContain("turnsRef(db, uid)");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// C3 — Workspace cannot create a second conversation authority
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('C3 — no second conversation authority', () => {
+  it('Workspace does not import addDoc directly', () => {
+    expect(workspace).not.toMatch(/import.*addDoc.*from.*firebase\/firestore/);
+  });
+
+  it('Workspace does not import collection directly', () => {
+    expect(workspace).not.toMatch(/import.*collection.*from.*firebase\/firestore/);
+  });
+
+  it('Workspace writes only through barryCanonical appendTurn', () => {
+    const sendFn = workspaceClean.slice(
+      workspaceClean.indexOf('async function sendMessage'),
+      workspaceClean.indexOf('function handleKeyDown')
+    );
+    expect(sendFn).not.toMatch(/addDoc\(/);
+    expect(sendFn).toMatch(/appendTurn\(/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// C4 — Structured angle turns do not render as bracketed speech
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('C4 — structured angles, no bracketed speech', () => {
+  it('appendTurn accepts a kind parameter', () => {
+    const appendSig = canonical.slice(
+      canonical.indexOf('export async function appendTurn'),
+      canonical.indexOf('return addDoc')
+    );
+    expect(appendSig).toContain('kind');
+  });
+
+  it('appendTurn writes kind to Firestore when not "message"', () => {
+    const appendFn = canonical.slice(
+      canonical.indexOf('export async function appendTurn'),
+      canonical.indexOf('export async function loadRecentTurns')
+    );
+    expect(appendFn).toMatch(/if\s*\(kind && kind !== 'message'\)/);
+    expect(appendFn).toMatch(/turnDoc\.kind\s*=\s*kind/);
+  });
+
+  it('Workspace renders angles with badge, not brackets', () => {
+    expect(workspace).toMatch(/barry-workspace-angles-badge/);
+    expect(workspaceClean).not.toMatch(/\[Message angles generated/);
+  });
+
+  it('Sidecar does not wrap angles in brackets', () => {
+    const chatClean = code(chatPanel);
+    expect(chatClean).not.toMatch(/\[Message angles generated/);
+  });
+
+  it('Workspace uses kind: "angles" for angle turns', () => {
+    expect(workspaceClean).toMatch(/['"]angles['"]/);
+    expect(workspaceClean).toMatch(/turn\.kind\s*===\s*'angles'/);
+  });
+
+  it('Sidecar uses kind: "angles" for angle turns', () => {
+    const chatClean = code(chatPanel);
+    expect(chatClean).toMatch(/turnKind\s*=\s*'angles'/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// C5 — Legacy seed concurrency cannot duplicate history
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('C5 — seed concurrency safety', () => {
+  const seedFn = canonical.slice(
+    canonical.indexOf('export async function seedFromLegacy'),
+    canonical.indexOf('export async function loadOrSeedRecentTurns')
+  );
+
+  it('checks seedComplete before starting', () => {
+    expect(seedFn).toMatch(/seedComplete/);
+    expect(seedFn).toMatch(/if\s*\(data\.seedComplete\)\s*return false/);
+  });
+
+  it('checks seeding lock with stale detection', () => {
+    expect(seedFn).toMatch(/data\.seeding/);
+    expect(seedFn).toMatch(/seedingAt/);
+    expect(seedFn).toMatch(/120_000/);
+  });
+
+  it('claims lock atomically with seedingAt timestamp', () => {
+    expect(seedFn).toMatch(/txn\.set\(metaRef/);
+    expect(seedFn).toMatch(/seeding:\s*true/);
+    expect(seedFn).toMatch(/seedingAt:\s*serverTimestamp\(\)/);
+  });
+
+  it('seedComplete is set only after successful import', () => {
+    expect(seedFn).toMatch(/seedComplete:\s*true.*seeding:\s*false/s);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// C6 — Failed/interrupted seeding remains recoverable
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('C6 — failed seeding is recoverable', () => {
+  const seedFn = canonical.slice(
+    canonical.indexOf('export async function seedFromLegacy'),
+    canonical.indexOf('export async function loadOrSeedRecentTurns')
+  );
+
+  it('clears seeding flag on failure so next caller can retry', () => {
+    expect(seedFn).toMatch(/seeding:\s*false/);
+    expect(seedFn).toMatch(/\{\s*seeding:\s*false\s*\}/);
+  });
+
+  it('does not set seedComplete on error', () => {
+    expect(seedFn).toMatch(/const complete = imported \|\| !hadError/);
+  });
+
+  it('stale lock (>2 min) can be reclaimed', () => {
+    expect(seedFn).toMatch(/age\s*<\s*120_000/);
+  });
+
+  it('catches per-doc errors and continues to next', () => {
+    expect(seedFn).toMatch(/catch\s*\(err\)/);
+    expect(seedFn).toMatch(/hadError\s*=\s*true/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// C7 — Soft progress derives from currentStep, not status
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('C7 — deriveSoftProgress uses currentStep', () => {
+  it('reads currentStep from conversationData', () => {
+    expect(workspaceClean).toMatch(/conversationData\?\.currentStep/);
+  });
+
+  it('does not read status from conversationData', () => {
+    expect(workspaceClean).not.toMatch(/conversationData\?\.status/);
+  });
+
+  it('checks for confirming/saving step values', () => {
+    expect(workspaceClean).toMatch(/currentStep\s*===\s*'confirming'/);
+    expect(workspaceClean).toMatch(/currentStep\s*===\s*'saving'/);
+  });
+
+  it('checks for asking/clarifying step values', () => {
+    expect(workspaceClean).toMatch(/currentStep\s*===\s*'asking'/);
+    expect(workspaceClean).toMatch(/currentStep\s*===\s*'clarifying'/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// C8 — Gate 0 invariants remain intact
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('C8 — Gate 0 invariants', () => {
+  it('/barry route remains inside ShellRoute', () => {
+    expect(app).toMatch(/ShellRoute[\s\S]*?path="\/barry"/);
+  });
+
+  it('ShellRoute is defined in App.jsx', () => {
+    expect(app).toMatch(/function ShellRoute/);
+  });
+
+  it('BarryWorkspace is imported in App.jsx', () => {
+    expect(app).toMatch(/import.*BarryWorkspace/);
+  });
+
+  it('legacy /onboarding routes still redirect to /barry', () => {
+    expect(app).toMatch(/path="\/onboarding"\s+element=\{<Navigate to="\/barry"/);
+  });
+
+  it('canonical subcollection path unchanged', () => {
+    expect(canonical).toContain("'barryConversations', 'canonical', 'turns'");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// C9 — Gate 1 append-only / continuity invariants remain intact
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('C9 — Gate 1 append-only and continuity invariants', () => {
+  it('appendTurn validates role is user or assistant', () => {
+    const appendFn = canonical.slice(
+      canonical.indexOf('export async function appendTurn'),
+      canonical.indexOf('export async function loadRecentTurns')
+    );
+    expect(appendFn).toMatch(/role !== 'user' && role !== 'assistant'/);
+  });
+
+  it('appendTurn validates content is truthy', () => {
+    const appendFn = canonical.slice(
+      canonical.indexOf('export async function appendTurn'),
+      canonical.indexOf('export async function loadRecentTurns')
+    );
+    expect(appendFn).toMatch(/if\s*\(!content\)\s*return null/);
+  });
+
+  it('loadOrSeedRecentTurns falls back to seedFromLegacy', () => {
+    const fn = canonical.slice(
+      canonical.indexOf('export async function loadOrSeedRecentTurns')
+    );
+    expect(fn).toMatch(/seedFromLegacy/);
+  });
+
+  it('turns include createdAt timestamp', () => {
+    const appendFn = canonical.slice(
+      canonical.indexOf('export async function appendTurn'),
+      canonical.indexOf('export async function loadRecentTurns')
+    );
+    expect(appendFn).toMatch(/createdAt:\s*serverTimestamp\(\)/);
+  });
+
+  it('Workspace assistant append is awaited', () => {
+    expect(workspaceClean).toMatch(/await appendTurn\(db,\s*user\.uid,\s*\{.*role:\s*'assistant'/s);
+  });
+});

@@ -10,12 +10,14 @@
  * other renderer uses (barryConversations/canonical/turns), so moving
  * between Workspace and Sidecar never loses turns.
  *
+ * The composer calls barryMissionChat — the same reasoning path as the
+ * Sidecar. One Barry, one conversation, different presentations.
+ *
  * During First Experience, the shell shows simplified navigation — just
  * Barry and a wordmark. After onboarding completes, the full nav appears.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { auth, db } from '../../firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
@@ -26,7 +28,7 @@ import { BRAND, ASSETS } from '../../theme/tokens';
 import { appendTurn, loadOrSeedRecentTurns } from '../../utils/barryCanonical';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { resolveWho } from '../../utils/resolveWho';
-import { resolveFirstExperienceMode, MODE_BEGIN, MODE_RESUME } from '../../utils/firstExperienceMode';
+import { buildContextStack } from '../../utils/barryContextStack';
 import FirstExperience from '../Onboarding/FirstExperience';
 import './BarryWorkspace.css';
 
@@ -38,8 +40,8 @@ const SOFT_PROGRESS_STATES = {
 
 function deriveSoftProgress(onboardingData, icpResolution, conversationData) {
   const hasIcp = icpResolution && isResolved(icpResolution);
-  const hasConversation = conversationData?.status === 'confirming' || conversationData?.status === 'saving';
-  const isAsking = conversationData?.status === 'asking' || conversationData?.status === 'clarifying';
+  const hasConversation = conversationData?.currentStep === 'confirming' || conversationData?.currentStep === 'saving';
+  const isAsking = conversationData?.currentStep === 'asking' || conversationData?.currentStep === 'clarifying';
 
   const states = SOFT_PROGRESS_STATES.prospecting;
 
@@ -51,20 +53,20 @@ function deriveSoftProgress(onboardingData, icpResolution, conversationData) {
 
 export default function BarryWorkspace() {
   const T = useT();
-  const navigate = useNavigate();
   const { closeBarry, setFirstExperience } = useShell();
   const [loading, setLoading] = useState(true);
   const [isFirstExperience, setIsFirstExperienceLocal] = useState(false);
   const [softProgress, setSoftProgress] = useState(null);
   const [conversationTurns, setConversationTurns] = useState([]);
   const [who, setWho] = useState(null);
+  const [inputValue, setInputValue] = useState('');
+  const [sending, setSending] = useState(false);
+  const [contextStack, setContextStack] = useState(null);
+  const [conversationHistory, setConversationHistory] = useState([]);
+  const [barryMode, setBarryMode] = useState('SUGGEST');
 
   const threadRef = useRef(null);
-
-  useEffect(() => {
-    closeBarry();
-    init();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const inputRef = useRef(null);
 
   async function init() {
     const user = getEffectiveUser() || auth.currentUser;
@@ -92,22 +94,139 @@ export default function BarryWorkspace() {
       }
 
       setConversationTurns(turns);
+      setConversationHistory(turns.map(t => ({ role: t.role, content: t.content })));
       setWho(resolveWho(user, userData));
     } catch (err) {
       console.warn('[BarryWorkspace] init failed:', err.message);
     }
     setLoading(false);
+
+    try {
+      const user = getEffectiveUser() || auth.currentUser;
+      if (user) {
+        const stack = await buildContextStack(user.uid);
+        setContextStack(stack);
+      }
+    } catch (err) {
+      console.warn('[BarryWorkspace] context stack build failed (non-fatal):', err.message);
+    }
   }
+
+  useEffect(() => {
+    closeBarry();
+    init();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (threadRef.current) {
       threadRef.current.scrollTop = threadRef.current.scrollHeight;
     }
-  }, [conversationTurns]);
+  }, [conversationTurns, sending]);
 
   useEffect(() => {
     return () => { setFirstExperience?.(false); };
   }, [setFirstExperience]);
+
+  async function sendMessage(text) {
+    if (!text.trim() || sending) return;
+    const userMessage = text.trim();
+    setInputValue('');
+    setSending(true);
+
+    const userTurn = { role: 'user', content: userMessage };
+    setConversationTurns(prev => [...prev, userTurn]);
+
+    setTimeout(() => {
+      if (threadRef.current) {
+        threadRef.current.scrollTop = threadRef.current.scrollHeight;
+      }
+    }, 0);
+
+    try {
+      const user = getEffectiveUser() || auth.currentUser;
+      if (!user) { setSending(false); return; }
+
+      await appendTurn(db, user.uid, { role: 'user', content: userMessage, surface: 'workspace' });
+
+      let authToken;
+      try { authToken = await user.getIdToken(); } catch (tokenErr) {
+        console.warn('[BarryWorkspace] getIdToken failed:', tokenErr.message);
+        setConversationTurns(prev => [...prev, {
+          role: 'assistant', content: 'Session expired — please refresh the page.',
+        }]);
+        setSending(false); return;
+      }
+
+      const res = await fetch('/.netlify/functions/barryMissionChat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.uid,
+          authToken,
+          message: userMessage,
+          conversationHistory,
+          barryMode,
+          contextStack,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        if (data.barry_mode && data.barry_mode !== barryMode) {
+          setBarryMode(data.barry_mode);
+        }
+
+        const hasAngles = !!data.has_message_angles && data.angles?.length > 0;
+        const responseContent = data.response_text || data.response || '';
+
+        const assistantTurn = {
+          role: 'assistant',
+          content: responseContent,
+          kind: hasAngles && !responseContent ? 'angles' : undefined,
+          has_message_angles: hasAngles,
+          angles: data.angles || [],
+        };
+
+        setConversationTurns(prev => [...prev, assistantTurn]);
+        setConversationHistory(data.updatedHistory || [...conversationHistory, userTurn, { role: 'assistant', content: responseContent }]);
+
+        let canonicalContent = responseContent;
+        let turnKind;
+        if (!canonicalContent && hasAngles) {
+          const angleNames = data.angles.map(a => a.label || a.subject || 'angle').join(', ');
+          canonicalContent = `Message angles generated: ${angleNames}`;
+          turnKind = 'angles';
+        }
+
+        try {
+          await appendTurn(db, user.uid, { role: 'assistant', content: canonicalContent, surface: 'workspace', kind: turnKind });
+        } catch (err) {
+          console.warn('[BarryWorkspace] canonical append failed:', err.message);
+        }
+      } else {
+        setConversationTurns(prev => [...prev, {
+          role: 'assistant',
+          content: 'I had trouble processing that. Try asking again.',
+        }]);
+      }
+    } catch (err) {
+      console.error('[BarryWorkspace] send failed:', err);
+      setConversationTurns(prev => [...prev, {
+        role: 'assistant',
+        content: 'Connection issue — try again in a moment.',
+      }]);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage(inputValue);
+    }
+  }
 
   if (loading) {
     return (
@@ -196,8 +315,8 @@ export default function BarryWorkspace() {
               {who?.name ? `Hey ${who.name}!` : 'Hey there!'}
             </p>
             <p style={{ color: T.textMuted, maxWidth: 440, textAlign: 'center', lineHeight: 1.6 }}>
-              This is your workspace with Barry. Your entire conversation history
-              lives here — pick up where you left off, or start something new.
+              This is your workspace with Barry. Ask anything about your pipeline,
+              contacts, or strategy — your conversation continues wherever you go.
             </p>
           </div>
         ) : (
@@ -224,9 +343,16 @@ export default function BarryWorkspace() {
                 }}
               >
                 {turn.role === 'assistant' ? (
-                  <ReactMarkdown className="barry-workspace-prose">
-                    {turn.content}
-                  </ReactMarkdown>
+                  turn.kind === 'angles' ? (
+                    <p className="barry-workspace-angles-summary">
+                      <span className="barry-workspace-angles-badge" style={{ color: BRAND.cyan }}>Angles</span>
+                      {' '}{turn.content}
+                    </p>
+                  ) : (
+                    <ReactMarkdown className="barry-workspace-prose">
+                      {turn.content}
+                    </ReactMarkdown>
+                  )
                 ) : (
                   <p>{turn.content}</p>
                 )}
@@ -234,12 +360,63 @@ export default function BarryWorkspace() {
             </div>
           ))
         )}
+
+        {sending && (
+          <div className="barry-workspace-message assistant">
+            <img
+              src={ASSETS.barryAvatar}
+              alt=""
+              className="barry-workspace-msg-avatar"
+              width={28}
+              height={28}
+            />
+            <div
+              className="barry-workspace-msg-bubble barry-workspace-typing"
+              style={{ background: T.surface, borderColor: T.border }}
+            >
+              <span className="barry-typing-dot" />
+              <span className="barry-typing-dot" />
+              <span className="barry-typing-dot" />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="barry-workspace-composer" style={{ borderColor: T.border }}>
-        <p className="barry-workspace-composer-hint" style={{ color: T.textMuted }}>
-          Use the Barry panel for live conversation — this workspace shows your full history.
-        </p>
+        <div className="barry-workspace-composer-row">
+          <textarea
+            ref={inputRef}
+            value={inputValue}
+            rows={1}
+            onChange={(e) => {
+              setInputValue(e.target.value);
+              e.target.style.height = 'auto';
+              e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask Barry anything..."
+            disabled={sending}
+            aria-label="Message Barry"
+            className="barry-workspace-input"
+            style={{
+              background: T.surface,
+              borderColor: T.border,
+              color: T.text,
+            }}
+          />
+          <button
+            onClick={() => sendMessage(inputValue)}
+            disabled={sending || !inputValue.trim()}
+            aria-label="Send message"
+            className="barry-workspace-send"
+            style={{
+              background: inputValue.trim() ? BRAND.pink : T.surface2,
+              color: inputValue.trim() ? '#fff' : T.textMuted,
+            }}
+          >
+            Send
+          </button>
+        </div>
       </div>
     </div>
   );

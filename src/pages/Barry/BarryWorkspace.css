@@ -241,18 +241,108 @@
   font-weight: 600;
 }
 
-/* ── Composer (placeholder for now — full interaction via Barry panel) ──── */
+/* Angles badge for structured turns */
+.barry-workspace-angles-summary {
+  margin: 0;
+  font-size: 13px;
+}
+
+.barry-workspace-angles-badge {
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-right: 4px;
+}
+
+/* ── Typing indicator ──────────────────────────────────────────────────── */
+
+.barry-workspace-typing {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 18px;
+}
+
+.barry-typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.4;
+  animation: barry-typing 1.2s ease-in-out infinite;
+}
+
+.barry-typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.barry-typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+@keyframes barry-typing {
+  0%, 60%, 100% { opacity: 0.3; transform: translateY(0); }
+  30% { opacity: 0.8; transform: translateY(-3px); }
+}
+
+/* ── Composer ──────────────────────────────────────────────────────────── */
 
 .barry-workspace-composer {
   flex-shrink: 0;
   padding: 16px 24px;
   border-top: 1px solid;
-  text-align: center;
 }
 
-.barry-workspace-composer-hint {
-  margin: 0;
-  font-size: 13px;
+.barry-workspace-composer-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-end;
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.barry-workspace-input {
+  flex: 1;
+  min-width: 0;
+  resize: none;
+  overflow-y: auto;
+  border: 1px solid;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 14px;
+  line-height: 1.5;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.barry-workspace-input:focus {
+  border-color: currentColor;
+}
+
+.barry-workspace-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.barry-workspace-input::placeholder {
+  opacity: 0.5;
+}
+
+.barry-workspace-send {
+  flex-shrink: 0;
+  padding: 10px 20px;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.barry-workspace-send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.barry-workspace-send:not(:disabled):hover {
+  opacity: 0.9;
 }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */
@@ -315,6 +405,15 @@
 
   .barry-workspace-composer {
     padding: 12px 16px;
+  }
+
+  .barry-workspace-composer-row {
+    gap: 8px;
+  }
+
+  .barry-workspace-send {
+    padding: 10px 14px;
+    font-size: 13px;
   }
 }
 

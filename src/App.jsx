@@ -469,9 +469,7 @@ function App() {
             {/* Barry Workspace — the full-page Barry surface. During First
                 Experience this is the onboarding container; post-onboarding it
                 is the persistent place a user intentionally works with Barry.
-                Payment is NOT required so new users hit Barry before checkout
-                would block them — ShellRoute's requirePayment default is
-                overridden at the ShellRoute level below. */}
+                Inside ShellRoute, so the standard payment gate applies. */}
             <Route path="/barry" element={<BarryWorkspace />} />
           </Route>
         ) : (

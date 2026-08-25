@@ -77,12 +77,9 @@ describe('W2 — all legacy /onboarding routes redirect to /barry', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('W3 — FirstExperience composition', () => {
-  it('BarryWorkspace imports FirstExperience', () => {
-    expect(workspace).toMatch(/import FirstExperience from/);
-  });
-
-  it('BarryWorkspace renders <FirstExperience /> when isFirstExperience is true', () => {
-    expect(workspace).toMatch(/<FirstExperience/);
+  it('BarryWorkspace renders FE inline via _feCard cards (B3 replaces FirstExperience import)', () => {
+    expect(workspace).toMatch(/turn\._feCard/);
+    expect(workspace).toMatch(/<BarryOnboarding/);
   });
 
   it('BarryWorkspace checks onboardingComplete to determine first experience', () => {

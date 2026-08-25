@@ -42,11 +42,11 @@ describe('B2-1 — Controller phase machine', () => {
     expect(controllerCode).toMatch(/useState\('loading'\)/);
   });
 
-  it('transitions through greeting → who → intent → classifying → handoff', () => {
+  it('transitions through greeting → who → intent → classifying → delivering', () => {
     expect(controllerCode).toMatch(/setPhase\('who'\)/);
     expect(controllerCode).toMatch(/setPhase\('intent'\)/);
     expect(controllerCode).toMatch(/setPhase\('classifying'\)/);
-    expect(controllerCode).toMatch(/setPhase\('handoff'\)/);
+    expect(controllerCode).toMatch(/setPhase\('delivering'\)/);
   });
 
   it('supports confirm phase for low-confidence classifications', () => {
@@ -119,9 +119,9 @@ describe('B2-3 — Resume and returning behavior', () => {
     expect(controller).toMatch(/from '\.\.\/utils\/firstExperienceMode'/);
   });
 
-  it('skips to handoff when mode is not MODE_BEGIN', () => {
+  it('skips to delivering when mode is not MODE_BEGIN', () => {
     expect(controllerCode).toMatch(/mode !== MODE_BEGIN/);
-    expect(controllerCode).toMatch(/setPhase\('handoff'\)/);
+    expect(controllerCode).toMatch(/deliverDecision\(routed/);
   });
 
   it('sets INTENT_PROSPECTING decision for resume/refine', () => {
@@ -176,11 +176,10 @@ describe('B2-5 — Workspace controller integration', () => {
     expect(workspaceCode).toMatch(/useFirstExperienceController\(arrival\)/);
   });
 
-  it('renders FirstExperience with preset props on handoff', () => {
-    expect(workspaceCode).toMatch(/presetDecision=\{feCtrl\.decision\}/);
-    expect(workspaceCode).toMatch(/presetWho=\{feCtrl\.who\}/);
-    expect(workspaceCode).toMatch(/presetPending=\{feCtrl\.pending\}/);
-    expect(workspaceCode).toMatch(/presetHeld=\{feCtrl\.held\}/);
+  it('renders inline cards during delivering phase (B3 replaces handoff)', () => {
+    expect(workspaceCode).toMatch(/turn\._feCard/);
+    expect(workspaceCode).toMatch(/<BarryOnboarding/);
+    expect(workspaceCode).toMatch(/<RelationshipFirstValue/);
   });
 
   it('renders conversation thread from controller turns', () => {

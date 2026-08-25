@@ -5,10 +5,12 @@
  * conversation turns that render in the Barry Workspace thread. The user
  * types into the same composer they will use post-onboarding.
  *
- * Phases: loading → greeting → who → intent → classifying → handoff
+ * Phases: loading → who → intent → classifying → confirm → delivering
  *
- * On handoff, the decision and who are available for FirstExperience.jsx
- * to render the First Value (BarryOnboarding, RelationshipFirstValue, etc.).
+ * The 'delivering' phase replaces the old 'handoff' phase. Instead of handing
+ * the user to a separate rendering branch, Barry announces what he's doing as
+ * a conversation turn, and the workspace renders any structured card (targeting
+ * proposal, relationship snapshot, action buttons) inline in the thread.
  *
  * Nothing here creates a new conversation authority. Canonical turns are NOT
  * written by this hook — that remains the workspace's responsibility after
@@ -37,6 +39,10 @@ import {
   intentLabel,
   ROUTE_CLARIFY,
   ROUTE_CONFIRM,
+  ROUTE_IN_PLACE,
+  ROUTE_NAVIGATE,
+  ROUTE_BLOCKED,
+  ROUTE_RELATIONSHIP,
 } from '../utils/firstValueRouting';
 import { logEvent, EVENTS } from '../services/analytics';
 
@@ -107,8 +113,9 @@ export default function useFirstExperienceController(arrival = null) {
       logEvent(EVENTS.WHO_RESOLVED, { source: resolved.source });
 
       if (mode !== MODE_BEGIN) {
-        setDecision(routeIntent({ intent: INTENT_PROSPECTING, confidence: 1 }, facts));
-        setPhase('handoff');
+        const routed = routeIntent({ intent: INTENT_PROSPECTING, confidence: 1 }, facts);
+        setDecision(routed);
+        deliverDecision(routed, resolved);
         return;
       }
 
@@ -235,7 +242,7 @@ export default function useFirstExperienceController(arrival = null) {
       logEvent(EVENTS.FIRST_VALUE_BRANCH_SELECTED, { intent: first, branch: routed.kind });
       setDecision(routed);
       setClassifying(false);
-      setPhase('handoff');
+      deliverDecision(routed, whoRef.current);
       return;
     }
 
@@ -269,7 +276,7 @@ export default function useFirstExperienceController(arrival = null) {
     const routed = routeIntent(settled, readinessRef.current);
     logEvent(EVENTS.FIRST_VALUE_BRANCH_SELECTED, { intent: settled.intent, branch: routed.kind });
     setDecision(routed);
-    setPhase('handoff');
+    deliverDecision(routed, whoRef.current);
   }
 
   function rejectIntent() {
@@ -281,13 +288,52 @@ export default function useFirstExperienceController(arrival = null) {
     setPhase('intent');
   }
 
+  function deliverDecision(routed, resolvedWho) {
+    const name = resolvedWho?.name || null;
+
+    if (routed.kind === ROUTE_IN_PLACE) {
+      setTurns(prev => [...prev, {
+        role: 'assistant',
+        content: routed.headline,
+        _feCard: 'prospecting',
+      }]);
+    } else if (routed.kind === ROUTE_RELATIONSHIP) {
+      setTurns(prev => [...prev, {
+        role: 'assistant',
+        content: routed.headline,
+        _feCard: 'relationship',
+      }]);
+    } else if (routed.kind === ROUTE_NAVIGATE) {
+      setTurns(prev => [...prev, {
+        role: 'assistant',
+        content: routed.headline,
+        _feCard: 'navigate',
+      }]);
+    } else if (routed.kind === ROUTE_BLOCKED) {
+      const msg = routed.headline + (routed.detail ? `\n\n${routed.detail}` : '');
+      setTurns(prev => [...prev, {
+        role: 'assistant',
+        content: msg,
+        _feCard: 'blocked',
+      }]);
+    } else {
+      setTurns(prev => [...prev, {
+        role: 'assistant',
+        content: routed.headline + (routed.detail ? ` ${routed.detail}` : ''),
+        _feCard: 'action',
+      }]);
+    }
+
+    setPhase('delivering');
+  }
+
   const chooseIntent = useCallback((intent) => {
     setHeld(prev => (prev === intent ? null : prev));
     setPending({ intent, confidence: 1 });
     const routed = routeIntent({ intent, confidence: 1 }, readinessRef.current);
     logEvent(EVENTS.FIRST_VALUE_BRANCH_SELECTED, { intent, branch: routed.kind });
     setDecision(routed);
-    setPhase('handoff');
+    deliverDecision(routed, whoRef.current);
   }, []);
 
   return {
@@ -295,6 +341,7 @@ export default function useFirstExperienceController(arrival = null) {
     turns,
     who,
     decision,
+    readiness,
     classifying,
     pending,
     held,

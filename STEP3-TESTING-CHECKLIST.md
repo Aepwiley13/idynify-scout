@@ -165,10 +165,16 @@ This document provides a comprehensive testing checklist for the credit-based pr
 
 ### 1. Netlify Function Deployment
 
+> **REMOVED (Scout Gate 1 containment, G1-02).** `netlify/functions/enrich-company.js`
+> has been deleted. It returned hard-coded mock company and contact data, deducted 10
+> real credits per call, and performed no authentication at all — `userId` was read
+> straight from the request body. Do not verify, restore, or re-deploy this endpoint.
+> The live enrichment path is `netlify/functions/enrichCompany.js` (no hyphen), which
+> is unaffected by Gate 1.
+
 - [ ] **Build Test**:
-  - [ ] enrich-company function builds successfully
-  - [ ] Function is accessible at /.netlify/functions/enrich-company
-  - [ ] Function timeout set to 900 seconds
+  - [ ] ~~enrich-company function builds successfully~~ (endpoint removed)
+  - [ ] ~~Function is accessible at /.netlify/functions/enrich-company~~ (endpoint removed)
 
 - [ ] **Environment Variables Test**:
   - [ ] FIREBASE_PROJECT_ID is set
@@ -269,7 +275,8 @@ This document provides a comprehensive testing checklist for the credit-based pr
 ## 📝 Known Limitations
 
 1. **Stripe Integration**: Currently placeholder - needs real Stripe checkout
-2. **Mock Enrichment Data**: enrich-company function uses mock data - replace with real API
+2. **Mock Enrichment Data**: ~~enrich-company function uses mock data~~ — resolved by
+   deletion in Scout Gate 1 containment (G1-02), not by replacement. See `enrichCompany.js`.
 3. **Monthly Reset**: No automated cron job for monthly credit reset yet
 
 ---
@@ -286,13 +293,13 @@ This document provides a comprehensive testing checklist for the credit-based pr
 - `/src/pages/MissionControlDashboard.jsx` (updated)
 
 **Functions:**
-- `/netlify/functions/enrich-company.js`
+- ~~`/netlify/functions/enrich-company.js`~~ — deleted (Scout Gate 1 containment, G1-02)
 
 **Schema:**
 - `/src/firebase/schema.js` (updated with credit fields)
 
 **Config:**
-- `/netlify.toml` (updated with enrich-company timeout)
+- `/netlify.toml` (previously carried an enrich-company timeout; endpoint since removed)
 
 ---
 

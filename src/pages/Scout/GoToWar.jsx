@@ -251,7 +251,6 @@ export default function GoToWar() {
   const [missionLaunched, setMissionLaunched] = useState(false);
   const [launchingMission, setLaunchingMission] = useState(false);
   const [activeMissionId, setActiveMissionId] = useState(null);
-  const [sendingStep, setSendingStep]         = useState(null); // contactId being sent
   const [sentSteps, setSentSteps]             = useState({});   // contactId → Set of step indices sent
 
   // Phase 7: Monitor — outcomes
@@ -555,102 +554,25 @@ export default function GoToWar() {
     }
   }
 
-  // ── Send throttle (90s global per-sender) ──────────────────────────────────
-  const [lastSendTime, setLastSendTime] = useState(0);
-  const [throttleRemaining, setThrottleRemaining] = useState(0);
-
-  useEffect(() => {
-    if (throttleRemaining <= 0) return;
-    const timer = setInterval(() => {
-      const remaining = Math.max(0, Math.ceil((lastSendTime + 90000 - Date.now()) / 1000));
-      setThrottleRemaining(remaining);
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [lastSendTime, throttleRemaining]);
-
-  // Phase 6: Manual send for a specific contact + step
-  async function handleManualSend(contact, stepIndex) {
-    // Enforce 90s global throttle
-    const now = Date.now();
-    const elapsed = now - lastSendTime;
-    if (lastSendTime > 0 && elapsed < 90000) {
-      const wait = Math.ceil((90000 - elapsed) / 1000);
-      setThrottleRemaining(wait);
-      alert(`Send throttle: please wait ${wait}s before sending again. This prevents rate-limiting.`);
-      return;
-    }
-
-    const key = `${contact.contactId}_${stepIndex}`;
-    setSendingStep(key);
-    try {
-      const user = getEffectiveUser();
-      if (!user || !activeMissionId) return;
-      const token = await user.getIdToken();
-      // Call existing Gmail send function
-      await fetch('/.netlify/functions/gmail-send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          authToken: token,
-          contactEmail: contact.email,
-          contactName: contact.name,
-          subject: `Step ${stepIndex + 1} — ${missionName || 'Go To War Mission'}`,
-          body: microSequence?.steps?.[stepIndex]?.action || 'Follow up message',
-        }),
-      });
-
-      // Update throttle timestamp
-      const sendTime = Date.now();
-      setLastSendTime(sendTime);
-      setThrottleRemaining(90);
-
-      // Log to timeline
-      logTimelineEvent({
-        userId: user.uid,
-        contactId: contact.contactId,
-        type: 'sequence_step_sent',
-        actor: ACTORS.USER,
-        preview: `Step ${stepIndex + 1} sent`,
-        metadata: { missionId: activeMissionId, stepIndex },
-      });
-
-      // Persist send state to Firestore — update mission contact
-      const missionRef = doc(db, 'users', user.uid, 'missions', activeMissionId);
-      const updatedContacts = missionContacts.map((mc) => {
-        if (mc.contactId !== contact.contactId) return mc;
-        const newHistory = [...(mc.stepHistory || []), {
-          stepIndex,
-          sentAt: new Date().toISOString(),
-          actor: 'user',
-        }];
-        return {
-          ...mc,
-          currentStepIndex: stepIndex + 1,
-          lastContactedAt: new Date().toISOString(),
-          replyStatus: 'no-reply',
-          stepHistory: newHistory,
-          status: (stepIndex + 1 >= (microSequence?.steps?.length || 1)) ? 'awaiting_outcome' : 'active',
-        };
-      });
-      await updateDoc(missionRef, {
-        contacts: updatedContacts,
-        updatedAt: new Date().toISOString(),
-      });
-      setMissionContacts(updatedContacts);
-
-      setSentSteps((prev) => {
-        const next = { ...prev };
-        if (!next[contact.contactId]) next[contact.contactId] = new Set();
-        next[contact.contactId] = new Set([...next[contact.contactId], stepIndex]);
-        return next;
-      });
-    } catch (err) {
-      console.error('[GoToWar] send error:', err);
-    } finally {
-      setSendingStep(null);
-    }
-  }
+  // ── GATE 1 CONTAINMENT (G1-01) — SEND PATH REMOVED ────────────────────────
+  // handleManualSend() used to POST to /.netlify/functions/gmail-send with:
+  //     subject: `Step N — {missionName}`
+  //     body:    microSequence.steps[stepIndex].action
+  // steps[].action is specified by barryGenerateMissionSequence.js:201 as a
+  // brief ACTION DESCRIPTION ("Send personalized email introducing value
+  // proposition"). It is a plan instruction, never customer-facing copy, and
+  // it was transmitted verbatim to real prospects.
+  //
+  // The same function also (a) never checked the gmail-send response, so a
+  // failed send still wrote sequence_step_sent to the timeline and advanced
+  // the mission, (b) never validated contact.email, and (c) bypassed
+  // sendActionResolver's Gmail integration check and confirmation gate.
+  //
+  // The payload-construction code is deleted rather than disabled so it
+  // cannot be re-reached. Re-enable ONLY through the MissionDetail pattern:
+  //     barryGenerateSequenceStep -> personalizedSteps -> user approval
+  //     -> executeSendAction() in src/utils/sendActionResolver.js
+  // Ref: Scout Gate 1 — Trust & Correctness Implementation Plan, section 06.
 
   const toggleContact = (id) => {
     setSelected((prev) => {
@@ -1361,7 +1283,7 @@ export default function GoToWar() {
         </h2>
         <p style={{ margin: 0, fontSize: 13, color: T.textFaint, lineHeight: 1.5 }}>
           {missionLaunched
-            ? 'Send each step manually. Click Send next to a contact to fire the email.'
+            ? "Step content isn't generated yet. Open a contact's engage panel to write and send this step."
             : `${missionContacts.length} contact${missionContacts.length !== 1 ? 's' : ''} queued. Launch the mission to begin sending.`}
         </p>
       </div>
@@ -1383,18 +1305,6 @@ export default function GoToWar() {
         </button>
       )}
 
-      {/* Throttle indicator */}
-      {missionLaunched && throttleRemaining > 0 && (
-        <div style={{
-          padding: '8px 14px', borderRadius: 8, background: `${WAR_ACCENT}08`,
-          border: `1.5px solid ${WAR_ACCENT}25`, marginBottom: 10,
-          fontSize: 12, color: WAR_ACCENT, fontWeight: 600,
-          display: 'flex', alignItems: 'center', gap: 6,
-        }}>
-          <Clock3 size={13} /> Send throttle: {throttleRemaining}s remaining
-        </div>
-      )}
-
       {/* Send feed */}
       {missionLaunched && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1414,21 +1324,21 @@ export default function GoToWar() {
                   </div>
                 </div>
                 {nextStepIdx !== null && (
-                  <button
-                    onClick={() => handleManualSend(mc, nextStepIdx)}
-                    disabled={sendingStep === `${mc.contactId}_${nextStepIdx}` || throttleRemaining > 0}
+                  /* GATE 1 (G1-01): no click surface — sequence steps carry a plan
+                     description, not generated message content. See the comment
+                     block where handleManualSend() used to live. */
+                  <div
+                    title="Sequence steps hold a plan description, not message content. Open this contact's engage panel to write and send this step."
                     style={{
-                      width: '100%', padding: '8px 0', borderRadius: 7, border: 'none',
-                      background: throttleRemaining > 0 ? `${T.border2}` : `${WAR_ACCENT}15`,
-                      color: throttleRemaining > 0 ? T.textFaint : WAR_ACCENT, fontSize: 12, fontWeight: 600,
-                      cursor: 'pointer', fontFamily: 'Inter, system-ui, sans-serif',
+                      width: '100%', padding: '8px 10px', borderRadius: 7,
+                      border: `1.5px dashed ${T.border2}`, background: 'transparent',
+                      color: T.textFaint, fontSize: 12, fontWeight: 600,
+                      fontFamily: 'Inter, system-ui, sans-serif', cursor: 'not-allowed',
                       display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                     }}
                   >
-                    {sendingStep === `${mc.contactId}_${nextStepIdx}`
-                      ? <><Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> Sending…</>
-                      : <><Send size={12} /> Send Step {nextStepIdx + 1}</>}
-                  </button>
+                    <AlertCircle size={12} /> Step {nextStepIdx + 1} — content not generated
+                  </div>
                 )}
               </div>
             );

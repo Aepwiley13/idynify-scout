@@ -75,7 +75,12 @@ async function loadConversation(userId) {
       const mcSnap = await getDoc(doc(db, 'users', userId, 'barryConversations', 'missionControl'));
       const mode = mcSnap.exists() ? mcSnap.data().mode : null;
       return {
-        messages: turns.map(t => ({ role: t.role, content: t.content })),
+        messages: turns.map(t => ({
+          role: t.role,
+          content: t.content,
+          kind: t.kind || undefined,
+          has_message_angles: t.kind === 'angles',
+        })),
         conversationHistory: turns.map(t => ({ role: t.role, content: t.content })),
         mode,
       };
@@ -382,7 +387,7 @@ export default function BarryChatPanel({
     sessionStorage.setItem('barry_mission_visited', 'true');
 
     initPanel();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   const prevBarryOpenRef = useRef(false);
   useEffect(() => {
@@ -428,7 +433,7 @@ export default function BarryChatPanel({
       }
     }, 800);
     return () => clearTimeout(timer);
-  }, [messages, userId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [messages, userId]);
 
   // ── Auto-scroll conversation thread ───────────────────────────────────────
 
@@ -1631,6 +1636,9 @@ export default function BarryChatPanel({
                         {/* Text portion — always shown if present */}
                         {msg.content && (
                           <div className="text-sm px-3 py-2 leading-relaxed rounded-2xl rounded-tl-sm" style={{ background: T.cardBg, color: T.text, border: `1px solid ${T.border}` }}>
+                            {msg.kind === 'angles' && !(msg.angles?.length > 0) && (
+                              <span className="inline-block text-xs font-bold uppercase tracking-wide mr-1.5" style={{ color: T.cyan, letterSpacing: '0.04em' }}>Angles</span>
+                            )}
                             <ReactMarkdown className="prose prose-invert prose-sm max-w-none [&>p]:mt-0 [&>p:last-child]:mb-0">
                               {msg.content}
                             </ReactMarkdown>

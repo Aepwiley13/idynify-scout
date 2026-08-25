@@ -326,8 +326,8 @@ describe('C4 — structured angles, no bracketed speech', () => {
     expect(appendFn).toMatch(/turnDoc\.kind\s*=\s*kind/);
   });
 
-  it('Workspace renders angles with badge, not brackets', () => {
-    expect(workspace).toMatch(/barry-workspace-angles-badge/);
+  it('Workspace renders structured kinds via ConversationCard, not brackets', () => {
+    expect(workspace).toMatch(/ConversationCard/);
     expect(workspaceClean).not.toMatch(/\[Message angles generated/);
   });
 
@@ -336,9 +336,9 @@ describe('C4 — structured angles, no bracketed speech', () => {
     expect(chatClean).not.toMatch(/\[Message angles generated/);
   });
 
-  it('Workspace uses kind: "angles" for angle turns', () => {
-    expect(workspaceClean).toMatch(/['"]angles['"]/);
-    expect(workspaceClean).toMatch(/turn\.kind\s*===\s*'angles'/);
+  it('Workspace uses kind discriminator to render structured turns', () => {
+    expect(workspaceClean).toMatch(/turn\.kind/);
+    expect(workspaceClean).toMatch(/ConversationCard\s+kind=/);
   });
 
   it('Sidecar uses kind: "angles" for angle turns', () => {

@@ -29,6 +29,7 @@ import { appendTurn, loadOrSeedRecentTurns } from '../../utils/barryCanonical';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { resolveWho } from '../../utils/resolveWho';
 import { buildContextStack } from '../../utils/barryContextStack';
+import ConversationCard from '../../components/conversation/ConversationCard';
 import FirstExperience from '../Onboarding/FirstExperience';
 import './BarryWorkspace.css';
 
@@ -73,12 +74,16 @@ export default function BarryWorkspace() {
     if (!user) { setLoading(false); return; }
 
     try {
-      const [userSnap, convSnap, icpResolution, turns] = await Promise.all([
+      const [userSnap, convSnap, icpResolution, turns, mcSnap] = await Promise.all([
         getDoc(doc(db, 'users', user.uid)).catch(() => null),
         getDoc(doc(db, 'users', user.uid, 'barryConversations', 'icp')).catch(() => null),
         resolveActiveIcp(user.uid),
         loadOrSeedRecentTurns(db, user.uid, 30),
+        getDoc(doc(db, 'users', user.uid, 'barryConversations', 'missionControl')).catch(() => null),
       ]);
+
+      const persistedMode = mcSnap?.exists() ? mcSnap.data().mode : null;
+      if (persistedMode) setBarryMode(persistedMode);
 
       const userData = userSnap?.exists() ? userSnap.data() : null;
       const convData = convSnap?.exists() ? convSnap.data() : null;
@@ -343,11 +348,12 @@ export default function BarryWorkspace() {
                 }}
               >
                 {turn.role === 'assistant' ? (
-                  turn.kind === 'angles' ? (
-                    <p className="barry-workspace-angles-summary">
-                      <span className="barry-workspace-angles-badge" style={{ color: BRAND.cyan }}>Angles</span>
-                      {' '}{turn.content}
-                    </p>
+                  turn.kind && turn.kind !== 'message' ? (
+                    <ConversationCard kind={turn.kind}>
+                      <ReactMarkdown className="barry-workspace-prose">
+                        {turn.content}
+                      </ReactMarkdown>
+                    </ConversationCard>
                   ) : (
                     <ReactMarkdown className="barry-workspace-prose">
                       {turn.content}

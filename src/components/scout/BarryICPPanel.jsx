@@ -81,6 +81,7 @@ export default function BarryICPPanel({ userId, icpProfile, onClose, onSearchCom
           const displayMsgs = turns.map(t => ({
             role: t.role === 'assistant' ? 'barry' : 'user',
             content: t.content,
+            kind: t.kind || undefined,
           }));
           const apiHistory = turns.map(t => ({
             role: t.role,

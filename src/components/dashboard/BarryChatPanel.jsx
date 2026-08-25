@@ -1154,8 +1154,21 @@ export default function BarryChatPanel({
         setMessages(prev => [...prev, assistantMsg]);
         setConversationHistory(data.updatedHistory || []);
 
-        appendTurn(db, user.uid, { role: 'assistant', content: assistantMsg.content, surface: 'workspace' })
-          .catch(err => console.warn('[BarryChatPanel] canonical append failed:', err.message));
+        // G2-D2: When the response is angles-only (no prose), synthesize a
+        // text summary so the canonical history captures what Barry said.
+        // G2-D3: Await the assistant append so the turn is guaranteed
+        // persisted before the UI settles — prevents a race where
+        // navigating to BarryWorkspace immediately after would miss it.
+        let canonicalContent = assistantMsg.content;
+        if (!canonicalContent && assistantMsg.has_message_angles && assistantMsg.angles.length > 0) {
+          const angleNames = assistantMsg.angles.map(a => a.label || a.subject || 'angle').join(', ');
+          canonicalContent = `[Message angles generated: ${angleNames}]`;
+        }
+        try {
+          await appendTurn(db, user.uid, { role: 'assistant', content: canonicalContent, surface: 'workspace' });
+        } catch (err) {
+          console.warn('[BarryChatPanel] canonical append failed:', err.message);
+        }
       } else {
         setMessages(prev => [...prev, {
           role: 'assistant',

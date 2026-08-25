@@ -1,0 +1,332 @@
+/* BarryWorkspace — full-page Barry conversation surface */
+
+.barry-workspace {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.barry-workspace--first-experience {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Loading ─────────────────────────────────────────────────────────────── */
+
+.barry-workspace-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 16px;
+}
+
+.barry-workspace-loading-avatar img {
+  border-radius: 50%;
+  opacity: 0.7;
+  animation: barry-pulse 2s ease-in-out infinite;
+}
+
+@keyframes barry-pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+/* ── Soft progress bar ───────────────────────────────────────────────────── */
+
+.barry-workspace-progress {
+  flex-shrink: 0;
+  padding: 12px 24px;
+  border-bottom: 1px solid;
+}
+
+.barry-workspace-progress-track {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  justify-content: center;
+}
+
+.barry-progress-step {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  position: relative;
+}
+
+.barry-progress-step:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  right: -2px;
+  top: 50%;
+  width: 16px;
+  height: 1px;
+  background: currentColor;
+  opacity: 0.15;
+}
+
+.barry-progress-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
+}
+
+.barry-progress-step.active .barry-progress-dot {
+  width: 10px;
+  height: 10px;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.barry-progress-label {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+
+/* ── First Experience content area ───────────────────────────────────────── */
+
+.barry-workspace-content {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.barry-workspace-content .barry-onboarding {
+  height: auto;
+  min-height: 100%;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* ── Post-onboarding header ──────────────────────────────────────────────── */
+
+.barry-workspace-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 24px;
+  border-bottom: 1px solid;
+}
+
+.barry-workspace-header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.barry-workspace-avatar {
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.barry-workspace-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.barry-workspace-subtitle {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+/* ── Conversation thread ─────────────────────────────────────────────────── */
+
+.barry-workspace-thread {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Empty state */
+.barry-workspace-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 12px;
+  padding: 48px 24px;
+}
+
+.barry-workspace-empty-avatar {
+  border-radius: 50%;
+  opacity: 0.8;
+}
+
+/* Messages */
+.barry-workspace-message {
+  display: flex;
+  gap: 10px;
+  max-width: 680px;
+  width: 100%;
+}
+
+.barry-workspace-message.user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.barry-workspace-message.assistant {
+  align-self: flex-start;
+}
+
+.barry-workspace-msg-avatar {
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.barry-workspace-msg-bubble {
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid;
+  max-width: 100%;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.barry-workspace-message.user .barry-workspace-msg-bubble {
+  border-radius: 14px 14px 4px 14px;
+}
+
+.barry-workspace-message.assistant .barry-workspace-msg-bubble {
+  border-radius: 14px 14px 14px 4px;
+}
+
+.barry-workspace-msg-bubble p {
+  margin: 0;
+}
+
+.barry-workspace-prose {
+  line-height: 1.6;
+}
+
+.barry-workspace-prose p {
+  margin: 0 0 8px;
+}
+
+.barry-workspace-prose p:last-child {
+  margin-bottom: 0;
+}
+
+.barry-workspace-prose ul,
+.barry-workspace-prose ol {
+  margin: 4px 0;
+  padding-left: 20px;
+}
+
+.barry-workspace-prose li {
+  margin: 2px 0;
+}
+
+.barry-workspace-prose strong {
+  font-weight: 600;
+}
+
+/* ── Composer (placeholder for now — full interaction via Barry panel) ──── */
+
+.barry-workspace-composer {
+  flex-shrink: 0;
+  padding: 16px 24px;
+  border-top: 1px solid;
+  text-align: center;
+}
+
+.barry-workspace-composer-hint {
+  margin: 0;
+  font-size: 13px;
+}
+
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+
+/* Tablet */
+@media (max-width: 1024px) {
+  .barry-workspace-thread {
+    padding: 20px 16px;
+  }
+
+  .barry-workspace-message {
+    max-width: 100%;
+  }
+
+  .barry-progress-step {
+    padding: 0 8px;
+  }
+
+  .barry-progress-label {
+    font-size: 11px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 767px) {
+  .barry-workspace-header {
+    padding: 12px 16px;
+  }
+
+  .barry-workspace-thread {
+    padding: 16px 12px;
+    gap: 12px;
+  }
+
+  .barry-workspace-msg-bubble {
+    padding: 10px 14px;
+    font-size: 14px;
+  }
+
+  .barry-workspace-empty {
+    padding: 32px 16px;
+  }
+
+  .barry-workspace-progress {
+    padding: 10px 12px;
+    overflow-x: auto;
+  }
+
+  .barry-workspace-progress-track {
+    min-width: max-content;
+  }
+
+  .barry-progress-step {
+    padding: 0 6px;
+  }
+
+  .barry-progress-label {
+    font-size: 10px;
+  }
+
+  .barry-workspace-composer {
+    padding: 12px 16px;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 374px) {
+  .barry-workspace-msg-bubble {
+    font-size: 13px;
+    padding: 8px 12px;
+  }
+
+  .barry-workspace-msg-avatar {
+    width: 24px;
+    height: 24px;
+  }
+}

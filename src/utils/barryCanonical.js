@@ -1,6 +1,7 @@
 import {
   collection, addDoc, doc, getDoc, setDoc,
   query, orderBy, limit, getDocs, serverTimestamp,
+  runTransaction,
 } from 'firebase/firestore';
 
 function turnsRef(db, uid) {
@@ -30,12 +31,24 @@ export async function loadAllTurns(db, uid) {
   return snap.docs.map(d => ({ id: d.id, ...d.data() }));
 }
 
+/**
+ * G2-D1: Atomically claim the seed lock, then migrate legacy turns.
+ *
+ * Two tabs opening simultaneously could both read seeded=false and both
+ * write turns, doubling the history. The transaction makes the check-and-set
+ * atomic: the loser sees seeded=true and bails.
+ */
 export async function seedFromLegacy(db, uid) {
   const metaRef = doc(db, 'users', uid, 'barryConversations', 'canonical');
-  const metaSnap = await getDoc(metaRef);
-  if (metaSnap.exists() && metaSnap.data().seeded) return false;
 
-  await setDoc(metaRef, { seeded: true, seededAt: serverTimestamp() }, { merge: true });
+  const shouldSeed = await runTransaction(db, async (txn) => {
+    const metaSnap = await txn.get(metaRef);
+    if (metaSnap.exists() && metaSnap.data().seeded) return false;
+    txn.set(metaRef, { seeded: true, seededAt: serverTimestamp() }, { merge: true });
+    return true;
+  });
+
+  if (!shouldSeed) return false;
 
   for (const docId of ['missionControl', 'icpChat', 'icp']) {
     try {

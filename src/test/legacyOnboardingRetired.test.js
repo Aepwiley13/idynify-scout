@@ -54,18 +54,16 @@ describe('1 — OnboardingFlow is retired, and was unreachable first', () => {
   });
 
   it('the legacy URLs still redirect — the paths are compatibility, not the component', () => {
-    // Someone with a bookmark to /onboarding/flow must still land somewhere
-    // useful. Retiring the component is not the same as breaking the address.
     const app = read('../App.jsx');
     for (const path of ['/onboarding/flow', '/onboarding/recon', '/onboarding/barry', '/onboarding/company-profile']) {
       expect(app, `${path} no longer redirects`).toMatch(
-        new RegExp(`path="${path}"[^>]*<Navigate to="/onboarding" replace`)
+        new RegExp(`path="${path}"[^>]*<Navigate to="/barry" replace`)
       );
     }
   });
 
-  it('the canonical route still resolves to the First Experience', () => {
-    expect(read('../App.jsx')).toMatch(/path="\/onboarding" element=\{<ProtectedRoute><FirstExperience \/><\/ProtectedRoute>\}/);
+  it('the canonical route redirects to /barry where BarryWorkspace renders the First Experience', () => {
+    expect(read('../App.jsx')).toMatch(/path="\/onboarding" element=\{<Navigate to="\/barry" replace \/>\}/);
   });
 });
 

@@ -181,7 +181,7 @@ const Sidebar = ({
 }) => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { openBarry, sidebarMode, toggleSidebar } = useShell();
+  const { openBarry, sidebarMode, toggleSidebar, isFirstExperience } = useShell();
   const isMobile = useIsMobile();
 
   const compact = sidebarMode === 'compact';
@@ -233,8 +233,10 @@ const Sidebar = ({
         <X size={18} aria-hidden="true" />
       </button>
 
-      {/* DESKTOP — the flat, locked order. Unchanged. */}
-      {!isMobile && (
+      {/* DESKTOP — the flat, locked order. During First Experience, only the
+          brand mark and Barry are visible; the module list would overwhelm a
+          new user who hasn't defined their ICP yet. */}
+      {!isMobile && !isFirstExperience && (
       <nav className="sidebar-nav sidebar-nav-flat" aria-label="Global navigation">
         <ul className="sidebar-modules">
           {sidebarDestinations().map(dest => (
@@ -261,7 +263,7 @@ const Sidebar = ({
           Only one is BUILT, not merely hidden: two landmarks both labelled
           "Global navigation" is one stylesheet failure away from rendering
           both, and it makes every query against the sidebar ambiguous. */}
-      {isMobile && (
+      {isMobile && !isFirstExperience && (
       <nav className="sidebar-nav sidebar-nav-grouped" aria-label="Global navigation">
         {mobileDrawerSections().map((section, i) => (
           <div className="sidebar-group" key={section.label || `ungrouped-${i}`}>

@@ -336,6 +336,10 @@ export default function useFirstExperienceController(arrival = null) {
     deliverDecision(routed, whoRef.current);
   }, []);
 
+  const addTurn = useCallback((turn) => {
+    setTurns(prev => [...prev, turn]);
+  }, []);
+
   return {
     phase,
     turns,
@@ -348,5 +352,6 @@ export default function useFirstExperienceController(arrival = null) {
     handleUserInput,
     skipName,
     chooseIntent,
+    addTurn,
   };
 }

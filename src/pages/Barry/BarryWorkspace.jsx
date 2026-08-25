@@ -57,6 +57,9 @@ export default function BarryWorkspace() {
 
   const threadRef = useRef(null);
   const inputRef = useRef(null);
+  const onboardingRef = useRef(null);
+  const [prospectingBusy, setProspectingBusy] = useState(false);
+  const [prospectingStep, setProspectingStep] = useState(null);
 
   const feCtrl = useFirstExperienceController(arrival);
   const feTurnCountRef = useRef(0);
@@ -140,7 +143,7 @@ export default function BarryWorkspace() {
     if (threadRef.current) {
       threadRef.current.scrollTop = threadRef.current.scrollHeight;
     }
-  }, [conversationTurns, sending, feCtrl.turns, feCtrl.classifying, feCtrl.phase]);
+  }, [conversationTurns, sending, feCtrl.turns, feCtrl.classifying, feCtrl.phase, prospectingBusy]);
 
   useEffect(() => {
     return () => { setFirstExperience?.(false); };
@@ -243,7 +246,7 @@ export default function BarryWorkspace() {
   function handleKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (isFirstExperience && feCtrl.phase !== 'handoff') {
+      if (isFirstExperience) {
         handleFirstExperienceSubmit();
       } else {
         sendMessage(inputValue);
@@ -252,9 +255,19 @@ export default function BarryWorkspace() {
   }
 
   function handleFirstExperienceSubmit() {
-    if (!inputValue.trim() || feCtrl.classifying) return;
-    feCtrl.handleUserInput(inputValue.trim());
-    setInputValue('');
+    if (!inputValue.trim()) return;
+    const text = inputValue.trim();
+    const delivering = feCtrl.phase === 'delivering';
+    const prospecting = delivering && feCtrl.decision?.kind === 'in-place';
+
+    if (prospecting && onboardingRef.current) {
+      feCtrl.addTurn({ role: 'user', content: text });
+      onboardingRef.current.submit(text);
+      setInputValue('');
+    } else if (!feCtrl.classifying) {
+      feCtrl.handleUserInput(text);
+      setInputValue('');
+    }
   }
 
   if (loading) {
@@ -278,12 +291,13 @@ export default function BarryWorkspace() {
     const feTurns = feCtrl.turns;
     const isWhoPhase = fePhase === 'who';
     const isDelivering = fePhase === 'delivering';
-    const isBusy = feCtrl.classifying;
+    const isBusy = feCtrl.classifying || prospectingBusy;
     const isProspecting = isDelivering && feCtrl.decision?.kind === 'in-place';
+    const prospectingReady = isProspecting && prospectingStep && ['asking', 'clarifying'].includes(prospectingStep);
     const placeholder = isWhoPhase ? 'Your name'
       : isProspecting ? 'Tell Barry about your target market...'
       : 'Type your answer...';
-    const composerDisabled = isBusy || (isDelivering && !isProspecting);
+    const composerDisabled = isBusy || (isDelivering && !isProspecting) || (isProspecting && !prospectingReady);
 
     return (
       <div className="barry-workspace">
@@ -339,8 +353,13 @@ export default function BarryWorkspace() {
                 {hasCard && turn._feCard === 'prospecting' && (
                   <div className="barry-workspace-fe-card">
                     <BarryOnboarding
+                      ref={onboardingRef}
+                      embedded
                       knownName={feCtrl.who?.name || null}
                       goal={feCtrl.pending?.restatement || null}
+                      onBarryMessage={(content) => feCtrl.addTurn({ role: 'assistant', content })}
+                      onProcessing={setProspectingBusy}
+                      onStepChange={setProspectingStep}
                     />
                   </div>
                 )}

@@ -72,6 +72,8 @@ const FALLBACK_SHELL = {
   quickEngage: null,
   openQuickEngage: () => {},
   closeQuickEngage: () => {},
+  isFirstExperience: false,
+  setFirstExperience: () => {},
   sidebarMode: 'wide',
   toggleSidebar: () => {},
   arrival: null,
@@ -146,6 +148,10 @@ export function ShellProvider({ children, user, userData }) {
 
   // Quick Engage drawer — shell-owned, see openQuickEngage below.
   const [quickEngage, setQuickEngage] = useState(null);
+
+  // First Experience: when true, the shell shows simplified navigation.
+  // Set by BarryWorkspace when the user hasn't completed onboarding.
+  const [isFirstExperience, setFirstExperience] = useState(false);
 
   // Wide (220px) or compact (64px). Persisted, so it survives navigation and
   // reload — a layout preference the user set should not reset on them.
@@ -410,6 +416,8 @@ export function ShellProvider({ children, user, userData }) {
     quickEngage,
     openQuickEngage,
     closeQuickEngage,
+    isFirstExperience,
+    setFirstExperience,
     sidebarMode,
     toggleSidebar,
     arrival,
@@ -422,6 +430,7 @@ export function ShellProvider({ children, user, userData }) {
     navigationContext, setEntityContext, clearEntityContext,
     announce, announcements, dismissAnnouncement,
     quickEngage, openQuickEngage, closeQuickEngage,
+    isFirstExperience, setFirstExperience,
     sidebarMode, toggleSidebar,
     arrival, setArrival, clearArrival,
   ]);

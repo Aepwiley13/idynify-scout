@@ -25,16 +25,19 @@ const read = rel => readFileSync(resolve(here, rel), 'utf8');
 const app = read('../App.jsx');
 
 describe('the canonical route', () => {
-  it('/onboarding renders the First Experience', () => {
-    expect(app).toMatch(/<Route path="\/onboarding" element=\{<ProtectedRoute><FirstExperience \/><\/ProtectedRoute>\} \/>/);
+  it('/onboarding redirects to /barry', () => {
+    expect(app).toMatch(/<Route path="\/onboarding" element=\{<Navigate to="\/barry" replace \/>\}/);
   });
 
-  it('is the only onboarding route with a component', () => {
+  it('/barry renders the Barry Workspace', () => {
+    expect(app).toMatch(/path="\/barry"\s+element=\{<BarryWorkspace/);
+  });
+
+  it('no onboarding route renders a component — all redirect to /barry', () => {
     const onboardingRoutes = [...app.matchAll(/<Route path="(\/onboarding[^"]*)" element=\{([^}]*)\}/g)];
 
     const withComponent = onboardingRoutes.filter(m => !m[2].includes('Navigate'));
-    expect(withComponent).toHaveLength(1);
-    expect(withComponent[0][1]).toBe('/onboarding');
+    expect(withComponent).toHaveLength(0);
   });
 });
 
@@ -45,7 +48,7 @@ describe('every legacy onboarding path redirects into it', () => {
     '/onboarding/barry',
     '/onboarding/company-profile',
   ])('%s redirects', (path) => {
-    const pattern = new RegExp(`<Route path="${path}" element=\\{<Navigate to="/onboarding" replace />\\}`);
+    const pattern = new RegExp(`<Route path="${path}" element=\\{<Navigate to="/barry" replace />\\}`);
     expect(app).toMatch(pattern);
   });
 
@@ -84,8 +87,8 @@ describe('every entry point lands on the canonical route', () => {
     }
   });
 
-  it('SmartRedirect already targeted the canonical route and is unchanged', () => {
-    expect(app).toMatch(/return <Navigate to="\/onboarding" \/>/);
+  it('SmartRedirect targets /barry directly', () => {
+    expect(app).toMatch(/return <Navigate to="\/barry" \/>/);
   });
 });
 

@@ -139,12 +139,12 @@ describe('the explicit affordances declare their intent', () => {
     expect(src).toMatch(/import \{ ARRIVAL_REVIEW_ICP \}/);
   });
 
-  it('there is still exactly one onboarding route — intent is an argument, not a second door', () => {
+  it('all onboarding routes redirect to /barry — intent is an argument, not a second door', () => {
     const app = readFileSync(resolve(here, '../App.jsx'), 'utf8');
     const routed = [...app.matchAll(/<Route path="(\/onboarding[^"]*)" element=\{([^}]*)\}/g)]
       .filter(m => !m[2].includes('Navigate'));
 
-    expect(routed).toHaveLength(1);
+    expect(routed).toHaveLength(0);
   });
 });
 

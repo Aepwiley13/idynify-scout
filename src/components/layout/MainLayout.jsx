@@ -345,34 +345,46 @@ function ShellChrome({ children, user }) {
 
       {/* Barry — always mounted, visibility toggled via inert + aria-hidden so
           conversation and orientation state survive open/close AND navigation.
-          This is the whole point of the shell: one Barry, one thread. */}
-      <div
-        ref={barryHostRef}
-        className="barry-panel-host"
-        role="dialog"
-        aria-modal={barryOpen ? 'true' : undefined}
-        aria-label="Barry"
-        aria-hidden={!barryOpen}
-        inert={!barryOpen ? '' : undefined}
-        tabIndex={-1}
-        onKeyDown={(e) => { if (e.key === 'Escape') closeBarry(); }}
-      >
-        <button
-          type="button"
-          className="barry-host-close"
-          onClick={closeBarry}
-          aria-label="Close Barry"
-        >
-          ✕
-        </button>
-        <BarryChatPanel
-          userId={activeUserId || auth.currentUser?.uid}
-          kpiContext={barryPageContext.kpiContext}
-          kpiContextReady={effectiveKpiContextReady}
-          onOrientationChange={setOrientation}
-          navigationContext={navigationContext}
-        />
-      </div>
+          This is the whole point of the shell: one Barry, one thread.
+
+          On /barry the full-page BarryWorkspace IS Barry, so the slide-in
+          panel is suppressed entirely — two Barry surfaces on one screen would
+          confuse people and fight for the canonical conversation. The panel
+          stays mounted (preserving state) but forced inert/hidden regardless
+          of barryOpen. */}
+      {(() => {
+        const onBarryPage = location.pathname === '/barry';
+        const hidden = !barryOpen || onBarryPage;
+        return (
+          <div
+            ref={barryHostRef}
+            className="barry-panel-host"
+            role="dialog"
+            aria-modal={!hidden ? 'true' : undefined}
+            aria-label="Barry"
+            aria-hidden={hidden}
+            inert={hidden ? '' : undefined}
+            tabIndex={-1}
+            onKeyDown={(e) => { if (e.key === 'Escape') closeBarry(); }}
+          >
+            <button
+              type="button"
+              className="barry-host-close"
+              onClick={closeBarry}
+              aria-label="Close Barry"
+            >
+              ✕
+            </button>
+            <BarryChatPanel
+              userId={activeUserId || auth.currentUser?.uid}
+              kpiContext={barryPageContext.kpiContext}
+              kpiContextReady={effectiveKpiContextReady}
+              onOrientationChange={setOrientation}
+              navigationContext={navigationContext}
+            />
+          </div>
+        );
+      })()}
     </div>
   );
 }

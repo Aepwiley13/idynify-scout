@@ -94,8 +94,8 @@ import CampaignDetail from './pages/Hunter/CampaignDetail';
 import CreateMission from './pages/Hunter/CreateMission';
 import MissionDetail from './pages/Hunter/MissionDetail';
 
-// Barry Onboarding
-import FirstExperience from './pages/Onboarding/FirstExperience';
+// Barry Workspace
+import BarryWorkspace from './pages/Barry/BarryWorkspace';
 
 // User Settings
 import UserSettings from './pages/UserSettings';
@@ -313,11 +313,11 @@ function App() {
       return <Navigate to="/checkout" />;
     }
 
-    // Return users skip onboarding; new users go through Barry onboarding flow
+    // Return users skip onboarding; new users go through Barry Workspace
     if (userData?.onboardingComplete || userData?.onboarding?.completed) {
       return <Navigate to="/mission-control-v2" />;
     }
-    return <Navigate to="/onboarding" />;
+    return <Navigate to="/barry" />;
   };
 
   if (loading) {
@@ -356,19 +356,14 @@ function App() {
         <Route path="/checkout/success" element={<ProtectedRoute requirePayment={false}><CheckoutSuccessPage /></ProtectedRoute>} />
         <Route path="/checkout/cancel" element={<ProtectedRoute requirePayment={false}><CheckoutCancelPage /></ProtectedRoute>} />
 
-        {/* ── The Barry First Experience ────────────────────────────────────
-            One canonical route. Two first-run flows used to exist and both
-            could mark a user onboarded while producing different outcomes —
-            one created an ICP and searched, the other created nothing.
-
-            Every legacy onboarding path redirects here, including the
-            existing-user affordances ("Review ICP with Barry"). That is only
-            correct because the route resumes and refines rather than
-            restarting: it is not a mode users enter and exit. */}
-        <Route path="/onboarding" element={<ProtectedRoute><FirstExperience /></ProtectedRoute>} />
-        <Route path="/onboarding/flow" element={<Navigate to="/onboarding" replace />} />
-        <Route path="/onboarding/recon" element={<Navigate to="/onboarding" replace />} />
-        <Route path="/onboarding/barry" element={<Navigate to="/onboarding" replace />} />
+        {/* ── Legacy onboarding routes → /barry ─────────────────────────────
+            First Experience now lives inside the Barry Workspace at /barry,
+            rendered inside the application shell. Every legacy onboarding
+            path redirects there. */}
+        <Route path="/onboarding" element={<Navigate to="/barry" replace />} />
+        <Route path="/onboarding/flow" element={<Navigate to="/barry" replace />} />
+        <Route path="/onboarding/recon" element={<Navigate to="/barry" replace />} />
+        <Route path="/onboarding/barry" element={<Navigate to="/barry" replace />} />
 
         {/* Protected Routes - OLD FLOW REDIRECTS (Disable old questionnaire flow) */}
         <Route path="/scout-questionnaire" element={<Navigate to="/mission-control-v2" />} />
@@ -470,6 +465,12 @@ function App() {
                 the top bar's user menu — but it is a full screen, and it was
                 the last one still swapping the shell out for the old rail. */}
             <Route path="/settings" element={<UserSettings />} />
+
+            {/* Barry Workspace — the full-page Barry surface. During First
+                Experience this is the onboarding container; post-onboarding it
+                is the persistent place a user intentionally works with Barry.
+                Inside ShellRoute, so the standard payment gate applies. */}
+            <Route path="/barry" element={<BarryWorkspace />} />
           </Route>
         ) : (
           <>
@@ -551,6 +552,7 @@ function App() {
             </Route>
             <Route path="/command-center" element={<ProtectedRoute withLayout={true}><PeopleMain /></ProtectedRoute>} />
             <Route path="/settings" element={<ProtectedRoute withLayout={true}><UserSettings /></ProtectedRoute>} />
+            <Route path="/barry" element={<ProtectedRoute withLayout={true}><BarryWorkspace /></ProtectedRoute>} />
           </>
         )}
 
@@ -729,7 +731,7 @@ function App() {
         {/* Retired: the company-profile questionnaire duplicated every other
             onboarding path, its search was removed in Phase 1B Tier 3, and its
             write remains deferred debt. It redirects into the canonical route. */}
-        <Route path="/onboarding/company-profile" element={<Navigate to="/onboarding" replace />} />
+        <Route path="/onboarding/company-profile" element={<Navigate to="/barry" replace />} />
 
         {/* Protected Routes - MVP Routes (Module 1) */}
         <Route

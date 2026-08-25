@@ -3,15 +3,16 @@
  *
  * Structural invariants verified by source scan:
  *
- * B2-1  useFirstExperienceController phase machine.
- * B2-2  Controller WHO flow and skip behavior.
- * B2-3  Controller resume/returning behavior (MODE_RESUME/MODE_REFINE).
- * B2-4  Controller does not create a new conversation authority.
- * B2-5  BarryWorkspace integrates controller for First Experience.
- * B2-6  BarryWorkspace removes visible onboarding stepper.
- * B2-7  FirstExperience thin rollback wrapper (preset props).
- * B2-8  rememberName behavior preserved in controller.
- * B2-9  Skip button CSS exists.
+ * B2-1   useFirstExperienceController phase machine.
+ * B2-2   Controller WHO flow and skip behavior.
+ * B2-3   Controller resume/returning behavior (MODE_RESUME/MODE_REFINE).
+ * B2-4   Controller does not create a new conversation authority.
+ * B2-5   BarryWorkspace integrates controller for First Experience.
+ * B2-6   BarryWorkspace removes visible onboarding stepper.
+ * B2-7   FirstExperience thin rollback wrapper (preset props).
+ * B2-8   rememberName behavior preserved in controller.
+ * B2-9   Skip button CSS exists.
+ * B2-C1  FE conversation turns persisted to canonical store.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -316,5 +317,45 @@ describe('B2-9 — Skip button CSS', () => {
 
   it('skip button has underline decoration', () => {
     expect(workspaceCss).toMatch(/\.barry-workspace-skip-btn[\s\S]*?text-decoration:\s*underline/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// B2-C1 — FE conversation turns persisted to canonical store
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('B2-C1 — FE turn canonical persistence', () => {
+  it('workspace has a useEffect that watches feCtrl.turns', () => {
+    expect(workspaceCode).toMatch(/useEffect\(\s*\(\)\s*=>\s*\{[\s\S]*?feCtrl\.turns/);
+  });
+
+  it('calls appendTurn for FE turns with surface workspace', () => {
+    expect(workspaceCode).toMatch(/appendTurn\(db,\s*user\.uid,\s*\{[\s\S]*?surface:\s*'workspace'/);
+  });
+
+  it('marks FE turns with kind first-experience', () => {
+    expect(workspaceCode).toMatch(/kind:\s*'first-experience'/);
+  });
+
+  it('tracks previous turn count with a ref to avoid duplicate appends', () => {
+    expect(workspaceCode).toMatch(/feTurnCountRef/);
+    expect(workspaceCode).toMatch(/useRef\(0\)/);
+  });
+
+  it('only appends new turns (slices from previous count)', () => {
+    expect(workspaceCode).toMatch(/turns\.slice\(prevCount\)/);
+  });
+
+  it('skips turns without content', () => {
+    expect(workspaceCode).toMatch(/if \(!turn\.content\) continue/);
+  });
+
+  it('uses existing appendTurn from barryCanonical (no new store)', () => {
+    const imports = workspace.match(/import\s*\{[^}]*appendTurn[^}]*\}\s*from\s*'[^']*barryCanonical'/);
+    expect(imports).not.toBeNull();
+  });
+
+  it('controller still does not call appendTurn (write stays in workspace)', () => {
+    expect(controllerCode).not.toMatch(/appendTurn\(/);
   });
 });

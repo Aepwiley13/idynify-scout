@@ -55,6 +55,37 @@ export default function BarryWorkspace() {
   const inputRef = useRef(null);
 
   const feCtrl = useFirstExperienceController(arrival);
+  const feTurnCountRef = useRef(0);
+
+  // B2-C1: Persist FE conversation turns to the canonical store so they
+  // survive refresh and remain visible after handoff.
+  useEffect(() => {
+    const turns = feCtrl.turns;
+    const prevCount = feTurnCountRef.current;
+    if (turns.length <= prevCount) return;
+
+    const newTurns = turns.slice(prevCount);
+    feTurnCountRef.current = turns.length;
+
+    const user = getEffectiveUser() || auth.currentUser;
+    if (!user) return;
+
+    (async () => {
+      for (const turn of newTurns) {
+        if (!turn.content) continue;
+        try {
+          await appendTurn(db, user.uid, {
+            role: turn.role,
+            content: turn.content,
+            surface: 'workspace',
+            kind: 'first-experience',
+          });
+        } catch (err) {
+          console.warn('[BarryWorkspace] FE canonical append failed:', err.message);
+        }
+      }
+    })();
+  }, [feCtrl.turns]);
 
   async function init() {
     const user = getEffectiveUser() || auth.currentUser;

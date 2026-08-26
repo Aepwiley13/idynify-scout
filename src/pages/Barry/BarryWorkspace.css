@@ -44,17 +44,91 @@
   padding-left: 38px;
 }
 
+/* B4: Flatten the embedded BarryOnboarding container so structured objects
+   sit directly in the thread as conversational cards, not inside a visible
+   application shell. */
 .barry-workspace-fe-card .barry-onboarding {
   height: auto;
   min-height: 0;
-  border-radius: 14px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
   box-shadow: none;
-  border: 1px solid var(--border, #e2e2e8);
   margin: 0;
+  overflow: visible;
 }
 
 .barry-workspace-fe-card .barry-onboarding-header {
   display: none;
+}
+
+.barry-workspace-fe-card .barry-conversation {
+  padding: 0;
+  overflow: visible;
+  max-width: none;
+}
+
+/* B4: Remove standalone avatar-offset padding — the thread's own
+   padding-left:38px already provides the conversational indent. */
+.barry-workspace-fe-card .confirmation-section {
+  padding-left: 0;
+  margin-top: 8px;
+}
+
+.barry-workspace-fe-card .save-confirmation-screen {
+  padding: 8px 0;
+  padding-left: 0;
+}
+
+/* B4: Restyle save confirmation for conversational context — the purple
+   gradient header reads as a standalone application modal; in the thread
+   it should read as a structured card Barry produced. */
+.barry-workspace-fe-card .save-confirmation-card {
+  border-color: var(--border, #e2e2e8);
+  max-width: 100%;
+  background: var(--surface, #fff);
+}
+
+.barry-workspace-fe-card .save-confirmation-header {
+  background: var(--surface-alt, #f6f6f9);
+  color: var(--text, #16161c);
+  border-bottom: 1px solid var(--border, #e2e2e8);
+}
+
+.barry-workspace-fe-card .save-confirmation-title {
+  color: var(--text, #16161c);
+}
+
+.barry-workspace-fe-card .save-confirmation-subtitle {
+  color: var(--text-muted, #6b6b78);
+}
+
+.barry-workspace-fe-card .save-check-icon {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.barry-workspace-fe-card .save-searching-indicator {
+  background: rgba(109, 74, 255, 0.06);
+  border-top-color: var(--border, #e2e2e8);
+  color: var(--accent, #6d4aff);
+}
+
+.barry-workspace-fe-card .save-redirect-note {
+  background: var(--surface-alt, #f6f6f9);
+  border-top-color: var(--border, #e2e2e8);
+}
+
+/* B4: Align accelerator to thread — inherit container width, remove
+   standalone centering and padding. */
+.barry-workspace-fe-card .barry-accelerator {
+  padding: 0;
+  margin: 8px 0 0;
+  max-width: none;
+}
+
+.barry-workspace-fe-card .error-message {
+  margin-top: 8px;
 }
 
 .barry-workspace-fe-card .rfv {

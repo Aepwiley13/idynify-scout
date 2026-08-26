@@ -4,14 +4,11 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync, existsSync } from 'fs';
 import { mintOperationId, OUTCOME, summarise, previewSentence } from '../utils/resolutionContract.js';
-import { buildCandidatePayloads, mintClientRef } from '../utils/candidatePayload.js';
-import { MOCK_PEOPLE, MOCK_SOURCE } from '../utils/mockPersonResults.js';
 
 const WORKSPACE = readFileSync('src/pages/Barry/BarryWorkspace.jsx', 'utf8');
 const PREVIEW = readFileSync('src/components/barry/BarryResolutionPreview.jsx', 'utf8');
 const CONTRACT = readFileSync('src/utils/resolutionContract.js', 'utf8');
 
-const rows = () => MOCK_PEOPLE.map((p, i) => ({ ...p, clientRef: mintClientRef(i) }));
 
 describe('C1 — one operationId spans preview → approval', () => {
   it('ids are unique per operation', () => {

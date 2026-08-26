@@ -19,7 +19,7 @@ vi.mock('../theme/tokens', () => ({ BRAND: { pink: '#E91E63', cyan: '#00BCD4' },
 import BarryResultSet from '../components/barry/BarryResultSet';
 import BarryResolutionPreview from '../components/barry/BarryResolutionPreview';
 import { RESOLVED_PREVIEW } from './fixtures/resolveSaveFixtures';
-import { buildCandidatePayloads, mintClientRef } from '../utils/candidatePayload';
+import { mintClientRef } from '../utils/candidatePayload';
 import { MOCK_PEOPLE, MOCK_SOURCE } from '../utils/mockPersonResults';
 
 const rows = () => MOCK_PEOPLE.map((p, i) => ({ ...p, clientRef: mintClientRef(i) }));

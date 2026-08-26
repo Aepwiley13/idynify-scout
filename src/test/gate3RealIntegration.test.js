@@ -9,7 +9,6 @@ import { readFileSync } from 'fs';
 import { resolveSave, link, linkSentence, RESOLVE_ENDPOINT, LINK_ENDPOINT } from '../utils/resolveSaveClient.js';
 import { buildCandidatePayloads, mintClientRef } from '../utils/candidatePayload.js';
 import { MOCK_PEOPLE, MOCK_SOURCE } from '../utils/mockPersonResults.js';
-import { mintOperationId } from '../utils/resolutionContract.js';
 
 const WORKSPACE = readFileSync('src/pages/Barry/BarryWorkspace.jsx', 'utf8');
 const rows = () => MOCK_PEOPLE.map((p, i) => ({ ...p, clientRef: mintClientRef(i) }));

@@ -5,11 +5,11 @@
  */
 import { describe, it, expect, beforeEach } from 'vitest';
 import {
-  holdResultSet, getResultSet, releaseResultSet, mintSessionRef, _clearAll, _size,
+  holdResultSet, getResultSet, releaseResultSet, _clearAll, _size,
 } from '../utils/barryTransientCandidates.js';
 import { stripIdentity } from '../utils/barryCanonical.js';
 import { previewSentence, summarise, OUTCOME } from '../utils/resolutionContract.js';
-import { buildCandidatePayloads, mintClientRef } from '../utils/candidatePayload.js';
+import { mintClientRef } from '../utils/candidatePayload.js';
 import { MOCK_PEOPLE, MOCK_SOURCE } from '../utils/mockPersonResults.js';
 
 const fixture = () => MOCK_PEOPLE.map((p, i) => ({ ...p, clientRef: mintClientRef(i) }));

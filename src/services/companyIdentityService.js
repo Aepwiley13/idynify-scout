@@ -25,7 +25,8 @@
  * check both so a historical document written under either name is found.
  */
 
-import { collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { normalizeLoose } from '../utils/identityNormalization';
 import { db } from '../firebase/config';
 
 /** The standard field. Everything else is a compatibility alias. */
@@ -101,26 +102,72 @@ export async function findCompanyByApolloId(userId, apolloOrgId) {
 }
 
 /**
- * Find an existing company by exact name.
+ * How many company documents the case-insensitive fallback will read.
+ *
+ * Mirrors the contact resolver's bounded-scan posture. Discovery writes 50–100
+ * companies per search, so this covers a typical workspace outright while
+ * staying a fixed, predictable cost.
+ */
+export const COMPANY_SCAN_WINDOW = 200;
+
+/**
+ * Find an existing company by name.
  *
  * The fallback for companies with no Apollo id at all — business cards, manual
- * adds, CSV rows. Weaker than an id match and deliberately exact: "Acme" and
- * "Acme Corp" are not provably the same organization, and merging them on a
- * prefix would fold subsidiaries into parents.
+ * adds, CSV rows.
+ *
+ * ─── EXACT FIRST, THEN CASE-INSENSITIVE (Gate 2 Phase 2e) ──────────────────
+ *
+ * Firestore equality is case-sensitive, so `where('name','==','Acme Corp')`
+ * never matched a record stored as `acme corp` — and the two arrive from
+ * different sources constantly: Apollo title-cases, a business card is whatever
+ * was printed, a CSV is whatever was typed. Every one of those pairs produced
+ * two company documents, each with its own status and its own half of the
+ * contacts.
+ *
+ * The second rung compares `normalizeLoose` forms — the SAME normalizer the
+ * contact resolver uses for its name+company step, so the two cannot disagree
+ * about what "the same name" means.
+ *
+ * Still deliberately NOT fuzzy. "Acme" and "Acme Corp" remain different
+ * companies: normalizeLoose only collapses case and whitespace. Matching on a
+ * prefix would fold subsidiaries into parents, which is unrecoverable.
+ *
+ * Returns the single match, or refuses when the loose form maps to two
+ * DIFFERENT companies — the company-side equivalent of the contact resolver's
+ * authoritative-collision rule. A name is not authoritative enough to merge on
+ * when it is ambiguous.
  */
 export async function findCompanyByName(userId, name) {
   if (!userId || !name) return null;
   const trimmed = String(name).trim();
   if (!trimmed) return null;
 
+  const companies = collection(db, 'users', userId, 'companies');
+
   try {
-    const snap = await getDocs(query(
-      collection(db, 'users', userId, 'companies'),
-      where('name', '==', trimmed),
-      limit(1),
-    ));
-    if (snap.empty) return null;
-    return { id: snap.docs[0].id, ...snap.docs[0].data(), _matchedField: 'name' };
+    const exact = await getDocs(query(companies, where('name', '==', trimmed), limit(1)));
+    if (!exact.empty) {
+      return { id: exact.docs[0].id, ...exact.docs[0].data(), _matchedField: 'name' };
+    }
+
+    const loose = normalizeLoose(trimmed);
+    if (!loose) return null;
+
+    // Deliberately unordered, for the same reason the contact scan is — an
+    // ordering on `name` would exclude every company document missing the
+    // field, and doing that silently is how a dedup check stops deduping.
+    const window = await getDocs(query(companies, limit(COMPANY_SCAN_WINDOW)));
+    const hits = window.docs.filter(d => normalizeLoose(d.data()?.name) === loose);
+
+    if (hits.length === 0) return null;
+    if (hits.length > 1) {
+      console.warn('[company-identity] name maps to several companies — refusing to choose', {
+        name: trimmed, companyIds: hits.map(d => d.id),
+      });
+      return null;
+    }
+    return { id: hits[0].id, ...hits[0].data(), _matchedField: 'name_normalized' };
   } catch (err) {
     console.error('[company-identity] name lookup failed', { code: err?.code, message: err?.message });
     throw err;
@@ -160,6 +207,7 @@ export async function resolveCompany(userId, candidate = {}, { source = 'unknown
 
 export default {
   APOLLO_ORG_FIELD,
+  COMPANY_SCAN_WINDOW,
   readApolloOrgId,
   apolloIdFields,
   findCompanyByApolloId,

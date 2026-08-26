@@ -21,6 +21,52 @@
 import { db } from './firebase-admin.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { logApiUsage } from './utils/logApiUsage.js';
+import { createAdminAdapter } from './utils/contactResolver.js';
+import { resolveContactCore, RESOLUTION } from '../../src/utils/identityResolution.js';
+
+// ── Gate 2: the model does not get to decide WHICH person ────────────────────
+
+/**
+ * Refuse when the contact the model chose is indistinguishable from another.
+ *
+ * `contact_id` on this path is emitted by the LLM copying an id out of prompt
+ * context — the system prompt literally says "the contact's id from the context
+ * above". The only validation was that the document exists. So with two Sarah
+ * Johnsons in context the model picked one, the server accepted it, and the
+ * confirmation bubble asked the user to approve a choice they were never shown.
+ * A button does not make a guess a decision.
+ *
+ * This is the MINIMUM correction, not a rewrite: the action layer is unchanged
+ * and every unambiguous action behaves exactly as before. It reuses hierarchy
+ * step 6 from the one identity engine rather than inventing a second opinion —
+ * if the chosen contact's name and company also describe another contact, the
+ * model had no basis to prefer either, and Barry asks instead of acting.
+ *
+ * Cost is one bounded scan on a single-contact action. Deliberately not applied
+ * to `firestore_id` supplied by a HUMAN click elsewhere in the product; this
+ * path is specifically the one where an id was inferred from a sentence.
+ */
+async function assertUnambiguousChoice(userId, contactId, contact) {
+  if (!contact?.name) return;   // nothing to be ambiguous about
+
+  const adapter = createAdminAdapter(db, userId);
+  const probe = await resolveContactCore(
+    adapter,
+    { name: contact.name, company_name: contact.company_name ?? contact.company ?? null },
+    { source: 'barryPipelineAction.ambiguityGuard' },
+  );
+
+  if (probe.outcome !== RESOLUTION.REVIEW) return;          // one match, or none
+  const ids = probe.candidates.map(c => c.id);
+  if (ids.length < 2 || !ids.includes(contactId)) return;   // not this record's problem
+
+  const err = new Error('ambiguous_contact');
+  err.ambiguous = true;
+  err.candidates = probe.candidates.map(c => ({
+    contactId: c.id, name: c.name, company_name: c.company_name,
+  }));
+  throw err;
+}
 
 // ── Auth verification (mirrors barryActions.js) ───────────────────────────────
 
@@ -386,6 +432,15 @@ export const handler = async (event) => {
 
     await verifyAuth(userId, authToken);
 
+    // Gate 2: every contact-scoped action confirms the model's pick is
+    // unambiguous before anything mutates.
+    if (contactId) {
+      const snap = await db.collection('users').doc(userId)
+        .collection('contacts').doc(contactId).get();
+      if (!snap.exists) throw new Error('contact_not_found');
+      await assertUnambiguousChoice(userId, contactId, snap.data());
+    }
+
     let result;
 
     switch (action_type) {
@@ -432,6 +487,20 @@ export const handler = async (event) => {
 
   } catch (err) {
     console.error('[barryPipelineAction] Error:', err.message);
+
+    if (err.ambiguous) {
+      // 409, not 500: nothing failed. Barry needs the user to say which person.
+      return {
+        statusCode: 409,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify({
+          success: false,
+          error: 'ambiguous_contact',
+          message: 'More than one contact matches that name — which one did you mean?',
+          candidates: err.candidates,
+        }),
+      };
+    }
 
     const isNotFound = err.message === 'contact_not_found' || err.message === 'mission_not_found';
 

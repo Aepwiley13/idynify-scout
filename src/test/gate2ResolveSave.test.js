@@ -395,19 +395,32 @@ describe('6 — the same operationId bridges preview and commit, and a retry is 
     expect(TABLE.filter(r => r.email_normalized === 'dana@acme.com')).toHaveLength(1);
   });
 
-  it('a retry of a candidate with NO identifier is still a no-op, via the operation guard', async () => {
-    // The one case resolver identity cannot cover: nothing to re-resolve
-    // against, so it would resolve to `new` on every attempt. The operation's
-    // own prior writes close it, with no operations collection.
+  it('a name+company retry is recognised as this operation\'s own write, not a new question', async () => {
+    // Without this the second attempt finds the record the FIRST attempt
+    // created, reports it as an ambiguity against itself, and asks the user to
+    // disambiguate a contact they just made. Recognised via
+    // identity_operation_id — no clientRef persisted, no operations collection.
     const payload = {
       ...base, operationId: 'op_2', commit: true,
-      candidates: [person('ui_lone', {})],
+      candidates: [person('ui_1', { name: 'Jo Ng', company_name: 'Acme' })],
     };
-    await call(payload);
+    const first = await call(payload);
+    expect(first.body.summary.created).toBe(1);
     expect(TABLE).toHaveLength(1);
 
-    await call(payload);
+    const second = await call(payload);
+    expect(second.body.summary).toMatchObject({ created: 1, ambiguous: 0 });
+    expect(byRef(second, 'ui_1').matchedOn).toBe('operation_retry');
     expect(TABLE).toHaveLength(1);
+  });
+
+  it('a DIFFERENT operation re-encountering the same name+company asks rather than duplicating', async () => {
+    const cands = [person('ui_1', { name: 'Jo Ng', company_name: 'Acme' })];
+    await call({ ...base, operationId: 'op_a', commit: true, candidates: cands });
+    const second = await call({ ...base, operationId: 'op_b', commit: true, candidates: cands });
+
+    expect(second.body.summary).toMatchObject({ created: 0, ambiguous: 1 });
+    expect(TABLE).toHaveLength(1);   // and above all: no duplicate
   });
 
   it('a DIFFERENT operationId with the same identifiable people still does not duplicate', async () => {
@@ -415,6 +428,80 @@ describe('6 — the same operationId bridges preview and commit, and a retry is 
     await call({ ...base, operationId: 'op_a', commit: true, candidates: cands });
     await call({ ...base, operationId: 'op_b', commit: true, candidates: cands });
     expect(TABLE.filter(r => r.email_normalized === 'dana@acme.com')).toHaveLength(1);
+  });
+});
+
+// ── 6b. The identity threshold ──────────────────────────────────────────────
+
+describe('6b — Barry creates only what Barry can find again', () => {
+  const refusal = (r) => byRef(r, 'ui_1');
+
+  it('refuses a candidate carrying no identity at all', async () => {
+    const r = await call({
+      ...base, operationId: 'op1', commit: true, candidates: [person('ui_1', {})],
+    });
+    expect(refusal(r)).toMatchObject({ outcome: 'refused', reason: 'insufficient_identity' });
+    expect(WRITES).toHaveLength(0);
+    expect(TABLE).toHaveLength(0);
+  });
+
+  it('refuses a bare name with no company — that is a question, not a save', async () => {
+    const r = await call({
+      ...base, operationId: 'op1', commit: true,
+      candidates: [person('ui_1', { name: 'Jane Smith' })],
+    });
+    expect(refusal(r).reason).toBe('insufficient_identity');
+    expect(TABLE).toHaveLength(0);
+  });
+
+  it('refuses a company with no name', async () => {
+    const r = await call({
+      ...base, operationId: 'op1', commit: true,
+      candidates: [person('ui_1', { company_name: 'Acme' })],
+    });
+    expect(refusal(r).reason).toBe('insufficient_identity');
+  });
+
+  it('says what would be enough, rather than only saying no', async () => {
+    const r = await call({
+      ...base, operationId: 'op1', commit: false, candidates: [person('ui_1', {})],
+    });
+    expect(refusal(r).detail).toMatch(/email.*phone.*LinkedIn.*Apollo|name together with a company/s);
+  });
+
+  for (const [label, fields] of [
+    ['an email', { email: 'a@b.com' }],
+    ['a phone', { phone: '4155550100' }],
+    ['a LinkedIn URL', { linkedin_url: 'linkedin.com/in/x' }],
+    ['an Apollo person id', { apollo_person_id: 'ap_1' }],
+    ['a name WITH a company', { name: 'Jane Smith', company_name: 'Acme' }],
+    ['a name with a company_id', { name: 'Jane Smith', company_id: 'co_1' }],
+  ]) {
+    it(`accepts ${label} — the resolver can re-find it`, async () => {
+      const r = await call({
+        ...base, operationId: 'op1', commit: true,
+        candidates: [person('ui_1', fields)],
+      });
+      expect(byRef(r, 'ui_1').outcome).toBe('created');
+      expect(TABLE).toHaveLength(1);
+    });
+  }
+
+  it('the threshold is exactly the resolver\'s re-match capability', async () => {
+    // Whatever is created must be findable on a second encounter. This is the
+    // property that makes the threshold principled rather than arbitrary.
+    const cands = [person('ui_1', { name: 'Jo Ng', company_name: 'Acme' })];
+    await call({ ...base, operationId: 'op_a', commit: true, candidates: cands });
+    const again = await call({ ...base, operationId: 'op_b', commit: false, candidates: cands });
+    expect(again.body.summary.created).toBe(0);   // found again, not re-created
+  });
+
+  it('reports refusals in the summary so the preview is honest', async () => {
+    const r = await call({
+      ...base, operationId: 'op1', commit: false,
+      candidates: [person('ui_1', {}), person('ui_2', { email: 'ok@x.com' })],
+    });
+    expect(r.body.summary).toMatchObject({ total: 2, refused: 1, created: 1 });
   });
 });
 
@@ -433,7 +520,7 @@ describe('7 — one operation, one scan window', () => {
   });
 
   it('caps the batch rather than accepting an unbounded write', async () => {
-    const candidates = Array.from({ length: 201 }, (_, i) => person(`ui_${i}`, { name: `P${i}` }));
+    const candidates = Array.from({ length: 201 }, (_, i) => person(`ui_${i}`, { email: `p${i}@x.com` }));
     const r = await call({ ...base, operationId: 'op1', commit: true, candidates });
     expect(r.status).toBe(400);
     expect(WRITES).toHaveLength(0);

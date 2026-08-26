@@ -183,10 +183,33 @@ A candidate answered this way returns `outcome: 'matched'` with
 | `matched` | Resolved to an existing contact on an authoritative signal | Merged, additively |
 | `created` | True zero-match | Created |
 | `ambiguous` | Only a weak name+company signal, one or more candidates returned | **No** — ask the user |
-| `refused` | Two or more existing records share an authoritative identifier | **No** — fail closed |
+| `refused` | Either two or more existing records share an authoritative identifier, or the candidate carries too little identity to create (`reason: 'insufficient_identity'`) | **No** — fail closed |
 
 `ambiguous` and `refused` are never persisted. Barry does not manufacture
 identity certainty.
+
+### The identity threshold — Barry creates only what Barry can find again
+
+A candidate that matches nothing is created **only if the resolver could
+re-find it on a later encounter**. That means at least one of:
+
+* an authoritative identifier — `email`, `phone`, `linkedin_url`,
+  `apollo_person_id`; or
+* `name` **together with** `company_name` or `company_id`.
+
+Anything less returns `refused` with `reason: 'insufficient_identity'` and a
+`detail` saying what would be enough. Creating below the threshold would write a
+record no rung of the hierarchy can ever match again — so every later encounter
+with that person makes another one, and the first can never be reconciled with
+anything. "Add Jane Smith", with no company and no address, is a question rather
+than a save.
+
+This is also why `clientRef` is **never persisted**. An earlier draft stored it
+as an idempotency key for identifier-less creates; that solved insufficient
+identity by writing a UI correlation key into the canonical record, which both
+contradicts the rule above and papers over the real problem. Retry safety comes
+from resolver identity, plus `identity_operation_id` for an operation's own
+re-attempt — never from `clientRef`.
 
 ---
 

@@ -55,6 +55,43 @@ const OUTCOME = {
   REFUSED: 'refused',
 };
 
+/**
+ * The minimum evidence Barry needs before it may create a canonical contact.
+ *
+ * ─── BARRY MAY CREATE ONLY WHAT BARRY CAN FIND AGAIN ───────────────────────
+ *
+ * This is exactly the resolver's own re-match capability, stated as a
+ * precondition. An authoritative identifier resolves on an indexed query;
+ * name + company resolves through hierarchy step 6. A candidate carrying
+ * NEITHER cannot be re-found by any rung, which has two consequences and both
+ * are bad: every later encounter with the same person creates another record,
+ * and the record already written can never be reconciled with anything.
+ *
+ * So a candidate below the threshold is REFUSED rather than created, and Barry
+ * asks for more instead of manufacturing an orphan. "Add Jane Smith" with no
+ * company and no address is not a save — it is a question.
+ *
+ * This replaces an earlier attempt to solve the same problem by persisting the
+ * UI's `clientRef` as an idempotency key. That was wrong twice over: the
+ * published handshake states clientRef is correlation only and is never
+ * persisted, and persisting a UI key would have papered over insufficient
+ * identity rather than surfacing it.
+ */
+function hasSufficientIdentity(candidate) {
+  const authoritative = Boolean(
+    candidate.email
+    || candidate.apollo_person_id
+    || candidate.linkedin_url
+    || candidate.phone,
+  );
+  if (authoritative) return true;
+
+  // The weak signal is still a signal: step 6 can re-find it, and does.
+  const name = typeof candidate.name === 'string' ? candidate.name.trim() : '';
+  const company = candidate.company_name ?? candidate.company_id ?? null;
+  return Boolean(name && company);
+}
+
 /** A candidate may never carry canonical identity. Rejected, not ignored. */
 const FORBIDDEN_ON_CANDIDATE = ['contactId', 'contact_id', 'canonicalId', 'personId', 'id'];
 
@@ -121,7 +158,7 @@ function applyUserResolution(resolution, chosenId) {
 
 // ── Per-candidate resolution ────────────────────────────────────────────────
 
-async function resolveOne(adapter, candidate, chosenId) {
+async function resolveOne(adapter, candidate, chosenId, operationId) {
   let resolution;
   try {
     resolution = await resolveContactCore(adapter, candidate, { source: 'barryResolveSave' });
@@ -153,6 +190,28 @@ async function resolveOne(adapter, candidate, chosenId) {
   }
 
   if (resolution.outcome === RESOLUTION.REVIEW) {
+    // Did THIS operation already create one of these? A name+company candidate
+    // written by an earlier attempt comes back as an ambiguity against itself,
+    // and asking the user to disambiguate a record they just created is a
+    // retry presenting as a question. Recognised via identity_operation_id —
+    // the field already authorized for exactly this — so a retry is a clean
+    // no-op rather than merely a safe one.
+    const mine = [];
+    for (const c of resolution.candidates) {
+      const doc = await adapter.getById(c.id);
+      if (doc?.identity_operation_id && doc.identity_operation_id === operationId) mine.push(doc);
+    }
+    if (mine.length === 1) {
+      return {
+        clientRef: candidate.clientRef,
+        outcome: OUTCOME.CREATED,
+        contactId: mine[0].id,
+        matchedOn: 'operation_retry',
+        _resolution: { ...resolution, contactId: mine[0].id, existing: mine[0] },
+        _alreadyWritten: true,
+      };
+    }
+
     const chosen = applyUserResolution(resolution, chosenId);
     if (chosen.ok) {
       // The user answered. This is the ONLY path by which a canonical id
@@ -183,6 +242,20 @@ async function resolveOne(adapter, candidate, chosenId) {
     };
   }
 
+  // Nothing matched. Creating is only correct if the record could be found
+  // again — see hasSufficientIdentity.
+  if (!hasSufficientIdentity(candidate)) {
+    return {
+      clientRef: candidate.clientRef,
+      outcome: OUTCOME.REFUSED,
+      contactId: null,
+      matchedOn: null,
+      reason: 'insufficient_identity',
+      detail: 'needs an email, phone, LinkedIn or Apollo id — or a name together '
+            + 'with a company — before it can become a contact',
+    };
+  }
+
   return {
     clientRef: candidate.clientRef,
     outcome: OUTCOME.CREATED,
@@ -209,22 +282,6 @@ function deterministicId(candidate) {
 async function commitResults(userId, results, candidatesByRef, { operationId, actor }) {
   const contacts = db.collection('users').doc(userId).collection('contacts');
 
-  // Idempotency for creates that carry nothing to re-resolve against.
-  //
-  // Resolver identity already covers the normal retry: a contact created by the
-  // first run is MATCHED by the second. The gap is a candidate with no
-  // authoritative identifier and no name+company — it resolves to `new` every
-  // time, so a retry would create a second record. One indexed query for this
-  // operation's own writes closes it without an operations collection.
-  const alreadyCreated = new Map();
-  if (results.some(r => r.outcome === OUTCOME.CREATED)) {
-    const prior = await contacts.where('identity_operation_id', '==', operationId).get();
-    for (const d of prior.docs) {
-      const ref = d.data()?.identity_client_ref;
-      if (ref) alreadyCreated.set(ref, d.id);
-    }
-  }
-
   for (const result of results) {
     const candidate = candidatesByRef.get(result.clientRef);
 
@@ -241,8 +298,8 @@ async function commitResults(userId, results, candidatesByRef, { operationId, ac
     }
 
     if (result.outcome === OUTCOME.CREATED) {
-      const seen = alreadyCreated.get(result.clientRef);
-      if (seen) { result.contactId = seen; continue; }   // idempotent no-op
+      // This operation already wrote it on a previous attempt.
+      if (result._alreadyWritten) continue;
 
       const id = deterministicId(candidate);
       const ref = id ? contacts.doc(id) : contacts.doc();
@@ -268,10 +325,6 @@ async function commitResults(userId, results, candidatesByRef, { operationId, ac
         identity_sources: [candidate.source ?? 'barry_resolve_save'],
         identity_operation_id: operationId,
         identity_actor: actor,
-        // Correlates this record to the selection row that produced it, which
-        // is what makes a retry of an identifier-less candidate a no-op rather
-        // than a duplicate. Not identity, and never resolved against.
-        identity_client_ref: result.clientRef,
         addedAt: new Date().toISOString(),
       }, { merge: true });
 
@@ -352,7 +405,7 @@ export const handler = async (event) => {
     const candidatesByRef = new Map(candidates.map(c => [c.clientRef, c]));
     const results = [];
     for (const candidate of candidates) {
-      results.push(await resolveOne(adapter, candidate, resolutions[candidate.clientRef]));
+      results.push(await resolveOne(adapter, candidate, resolutions[candidate.clientRef], operationId));
     }
 
     if (commit) {
@@ -380,6 +433,7 @@ export const handler = async (event) => {
       results: results.map((r) => {
         const out = { ...r };
         delete out._resolution;
+        delete out._alreadyWritten;
         return out;
       }),
       summary,

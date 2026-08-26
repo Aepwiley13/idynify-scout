@@ -339,14 +339,22 @@ describe('6 — totals', () => {
 });
 
 describe('7 — the report cannot drift from the resolver', () => {
-  it('mirrors SCAN_WINDOW from contactIdentityService', () => {
-    // The script cannot import the service — it pulls in the Firestore web
-    // SDK and the script runs under Node with the Admin SDK. So the constant
-    // is copied, and this reads the source to prove the copy is current.
-    const src = read('../services/contactIdentityService.js');
+  it('mirrors SCAN_WINDOW from the identity decision engine', () => {
+    // The script cannot import the engine's module graph directly in every
+    // runtime, so the constant is copied and this proves the copy is current.
+    //
+    // Gate 2 Phase 1 moved the DECLARATION out of contactIdentityService.js
+    // (now a web-SDK adapter that merely re-exports it) and into
+    // identityResolution.js. This assertion caught that move, which is what it
+    // is for — so it follows the declaration rather than the re-export.
+    const src = read('../utils/identityResolution.js');
     const match = src.match(/export const SCAN_WINDOW\s*=\s*(\d+)/);
-    expect(match, 'SCAN_WINDOW declaration not found in contactIdentityService').toBeTruthy();
+    expect(match, 'SCAN_WINDOW declaration not found in identityResolution').toBeTruthy();
     expect(Number(match[1])).toBe(SCAN_WINDOW);
+  });
+
+  it('the adapter still re-exports SCAN_WINDOW, so existing importers keep working', () => {
+    expect(read('../services/contactIdentityService.js')).toMatch(/SCAN_WINDOW/);
   });
 
   it('imports normalization from the module the resolver uses', () => {

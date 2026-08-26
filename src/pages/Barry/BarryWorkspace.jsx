@@ -40,6 +40,16 @@ import RelationshipFirstValue from '../../components/onboarding/RelationshipFirs
 import CompanyResultsCard from '../../components/onboarding/CompanyResultsCard';
 import { useOnboardingState } from '../../hooks/useOnboardingState';
 import { calculateICPScore } from '../../utils/icpScoring';
+import BarryResultSet from '../../components/barry/BarryResultSet';
+import BarryResolutionPreview from '../../components/barry/BarryResolutionPreview';
+import { buildCandidatePayloads, mintClientRef } from '../../utils/candidatePayload';
+import { holdResultSet, getResultSet, mintSessionRef, releaseResultSet } from '../../utils/barryTransientCandidates';
+import { previewSentence, mintOperationId } from '../../utils/resolutionContract';
+import { resolveSave, link, linkSentence } from '../../utils/resolveSaveClient';
+// NOTE: the mock resolver and its fake people are NOT imported here. They are
+// reached only through dynamic import() inside an import.meta.env.DEV branch,
+// so a production build drops them from the module graph entirely rather than
+// relying on nobody calling them. Production must fail closed.
 import './BarryWorkspace.css';
 
 export default function BarryWorkspace() {
@@ -51,6 +61,14 @@ export default function BarryWorkspace() {
   const [loading, setLoading] = useState(true);
   const [isFirstExperience, setIsFirstExperienceLocal] = useState(false);
   const [conversationTurns, setConversationTurns] = useState([]);
+  // Structured-turn UI state. Deliberately local: selection, previews and
+  // approval are conversation-scoped interactions, not stored entities.
+  // `settled` records that a turn has been acted on so it renders as history
+  // instead of staying live.
+  const [settled, setSettled] = useState({});   // sessionRef -> {...}
+  const [resolving, setResolving] = useState(false);
+  // "Put these into Scout" — offered after a successful commit, in-thread.
+  const [pendingLink, setPendingLink] = useState(null);
   const [who, setWho] = useState(null);
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
@@ -613,6 +631,267 @@ export default function BarryWorkspace() {
   }
 
   // Post-onboarding (or first-experience controller still loading): conversation UI
+
+  // ── Structured-turn handlers ────────────────────────────────────────────
+  // These cross NO persistence boundary. The only writes are canonical
+  // conversation turns (Barry talking) — never a Person, Company or Candidate.
+
+  /**
+   * @param {boolean} [persist=true]  When false the turn renders in the thread
+   *   but is NOT written to Firestore.
+   *
+   * C2: the dev seed runs against LIVE Firebase — there is one project and it is
+   * the production one. Persisting a mocked turn would write a fabricated Barry
+   * statement ("I found 8 people who look relevant") into a real user's
+   * canonical conversation, where it would be indistinguishable from something
+   * Barry actually did. Every turn produced by the mocked flow is therefore
+   * local-only; only real turns persist.
+   */
+  async function appendStructuredTurn({ content, kind, meta, persist = true }) {
+    const user = getEffectiveUser() || auth.currentUser;
+    if (!user) return;
+    const turn = { role: 'assistant', content, kind, meta, surface: 'workspace' };
+    setConversationTurns(prev => [...prev, { ...turn, id: `local_${Date.now()}`, ephemeral: !persist }]);
+    if (!persist) return;
+    await appendTurn(db, user.uid, turn).catch(err =>
+      console.warn('[BarryWorkspace] structured turn append failed:', err.message));
+  }
+
+  /**
+   * RESOLVE_SAVE — real, Gate 2 Phase 3. The mock is gone from this path.
+   *
+   * commit:false resolves fully and writes nothing. `resolutions` carries the
+   * user's ambiguity answers on the commit pass; on the preview pass it is empty.
+   */
+  async function callResolveSave({ payloads, operationId, commit, resolutions }) {
+    const user = getEffectiveUser() || auth.currentUser;
+    if (!user) throw new Error('not_authenticated');
+    const authToken = await user.getIdToken();
+    return resolveSave({
+      userId: user.uid,
+      authToken,
+      operationId,
+      candidates: payloads,
+      resolutions,
+      commit,
+      actor: 'user',
+    });
+  }
+
+  /**
+   * User picked people. Build CandidatePayloads and run the resolution dry-run.
+   *
+   * The payloads are built here and handed straight to the resolver — they are
+   * never stored, and no contactId/companyId is minted anywhere on this path.
+   */
+  async function handleSelectionConfirmed(sessionRef, selectedRefs) {
+    const held = getResultSet(sessionRef);
+    if (!held || resolving) return;
+
+    setSettled(prev => ({ ...prev, [sessionRef]: { count: selectedRefs.length } }));
+    setResolving(true);
+
+    const payloads = buildCandidatePayloads(held.results, selectedRefs, {
+      kind: held.kind,
+      source: held.source,
+    });
+
+    if (import.meta.env.DEV) {
+      console.info('[Gate3] CandidatePayload[] emitted to resolver:', payloads);
+    }
+
+    // C1: minted ONCE, here. RESOLVE_SAVE is idempotent on operationId, and the
+    // commit must be the same operation as the preview the user approved — so
+    // this id travels preview → ambiguity answers → approval unchanged. It is
+    // deliberately NOT re-minted in handleApprove.
+    const operationId = mintOperationId();
+
+    try {
+      const preview = await callResolveSave({ payloads, operationId, commit: false, resolutions: {} });
+
+      const previewRef = mintSessionRef();
+      holdResultSet({ sessionRef: previewRef, kind: held.kind, source: held.source, results: preview.results });
+      // The preview, the payloads it came from, and the operation it belongs to
+      // ride together in memory. The payloads are kept because commit re-sends
+      // the SAME candidates alongside the user's resolutions.
+      // operationId is NOT written to the turn — it identifies a write
+      // operation, and a turn records a conversation.
+      const stored = getResultSet(previewRef);
+      stored.preview = preview;
+      stored.payloads = payloads;
+      stored.operationId = preview.operationId || operationId;
+
+      await appendStructuredTurn({
+        content: previewSentence(preview.summary),
+        kind: 'resolution_preview',
+        meta: { sessionRef: previewRef, ...preview.summary },   // counts only
+      });   // persists: this is a real resolution Barry actually performed
+    } catch (err) {
+      console.error('[BarryWorkspace] resolve dry-run failed:', err);
+      // Say what actually went wrong rather than implying it half-worked.
+      // commit:false writes nothing, so "nothing was saved" is literally true.
+      await appendStructuredTurn({
+        content: err.serverError
+          ? `I couldn't check those against your existing people — ${err.serverError}. Nothing was saved.`
+          : "I couldn't reach the part of me that checks against your existing people. Nothing was saved — want me to try again?",
+        kind: 'message',
+      });
+    } finally {
+      setResolving(false);
+    }
+  }
+
+  /**
+   * Approval. THE PERSISTENCE BOUNDARY STOPS HERE.
+   * Team A's RESOLVE_SAVE(commit:true) attaches at this point; until then Barry
+   * states plainly that nothing was written rather than implying it was.
+   */
+  /**
+   * Approval → RESOLVE_SAVE(commit:true). THIS IS THE PERSISTENCE BOUNDARY.
+   *
+   * The same operationId the preview ran under, the same candidates, plus the
+   * user's ambiguity answers as `resolutions: { [clientRef]: contactId }`.
+   *
+   * Every contactId in `resolutions` came from the candidate list the RESOLVER
+   * offered for that clientRef — the UI never mints one and never chooses one.
+   * The resolver re-validates that the id was actually offered, so a stale or
+   * invented answer comes back as ambiguous with a reason rather than writing.
+   */
+  async function handleApprove(sessionRef, decision) {
+    const stored = getResultSet(sessionRef);
+    if (!stored || resolving) return;
+
+    const operationId = stored.operationId;
+    // decision.choices is { clientRef: contactId | 'neither' }. 'neither' means
+    // "none of these is the person" — it is the ABSENCE of a resolution, which
+    // lets the resolver fall through to create. It must not be sent as an id.
+    const resolutions = {};
+    for (const [clientRef, choice] of Object.entries(decision.choices || {})) {
+      if (choice && choice !== 'neither') resolutions[clientRef] = choice;
+    }
+
+    setResolving(true);
+    try {
+      const committed = await callResolveSave({
+        payloads: stored.payloads,
+        operationId,
+        commit: true,
+        resolutions,
+      });
+
+      const s = committed.summary;
+      const contactIds = committed.results.map(r => r.contactId).filter(Boolean);
+
+      setSettled(prev => ({ ...prev, [sessionRef]: { approved: true, operationId, contactIds } }));
+
+      // Report what happened, including what did NOT happen. ambiguous and
+      // refused are never written, so claiming a clean save would be a lie.
+      const parts = [];
+      if (s.matched) parts.push(`${s.matched} linked to people you already had`);
+      if (s.created) parts.push(`${s.created} added as new`);
+      const trailer = [];
+      if (s.ambiguous) trailer.push(`${s.ambiguous} I still can't place`);
+      if (s.refused) trailer.push(`${s.refused} I couldn't save`);
+
+      await appendStructuredTurn({
+        content: parts.length
+          ? `Done — ${parts.join(' and ')}.${trailer.length ? ` ${trailer.join(', ')}, so I left ${s.ambiguous + s.refused === 1 ? 'that one' : 'those'} out.` : ''}`
+          : `I couldn't save any of those.${trailer.length ? ` ${trailer.join(' and ')}.` : ''}`,
+        kind: 'message',
+        meta: { matched: s.matched, created: s.created, ambiguous: s.ambiguous, refused: s.refused },
+      });
+
+      // Offer the workflow placement as the natural next step, not a new screen.
+      if (contactIds.length) {
+        holdResultSet({ sessionRef: `${sessionRef}_saved`, kind: 'person', source: 'resolve_save', results: [] });
+        const saved = getResultSet(`${sessionRef}_saved`);
+        saved.contactIds = contactIds;
+        saved.operationId = operationId;
+        setPendingLink({ sessionRef: `${sessionRef}_saved`, count: contactIds.length });
+      }
+    } catch (err) {
+      console.error('[BarryWorkspace] commit failed:', err);
+      await appendStructuredTurn({
+        content: err.serverError
+          ? `I couldn't save those — ${err.serverError}.`
+          : "I couldn't save those just now. Nothing was written — want me to try again?",
+        kind: 'message',
+      });
+      setSettled(prev => ({ ...prev, [sessionRef]: { approved: false } }));
+    } finally {
+      setResolving(false);
+    }
+  }
+
+  /**
+   * LINK — "put these into Scout".
+   *
+   * Scout is a LENS over the canonical person, not a copy. A contact already at
+   * the target stage returns changed:false, which is a valid no-op — reporting
+   * it as a failure, or reporting the write count, would both be wrong. The
+   * sentence describes the FINAL STATE.
+   */
+  async function handleLinkToScout(sessionRef) {
+    const stored = getResultSet(sessionRef);
+    if (!stored?.contactIds?.length || resolving) return;
+
+    setPendingLink(null);
+    setResolving(true);
+    try {
+      const user = getEffectiveUser() || auth.currentUser;
+      const authToken = await user.getIdToken();
+      const res = await link({
+        userId: user.uid,
+        authToken,
+        operationId: stored.operationId,   // same operation, end to end
+        contactIds: stored.contactIds,
+        targetStage: 'scout',
+        actor: 'user',
+      });
+      releaseResultSet(sessionRef);
+      await appendStructuredTurn({
+        content: linkSentence(res.summary, res.targetStage),
+        kind: 'message',
+        meta: { ...res.summary, targetStage: res.targetStage },
+      });
+    } catch (err) {
+      console.error('[BarryWorkspace] link failed:', err);
+      await appendStructuredTurn({
+        content: err.serverError
+          ? `They're saved, but I couldn't move them into Scout — ${err.serverError}.`
+          : "They're saved, but I couldn't move them into Scout just now.",
+        kind: 'message',
+      });
+    } finally {
+      setResolving(false);
+    }
+  }
+
+  async function handleCancelPreview(sessionRef) {
+    setSettled(prev => ({ ...prev, [sessionRef]: { approved: false } }));
+    releaseResultSet(sessionRef);
+    await appendStructuredTurn({
+      content: "No problem — I haven't saved anything. Tell me when you want to pick these up again.",
+      kind: 'message',
+    });
+  }
+
+  /** DEV ONLY. Seeds a mocked people result set so the flow can be walked. */
+  async function seedMockResultSet() {
+    if (!import.meta.env.DEV) return;   // unreachable in production by construction
+    const { MOCK_PEOPLE, MOCK_SOURCE } = await import('../../utils/mockPersonResults');
+    const results = MOCK_PEOPLE.map((p, i) => ({ ...p, clientRef: mintClientRef(i) }));
+    const sessionRef = holdResultSet({ kind: 'person', source: MOCK_SOURCE, results });
+    await appendStructuredTurn({
+      content: `I found ${results.length} people who look relevant.`,
+      kind: 'result_set',
+      meta: { sessionRef, count: results.length, entity: 'person' },
+      // C2: fabricated people must never reach the canonical conversation, and
+      // dev runs against live Firebase.
+      persist: false,
+    });
+  }
+
   return (
     <div className="barry-workspace">
       <div className="barry-workspace-header" style={{ borderColor: T.border }}>
@@ -675,7 +954,27 @@ export default function BarryWorkspace() {
                 }}
               >
                 {turn.role === 'assistant' ? (
-                  turn.kind && turn.kind !== 'message' ? (
+                  turn.kind === 'result_set' ? (
+                    <ConversationCard kind={turn.kind}>
+                      <ReactMarkdown className="barry-workspace-prose">{turn.content}</ReactMarkdown>
+                      <BarryResultSet
+                        resultSet={getResultSet(turn.meta?.sessionRef)}
+                        disabled={resolving}
+                        settled={settled[turn.meta?.sessionRef] || null}
+                        onConfirmSelection={(refs) => handleSelectionConfirmed(turn.meta?.sessionRef, refs)}
+                      />
+                    </ConversationCard>
+                  ) : turn.kind === 'resolution_preview' ? (
+                    <ConversationCard kind={turn.kind}>
+                      <ReactMarkdown className="barry-workspace-prose">{turn.content}</ReactMarkdown>
+                      <BarryResolutionPreview
+                        preview={getResultSet(turn.meta?.sessionRef)?.preview || null}
+                        settled={settled[turn.meta?.sessionRef] || null}
+                        onApprove={(d) => handleApprove(turn.meta?.sessionRef, d)}
+                        onCancel={() => handleCancelPreview(turn.meta?.sessionRef)}
+                      />
+                    </ConversationCard>
+                  ) : turn.kind && turn.kind !== 'message' ? (
                     <ConversationCard kind={turn.kind}>
                       <ReactMarkdown className="barry-workspace-prose">
                         {turn.content}
@@ -714,6 +1013,30 @@ export default function BarryWorkspace() {
           </div>
         )}
       </div>
+
+      {pendingLink && (
+        <div className="barry-workspace-linkoffer">
+          <button
+            type="button"
+            onClick={() => handleLinkToScout(pendingLink.sessionRef)}
+            disabled={resolving}
+            style={{ background: BRAND.pink, color: '#fff' }}
+          >
+            Put {pendingLink.count === 1 ? 'them' : `all ${pendingLink.count}`} into Scout
+          </button>
+          <button type="button" className="quiet" onClick={() => setPendingLink(null)} style={{ color: T.textFaint }}>
+            Not now
+          </button>
+        </div>
+      )}
+
+      {import.meta.env.DEV && (
+        <div className="barry-workspace-devbar">
+          <button type="button" onClick={seedMockResultSet} disabled={sending || resolving}>
+            dev · seed mocked person results
+          </button>
+        </div>
+      )}
 
       <div className="barry-workspace-composer" style={{ borderColor: T.border }}>
         <div className="barry-workspace-composer-row">

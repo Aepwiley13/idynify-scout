@@ -167,8 +167,24 @@ describe('R7 — No new persistence models', () => {
 
   it('no discovery batch or result set persisted in workspace', () => {
     expect(workspaceCode).not.toMatch(/discoveryBatch/);
-    expect(workspaceCode).not.toMatch(/resultSet/);
     expect(workspaceCode).not.toMatch(/firstValueResults/);
+
+    // WIDENED BY GATE 3 PERSON-SELECTION (PR #582).
+    // This previously asserted `not.toMatch(/resultSet/)` — a NAME-based proxy
+    // for "no result set is persisted", which was exact while no such identifier
+    // existed. Person selection introduces a legitimately TRANSIENT result set:
+    // `resultSet` is a React prop fed by getResultSet(), an in-memory store
+    // (src/utils/barryTransientCandidates.js) that is deliberately lost on
+    // reload. The identifier now appears; the invariant is unchanged.
+    //
+    // So assert the INVARIANT instead of the name, which is strictly stronger:
+    // the workspace performs no direct Firestore document writes at all. Its
+    // only persistence path is appendTurn(), which writes conversation turns
+    // and strips identity from turn meta (barryCanonical.stripIdentity).
+    expect(workspaceCode).not.toMatch(/\bsetDoc\(/);
+    expect(workspaceCode).not.toMatch(/\baddDoc\(/);
+    expect(workspaceCode).not.toMatch(/\bupdateDoc\(/);
+    expect(workspaceCode).not.toMatch(/\bwriteBatch\(/);
   });
 
   it('CompanyResultsCard does not duplicate Company documents', () => {

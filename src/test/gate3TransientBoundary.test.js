@@ -8,7 +8,8 @@ import {
   holdResultSet, getResultSet, releaseResultSet, mintSessionRef, _clearAll, _size,
 } from '../utils/barryTransientCandidates.js';
 import { stripIdentity } from '../utils/barryCanonical.js';
-import { mockResolveSaveDryRun, previewSentence, summarise, OUTCOME } from '../utils/mockResolveSave.js';
+import { mockResolveSaveDryRun } from '../utils/mockResolveSave.js';
+import { previewSentence, summarise, OUTCOME } from '../utils/resolutionContract.js';
 import { buildCandidatePayloads, mintClientRef } from '../utils/candidatePayload.js';
 import { MOCK_PEOPLE, MOCK_SOURCE } from '../utils/mockPersonResults.js';
 

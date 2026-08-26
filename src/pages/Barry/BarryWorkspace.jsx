@@ -44,8 +44,11 @@ import BarryResultSet from '../../components/barry/BarryResultSet';
 import BarryResolutionPreview from '../../components/barry/BarryResolutionPreview';
 import { buildCandidatePayloads, mintClientRef } from '../../utils/candidatePayload';
 import { holdResultSet, getResultSet, mintSessionRef, releaseResultSet } from '../../utils/barryTransientCandidates';
-import { mockResolveSaveDryRun, previewSentence } from '../../utils/mockResolveSave';
-import { MOCK_PEOPLE, MOCK_SOURCE } from '../../utils/mockPersonResults';
+import { previewSentence, mintOperationId } from '../../utils/resolutionContract';
+// NOTE: the mock resolver and its fake people are NOT imported here. They are
+// reached only through dynamic import() inside an import.meta.env.DEV branch,
+// so a production build drops them from the module graph entirely rather than
+// relying on nobody calling them. Production must fail closed.
 import './BarryWorkspace.css';
 
 export default function BarryWorkspace() {
@@ -630,14 +633,42 @@ export default function BarryWorkspace() {
   // These cross NO persistence boundary. The only writes are canonical
   // conversation turns (Barry talking) — never a Person, Company or Candidate.
 
-  async function appendStructuredTurn({ content, kind, meta }) {
+  /**
+   * @param {boolean} [persist=true]  When false the turn renders in the thread
+   *   but is NOT written to Firestore.
+   *
+   * C2: the dev seed runs against LIVE Firebase — there is one project and it is
+   * the production one. Persisting a mocked turn would write a fabricated Barry
+   * statement ("I found 8 people who look relevant") into a real user's
+   * canonical conversation, where it would be indistinguishable from something
+   * Barry actually did. Every turn produced by the mocked flow is therefore
+   * local-only; only real turns persist.
+   */
+  async function appendStructuredTurn({ content, kind, meta, persist = true }) {
     const user = getEffectiveUser() || auth.currentUser;
     if (!user) return;
     const turn = { role: 'assistant', content, kind, meta, surface: 'workspace' };
-    // optimistic local render so the conversation stays responsive
-    setConversationTurns(prev => [...prev, { ...turn, id: `local_${Date.now()}` }]);
+    setConversationTurns(prev => [...prev, { ...turn, id: `local_${Date.now()}`, ephemeral: !persist }]);
+    if (!persist) return;
     await appendTurn(db, user.uid, turn).catch(err =>
       console.warn('[BarryWorkspace] structured turn append failed:', err.message));
+  }
+
+  /**
+   * The ONLY route to a resolution dry-run. Production fails closed.
+   *
+   * When the real endpoint lands this becomes a fetch to barryResolveSave with
+   * { commit:false, operationId, candidates } and the DEV branch is deleted.
+   */
+  async function runResolutionDryRun(payloads, operationId) {
+    if (!import.meta.env.DEV) {
+      // No resolver exists yet in production. Refusing is the honest outcome —
+      // showing mocked verdicts to a real user would be fabricated certainty.
+      console.error('[BarryWorkspace] resolution unavailable: no RESOLVE_SAVE endpoint in production');
+      return null;
+    }
+    const { mockResolveSaveDryRun } = await import('../../utils/mockResolveSave');
+    return mockResolveSaveDryRun(payloads, { operationId });
   }
 
   /**
@@ -662,24 +693,45 @@ export default function BarryWorkspace() {
       console.info('[Gate3] CandidatePayload[] emitted to resolver:', payloads);
     }
 
+    // C1: minted ONCE, here. RESOLVE_SAVE is idempotent on operationId, and the
+    // commit must be the same operation as the preview the user approved — so
+    // this id travels preview → ambiguity answers → approval unchanged. It is
+    // deliberately NOT re-minted in handleApprove.
+    const operationId = mintOperationId();
+
     try {
-      // MOCK. Swap for RESOLVE_SAVE(commit:false). Nothing above this line changes.
-      const preview = await mockResolveSaveDryRun(payloads);
+      const preview = await runResolutionDryRun(payloads, operationId);
+
+      if (!preview) {
+        await appendStructuredTurn({
+          content: "I can't check these against your existing people yet — that part of me isn't connected. Nothing has been saved.",
+          kind: 'message',
+          persist: !import.meta.env.DEV,
+        });
+        return;
+      }
+
       const previewRef = mintSessionRef();
       holdResultSet({ sessionRef: previewRef, kind: held.kind, source: held.source, results: preview.results });
-      // keep the full preview alongside the results for the renderer
-      getResultSet(previewRef).preview = preview;
+      // The full preview and the operation it belongs to ride with the results,
+      // in memory. operationId is NOT written to the turn — it identifies a
+      // write operation, and this turn records a conversation, not a write.
+      const stored = getResultSet(previewRef);
+      stored.preview = preview;
+      stored.operationId = preview.operationId || operationId;
 
       await appendStructuredTurn({
         content: previewSentence(preview.summary),
         kind: 'resolution_preview',
         meta: { sessionRef: previewRef, ...preview.summary },   // counts only
+        persist: false,   // mocked outcome — never into the canonical record
       });
     } catch (err) {
       console.error('[BarryWorkspace] dry-run failed:', err);
       await appendStructuredTurn({
         content: "I couldn't check those against your existing people just now. Nothing was saved — want me to try again?",
         kind: 'message',
+        persist: false,
       });
     } finally {
       setResolving(false);
@@ -692,7 +744,17 @@ export default function BarryWorkspace() {
    * states plainly that nothing was written rather than implying it was.
    */
   async function handleApprove(sessionRef, decision) {
-    setSettled(prev => ({ ...prev, [sessionRef]: { approved: true } }));
+    // C1: the SAME operationId the preview was produced under. Team A's
+    // RESOLVE_SAVE(commit:true) attaches here and must receive this exact value
+    // — a freshly minted id would make the commit a different operation from
+    // the one the user actually approved, and would defeat idempotency.
+    const operationId = getResultSet(sessionRef)?.operationId || null;
+
+    if (import.meta.env.DEV) {
+      console.info('[Gate3] approval — commit would use operationId:', operationId, decision);
+    }
+
+    setSettled(prev => ({ ...prev, [sessionRef]: { approved: true, operationId } }));
     releaseResultSet(sessionRef);
     await appendStructuredTurn({
       content:
@@ -700,6 +762,7 @@ export default function BarryWorkspace() {
         `_Nothing has been written yet: the save path is still being built. When it lands, this is the point where these become real contacts._`,
       kind: 'message',
       meta: { approvedCount: decision.willSave, newCount: decision.willCreate },
+      persist: false,   // mocked flow — not part of the canonical record
     });
   }
 
@@ -709,17 +772,23 @@ export default function BarryWorkspace() {
     await appendStructuredTurn({
       content: "No problem — I haven't saved anything. Tell me when you want to pick these up again.",
       kind: 'message',
+      persist: false,
     });
   }
 
   /** DEV ONLY. Seeds a mocked people result set so the flow can be walked. */
   async function seedMockResultSet() {
+    if (!import.meta.env.DEV) return;   // unreachable in production by construction
+    const { MOCK_PEOPLE, MOCK_SOURCE } = await import('../../utils/mockPersonResults');
     const results = MOCK_PEOPLE.map((p, i) => ({ ...p, clientRef: mintClientRef(i) }));
     const sessionRef = holdResultSet({ kind: 'person', source: MOCK_SOURCE, results });
     await appendStructuredTurn({
       content: `I found ${results.length} people who look relevant.`,
       kind: 'result_set',
       meta: { sessionRef, count: results.length, entity: 'person' },
+      // C2: fabricated people must never reach the canonical conversation, and
+      // dev runs against live Firebase.
+      persist: false,
     });
   }
 

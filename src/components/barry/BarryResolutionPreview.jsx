@@ -19,7 +19,7 @@
 import { useState } from 'react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
-import { OUTCOME } from '../../utils/mockResolveSave';
+import { OUTCOME } from '../../utils/resolutionContract';
 import './BarryStructuredTurn.css';
 
 // Outcome vocabulary and summary keys come from

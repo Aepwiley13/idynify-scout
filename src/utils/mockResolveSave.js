@@ -1,37 +1,33 @@
 /**
  * MOCKED RESOLVE_SAVE — stands in for Team A's barryResolveSave until it exists.
  *
- * ⚠️  MOCK. Delete on wiring. It defines NOTHING except the response SHAPE and
- * the conversational rhythm around it. It must not become a second resolver:
- *   · it does not decide identity — verdicts are canned
+ * ⚠️  MOCK. DEV ONLY. DELETE ON WIRING.
+ *
+ * This module must NEVER enter the production bundle. It is imported through a
+ * dynamic `import()` that sits inside an `import.meta.env.DEV` guard, so in a
+ * production build the branch is statically false, the import is unreachable,
+ * and the module is dropped from the graph entirely.
+ *
+ * It previously leaked into production despite a guarded call site, because
+ * BarryResolutionPreview imported OUTCOME from here — a real component pulling
+ * in a mock. The contract vocabulary now lives in utils/resolutionContract.js
+ * and this file contains ONLY the fake resolver.
+ *
+ * It defines nothing except the response SHAPE and the conversational rhythm:
+ *   · it does not decide identity — outcomes are canned
  *   · it does not read or write Firestore
  *   · it does not normalise identifiers
  *
- * SHAPE IS TAKEN VERBATIM FROM docs/GATE2_CANDIDATE_CONTRACT.md so that wiring
- * the real endpoint is a call-site swap and nothing above it changes.
- *
+ * Shape taken verbatim from docs/GATE2_CANDIDATE_CONTRACT.md:
  *   POST /.netlify/functions/barryResolveSave
  *   { userId, authToken, operationId, actor, commit, candidates[] }
- *
  *   → { success, operationId, results: [{ clientRef, outcome, contactId,
  *       matchedOn, existingName, candidates[] }], summary }
  */
 
-/** Contract outcomes. Only `matched` and `created` are ever written on commit. */
-export const OUTCOME = {
-  MATCHED: 'matched',      // resolved on an authoritative signal
-  CREATED: 'created',      // true zero-match
-  AMBIGUOUS: 'ambiguous',  // weak name+company signal only — ASK
-  REFUSED: 'refused',      // 2+ existing records share an authoritative id — fail closed
-};
+import { OUTCOME, summarise, mintOperationId } from './resolutionContract.js';
 
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
-
-/** operationId bridges preview → commit. Client-generated, per the contract. */
-export function mintOperationId() {
-  return (globalThis.crypto?.randomUUID?.())
-    || `op_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
-}
 
 /**
  * @param {Object[]} candidates CandidatePayload[]
@@ -80,32 +76,4 @@ export async function mockResolveSaveDryRun(candidates, { latencyMs = 900, opera
   });
 
   return { success: true, operationId: opId, results, summary: summarise(results) };
-}
-
-/** Contract summary keys: matched · created · ambiguous · refused. */
-export function summarise(results) {
-  const count = (o) => results.filter(r => r.outcome === o).length;
-  return {
-    total: results.length,
-    matched: count(OUTCOME.MATCHED),
-    created: count(OUTCOME.CREATED),
-    ambiguous: count(OUTCOME.AMBIGUOUS),
-    refused: count(OUTCOME.REFUSED),
-  };
-}
-
-/**
- * Barry's sentence. The contract is explicit that the user must see WHAT WILL
- * HAPPEN, not how many rows they ticked — "approving a count is not approving a
- * decision". So this never says "20 contacts will be saved".
- * Only mentions what is actually true: a clean set gets a clean sentence.
- */
-export function previewSentence(summary) {
-  if (!summary || summary.total === 0) return 'Nothing selected yet.';
-  const lines = [];
-  if (summary.matched) lines.push(`${summary.matched} ${summary.matched === 1 ? 'is' : 'are'} already in IDYNIFY`);
-  if (summary.created) lines.push(`${summary.created} would be new`);
-  if (summary.ambiguous) lines.push(`${summary.ambiguous} ${summary.ambiguous === 1 ? 'needs' : 'need'} your help`);
-  if (summary.refused) lines.push(`${summary.refused} I can't tell apart`);
-  return `I checked these against the people you already know.\n\n${lines.join('\n')}`;
 }

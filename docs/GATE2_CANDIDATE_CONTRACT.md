@@ -88,7 +88,7 @@ POST /.netlify/functions/barryResolveSave
 | **Never persist a `CandidatePayload`** anywhere — not Firestore, not localStorage, not sessionStorage | PROPOSE must not mutate canonical state. Persisted candidates are a parallel entity model |
 | **Send identifiers raw** | Gate 2 Phase 2 adds fallback queries that match on the *original* stored bytes — an un-normalized LinkedIn URL is matched by querying the raw incoming value. Normalizing client-side destroys the signal the resolver needs |
 | **`clientRef` is correlation only** | It must remain structurally impossible for it to become identity |
-| **Never send `contactId`** | The endpoint rejects it. The model interprets intent; the resolver determines identity |
+| **Never send `contactId`** | The endpoint rejects it outright — along with `contact_id`, `canonicalId`, `personId` and `id`. The model interprets intent; the resolver determines identity. The one way a canonical id may be supplied is `resolutions`, below, and only for an id the resolver itself just offered |
 | **Selection may be any size** — do not chunk | The server batches and shares one scan window across the operation |
 | **Render the resolution preview before the commit control** | See below |
 
@@ -113,6 +113,58 @@ not:
 > 20 contacts will be saved
 
 Approving a count is not approving a decision.
+
+## Carrying the user's disambiguation choice
+
+A preview can come back `ambiguous` with the canonical records the resolver
+could not choose between. The user picks one. That choice has to reach `commit`
+**without letting a client name an arbitrary contact.**
+
+The choice travels in the **request envelope**, never on a `CandidatePayload`:
+
+```js
+{
+  userId, authToken, operationId, actor,
+  commit: true,
+  candidates: CandidatePayload[],          // still never carry contactId
+  resolutions: { [clientRef]: contactId }  // optional; the user's answers
+}
+```
+
+Putting it in the envelope keeps the contract's absolute rule literally intact —
+a candidate still carries no canonical identity, and `findPayloadViolations()`
+keeps rejecting one unchanged.
+
+### The validation rule
+
+For each `resolutions[clientRef]`, the server:
+
+1. **Re-resolves that candidate.** Commit never trusts the preview's verdict —
+   the workspace can change between the two calls.
+2. Requires the fresh outcome to still be `ambiguous`. If it now resolves on its
+   own, or matches nothing, the user answered a question that is no longer being
+   asked → `refused`, reason `stale_resolution`.
+3. Requires the chosen `contactId` to be **a member of the candidate list that
+   re-resolution just produced**. Not a member → `refused`, reason
+   `candidate_not_offered`.
+4. Needs no separate workspace check: the candidate set is produced by the
+   resolver querying `users/{uid}/contacts` for the authenticated workspace, so
+   every id in it is by construction inside that workspace and a foreign id can
+   never be a member.
+
+**Membership in a freshly computed set is the authorization.** That is stronger
+than replaying a token from the earlier call, because it cannot be stale — and
+it needs no candidate collection, no operations collection, and no persistent
+ambiguity object.
+
+**Honest limit.** With no stored operation record the server cannot prove the id
+came from *that* `operationId`'s preview — only that it is a valid answer to the
+same question right now. `operationId` carries idempotency and correlation, not
+authorization. If binding to a specific preview is ever required, the minimal
+upgrade is an HMAC-signed token, not a collection.
+
+A candidate answered this way returns `outcome: 'matched'` with
+`matchedOn: 'user_disambiguation'`.
 
 ## Response
 

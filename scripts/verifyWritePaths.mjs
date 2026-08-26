@@ -16,6 +16,27 @@
  *   3. No company creation path queries the bare `apollo_id` field alone.
  *   4. Every sniper_contacts write goes through the guard.
  *
+ * KNOWN GAP — server-side writes are NOT covered (Gate 2 Phase 3).
+ *
+ * Every rule below is web-SDK shaped: it looks for `setDoc`/`addDoc` calls whose
+ * collection argument is `collection(db, 'users', uid, 'contacts')`. A Netlify
+ * function writes the same document through an entirely different shape —
+ * `db.collection('users').doc(uid).collection('contacts').doc(id).set()`, very
+ * often via an intermediate variable — so nothing under netlify/functions is
+ * checked here at all.
+ *
+ * A flattened-source rule for it was written during Phase 3 and REMOVED. Tuned
+ * loosely it matched `.collection('contacts').doc(id).collection('timeline')
+ * .add()` in four files that create no contact; tuned tightly it stopped seeing
+ * barryResolveSave.js, the very path it was added for, because that binds the
+ * collection to a variable first. A guard that is both wrong and blind is worse
+ * than a documented gap, because it reads as coverage.
+ *
+ * Closing it properly needs an AST pass that resolves admin-SDK chains through
+ * variable bindings — real work, and separable. Until then the server-side
+ * guarantee rests on src/test/gate2ResolveSave.test.js, which asserts the
+ * behaviour directly rather than inferring it from source shape.
+ *
  * Run:  node scripts/verifyWritePaths.mjs
  * Exit: 0 clean · 1 violations found
  *

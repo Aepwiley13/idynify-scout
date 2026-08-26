@@ -23,7 +23,7 @@ import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, query, where } from 'firebase/firestore';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { useShell } from '../../context/ShellContext';
 import { useLocation } from 'react-router-dom';
@@ -37,6 +37,9 @@ import ConversationCard from '../../components/conversation/ConversationCard';
 import useFirstExperienceController from '../../hooks/useFirstExperienceController';
 import BarryOnboarding from '../Onboarding/BarryOnboarding';
 import RelationshipFirstValue from '../../components/onboarding/RelationshipFirstValue';
+import CompanyResultsCard from '../../components/onboarding/CompanyResultsCard';
+import { useOnboardingState } from '../../hooks/useOnboardingState';
+import { calculateICPScore } from '../../utils/icpScoring';
 import './BarryWorkspace.css';
 
 export default function BarryWorkspace() {
@@ -60,7 +63,10 @@ export default function BarryWorkspace() {
   const onboardingRef = useRef(null);
   const [prospectingBusy, setProspectingBusy] = useState(false);
   const [prospectingStep, setProspectingStep] = useState(null);
+  const [resultCompanies, setResultCompanies] = useState(null);
+  const resultsDeliveredRef = useRef(false);
 
+  const { barryState, companiesFoundCount } = useOnboardingState();
   const feCtrl = useFirstExperienceController(arrival);
   const feTurnCountRef = useRef(0);
 
@@ -93,6 +99,54 @@ export default function BarryWorkspace() {
       }
     })();
   }, [feCtrl.turns]);
+
+  // First Value: when barryState flips to READY after ICP confirmation,
+  // load the top-scoring pending companies and present them conversationally.
+  useEffect(() => {
+    if (barryState !== 'READY') return;
+    if (resultsDeliveredRef.current) return;
+    if (!isFirstExperience) return;
+
+    resultsDeliveredRef.current = true;
+
+    (async () => {
+      const user = getEffectiveUser() || auth.currentUser;
+      if (!user) return;
+
+      try {
+        const companiesSnap = await getDocs(
+          query(collection(db, 'users', user.uid, 'companies'), where('status', '==', 'pending'))
+        );
+        if (companiesSnap.empty) return;
+
+        const icpSnap = await getDoc(doc(db, 'users', user.uid, 'companyProfile', 'current'));
+        const icpProfile = icpSnap.exists() ? icpSnap.data() : null;
+
+        let scored = companiesSnap.docs.map(d => {
+          const data = d.data();
+          const score = icpProfile ? calculateICPScore(data, icpProfile) : 50;
+          return { ...data, id: d.id, _fitScore: score };
+        });
+
+        scored.sort((a, b) => b._fitScore - a._fitScore);
+        const top = scored.slice(0, 5);
+        setResultCompanies(top);
+
+        const total = companiesSnap.size;
+        const resultsMessage = total <= 5
+          ? `I found ${total} ${total === 1 ? 'company' : 'companies'} that match what we talked about.`
+          : `I found ${total} companies that match what we talked about. Here are a few I think are worth starting with.`;
+
+        feCtrl.addTurn({
+          role: 'assistant',
+          content: resultsMessage,
+          _feCard: 'results',
+        });
+      } catch (err) {
+        console.warn('[BarryWorkspace] First Value results load failed:', err.message);
+      }
+    })();
+  }, [barryState, isFirstExperience]);
 
   async function init() {
     const user = getEffectiveUser() || auth.currentUser;
@@ -143,7 +197,7 @@ export default function BarryWorkspace() {
     if (threadRef.current) {
       threadRef.current.scrollTop = threadRef.current.scrollHeight;
     }
-  }, [conversationTurns, sending, feCtrl.turns, feCtrl.classifying, feCtrl.phase, prospectingBusy]);
+  }, [conversationTurns, sending, feCtrl.turns, feCtrl.classifying, feCtrl.phase, prospectingBusy, resultCompanies]);
 
   useEffect(() => {
     return () => { setFirstExperience?.(false); };
@@ -370,6 +424,30 @@ export default function BarryWorkspace() {
                       decision={feCtrl.decision}
                       knownName={feCtrl.who?.name || null}
                     />
+                  </div>
+                )}
+
+                {hasCard && turn._feCard === 'results' && resultCompanies && (
+                  <div className="barry-workspace-fe-card">
+                    <CompanyResultsCard
+                      companies={resultCompanies}
+                      totalCount={companiesFoundCount || resultCompanies.length}
+                      onAccept={(company) => {
+                        feCtrl.addTurn({
+                          role: 'assistant',
+                          content: `Got it — I'll keep ${company.name || company.company_name}. We can look at the right people there next.`,
+                        });
+                      }}
+                    />
+                    <div className="barry-workspace-fe-actions" style={{ marginTop: 12 }}>
+                      <button
+                        className="barry-workspace-fe-btn barry-workspace-fe-btn--go"
+                        style={{ background: BRAND.pink, color: '#fff' }}
+                        onClick={() => navigate('/scout', { state: { activeTab: 'daily-leads' } })}
+                      >
+                        Review these in Scout
+                      </button>
+                    </div>
                   </div>
                 )}
 

@@ -670,9 +670,11 @@ const BarryOnboarding = forwardRef(function BarryOnboarding({
           .catch(err => console.warn('[BarryOnboarding] canonical append failed:', err.message));
       }
 
-      setTimeout(() => {
-        navigate('/mission-control-v2');
-      }, 2500);
+      if (!embedded) {
+        setTimeout(() => {
+          navigate('/mission-control-v2');
+        }, 2500);
+      }
 
     } catch (error) {
       console.error('Error saving ICP:', error);

@@ -121,9 +121,10 @@ describe('R5 — Company acceptance uses canonical document', () => {
     expect(resultsCardCode).toMatch(/doc\(db, 'users',.*'companies', company\.id\)/);
   });
 
-  it('skip sets status to rejected', () => {
-    expect(resultsCardCode).toMatch(/updateDoc/);
-    expect(resultsCardCode).toMatch(/status: 'rejected'/);
+  it('skip is presentation-only — does not persist a state change', () => {
+    const skipFn = resultsCardCode.split('handleSkip')[1]?.split('}')[0] || '';
+    expect(skipFn).not.toMatch(/updateDoc/);
+    expect(skipFn).not.toMatch(/status: 'rejected'/);
   });
 
   it('sets swipe_source to barry_first_value', () => {
@@ -256,6 +257,128 @@ describe('R11 — Scout navigation from results', () => {
 
   it('Review button text is present', () => {
     expect(workspaceCode).toMatch(/Review these in Scout/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// E1 — SEARCHING state: embedded message
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('E1 — Embedded searching message', () => {
+  it('embedded mode uses "Give me a moment" message', () => {
+    expect(onboardingCode).toMatch(/Give me a moment/);
+  });
+
+  it('embedded branch does not reference Scout', () => {
+    const embeddedMsg = onboarding.match(/embedded\s*\?\s*`([^`]*)`/)?.[1] || '';
+    expect(embeddedMsg).not.toMatch(/Scout/);
+  });
+
+  it('standalone branch references Scout', () => {
+    const standaloneMsg = onboarding.match(/:\s*`([^`]*New targets[^`]*)`/)?.[1] || '';
+    expect(standaloneMsg).toMatch(/Scout/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// E2 — Zero-result recovery
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('E2 — Zero-result recovery', () => {
+  it('workspace handles companiesSnap.empty', () => {
+    expect(workspaceCode).toMatch(/companiesSnap\.empty/);
+  });
+
+  it('zero-result adds a conversational recovery turn', () => {
+    const afterEmpty = workspaceCode.split('companiesSnap.empty')[1]?.split('return')[0] || '';
+    expect(afterEmpty).toMatch(/addTurn/);
+  });
+
+  it('recovery message offers to refine targeting', () => {
+    expect(workspaceCode).toMatch(/refine your targeting/);
+  });
+
+  it('zero-result does not set resultCompanies', () => {
+    const emptyBlock = workspaceCode.split('companiesSnap.empty')[1]?.split('return;')[0] || '';
+    expect(emptyBlock).not.toMatch(/setResultCompanies/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// E3 — Partial results indicator
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('E3 — Partial results indicator', () => {
+  it('CompanyResultsCard renders "more available in Scout" when totalCount exceeds shown', () => {
+    expect(resultsCardCode).toMatch(/more available in Scout/);
+  });
+
+  it('indicator is gated on totalCount > companies.length', () => {
+    expect(resultsCardCode).toMatch(/totalCount > companies\.length/);
+  });
+
+  it('CSS defines crc-more class', () => {
+    expect(resultsCss).toMatch(/\.crc-more/);
+  });
+
+  it('workspace passes totalCount prop to CompanyResultsCard', () => {
+    expect(workspaceCode).toMatch(/totalCount=/);
+  });
+
+  it('workspace results message varies by count', () => {
+    expect(workspaceCode).toMatch(/total <= 5/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// E4 — Skip is presentation-only
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('E4 — Skip is presentation-only', () => {
+  it('handleSkip sets local state only', () => {
+    const skipBody = resultsCardCode.split('handleSkip')[1]?.split(/\n  \}$/m)[0] || '';
+    expect(skipBody).toMatch(/setDecisions/);
+  });
+
+  it('handleSkip does not call updateDoc', () => {
+    const skipBody = resultsCardCode.split('handleSkip')[1]?.split(/\n  \}$/m)[0] || '';
+    expect(skipBody).not.toMatch(/updateDoc/);
+  });
+
+  it('handleSkip does not set status rejected', () => {
+    const skipBody = resultsCardCode.split('handleSkip')[1]?.split(/\n  \}$/m)[0] || '';
+    expect(skipBody).not.toMatch(/rejected/);
+  });
+
+  it('skip button says "Skip for now"', () => {
+    expect(resultsCard).toMatch(/Skip for now/);
+  });
+
+  it('skipped row gets visual dimming', () => {
+    expect(resultsCss).toMatch(/\.crc-row--skipped/);
+    expect(resultsCss).toMatch(/opacity/);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════
+// E5 — Accepted-state UI feedback
+// ═══════════════════════════════════════════════════════════════════════════
+
+describe('E5 — Accepted-state UI feedback', () => {
+  it('accepted row shows "Saved" label', () => {
+    expect(resultsCard).toMatch(/Saved/);
+  });
+
+  it('accepted row has decided--accepted class', () => {
+    expect(resultsCardCode).toMatch(/crc-row-decided--accepted/);
+  });
+
+  it('accepted row gets visual class', () => {
+    expect(resultsCardCode).toMatch(/crc-row--accepted/);
+  });
+
+  it('actions are hidden after decision', () => {
+    expect(resultsCardCode).toMatch(/!decided/);
   });
 });
 

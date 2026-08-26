@@ -117,7 +117,14 @@ export default function BarryWorkspace() {
         const companiesSnap = await getDocs(
           query(collection(db, 'users', user.uid, 'companies'), where('status', '==', 'pending'))
         );
-        if (companiesSnap.empty) return;
+
+        if (companiesSnap.empty) {
+          feCtrl.addTurn({
+            role: 'assistant',
+            content: "The search finished but didn't find companies that match closely enough. We can refine your targeting — tell me more about who you're looking for, or try a different industry or location.",
+          });
+          return;
+        }
 
         const icpSnap = await getDoc(doc(db, 'users', user.uid, 'companyProfile', 'current'));
         const icpProfile = icpSnap.exists() ? icpSnap.data() : null;

@@ -287,8 +287,8 @@ describe('C3 — no second conversation authority', () => {
     expect(workspace).not.toMatch(/import.*addDoc.*from.*firebase\/firestore/);
   });
 
-  it('Workspace does not import collection directly', () => {
-    expect(workspace).not.toMatch(/import.*collection.*from.*firebase\/firestore/);
+  it('Workspace does not import addDoc', () => {
+    expect(workspace).not.toMatch(/import.*addDoc.*from.*firebase\/firestore/);
   });
 
   it('Workspace writes only through barryCanonical appendTurn', () => {

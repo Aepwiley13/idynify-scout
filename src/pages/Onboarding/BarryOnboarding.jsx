@@ -652,7 +652,9 @@ const BarryOnboarding = forwardRef(function BarryOnboarding({
         ? ` (${extractedICP.companySizes[0]} employees)`
         : '';
 
-      const finalMessage = `I'm finding ${strategyContext}${sizeContext} ${locationContext}.\n\nNew targets will appear in Scout shortly. You can also refresh leads manually anytime.`;
+      const finalMessage = embedded
+        ? `I'm searching for ${strategyContext}${sizeContext} ${locationContext}. Give me a moment...`
+        : `I'm finding ${strategyContext}${sizeContext} ${locationContext}.\n\nNew targets will appear in Scout shortly. You can also refresh leads manually anytime.`;
 
       const finalHistory = [
         ...conversationHistory,

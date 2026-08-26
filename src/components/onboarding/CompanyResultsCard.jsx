@@ -27,21 +27,8 @@ export default function CompanyResultsCard({ companies, totalCount, onAccept }) 
     }
   }
 
-  async function handleSkip(company) {
-    const user = getEffectiveUser() || auth.currentUser;
-    if (!user) return;
-    try {
-      const companyRef = doc(db, 'users', user.uid, 'companies', company.id);
-      await updateDoc(companyRef, {
-        status: 'rejected',
-        swipedAt: new Date().toISOString(),
-        swipeDirection: 'left',
-        swipe_source: 'barry_first_value',
-      });
-      setDecisions(prev => ({ ...prev, [company.id]: 'skipped' }));
-    } catch (err) {
-      console.error('[CompanyResultsCard] skip failed:', err.message);
-    }
+  function handleSkip(company) {
+    setDecisions(prev => ({ ...prev, [company.id]: 'skipped' }));
   }
 
   const sizeLabel = (company) => {
@@ -95,7 +82,7 @@ export default function CompanyResultsCard({ companies, totalCount, onAccept }) 
                     style={{ borderColor: T.border, color: T.text }}
                     onClick={() => handleSkip(company)}
                   >
-                    Skip
+                    Skip for now
                   </button>
                   <button
                     className="crc-btn crc-btn--accept"
@@ -118,6 +105,11 @@ export default function CompanyResultsCard({ companies, totalCount, onAccept }) 
           );
         })}
       </div>
+      {totalCount > companies.length && (
+        <div className="crc-more" style={{ color: T.textMuted, borderColor: T.border }}>
+          +{totalCount - companies.length} more available in Scout
+        </div>
+      )}
     </div>
   );
 }

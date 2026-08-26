@@ -128,7 +128,9 @@ describe('the delegated conversation stays intact', () => {
     // proposal can open with what Barry thinks the user wants rather than a
     // field list. Both props default to null, so the component still behaves
     // exactly as before when neither is supplied.
-    expect(barry).toMatch(/function BarryOnboarding\(\{ knownName = null, goal = null \} = \{\}\)/);
+    expect(barry).toMatch(/function BarryOnboarding\(\{/);
+    expect(barry).toMatch(/knownName = null/);
+    expect(barry).toMatch(/goal = null/);
   });
 
   it('greets by name when one is known', () => {

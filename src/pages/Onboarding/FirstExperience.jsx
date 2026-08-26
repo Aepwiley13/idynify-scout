@@ -84,31 +84,30 @@ async function readReadiness(userId) {
   };
 }
 
-export default function FirstExperience() {
+export default function FirstExperience({ presetDecision, presetWho, presetPending, presetHeld }) {
   const T = useT();
   const navigate = useNavigate();
-  // Why the user arrived on this navigation. Transient by construction — it
-  // lives in the history entry and is gone on reload — so an explicit
-  // "Review ICP with Barry" click can outrank generic resume state without
-  // becoming durable mode state.
   const location = useLocation();
   const arrival = location.state?.arrival || null;
-  const [loading, setLoading] = useState(true);
-  const [who, setWho] = useState(null);
+
+  const hasPresets = Boolean(presetDecision);
+
+  const [loading, setLoading] = useState(!hasPresets);
+  const [who, setWho] = useState(hasPresets ? presetWho : null);
   const [askingName, setAskingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
 
-  // Everything below is session state and dies with the tab. Intent is
-  // transient routing context: no field, no collection, no history.
   const [askingIntent, setAskingIntent] = useState(false);
   const [readiness, setReadiness] = useState({ hasContacts: false, gmailConnected: false });
   const [turn, setTurn] = useState('');
   const [classifying, setClassifying] = useState(false);
-  const [pending, setPending] = useState(null);   // classification awaiting confirmation
-  const [decision, setDecision] = useState(null);
-  const [held, setHeld] = useState(null);         // the second half of a compound intent
+  const [pending, setPending] = useState(hasPresets ? presetPending : null);
+  const [decision, setDecision] = useState(hasPresets ? presetDecision : null);
+  const [held, setHeld] = useState(hasPresets ? presetHeld : null);
 
   useEffect(() => {
+    if (hasPresets) return;
+
     let cancelled = false;
 
     (async () => {
@@ -120,14 +119,9 @@ export default function FirstExperience() {
         const snap = await getDoc(doc(db, 'users', user.uid));
         userData = snap.exists() ? snap.data() : null;
       } catch (err) {
-        // WHO is never a gate. A failed read means Barry does not know the
-        // name yet, not that the experience stops.
         console.warn('[FirstExperience] user document read failed:', err.message);
       }
 
-      // What this visit is: beginning, resuming an unfinished conversation, or
-      // refining an ICP that already exists. Derived from state that already
-      // exists — never stored, so it cannot become another completion flag.
       let conversation = null;
       try {
         const convSnap = await getDoc(doc(db, 'users', user.uid, 'barryConversations', 'icp'));
@@ -144,9 +138,6 @@ export default function FirstExperience() {
       setWho(resolved);
       setReadiness(facts);
 
-      // Someone resuming or refining has met Barry already. Asking their name
-      // mid-conversation is the tell of a flow that does not know you have been
-      // here, so the question belongs to a genuine first conversation.
       const { mode } = resolveFirstExperienceMode(conversation, icpResolution, arrival);
 
       logEvent(EVENTS.FIRST_EXPERIENCE_STARTED, { mode: mode === MODE_BEGIN ? 'begin' : 'resume' });
@@ -157,10 +148,6 @@ export default function FirstExperience() {
       setAskingName(wantsName);
       if (wantsName) logEvent(EVENTS.WHO_ASKED);
 
-      // The intent question belongs to a genuine first conversation only.
-      // Someone resuming an unfinished targeting conversation, or arriving to
-      // refine an ICP that exists, has already told Barry what they came for —
-      // asking again would throw away the thing this route was built to keep.
       const beginning = mode === MODE_BEGIN;
       setAskingIntent(beginning && !wantsName);
       if (!beginning) {
@@ -170,7 +157,7 @@ export default function FirstExperience() {
     })();
 
     return () => { cancelled = true; };
-  }, [arrival]);
+  }, [arrival, hasPresets]);
 
   async function submitName() {
     const user = getEffectiveUser() || auth.currentUser;

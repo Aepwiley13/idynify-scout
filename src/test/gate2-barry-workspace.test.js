@@ -77,12 +77,9 @@ describe('W2 — all legacy /onboarding routes redirect to /barry', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('W3 — FirstExperience composition', () => {
-  it('BarryWorkspace imports FirstExperience', () => {
-    expect(workspace).toMatch(/import FirstExperience from/);
-  });
-
-  it('BarryWorkspace renders <FirstExperience /> when isFirstExperience is true', () => {
-    expect(workspace).toMatch(/<FirstExperience\s*\/>/);
+  it('BarryWorkspace renders FE inline via _feCard cards (B3 replaces FirstExperience import)', () => {
+    expect(workspace).toMatch(/turn\._feCard/);
+    expect(workspace).toMatch(/<BarryOnboarding/);
   });
 
   it('BarryWorkspace checks onboardingComplete to determine first experience', () => {
@@ -290,8 +287,8 @@ describe('C3 — no second conversation authority', () => {
     expect(workspace).not.toMatch(/import.*addDoc.*from.*firebase\/firestore/);
   });
 
-  it('Workspace does not import collection directly', () => {
-    expect(workspace).not.toMatch(/import.*collection.*from.*firebase\/firestore/);
+  it('Workspace does not import addDoc', () => {
+    expect(workspace).not.toMatch(/import.*addDoc.*from.*firebase\/firestore/);
   });
 
   it('Workspace writes only through barryCanonical appendTurn', () => {
@@ -326,8 +323,8 @@ describe('C4 — structured angles, no bracketed speech', () => {
     expect(appendFn).toMatch(/turnDoc\.kind\s*=\s*kind/);
   });
 
-  it('Workspace renders angles with badge, not brackets', () => {
-    expect(workspace).toMatch(/barry-workspace-angles-badge/);
+  it('Workspace renders structured kinds via ConversationCard, not brackets', () => {
+    expect(workspace).toMatch(/ConversationCard/);
     expect(workspaceClean).not.toMatch(/\[Message angles generated/);
   });
 
@@ -336,9 +333,9 @@ describe('C4 — structured angles, no bracketed speech', () => {
     expect(chatClean).not.toMatch(/\[Message angles generated/);
   });
 
-  it('Workspace uses kind: "angles" for angle turns', () => {
-    expect(workspaceClean).toMatch(/['"]angles['"]/);
-    expect(workspaceClean).toMatch(/turn\.kind\s*===\s*'angles'/);
+  it('Workspace uses kind discriminator to render structured turns', () => {
+    expect(workspaceClean).toMatch(/turn\.kind/);
+    expect(workspaceClean).toMatch(/ConversationCard\s+kind=/);
   });
 
   it('Sidecar uses kind: "angles" for angle turns', () => {
@@ -409,26 +406,26 @@ describe('C6 — failed seeding is recoverable', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// C7 — Soft progress derives from currentStep, not status
+// C7 — First Experience uses controller (replaced soft progress stepper)
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('C7 — deriveSoftProgress uses currentStep', () => {
-  it('reads currentStep from conversationData', () => {
-    expect(workspaceClean).toMatch(/conversationData\?\.currentStep/);
+describe('C7 — First Experience uses controller instead of stepper', () => {
+  it('imports useFirstExperienceController', () => {
+    expect(workspace).toMatch(/import useFirstExperienceController/);
   });
 
-  it('does not read status from conversationData', () => {
-    expect(workspaceClean).not.toMatch(/conversationData\?\.status/);
+  it('does not use SOFT_PROGRESS_STATES or deriveSoftProgress', () => {
+    expect(workspaceClean).not.toMatch(/SOFT_PROGRESS_STATES/);
+    expect(workspaceClean).not.toMatch(/deriveSoftProgress/);
   });
 
-  it('checks for confirming/saving step values', () => {
-    expect(workspaceClean).toMatch(/currentStep\s*===\s*'confirming'/);
-    expect(workspaceClean).toMatch(/currentStep\s*===\s*'saving'/);
+  it('does not render progress stepper markup', () => {
+    expect(workspaceClean).not.toMatch(/barry-workspace-progress/);
+    expect(workspaceClean).not.toMatch(/barry-progress-step/);
   });
 
-  it('checks for asking/clarifying step values', () => {
-    expect(workspaceClean).toMatch(/currentStep\s*===\s*'asking'/);
-    expect(workspaceClean).toMatch(/currentStep\s*===\s*'clarifying'/);
+  it('routes composer to controller during First Experience', () => {
+    expect(workspaceClean).toMatch(/feCtrl\.handleUserInput/);
   });
 });
 

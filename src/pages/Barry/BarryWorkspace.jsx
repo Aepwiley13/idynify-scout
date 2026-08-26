@@ -13,50 +13,43 @@
  * The composer calls barryMissionChat — the same reasoning path as the
  * Sidecar. One Barry, one conversation, different presentations.
  *
- * During First Experience, the shell shows simplified navigation — just
- * Barry and a wordmark. After onboarding completes, the full nav appears.
+ * During First Experience, the conversation UI is continuous — Barry's
+ * WHO → INTENT conversation and the First Value delivery (targeting,
+ * relationship snapshot, navigation) all render as conversation objects
+ * inside the same thread. The user never leaves the workspace.
  */
 
 import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
+import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, getDocs, collection, query, where } from 'firebase/firestore';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { useShell } from '../../context/ShellContext';
+import { useLocation } from 'react-router-dom';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, ASSETS } from '../../theme/tokens';
 import { appendTurn, loadOrSeedRecentTurns } from '../../utils/barryCanonical';
-import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { resolveWho } from '../../utils/resolveWho';
 import { buildContextStack } from '../../utils/barryContextStack';
-import FirstExperience from '../Onboarding/FirstExperience';
+import { intentLabel } from '../../utils/firstValueRouting';
+import ConversationCard from '../../components/conversation/ConversationCard';
+import useFirstExperienceController from '../../hooks/useFirstExperienceController';
+import BarryOnboarding from '../Onboarding/BarryOnboarding';
+import RelationshipFirstValue from '../../components/onboarding/RelationshipFirstValue';
+import CompanyResultsCard from '../../components/onboarding/CompanyResultsCard';
+import { useOnboardingState } from '../../hooks/useOnboardingState';
+import { calculateICPScore } from '../../utils/icpScoring';
 import './BarryWorkspace.css';
-
-const SOFT_PROGRESS_STATES = {
-  prospecting: ['Understanding', 'Refining', 'Searching', 'First results'],
-  engagement: ['Understanding', 'Finding context', 'Helping you act'],
-  general: ['Getting started', 'Building context', 'Ready'],
-};
-
-function deriveSoftProgress(onboardingData, icpResolution, conversationData) {
-  const hasIcp = icpResolution && isResolved(icpResolution);
-  const hasConversation = conversationData?.currentStep === 'confirming' || conversationData?.currentStep === 'saving';
-  const isAsking = conversationData?.currentStep === 'asking' || conversationData?.currentStep === 'clarifying';
-
-  const states = SOFT_PROGRESS_STATES.prospecting;
-
-  if (hasIcp) return { states, current: 3, label: states[3] };
-  if (hasConversation) return { states, current: 2, label: states[2] };
-  if (isAsking) return { states, current: 1, label: states[1] };
-  return { states, current: 0, label: states[0] };
-}
 
 export default function BarryWorkspace() {
   const T = useT();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const arrival = location.state?.arrival || null;
   const { closeBarry, setFirstExperience } = useShell();
   const [loading, setLoading] = useState(true);
   const [isFirstExperience, setIsFirstExperienceLocal] = useState(false);
-  const [softProgress, setSoftProgress] = useState(null);
   const [conversationTurns, setConversationTurns] = useState([]);
   const [who, setWho] = useState(null);
   const [inputValue, setInputValue] = useState('');
@@ -67,31 +60,121 @@ export default function BarryWorkspace() {
 
   const threadRef = useRef(null);
   const inputRef = useRef(null);
+  const onboardingRef = useRef(null);
+  const [prospectingBusy, setProspectingBusy] = useState(false);
+  const [prospectingStep, setProspectingStep] = useState(null);
+  const [resultCompanies, setResultCompanies] = useState(null);
+  const resultsDeliveredRef = useRef(false);
+
+  const { barryState, companiesFoundCount } = useOnboardingState();
+  const feCtrl = useFirstExperienceController(arrival);
+  const feTurnCountRef = useRef(0);
+
+  // B2-C1: Persist FE conversation turns to the canonical store so they
+  // survive refresh and remain visible after handoff.
+  useEffect(() => {
+    const turns = feCtrl.turns;
+    const prevCount = feTurnCountRef.current;
+    if (turns.length <= prevCount) return;
+
+    const newTurns = turns.slice(prevCount);
+    feTurnCountRef.current = turns.length;
+
+    const user = getEffectiveUser() || auth.currentUser;
+    if (!user) return;
+
+    (async () => {
+      for (const turn of newTurns) {
+        if (!turn.content) continue;
+        try {
+          await appendTurn(db, user.uid, {
+            role: turn.role,
+            content: turn.content,
+            surface: 'workspace',
+            kind: 'first-experience',
+          });
+        } catch (err) {
+          console.warn('[BarryWorkspace] FE canonical append failed:', err.message);
+        }
+      }
+    })();
+  }, [feCtrl.turns]);
+
+  // First Value: when barryState flips to READY after ICP confirmation,
+  // load the top-scoring pending companies and present them conversationally.
+  useEffect(() => {
+    if (barryState !== 'READY') return;
+    if (resultsDeliveredRef.current) return;
+    if (!isFirstExperience) return;
+
+    resultsDeliveredRef.current = true;
+
+    (async () => {
+      const user = getEffectiveUser() || auth.currentUser;
+      if (!user) return;
+
+      try {
+        const companiesSnap = await getDocs(
+          query(collection(db, 'users', user.uid, 'companies'), where('status', '==', 'pending'))
+        );
+
+        if (companiesSnap.empty) {
+          feCtrl.addTurn({
+            role: 'assistant',
+            content: "The search finished but didn't find companies that match closely enough. We can refine your targeting — tell me more about who you're looking for, or try a different industry or location.",
+          });
+          return;
+        }
+
+        const icpSnap = await getDoc(doc(db, 'users', user.uid, 'companyProfile', 'current'));
+        const icpProfile = icpSnap.exists() ? icpSnap.data() : null;
+
+        let scored = companiesSnap.docs.map(d => {
+          const data = d.data();
+          const score = icpProfile ? calculateICPScore(data, icpProfile) : 50;
+          return { ...data, id: d.id, _fitScore: score };
+        });
+
+        scored.sort((a, b) => b._fitScore - a._fitScore);
+        const top = scored.slice(0, 5);
+        setResultCompanies(top);
+
+        const total = companiesSnap.size;
+        const resultsMessage = total <= 5
+          ? `I found ${total} ${total === 1 ? 'company' : 'companies'} that match what we talked about.`
+          : `I found ${total} companies that match what we talked about. Here are a few I think are worth starting with.`;
+
+        feCtrl.addTurn({
+          role: 'assistant',
+          content: resultsMessage,
+          _feCard: 'results',
+        });
+      } catch (err) {
+        console.warn('[BarryWorkspace] First Value results load failed:', err.message);
+      }
+    })();
+  }, [barryState, isFirstExperience]);
 
   async function init() {
     const user = getEffectiveUser() || auth.currentUser;
     if (!user) { setLoading(false); return; }
 
     try {
-      const [userSnap, convSnap, icpResolution, turns] = await Promise.all([
+      const [userSnap, turns, mcSnap] = await Promise.all([
         getDoc(doc(db, 'users', user.uid)).catch(() => null),
-        getDoc(doc(db, 'users', user.uid, 'barryConversations', 'icp')).catch(() => null),
-        resolveActiveIcp(user.uid),
         loadOrSeedRecentTurns(db, user.uid, 30),
+        getDoc(doc(db, 'users', user.uid, 'barryConversations', 'missionControl')).catch(() => null),
       ]);
 
+      const persistedMode = mcSnap?.exists() ? mcSnap.data().mode : null;
+      if (persistedMode) setBarryMode(persistedMode);
+
       const userData = userSnap?.exists() ? userSnap.data() : null;
-      const convData = convSnap?.exists() ? convSnap.data() : null;
       const onboardingComplete = userData?.onboardingComplete || userData?.onboarding?.completed;
 
       const firstExp = !onboardingComplete;
       setIsFirstExperienceLocal(firstExp);
       setFirstExperience?.(firstExp);
-
-      if (firstExp) {
-        const progress = deriveSoftProgress(userData?.onboarding, icpResolution, convData);
-        setSoftProgress(progress);
-      }
 
       setConversationTurns(turns);
       setConversationHistory(turns.map(t => ({ role: t.role, content: t.content })));
@@ -121,7 +204,7 @@ export default function BarryWorkspace() {
     if (threadRef.current) {
       threadRef.current.scrollTop = threadRef.current.scrollHeight;
     }
-  }, [conversationTurns, sending]);
+  }, [conversationTurns, sending, feCtrl.turns, feCtrl.classifying, feCtrl.phase, prospectingBusy, resultCompanies]);
 
   useEffect(() => {
     return () => { setFirstExperience?.(false); };
@@ -224,7 +307,27 @@ export default function BarryWorkspace() {
   function handleKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      sendMessage(inputValue);
+      if (isFirstExperience) {
+        handleFirstExperienceSubmit();
+      } else {
+        sendMessage(inputValue);
+      }
+    }
+  }
+
+  function handleFirstExperienceSubmit() {
+    if (!inputValue.trim()) return;
+    const text = inputValue.trim();
+    const delivering = feCtrl.phase === 'delivering';
+    const prospecting = delivering && feCtrl.decision?.kind === 'in-place';
+
+    if (prospecting && onboardingRef.current) {
+      feCtrl.addTurn({ role: 'user', content: text });
+      onboardingRef.current.submit(text);
+      setInputValue('');
+    } else if (!feCtrl.classifying) {
+      feCtrl.handleUserInput(text);
+      setInputValue('');
     }
   }
 
@@ -241,46 +344,275 @@ export default function BarryWorkspace() {
     );
   }
 
-  if (isFirstExperience) {
+  // First Experience — all phases render inside the same workspace shell.
+  // The 'delivering' phase keeps the conversation visible and renders
+  // structured cards (targeting, relationship, navigation) inline.
+  if (isFirstExperience && feCtrl.phase !== 'loading') {
+    const fePhase = feCtrl.phase;
+    const feTurns = feCtrl.turns;
+    const isWhoPhase = fePhase === 'who';
+    const isDelivering = fePhase === 'delivering';
+    const isBusy = feCtrl.classifying || prospectingBusy;
+    const isProspecting = isDelivering && feCtrl.decision?.kind === 'in-place';
+    const prospectingReady = isProspecting && prospectingStep && ['asking', 'clarifying'].includes(prospectingStep);
+    const placeholder = isWhoPhase ? 'Your name'
+      : isProspecting ? 'Tell Barry about your target market...'
+      : 'Type your answer...';
+    const composerDisabled = isBusy || (isDelivering && !isProspecting) || (isProspecting && !prospectingReady);
+
     return (
-      <div className="barry-workspace barry-workspace--first-experience">
-        {softProgress && (
-          <div className="barry-workspace-progress" style={{ borderColor: T.border }}>
-            <div className="barry-workspace-progress-track">
-              {softProgress.states.map((label, i) => {
-                const isActive = i === softProgress.current;
-                const isDone = i < softProgress.current;
-                return (
-                  <div
-                    key={label}
-                    className={`barry-progress-step ${isDone ? 'done' : ''} ${isActive ? 'active' : ''}`}
-                  >
-                    <div
-                      className="barry-progress-dot"
-                      style={{
-                        background: isDone ? BRAND.cyan : isActive ? BRAND.pink : T.surface2,
-                        borderColor: isActive ? BRAND.pink : 'transparent',
-                      }}
-                    />
-                    <span
-                      className="barry-progress-label"
-                      style={{ color: isActive ? T.text : T.textMuted }}
-                    >
-                      {label}
-                    </span>
-                  </div>
-                );
-              })}
+      <div className="barry-workspace">
+        <div className="barry-workspace-header" style={{ borderColor: T.border }}>
+          <div className="barry-workspace-header-left">
+            <img
+              src={ASSETS.barryAvatar}
+              alt="Barry"
+              className="barry-workspace-avatar"
+              width={40}
+              height={40}
+            />
+            <div>
+              <h1 className="barry-workspace-title" style={{ color: T.text }}>Barry</h1>
+              <span className="barry-workspace-subtitle" style={{ color: T.textMuted }}>
+                Your sales intelligence co-pilot
+              </span>
             </div>
           </div>
-        )}
-        <div className="barry-workspace-content">
-          <FirstExperience />
+        </div>
+
+        <div className="barry-workspace-thread" ref={threadRef}>
+          {feTurns.map((turn, i) => {
+            // Structured card turns render their card below the message bubble
+            const hasCard = turn._feCard && i === feTurns.length - 1;
+
+            return (
+              <div key={i}>
+                <div
+                  className={`barry-workspace-message ${turn.role === 'user' ? 'user' : 'assistant'}`}
+                >
+                  {turn.role === 'assistant' && (
+                    <img
+                      src={ASSETS.barryAvatar}
+                      alt=""
+                      className="barry-workspace-msg-avatar"
+                      width={28}
+                      height={28}
+                    />
+                  )}
+                  <div
+                    className="barry-workspace-msg-bubble"
+                    style={{
+                      background: turn.role === 'user' ? `${BRAND.pink}18` : T.surface,
+                      borderColor: turn.role === 'user' ? `${BRAND.pink}30` : T.border,
+                      color: T.text,
+                    }}
+                  >
+                    <p>{turn.content}</p>
+                  </div>
+                </div>
+
+                {hasCard && turn._feCard === 'prospecting' && (
+                  <div className="barry-workspace-fe-card">
+                    <BarryOnboarding
+                      ref={onboardingRef}
+                      embedded
+                      knownName={feCtrl.who?.name || null}
+                      goal={feCtrl.pending?.restatement || null}
+                      onBarryMessage={(content) => feCtrl.addTurn({ role: 'assistant', content })}
+                      onProcessing={setProspectingBusy}
+                      onStepChange={setProspectingStep}
+                    />
+                  </div>
+                )}
+
+                {hasCard && turn._feCard === 'relationship' && (
+                  <div className="barry-workspace-fe-card">
+                    <RelationshipFirstValue
+                      decision={feCtrl.decision}
+                      knownName={feCtrl.who?.name || null}
+                    />
+                  </div>
+                )}
+
+                {hasCard && turn._feCard === 'results' && resultCompanies && (
+                  <div className="barry-workspace-fe-card">
+                    <CompanyResultsCard
+                      companies={resultCompanies}
+                      totalCount={companiesFoundCount || resultCompanies.length}
+                      onAccept={(company) => {
+                        feCtrl.addTurn({
+                          role: 'assistant',
+                          content: `Got it — I'll keep ${company.name || company.company_name}. We can look at the right people there next.`,
+                        });
+                      }}
+                    />
+                    <div className="barry-workspace-fe-actions" style={{ marginTop: 12 }}>
+                      <button
+                        className="barry-workspace-fe-btn barry-workspace-fe-btn--go"
+                        style={{ background: BRAND.pink, color: '#fff' }}
+                        onClick={() => navigate('/scout', { state: { activeTab: 'daily-leads' } })}
+                      >
+                        Review these in Scout
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {hasCard && turn._feCard === 'navigate' && feCtrl.decision?.destination && (
+                  <div className="barry-workspace-fe-actions">
+                    <button
+                      className="barry-workspace-fe-btn barry-workspace-fe-btn--go"
+                      style={{ background: BRAND.pink, color: '#fff' }}
+                      onClick={() => navigate(feCtrl.decision.destination.path)}
+                    >
+                      Take me there
+                    </button>
+                    {feCtrl.held && (
+                      <button
+                        className="barry-workspace-fe-btn barry-workspace-fe-btn--quiet"
+                        style={{ borderColor: T.border, color: T.text }}
+                        onClick={() => feCtrl.chooseIntent(feCtrl.held)}
+                      >
+                        Then {intentLabel(feCtrl.held)}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {hasCard && turn._feCard === 'blocked' && (
+                  <div className="barry-workspace-fe-actions">
+                    {feCtrl.decision?.destination && (
+                      <button
+                        className="barry-workspace-fe-btn barry-workspace-fe-btn--go"
+                        style={{ background: BRAND.pink, color: '#fff' }}
+                        onClick={() => navigate(feCtrl.decision.destination.path)}
+                      >
+                        Set that up
+                      </button>
+                    )}
+                    {(feCtrl.decision?.options || []).map(o => (
+                      <button
+                        key={o.id}
+                        className="barry-workspace-fe-btn barry-workspace-fe-btn--quiet"
+                        style={{ borderColor: T.border, color: T.text }}
+                        onClick={() => feCtrl.chooseIntent(o.intent)}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                    {feCtrl.held && (
+                      <button
+                        className="barry-workspace-fe-btn barry-workspace-fe-btn--quiet"
+                        style={{ borderColor: T.border, color: T.text }}
+                        onClick={() => feCtrl.chooseIntent(feCtrl.held)}
+                      >
+                        Then {intentLabel(feCtrl.held)}
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {hasCard && turn._feCard === 'action' && (
+                  <div className="barry-workspace-fe-actions">
+                    {feCtrl.decision?.destination && (
+                      <button
+                        className="barry-workspace-fe-btn barry-workspace-fe-btn--go"
+                        style={{ background: BRAND.pink, color: '#fff' }}
+                        onClick={() => navigate(feCtrl.decision.destination.path)}
+                      >
+                        Take me there
+                      </button>
+                    )}
+                    {(feCtrl.decision?.options || []).map(o => (
+                      <button
+                        key={o.id}
+                        className="barry-workspace-fe-btn barry-workspace-fe-btn--quiet"
+                        style={{ borderColor: T.border, color: T.text }}
+                        onClick={() => feCtrl.chooseIntent(o.intent)}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {isWhoPhase && (
+            <div className="barry-workspace-fe-skip">
+              <button
+                onClick={feCtrl.skipName}
+                className="barry-workspace-skip-btn"
+                style={{ color: T.textMuted }}
+              >
+                Skip
+              </button>
+            </div>
+          )}
+
+          {isBusy && (
+            <div className="barry-workspace-message assistant">
+              <img
+                src={ASSETS.barryAvatar}
+                alt=""
+                className="barry-workspace-msg-avatar"
+                width={28}
+                height={28}
+              />
+              <div
+                className="barry-workspace-msg-bubble barry-workspace-typing"
+                style={{ background: T.surface, borderColor: T.border }}
+              >
+                <span className="barry-typing-dot" />
+                <span className="barry-typing-dot" />
+                <span className="barry-typing-dot" />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="barry-workspace-composer" style={{ borderColor: T.border }}>
+          <div className="barry-workspace-composer-row">
+            <textarea
+              ref={inputRef}
+              value={inputValue}
+              rows={1}
+              onChange={(e) => {
+                setInputValue(e.target.value);
+                e.target.style.height = 'auto';
+                e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder={placeholder}
+              disabled={composerDisabled}
+              aria-label={isWhoPhase ? 'Your name' : 'Message Barry'}
+              className="barry-workspace-input"
+              style={{
+                background: T.surface,
+                borderColor: T.border,
+                color: T.text,
+              }}
+            />
+            <button
+              onClick={handleFirstExperienceSubmit}
+              disabled={composerDisabled || !inputValue.trim()}
+              aria-label="Send"
+              className="barry-workspace-send"
+              style={{
+                background: inputValue.trim() ? BRAND.pink : T.surface2,
+                color: inputValue.trim() ? '#fff' : T.textMuted,
+              }}
+            >
+              Send
+            </button>
+          </div>
         </div>
       </div>
     );
   }
 
+  // Post-onboarding (or first-experience controller still loading): conversation UI
   return (
     <div className="barry-workspace">
       <div className="barry-workspace-header" style={{ borderColor: T.border }}>
@@ -343,11 +675,12 @@ export default function BarryWorkspace() {
                 }}
               >
                 {turn.role === 'assistant' ? (
-                  turn.kind === 'angles' ? (
-                    <p className="barry-workspace-angles-summary">
-                      <span className="barry-workspace-angles-badge" style={{ color: BRAND.cyan }}>Angles</span>
-                      {' '}{turn.content}
-                    </p>
+                  turn.kind && turn.kind !== 'message' ? (
+                    <ConversationCard kind={turn.kind}>
+                      <ReactMarkdown className="barry-workspace-prose">
+                        {turn.content}
+                      </ReactMarkdown>
+                    </ConversationCard>
                   ) : (
                     <ReactMarkdown className="barry-workspace-prose">
                       {turn.content}

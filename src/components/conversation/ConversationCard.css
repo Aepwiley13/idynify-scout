@@ -1,0 +1,90 @@
+.conversation-card {
+  border-left: 3px solid var(--card-accent, #00c4cc);
+  border-radius: 4px 10px 10px 4px;
+  padding: 10px 14px;
+  margin-top: 6px;
+}
+
+.conversation-card-label {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+  line-height: 1;
+}
+
+.conversation-card-body {
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.conversation-card-body p {
+  margin: 0 0 6px;
+}
+
+.conversation-card-body p:last-child {
+  margin-bottom: 0;
+}
+
+/* ── ChoiceChips ─────────────────────────────────────────────────────────── */
+
+.choice-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.choice-chips-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.choice-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border: 1px solid var(--chip-border, rgba(0,0,0,0.12));
+  border-radius: 999px;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  line-height: 1.3;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
+}
+
+.choice-chip:hover:not(:disabled) {
+  border-color: rgba(124, 58, 237, 0.4);
+  background: rgba(124, 58, 237, 0.06);
+}
+
+.choice-chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.choice-chips-free {
+  padding: 8px 12px;
+  border: 1px solid var(--chip-border, rgba(0,0,0,0.12));
+  border-radius: 10px;
+  background: transparent;
+  font-size: 13px;
+  font-family: inherit;
+  color: inherit;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.choice-chips-free:focus {
+  border-color: rgba(124, 58, 237, 0.5);
+}
+
+.choice-chips-free::placeholder {
+  opacity: 0.5;
+}

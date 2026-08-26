@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Fragment } from 'react';
+import { useState, useEffect, useRef, Fragment, forwardRef, useImperativeHandle } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
@@ -71,7 +71,14 @@ function buildReturnGreeting(icpData) {
   return `${strategyLine}${sizeContext}${locationContext}.${strategyExplanation}${contextSummary}${refreshNote}${actionPrompt}`;
 }
 
-export default function BarryOnboarding({ knownName = null, goal = null } = {}) {
+const BarryOnboarding = forwardRef(function BarryOnboarding({
+  knownName = null,
+  goal = null,
+  embedded = false,
+  onBarryMessage = null,
+  onProcessing = null,
+  onStepChange = null,
+}, ref) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState('welcome'); // welcome, asking, clarifying, confirming, saving
@@ -84,16 +91,19 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
   const [followUpCount, setFollowUpCount] = useState(0);
   const [error, setError] = useState(null);
   const [savedICP, setSavedICP] = useState(null); // populated when step === 'saving'
-  // The website accelerator. Optional in the strongest sense: nothing below is
-  // gated on it, and a user who ignores the field reaches exactly the same
-  // places by talking. `reading` holds what Barry got from the site for this
-  // session only — the analysis itself is persisted by the function, in RECON,
-  // where it already went before this phase.
   const [siteUrl, setSiteUrl] = useState('');
   const [reading, setReading] = useState(null);
   const [readingSite, setReadingSite] = useState(false);
   const inputRef = useRef(null);
   const messagesEndRef = useRef(null);
+
+  function emitMessage(msg) { if (embedded && onBarryMessage) onBarryMessage(msg); }
+  function emitStep(s) { if (embedded && onStepChange) onStepChange(s); }
+  function emitProcessing(busy) { if (embedded && onProcessing) onProcessing(busy); }
+
+  useImperativeHandle(ref, () => ({
+    submit: (text) => handleSubmit(null, text),
+  }));
 
   useEffect(() => {
     checkExistingICP();
@@ -105,7 +115,7 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
   }, [conversationHistory]);
 
   useEffect(() => {
-    if ((step === 'asking' || step === 'clarifying') && inputRef.current) {
+    if (!embedded && (step === 'asking' || step === 'clarifying') && inputRef.current) {
       inputRef.current.focus();
     }
     // Scroll to bottom when confirmation card or saving screen appears
@@ -113,6 +123,22 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
   }, [step]);
+
+  useEffect(() => {
+    if (embedded && onStepChange) onStepChange(step);
+  }, [step, embedded, onStepChange]);
+
+  useEffect(() => {
+    if (embedded && onProcessing) onProcessing(isProcessing);
+  }, [isProcessing, embedded, onProcessing]);
+
+  const didEmitInitialRef = useRef(false);
+  useEffect(() => {
+    if (!loading && embedded && !didEmitInitialRef.current && barryMessage) {
+      didEmitInitialRef.current = true;
+      emitMessage(barryMessage);
+    }
+  }, [loading, embedded, barryMessage]);
 
   async function checkExistingICP() {
     try {
@@ -199,12 +225,11 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
     }
   }
 
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!userInput.trim() || isProcessing) return;
-
-    const input = userInput.trim();
-    setUserInput('');
+  async function handleSubmit(e, externalText = null) {
+    if (e) e.preventDefault();
+    const input = (externalText || userInput).trim();
+    if (!input || isProcessing) return;
+    if (!externalText) setUserInput('');
     setIsProcessing(true);
     setError(null);
 
@@ -218,8 +243,10 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
     try {
       const user = auth.currentUser;
 
-      appendTurn(db, user.uid, { role: 'user', content: input, surface: 'onboarding' })
-        .catch(err => console.warn('[BarryOnboarding] canonical append failed:', err.message));
+      if (!embedded) {
+        appendTurn(db, user.uid, { role: 'user', content: input, surface: 'onboarding' })
+          .catch(err => console.warn('[BarryOnboarding] canonical append failed:', err.message));
+      }
 
       const authToken = await user.getIdToken();
 
@@ -285,9 +312,12 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
       ];
       setConversationHistory(updatedHistory);
       setBarryMessage(barryMsg);
+      emitMessage(barryMsg);
 
-      appendTurn(db, user.uid, { role: 'assistant', content: barryMsg, surface: 'onboarding' })
-        .catch(err => console.warn('[BarryOnboarding] canonical append failed:', err.message));
+      if (!embedded) {
+        appendTurn(db, user.uid, { role: 'assistant', content: barryMsg, surface: 'onboarding' })
+          .catch(err => console.warn('[BarryOnboarding] canonical append failed:', err.message));
+      }
 
       // Determine the gated step — the step Barry actually allows the user
       // to enter. The backend may return newStep='confirming' while flagging
@@ -325,11 +355,14 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
       ];
       setConversationHistory(errorHistory);
       setBarryMessage(barryErrorMsg);
+      emitMessage(barryErrorMsg);
 
-      const errUser = auth.currentUser;
-      if (errUser) {
-        appendTurn(db, errUser.uid, { role: 'assistant', content: barryErrorMsg, surface: 'onboarding' })
-          .catch(() => {});
+      if (!embedded) {
+        const errUser = auth.currentUser;
+        if (errUser) {
+          appendTurn(db, errUser.uid, { role: 'assistant', content: barryErrorMsg, surface: 'onboarding' })
+            .catch(() => {});
+        }
       }
     } finally {
       setIsProcessing(false);
@@ -375,9 +408,9 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
 
     if (!result.ok) {
       logEvent(EVENTS.WEBSITE_ANALYSIS_FAILED, { reason: result.message ? 'unreadable' : 'request_failed' });
-      setBarryMessage(
-        `${result.message || "I couldn't get much from that site."}\n\nNo problem — tell me who you're trying to reach and I'll work from that.`
-      );
+      const failMsg = `${result.message || "I couldn't get much from that site."}\n\nNo problem — tell me who you're trying to reach and I'll work from that.`;
+      setBarryMessage(failMsg);
+      emitMessage(failMsg);
       setStep('asking');
       return;
     }
@@ -408,11 +441,15 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
     ].filter(Boolean).join(' ');
 
     if (hasRetrievalConstraint(next)) {
-      setBarryMessage(`${opener}\n\nIs that still accurate?`);
+      const confirmMsg = `${opener}\n\nIs that still accurate?`;
+      setBarryMessage(confirmMsg);
+      emitMessage(confirmMsg);
       setStep('confirming');
     } else {
       const question = acceleratorQuestion(result) || "Who are you trying to reach?";
-      setBarryMessage(`${opener}\n\n${question}`);
+      const askMsg = `${opener}\n\n${question}`;
+      setBarryMessage(askMsg);
+      emitMessage(askMsg);
       setStep('asking');
     }
   }
@@ -615,7 +652,9 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
         ? ` (${extractedICP.companySizes[0]} employees)`
         : '';
 
-      const finalMessage = `I'm finding ${strategyContext}${sizeContext} ${locationContext}.\n\nNew targets will appear in Scout shortly. You can also refresh leads manually anytime.`;
+      const finalMessage = embedded
+        ? `I'm searching for ${strategyContext}${sizeContext} ${locationContext}. Give me a moment...`
+        : `I'm finding ${strategyContext}${sizeContext} ${locationContext}.\n\nNew targets will appear in Scout shortly. You can also refresh leads manually anytime.`;
 
       const finalHistory = [
         ...conversationHistory,
@@ -626,15 +665,18 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
         }
       ];
       setConversationHistory(finalHistory);
+      emitMessage(finalMessage);
 
-      appendTurn(db, user.uid, { role: 'assistant', content: finalMessage, surface: 'onboarding' })
-        .catch(err => console.warn('[BarryOnboarding] canonical append failed:', err.message));
+      if (!embedded) {
+        appendTurn(db, user.uid, { role: 'assistant', content: finalMessage, surface: 'onboarding' })
+          .catch(err => console.warn('[BarryOnboarding] canonical append failed:', err.message));
+      }
 
-      // Navigate to Mission Control after a brief delay — users watch Barry
-      // work (barryState) from there.
-      setTimeout(() => {
-        navigate('/mission-control-v2');
-      }, 2500);
+      if (!embedded) {
+        setTimeout(() => {
+          navigate('/mission-control-v2');
+        }, 2500);
+      }
 
     } catch (error) {
       console.error('Error saving ICP:', error);
@@ -647,8 +689,12 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
 
   function handleRefine() {
     setStep('asking');
-    setBarryMessage("No problem. Tell me more about who you're hunting.");
+    const msg = "No problem. Tell me more about who you're hunting.";
+    setBarryMessage(msg);
+    emitMessage(msg);
   }
+
+  if (loading && embedded) return null;
 
   if (loading) {
     return (
@@ -671,8 +717,8 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
 
   return (
     <div className="barry-onboarding">
-      {/* Header: back button + progress */}
-      <div className="barry-onboarding-header">
+      {/* Header: back button + progress — hidden in embedded mode */}
+      {!embedded && <div className="barry-onboarding-header">
         <button
           className="barry-onboarding-back"
           onClick={() => navigate('/scout?tab=icp-settings')}
@@ -695,12 +741,12 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
           </Fragment>
         ))}
         </div>
-      </div>
+      </div>}
 
       {/* Conversation Area */}
       <div className="barry-conversation">
-        {/* Initial Barry Message */}
-        {conversationHistory.length === 0 && (
+        {/* Initial Barry Message — hidden in embedded mode */}
+        {!embedded && conversationHistory.length === 0 && (
           <div className="barry-message-container">
             <div className="message-avatar">
               <Brain className="w-5 h-5 text-purple-600" />
@@ -711,8 +757,8 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
           </div>
         )}
 
-        {/* Conversation History */}
-        {conversationHistory.map((msg, idx) => (
+        {/* Conversation History — hidden in embedded mode */}
+        {!embedded && conversationHistory.map((msg, idx) => (
           <div
             key={idx}
             className={`message-container ${msg.role === 'user' ? 'user-message-container' : 'barry-message-container'}`}
@@ -730,8 +776,8 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
           </div>
         ))}
 
-        {/* Processing Indicator */}
-        {isProcessing && step !== 'saving' && (
+        {/* Processing Indicator — hidden in embedded mode (workspace has its own) */}
+        {!embedded && isProcessing && step !== 'saving' && (
           <div className="barry-message-container">
             <div className="message-avatar">
               <Brain className="w-5 h-5 text-purple-600" />
@@ -859,8 +905,8 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
         </form>
       )}
 
-      {/* Input Area */}
-      {(step === 'asking' || step === 'clarifying') && !isProcessing && (
+      {/* Input Area — hidden in embedded mode (workspace composer is authoritative) */}
+      {!embedded && (step === 'asking' || step === 'clarifying') && !isProcessing && (
         <form onSubmit={handleSubmit} className="barry-input-form">
           <div className="input-wrapper">
             <textarea
@@ -905,4 +951,6 @@ export default function BarryOnboarding({ knownName = null, goal = null } = {}) 
       )}
     </div>
   );
-}
+});
+
+export default BarryOnboarding;

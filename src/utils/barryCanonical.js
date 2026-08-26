@@ -8,7 +8,22 @@ function turnsRef(db, uid) {
   return collection(db, 'users', uid, 'barryConversations', 'canonical', 'turns');
 }
 
-export async function appendTurn(db, uid, { role, content, surface, kind }) {
+/**
+ * @param {Object} params
+ * @param {string} [params.kind]  'message' (default) | 'result_set' | 'resolution_preview' | ...
+ * @param {Object} [params.meta]  NON-IDENTIFYING turn metadata only.
+ *
+ * `meta` exists so a structured turn can point at the transient data it rendered
+ * (a sessionRef) and record counts, WITHOUT persisting the data itself.
+ *
+ * It must never carry candidate identity. Search results are proposals; writing
+ * names, emails, LinkedIn URLs or Apollo ids into a turn document would be
+ * candidate persistence whatever collection it lives in. The identity data for a
+ * structured turn lives in src/utils/barryTransientCandidates.js, in memory, and
+ * is deliberately lost on reload — see that file for why that is the honest
+ * behaviour rather than a limitation.
+ */
+export async function appendTurn(db, uid, { role, content, surface, kind, meta }) {
   if (role !== 'user' && role !== 'assistant') return null;
   if (!content) return null;
   const turnDoc = {
@@ -18,7 +33,30 @@ export async function appendTurn(db, uid, { role, content, surface, kind }) {
     createdAt: serverTimestamp(),
   };
   if (kind && kind !== 'message') turnDoc.kind = kind;
+  if (meta && Object.keys(meta).length) turnDoc.meta = stripIdentity(meta);
   return addDoc(turnsRef(db, uid), turnDoc);
+}
+
+/**
+ * Defence in depth for the rule above: even if a caller passes identity by
+ * mistake, it does not reach Firestore. Cheap, and the failure it prevents
+ * (a durable copy of unresolved candidate identity) is expensive to undo.
+ */
+const FORBIDDEN_IN_META = new Set([
+  'email', 'phone', 'linkedin_url', 'apollo_person_id', 'apollo_organization_id',
+  'name', 'company_name', 'title', 'results', 'candidates', 'payloads',
+]);
+
+export function stripIdentity(meta) {
+  const clean = {};
+  for (const [k, v] of Object.entries(meta)) {
+    if (FORBIDDEN_IN_META.has(k)) {
+      console.warn(`[barryCanonical] refused to persist "${k}" in turn meta — candidate identity stays transient`);
+      continue;
+    }
+    clean[k] = v;
+  }
+  return clean;
 }
 
 export async function loadRecentTurns(db, uid, count = 30) {

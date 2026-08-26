@@ -40,6 +40,12 @@ import RelationshipFirstValue from '../../components/onboarding/RelationshipFirs
 import CompanyResultsCard from '../../components/onboarding/CompanyResultsCard';
 import { useOnboardingState } from '../../hooks/useOnboardingState';
 import { calculateICPScore } from '../../utils/icpScoring';
+import BarryResultSet from '../../components/barry/BarryResultSet';
+import BarryResolutionPreview from '../../components/barry/BarryResolutionPreview';
+import { buildCandidatePayloads, mintClientRef } from '../../utils/candidatePayload';
+import { holdResultSet, getResultSet, mintSessionRef, releaseResultSet } from '../../utils/barryTransientCandidates';
+import { mockResolveSaveDryRun, previewSentence } from '../../utils/mockResolveSave';
+import { MOCK_PEOPLE, MOCK_SOURCE } from '../../utils/mockPersonResults';
 import './BarryWorkspace.css';
 
 export default function BarryWorkspace() {
@@ -51,6 +57,12 @@ export default function BarryWorkspace() {
   const [loading, setLoading] = useState(true);
   const [isFirstExperience, setIsFirstExperienceLocal] = useState(false);
   const [conversationTurns, setConversationTurns] = useState([]);
+  // Structured-turn UI state. Deliberately local: selection, previews and
+  // approval are conversation-scoped interactions, not stored entities.
+  // `settled` records that a turn has been acted on so it renders as history
+  // instead of staying live.
+  const [settled, setSettled] = useState({});   // sessionRef -> {...}
+  const [resolving, setResolving] = useState(false);
   const [who, setWho] = useState(null);
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
@@ -613,6 +625,104 @@ export default function BarryWorkspace() {
   }
 
   // Post-onboarding (or first-experience controller still loading): conversation UI
+
+  // ── Structured-turn handlers ────────────────────────────────────────────
+  // These cross NO persistence boundary. The only writes are canonical
+  // conversation turns (Barry talking) — never a Person, Company or Candidate.
+
+  async function appendStructuredTurn({ content, kind, meta }) {
+    const user = getEffectiveUser() || auth.currentUser;
+    if (!user) return;
+    const turn = { role: 'assistant', content, kind, meta, surface: 'workspace' };
+    // optimistic local render so the conversation stays responsive
+    setConversationTurns(prev => [...prev, { ...turn, id: `local_${Date.now()}` }]);
+    await appendTurn(db, user.uid, turn).catch(err =>
+      console.warn('[BarryWorkspace] structured turn append failed:', err.message));
+  }
+
+  /**
+   * User picked people. Build CandidatePayloads and run the resolution dry-run.
+   *
+   * The payloads are built here and handed straight to the resolver — they are
+   * never stored, and no contactId/companyId is minted anywhere on this path.
+   */
+  async function handleSelectionConfirmed(sessionRef, selectedRefs) {
+    const held = getResultSet(sessionRef);
+    if (!held || resolving) return;
+
+    setSettled(prev => ({ ...prev, [sessionRef]: { count: selectedRefs.length } }));
+    setResolving(true);
+
+    const payloads = buildCandidatePayloads(held.results, selectedRefs, {
+      kind: held.kind,
+      source: held.source,
+    });
+
+    if (import.meta.env.DEV) {
+      console.info('[Gate3] CandidatePayload[] emitted to resolver:', payloads);
+    }
+
+    try {
+      // MOCK. Swap for RESOLVE_SAVE(commit:false). Nothing above this line changes.
+      const preview = await mockResolveSaveDryRun(payloads);
+      const previewRef = mintSessionRef();
+      holdResultSet({ sessionRef: previewRef, kind: held.kind, source: held.source, results: preview.results });
+      // keep the full preview alongside the results for the renderer
+      getResultSet(previewRef).preview = preview;
+
+      await appendStructuredTurn({
+        content: previewSentence(preview.summary),
+        kind: 'resolution_preview',
+        meta: { sessionRef: previewRef, ...preview.summary },   // counts only
+      });
+    } catch (err) {
+      console.error('[BarryWorkspace] dry-run failed:', err);
+      await appendStructuredTurn({
+        content: "I couldn't check those against your existing people just now. Nothing was saved — want me to try again?",
+        kind: 'message',
+      });
+    } finally {
+      setResolving(false);
+    }
+  }
+
+  /**
+   * Approval. THE PERSISTENCE BOUNDARY STOPS HERE.
+   * Team A's RESOLVE_SAVE(commit:true) attaches at this point; until then Barry
+   * states plainly that nothing was written rather than implying it was.
+   */
+  async function handleApprove(sessionRef, decision) {
+    setSettled(prev => ({ ...prev, [sessionRef]: { approved: true } }));
+    releaseResultSet(sessionRef);
+    await appendStructuredTurn({
+      content:
+        `Ready to save ${decision.willSave}${decision.willCreate ? ` — ${decision.willCreate} of them new` : ''}.\n\n` +
+        `_Nothing has been written yet: the save path is still being built. When it lands, this is the point where these become real contacts._`,
+      kind: 'message',
+      meta: { approvedCount: decision.willSave, newCount: decision.willCreate },
+    });
+  }
+
+  async function handleCancelPreview(sessionRef) {
+    setSettled(prev => ({ ...prev, [sessionRef]: { approved: false } }));
+    releaseResultSet(sessionRef);
+    await appendStructuredTurn({
+      content: "No problem — I haven't saved anything. Tell me when you want to pick these up again.",
+      kind: 'message',
+    });
+  }
+
+  /** DEV ONLY. Seeds a mocked people result set so the flow can be walked. */
+  async function seedMockResultSet() {
+    const results = MOCK_PEOPLE.map((p, i) => ({ ...p, clientRef: mintClientRef(i) }));
+    const sessionRef = holdResultSet({ kind: 'person', source: MOCK_SOURCE, results });
+    await appendStructuredTurn({
+      content: `I found ${results.length} people who look relevant.`,
+      kind: 'result_set',
+      meta: { sessionRef, count: results.length, entity: 'person' },
+    });
+  }
+
   return (
     <div className="barry-workspace">
       <div className="barry-workspace-header" style={{ borderColor: T.border }}>
@@ -675,7 +785,27 @@ export default function BarryWorkspace() {
                 }}
               >
                 {turn.role === 'assistant' ? (
-                  turn.kind && turn.kind !== 'message' ? (
+                  turn.kind === 'result_set' ? (
+                    <ConversationCard kind={turn.kind}>
+                      <ReactMarkdown className="barry-workspace-prose">{turn.content}</ReactMarkdown>
+                      <BarryResultSet
+                        resultSet={getResultSet(turn.meta?.sessionRef)}
+                        disabled={resolving}
+                        settled={settled[turn.meta?.sessionRef] || null}
+                        onConfirmSelection={(refs) => handleSelectionConfirmed(turn.meta?.sessionRef, refs)}
+                      />
+                    </ConversationCard>
+                  ) : turn.kind === 'resolution_preview' ? (
+                    <ConversationCard kind={turn.kind}>
+                      <ReactMarkdown className="barry-workspace-prose">{turn.content}</ReactMarkdown>
+                      <BarryResolutionPreview
+                        preview={getResultSet(turn.meta?.sessionRef)?.preview || null}
+                        settled={settled[turn.meta?.sessionRef] || null}
+                        onApprove={(d) => handleApprove(turn.meta?.sessionRef, d)}
+                        onCancel={() => handleCancelPreview(turn.meta?.sessionRef)}
+                      />
+                    </ConversationCard>
+                  ) : turn.kind && turn.kind !== 'message' ? (
                     <ConversationCard kind={turn.kind}>
                       <ReactMarkdown className="barry-workspace-prose">
                         {turn.content}
@@ -714,6 +844,14 @@ export default function BarryWorkspace() {
           </div>
         )}
       </div>
+
+      {import.meta.env.DEV && (
+        <div className="barry-workspace-devbar">
+          <button type="button" onClick={seedMockResultSet} disabled={sending || resolving}>
+            dev · seed mocked person results
+          </button>
+        </div>
+      )}
 
       <div className="barry-workspace-composer" style={{ borderColor: T.border }}>
         <div className="barry-workspace-composer-row">

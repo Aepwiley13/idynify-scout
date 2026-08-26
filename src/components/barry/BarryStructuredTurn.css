@@ -1,0 +1,70 @@
+/* Structured turns inside the canonical Barry thread.
+   These sit INSIDE an assistant bubble — no panel chrome, no modal, no card
+   stack. Visually they must read as Barry talking, not as a tool that opened. */
+
+.bst { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+
+.bst-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.bst-count { font-size: 12px; font-variant-numeric: tabular-nums; }
+
+.bst-linkbtn {
+  background: none; border: 0; padding: 0; font: inherit; font-size: 12px;
+  font-weight: 600; cursor: pointer; text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.bst-linkbtn:disabled { opacity: .5; cursor: not-allowed; }
+.bst-ask-a .bst-linkbtn { margin-left: 8px; }
+
+.bst-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow-y: auto; }
+
+.bst-row {
+  width: 100%; display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 11px; border-radius: 9px; border: 1.5px solid; cursor: pointer;
+  font: inherit; text-align: left; transition: background .12s ease, border-color .12s ease;
+}
+.bst-row:disabled { cursor: not-allowed; opacity: .6; }
+
+.bst-check {
+  flex: none; width: 17px; height: 17px; border-radius: 5px; border: 1.5px solid;
+  display: grid; place-items: center; font-size: 11px; line-height: 1; color: #fff; margin-top: 1px;
+}
+
+.bst-who { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bst-name { font-size: 13.5px; font-weight: 600; }
+.bst-meta { font-size: 11.5px; }
+
+.bst-actions { display: flex; gap: 8px; margin-top: 2px; }
+.bst-actions--split { justify-content: space-between; }
+
+.bst-primary {
+  flex: 1; padding: 9px 14px; border-radius: 9px; border: 0;
+  font: inherit; font-size: 13px; font-weight: 600; transition: background .12s ease;
+}
+.bst-quiet {
+  padding: 9px 14px; border-radius: 9px; border: 1.5px solid; background: transparent;
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+
+.bst-tallies { display: flex; flex-wrap: wrap; gap: 6px; }
+.bst-tally { font-size: 11.5px; padding: 3px 9px; border-radius: 999px; border: 1px solid; }
+.bst-tally strong { font-variant-numeric: tabular-nums; }
+
+/* The ambiguity question. Warm, not alarming — this is collaboration. */
+.bst-ask { border: 1.5px solid; border-radius: 10px; padding: 11px 12px; display: flex; flex-direction: column; gap: 8px; }
+.bst-ask-q { margin: 0; font-size: 13.5px; font-weight: 600; line-height: 1.45; }
+.bst-ask-a { margin: 0; font-size: 12.5px; }
+
+.bst-options { display: flex; flex-direction: column; gap: 6px; }
+.bst-option {
+  display: flex; flex-direction: column; gap: 2px; align-items: flex-start;
+  padding: 8px 11px; border-radius: 8px; border: 1.5px solid; background: none;
+  font: inherit; text-align: left; cursor: pointer;
+}
+.bst-option--quiet { font-size: 12.5px; font-weight: 600; border-style: dashed; }
+
+.bst-refused { margin: 0; font-size: 12.5px; line-height: 1.5; }
+.bst-expired, .bst-settled { margin: 8px 0 0; font-size: 12.5px; font-style: italic; }
+
+@media (prefers-reduced-motion: reduce) {
+  .bst-row, .bst-primary { transition: none; }
+}

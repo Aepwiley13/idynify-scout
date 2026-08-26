@@ -500,3 +500,13 @@
     height: 24px;
   }
 }
+
+/* Dev-only affordance for walking the mocked Gate 3 selection flow.
+   Stripped from production builds by the import.meta.env.DEV guard. */
+.barry-workspace-devbar { padding: 6px 16px 0; }
+.barry-workspace-devbar button {
+  font-size: 11px; font-family: ui-monospace, monospace; opacity: .55;
+  background: none; border: 1px dashed currentColor; border-radius: 6px;
+  padding: 3px 8px; cursor: pointer; color: inherit;
+}
+.barry-workspace-devbar button:disabled { opacity: .25; cursor: not-allowed; }

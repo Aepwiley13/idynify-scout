@@ -36,9 +36,14 @@
  *   {
  *     userId,                          the workspace being resolved against
  *     getById(contactId)   → doc|null  hierarchy step 1
- *     findByField(f, v)    → doc|null  one equality query; MUST rethrow on error
+ *     findByField(f, v)    → doc[]     one equality query, capped; MUST rethrow
  *     loadScanWindow()     → doc[]     bounded, cached; MUST return [] on error
  *   }
+ *
+ * findByField returns an ARRAY, not a first hit. Gate 2 Phase 2f: when one
+ * authoritative identifier maps to two records that is a data-integrity
+ * violation, not a match, and the resolver must refuse rather than silently
+ * take docs[0] — which is what it used to do, invisibly, forever.
  *
  * The fail-closed / fail-open asymmetry is part of the contract, not an
  * implementation detail of either adapter:
@@ -79,7 +84,33 @@
  * flag and a candidate list, and refuses to choose.
  */
 
-import { extractIdentifiers } from './identityNormalization.js';
+import { extractIdentifiers, normalizeLoose } from './identityNormalization.js';
+
+/**
+ * One authoritative identifier, two existing records.
+ *
+ * Thrown rather than returned, deliberately. Every existing caller wraps its
+ * save in a try/catch and surfaces the failure to the user, so throwing makes
+ * all thirteen client write paths fail closed with no change to any of them.
+ * Returning a new outcome would have fallen through their
+ * `if (action === 'merge') … else create` shape and produced a THIRD duplicate,
+ * which is the opposite of the intent.
+ *
+ * RESOLVE_SAVE catches this per candidate and maps it to the contract's
+ * `refused` outcome. See docs/GATE2_CANDIDATE_CONTRACT.md.
+ */
+export class IdentityConflictError extends Error {
+  constructor(signal, value, contactIds) {
+    super(
+      `Two or more existing contacts share the same ${signal}. ` +
+      `IDYNIFY will not guess which one you meant.`
+    );
+    this.name = 'IdentityConflictError';
+    this.signal = signal;
+    this.value = value;
+    this.contactIds = contactIds;
+  }
+}
 
 /** How a match was made. Ordered — index is the hierarchy rank. */
 export const MATCH_SIGNALS = Object.freeze([
@@ -107,7 +138,49 @@ export const RESOLUTION = Object.freeze({
   NEW: 'new',                   // nothing matched — create
 });
 
-/** How many documents the normalizing fallback scan will read. */
+/**
+ * How many documents the normalizing fallback scan will read.
+ *
+ * ─── SCAN ORDERING — why it is by document id and NOT by is_archived/name ───
+ *
+ * Gate 2 Phase 2b planned to order the window `is_archived ASC, name ASC`,
+ * reusing the composite index that already exists in firestore.indexes.json.
+ * The reasoning was sound — the window was implicitly ordered by document id,
+ * so its contents were arbitrary and included archived records.
+ *
+ * Production evidence killed it. Firestore EXCLUDES a document from any query
+ * that filters or orders on a field the document does not carry, and
+ * `is_archived` was absent from every Scout write path until PR #510:
+ *
+ *     is_archived present   228 / 1,365 contacts   (16.7%)
+ *     name present        1,228 / 1,365 contacts   (90.0%)
+ *     largest workspace      47 /   621 contacts   (7.6%)
+ *
+ * So `where('is_archived','==',false) + orderBy('name')` would have shrunk the
+ * window from 200 documents to at most 47 in the 621-contact workspace — the
+ * one that most depends on the fallback — losing ~93% of it. And the records
+ * dropped would be the legacy ones, which are precisely the population that
+ * has no normalized identifiers and therefore needs the scan.
+ *
+ * An ordering intended to make the window better would have made it nearly
+ * useless, silently, with no error and no failing test.
+ *
+ * The safe half — making the implicit document-id order EXPLICIT with
+ * `orderBy(documentId())` — was built and then also dropped. Firestore already
+ * orders by `__name__` by default, so it changed no behaviour, while adding a
+ * real failure surface: `loadScanWindow` fails open by design, so any
+ * environment where that call does not resolve silently disables the ENTIRE
+ * fallback scan and every affected resolution quietly returns "new". A
+ * cosmetic gain is not worth a new way to lose the fallback without an error.
+ *
+ * So the window stays unordered, which is to say ordered by document id — the
+ * same contents as before, in both runtimes, with no new way to break.
+ *
+ * SCAN_WINDOW stays at 200. Raising it was rejected on the same evidence: of
+ * the 111 records reachable only by scanning, 103 are LinkedIn-only records
+ * with no normalized field. The Phase 2d raw-value rung removes them from scan
+ * dependence entirely, which is a better answer than reading more documents.
+ */
 export const SCAN_WINDOW = 200;
 
 // ── Logging ─────────────────────────────────────────────────────────────────
@@ -149,11 +222,27 @@ function logResolution(entry) {
 
 // ── Lookups, all through the adapter ────────────────────────────────────────
 
-/** First record in the scan window whose normalized `key` equals `value`. */
-async function findByNormalized(adapter, key, value) {
-  if (!value) return null;
+/**
+ * Collapse a set of matches into one answer, or refuse.
+ *
+ * 0 → null (keep looking)   1 → the record   2+ → IdentityConflictError
+ *
+ * Applied to BOTH the indexed queries and the scan fallbacks: a signal that
+ * maps to two records is ambiguous wherever the two records were found.
+ */
+function single(signal, value, docs) {
+  if (!docs || docs.length === 0) return null;
+  const unique = [];
+  for (const d of docs) if (!unique.some(u => u.id === d.id)) unique.push(d);
+  if (unique.length === 1) return unique[0];
+  throw new IdentityConflictError(signal, value, unique.map(d => d.id));
+}
+
+/** Records in the scan window whose normalized `key` equals `value`. */
+async function scanFor(adapter, key, value) {
+  if (!value) return [];
   const records = await adapter.loadScanWindow();
-  return records.find(r => extractIdentifiers(r)[key] === value) ?? null;
+  return records.filter(r => extractIdentifiers(r)[key] === value);
 }
 
 /**
@@ -171,23 +260,75 @@ async function findByEmail(adapter, normalized) {
     adapter.findByField('email', normalized),
   ]);
 
-  return byNormalizedField
-    ?? byExactEmail
-    ?? await findByNormalized(adapter, 'email', normalized);
+  return single('email', normalized, byNormalizedField)
+    ?? single('email', normalized, byExactEmail)
+    ?? single('email', normalized, await scanFor(adapter, 'email', normalized));
 }
 
-/** LinkedIn lookup: normalized field first, then the normalizing scan. */
-async function findByLinkedIn(adapter, normalized) {
+/**
+ * LinkedIn lookup: normalized field, then the RAW candidate value, then scan.
+ *
+ * Gate 2 Phase 2d. The middle rung is deliberately queried at the candidate's
+ * ORIGINAL string rather than at its normalized form, and that asymmetry with
+ * findByEmail is the whole point.
+ *
+ * Email normalization is lowercase-and-trim, so a stored address is very often
+ * already equal to its normalized form and an equality query at the normalized
+ * value hits. LinkedIn normalization strips scheme, `www.`, trailing slash,
+ * query and fragment — `https://www.linkedin.com/in/jane/` becomes
+ * `linkedin.com/in/jane`, and the two are almost never equal. Querying the raw
+ * field at the normalized value would therefore match almost nothing.
+ *
+ * Querying it at the RAW incoming value does match, because the common
+ * duplicate pair is two records from the SAME source (Apollo→Apollo,
+ * import→import) that stored byte-identical URLs.
+ *
+ * Production evidence for prioritising this: of 111 records reachable only
+ * through the fallback scan, 103 are LinkedIn-only records with no
+ * `linkedin_url_normalized`. This rung is the one that removes them from scan
+ * dependence — which is why SCAN_WINDOW stays at 200 rather than growing.
+ */
+async function findByLinkedIn(adapter, normalized, raw) {
   if (!normalized) return null;
-  return await adapter.findByField('linkedin_url_normalized', normalized)
-    ?? await findByNormalized(adapter, 'linkedinUrl', normalized);
+
+  const byNormalizedField = await adapter.findByField('linkedin_url_normalized', normalized);
+  const hit = single('linkedin_url', normalized, byNormalizedField);
+  if (hit) return hit;
+
+  if (typeof raw === 'string' && raw.trim() && raw.trim() !== normalized) {
+    const byRaw = await adapter.findByField('linkedin_url', raw.trim());
+    const rawHit = single('linkedin_url', normalized, byRaw);
+    if (rawHit) return rawHit;
+  }
+
+  return single('linkedin_url', normalized, await scanFor(adapter, 'linkedinUrl', normalized));
 }
 
-/** Phone lookup: normalized field first, then the normalizing scan. */
+/**
+ * Phone lookup: normalized field, then the raw field, then scan.
+ *
+ * Gate 2 Phase 2c. Unlike LinkedIn, the raw rung here queries at the NORMALIZED
+ * value: normalizePhone reduces to digits, and Apollo supplies
+ * `phone_numbers[0].sanitized_number`, which is already digits — so a stored
+ * value frequently equals its normalized form.
+ *
+ * Kept deliberately low-priority: production carries exactly one phone-only
+ * record and zero `phone_normalized` fields. It costs one indexed query on a
+ * path that had already missed twice, and it is here for correctness parity
+ * with the other identifiers rather than because the population justifies it.
+ */
 async function findByPhone(adapter, normalized) {
   if (!normalized) return null;
-  return await adapter.findByField('phone_normalized', normalized)
-    ?? await findByNormalized(adapter, 'phone', normalized);
+
+  const byNormalizedField = await adapter.findByField('phone_normalized', normalized);
+  const hit = single('phone', normalized, byNormalizedField);
+  if (hit) return hit;
+
+  const byRaw = await adapter.findByField('phone', normalized);
+  const rawHit = single('phone', normalized, byRaw);
+  if (rawHit) return rawHit;
+
+  return single('phone', normalized, await scanFor(adapter, 'phone', normalized));
 }
 
 /**
@@ -270,10 +411,22 @@ export async function resolveContactCore(adapter, candidate, { source = 'unknown
   }
 
   // 2–5 — exact identifier matches, in locked order.
+  // The RAW strings, straight off the candidate. Phase 2d queries LinkedIn at
+  // the original bytes, which is why the published CandidatePayload contract
+  // requires callers to pass identifiers un-normalized.
+  const rawLinkedIn = candidate?.linkedin_url ?? candidate?.linkedinUrl ?? null;
+
   const exactChecks = [
     { signal: 'email', run: () => findByEmail(adapter, identifiers.email) },
-    { signal: 'apollo_person_id', run: () => adapter.findByField('apollo_person_id', identifiers.apolloPersonId) },
-    { signal: 'linkedin_url', run: () => findByLinkedIn(adapter, identifiers.linkedinUrl) },
+    {
+      signal: 'apollo_person_id',
+      run: async () => single(
+        'apollo_person_id',
+        identifiers.apolloPersonId,
+        await adapter.findByField('apollo_person_id', identifiers.apolloPersonId),
+      ),
+    },
+    { signal: 'linkedin_url', run: () => findByLinkedIn(adapter, identifiers.linkedinUrl, rawLinkedIn) },
     { signal: 'phone', run: () => findByPhone(adapter, identifiers.phone) },
   ];
 
@@ -435,8 +588,11 @@ export function reviewFields(resolution) {
   };
 }
 
+export { normalizeLoose };
+
 export default {
   resolveContactCore,
+  IdentityConflictError,
   mergeIdentifiers,
   identityFields,
   reviewFields,

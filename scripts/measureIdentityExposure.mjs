@@ -184,6 +184,20 @@ export function analyzeExposure(userId, contacts, { scanWindow = SCAN_WINDOW } =
   // more records is what Phase 2f will start refusing.
   const emailOwners = new Map();
   const apolloOwners = new Map();
+  const linkedinOwners = new Map();
+  const phoneOwners = new Map();
+
+  // Would an ORDERED scan still see this record?
+  //
+  // Firestore excludes a document from a query that filters or orders on a
+  // field the document does not have. `is_archived` was absent from every
+  // Scout write path until PR #510, and `name` is absent from some
+  // enrichment-created rows. So ordering the fallback scan on those fields
+  // would silently shrink its coverage — and the records it would drop are
+  // legacy ones, which is exactly the population that depends on the scan.
+  //
+  // Measured before the ordering change, not assumed.
+  const scanEligibility = { hasIsArchived: 0, hasName: 0, hasBoth: 0 };
 
   let normalizedEmail = 0;
   let normalizedLinkedin = 0;
@@ -235,6 +249,16 @@ export function analyzeExposure(userId, contacts, { scanWindow = SCAN_WINDOW } =
     if (ids.apolloPersonId) {
       apolloOwners.set(ids.apolloPersonId, (apolloOwners.get(ids.apolloPersonId) ?? 0) + 1);
     }
+    if (ids.linkedinUrl) {
+      linkedinOwners.set(ids.linkedinUrl, (linkedinOwners.get(ids.linkedinUrl) ?? 0) + 1);
+    }
+    if (ids.phone) phoneOwners.set(ids.phone, (phoneOwners.get(ids.phone) ?? 0) + 1);
+
+    const hasArchivedField = contact.is_archived !== undefined;
+    const hasNameField = typeof contact.name === 'string' && contact.name !== '';
+    if (hasArchivedField) scanEligibility.hasIsArchived += 1;
+    if (hasNameField) scanEligibility.hasName += 1;
+    if (hasArchivedField && hasNameField) scanEligibility.hasBoth += 1;
 
     if (contact.email_normalized) normalizedEmail += 1;
     if (contact.linkedin_url_normalized) normalizedLinkedin += 1;
@@ -275,7 +299,10 @@ export function analyzeExposure(userId, contacts, { scanWindow = SCAN_WINDOW } =
     collisions: {
       email: collisions(emailOwners),
       apollo_person_id: collisions(apolloOwners),
+      linkedin_url: collisions(linkedinOwners),
+      phone: collisions(phoneOwners),
     },
+    scanEligibility,
     normalizedFieldCoverage: {
       email: normalizedEmail,
       linkedin: normalizedLinkedin,
@@ -328,7 +355,10 @@ export function totalsFor(workspaces) {
     collisions: {
       email: { keys: 0, records: 0 },
       apollo_person_id: { keys: 0, records: 0 },
+      linkedin_url: { keys: 0, records: 0 },
+      phone: { keys: 0, records: 0 },
     },
+    scanEligibility: { hasIsArchived: 0, hasName: 0, hasBoth: 0 },
     normalizedFieldCoverage: { email: 0, linkedin: 0, phone: 0 },
     scanDependent: { linkedin: 0, phone: 0, name_company: 0, email: 0 },
     scanDependentTotal: 0,
@@ -342,9 +372,12 @@ export function totalsFor(workspaces) {
     if (ws.overScanWindow) totals.workspacesOverScanWindow += 1;
     totals.flaggedForReview += ws.flaggedForReview;
     for (const b of BUCKETS) totals.buckets[b.id] += ws.buckets[b.id];
-    for (const key of ['email', 'apollo_person_id']) {
+    for (const key of ['email', 'apollo_person_id', 'linkedin_url', 'phone']) {
       totals.collisions[key].keys += ws.collisions[key].keys;
       totals.collisions[key].records += ws.collisions[key].records;
+    }
+    for (const key of ['hasIsArchived', 'hasName', 'hasBoth']) {
+      totals.scanEligibility[key] += ws.scanEligibility[key];
     }
     for (const key of ['email', 'linkedin', 'phone']) {
       totals.normalizedFieldCoverage[key] += ws.normalizedFieldCoverage[key];
@@ -424,9 +457,16 @@ async function main() {
   say(`  No authoritative identifier:   ${totals.noAuthoritativeId}`);
   say(`    …of those, in a workspace larger than the scan window: ${totals.exposedBeyondScanWindow}`);
   say('');
-  say('  Authoritative collisions (Gate 2 Phase 2f will refuse these):');
-  say(`    email:             ${totals.collisions.email.keys} address(es) across ${totals.collisions.email.records} records`);
-  say(`    apollo_person_id:  ${totals.collisions.apollo_person_id.keys} id(s) across ${totals.collisions.apollo_person_id.records} records`);
+  say('  Authoritative collisions (Gate 2 Phase 2f refuses these):');
+  for (const key of ['email', 'apollo_person_id', 'linkedin_url', 'phone']) {
+    const c = totals.collisions[key];
+    say(`    ${key.padEnd(18)} ${c.keys} value(s) across ${c.records} records`);
+  }
+  say('');
+  say('  Ordered-scan eligibility (a doc missing the field drops out of the window):');
+  say(`    has is_archived:   ${totals.scanEligibility.hasIsArchived} / ${totals.contacts}`);
+  say(`    has name:          ${totals.scanEligibility.hasName} / ${totals.contacts}`);
+  say(`    has both:          ${totals.scanEligibility.hasBoth} / ${totals.contacts}`);
   say('');
   say('  Normalized field coverage (context only — NOT a backfill argument):');
   say(`    email_normalized:        ${totals.normalizedFieldCoverage.email}`);

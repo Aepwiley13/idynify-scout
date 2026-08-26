@@ -41,7 +41,7 @@
  * the next duplicate from being created.
  */
 
-import { collection, doc, getDoc, getDocs, query, where, limit } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import {
   resolveContactCore,
@@ -104,21 +104,23 @@ export function createWebAdapter(userId) {
     },
 
     /**
-     * One equality query, returning the first hit as {id, ...data}.
+     * One equality query, returning EVERY hit up to the cap.
      *
      * Single-field equality queries need no composite index, which is why the
      * hierarchy is several cheap queries rather than one clever compound one.
+     *
+     * Returns an array rather than a first hit: the engine refuses when an
+     * authoritative identifier maps to more than one record, and it cannot do
+     * that if the adapter has already thrown the second one away.
      *
      * RETHROWS on failure, deliberately. A permission or network error here
      * would otherwise present as "no duplicate found" and quietly create one.
      */
     async findByField(field, value) {
-      if (!value) return null;
+      if (!value) return [];
       try {
         const snap = await getDocs(query(contactsRef(userId), where(field, '==', value), limit(5)));
-        if (snap.empty) return null;
-        const hit = snap.docs[0];
-        return { id: hit.id, ...hit.data() };
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
       } catch (err) {
         console.error('[contact-identity] lookup failed', { field, value, code: err?.code, message: err?.message });
         throw err;
@@ -151,6 +153,7 @@ export function createWebAdapter(userId) {
       if (cache.failed) return [];
 
       try {
+        // Deliberately unordered — see SCAN ORDERING in identityResolution.js.
         const snap = await getDocs(query(contactsRef(userId), limit(SCAN_WINDOW)));
         cache.records = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         return cache.records;

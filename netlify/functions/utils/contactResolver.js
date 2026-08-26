@@ -74,13 +74,13 @@ export function createAdminAdapter(db, userId) {
       return snap.exists ? { id: snap.id, ...snap.data() } : null;
     },
 
+    /** Returns EVERY hit up to the cap — the engine needs the second one to
+     *  detect an authoritative collision and refuse. */
     async findByField(field, value) {
-      if (!value) return null;
+      if (!value) return [];
       try {
         const snap = await contacts().where(field, '==', value).limit(5).get();
-        if (snap.empty) return null;
-        const hit = snap.docs[0];
-        return { id: hit.id, ...hit.data() };
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
       } catch (err) {
         console.error('[contact-identity] lookup failed', { field, value, code: err?.code, message: err?.message });
         throw err;
@@ -92,6 +92,8 @@ export function createAdminAdapter(db, userId) {
       if (cache.failed) return [];
 
       try {
+        // Deliberately unordered, matching the web adapter exactly — see
+        // SCAN ORDERING in identityResolution.js.
         const snap = await contacts().limit(SCAN_WINDOW).get();
         cache.records = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         return cache.records;

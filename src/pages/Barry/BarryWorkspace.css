@@ -510,3 +510,13 @@
   padding: 3px 8px; cursor: pointer; color: inherit;
 }
 .barry-workspace-devbar button:disabled { opacity: .25; cursor: not-allowed; }
+
+/* "Put these into Scout" — offered in the thread after a successful commit.
+   Not a modal and not a new surface: one action, in the conversation. */
+.barry-workspace-linkoffer { display: flex; gap: 8px; align-items: center; padding: 8px 16px 0; }
+.barry-workspace-linkoffer button {
+  padding: 8px 14px; border-radius: 9px; border: 0; font: inherit;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.barry-workspace-linkoffer button.quiet { background: none; text-decoration: underline; text-underline-offset: 2px; }
+.barry-workspace-linkoffer button:disabled { opacity: .5; cursor: not-allowed; }

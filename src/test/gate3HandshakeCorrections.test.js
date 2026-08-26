@@ -2,9 +2,8 @@
  * GATE 3 — C1 (operationId continuity) and C2 (structural production isolation).
  */
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
+import { readFileSync, existsSync } from 'fs';
 import { mintOperationId, OUTCOME, summarise, previewSentence } from '../utils/resolutionContract.js';
-import { mockResolveSaveDryRun } from '../utils/mockResolveSave.js';
 import { buildCandidatePayloads, mintClientRef } from '../utils/candidatePayload.js';
 import { MOCK_PEOPLE, MOCK_SOURCE } from '../utils/mockPersonResults.js';
 
@@ -15,19 +14,6 @@ const CONTRACT = readFileSync('src/utils/resolutionContract.js', 'utf8');
 const rows = () => MOCK_PEOPLE.map((p, i) => ({ ...p, clientRef: mintClientRef(i) }));
 
 describe('C1 — one operationId spans preview → approval', () => {
-  it('the dry-run echoes back the operationId it was given', async () => {
-    const op = mintOperationId();
-    const payloads = buildCandidatePayloads(rows(), rows().map(r => r.clientRef), { kind: 'person', source: MOCK_SOURCE });
-    const res = await mockResolveSaveDryRun(payloads, { latencyMs: 0, operationId: op });
-    expect(res.operationId).toBe(op);
-  });
-
-  it('mints one when none is supplied, and it is stable within the response', async () => {
-    const payloads = buildCandidatePayloads(rows(), [rows()[0].clientRef], { kind: 'person', source: MOCK_SOURCE });
-    const res = await mockResolveSaveDryRun(payloads, { latencyMs: 0 });
-    expect(res.operationId).toBeTruthy();
-  });
-
   it('ids are unique per operation', () => {
     expect(new Set(Array.from({ length: 50 }, mintOperationId)).size).toBe(50);
   });
@@ -39,10 +25,10 @@ describe('C1 — one operationId spans preview → approval', () => {
     expect(mints).toHaveLength(1);
   });
 
-  it('handleApprove reads the stored operationId instead of minting', () => {
+  it('handleApprove reuses the stored operationId instead of minting', () => {
     const fn = WORKSPACE.slice(WORKSPACE.indexOf('async function handleApprove'));
-    const body = fn.slice(0, fn.indexOf('\n  }'));
-    expect(body).toMatch(/getResultSet\(sessionRef\)\?\.operationId/);
+    const body = fn.slice(0, fn.indexOf('\n  async function'));
+    expect(body).toMatch(/stored\.operationId/);
     expect(body).not.toMatch(/mintOperationId/);
   });
 
@@ -51,57 +37,44 @@ describe('C1 — one operationId spans preview → approval', () => {
   });
 });
 
-describe('C2 — the mock cannot reach production by construction', () => {
-  it('BarryWorkspace has NO static import of the mock resolver or fake people', () => {
-    const statics = WORKSPACE.split('\n').filter(l => /^import .*from/.test(l));
-    expect(statics.join('\n')).not.toMatch(/mockResolveSave|mockPersonResults/);
+describe('C2 — no fake resolver exists anywhere any more', () => {
+  it('the mock resolver module has been DELETED, not merely gated', () => {
+    // Checked on disk, not via import(): Vite resolves dynamic imports at
+    // transform time, so importing a deleted module fails the whole file.
+    expect(existsSync('src/utils/mockResolveSave.js')).toBe(false);
   });
 
-  it('every mock import is dynamic AND inside a DEV guard', () => {
-    for (const mod of ['mockResolveSave', 'mockPersonResults']) {
-      const idx = WORKSPACE.indexOf(`import('../../utils/${mod}')`);
-      expect(idx, `${mod} must be dynamically imported`).toBeGreaterThan(-1);
-      // the nearest preceding DEV guard must be within the same function body
-      const before = WORKSPACE.slice(Math.max(0, idx - 400), idx);
-      expect(before, `${mod} import must sit behind import.meta.env.DEV`).toMatch(/import\.meta\.env\.DEV/);
-    }
-  });
-
-  it('production fails CLOSED — no resolver, no fabricated verdicts', () => {
-    const fn = WORKSPACE.slice(WORKSPACE.indexOf('async function runResolutionDryRun'));
-    const body = fn.slice(0, fn.indexOf('\n  }'));
-    expect(body).toMatch(/if \(!import\.meta\.env\.DEV\)/);
-    expect(body).toMatch(/return null/);
-  });
-
-  it('the real preview component does NOT import the mock', () => {
+  it('no app code references a mock resolver', () => {
+    expect(WORKSPACE).not.toMatch(/mockResolveSave/);
     expect(PREVIEW).not.toMatch(/mockResolveSave/);
-    expect(PREVIEW).toMatch(/resolutionContract/);
   });
 
-  it('the contract module imports no mock (comments may mention one)', () => {
-    const imports = CONTRACT.split('\n').filter(l => /^import .*from/.test(l));
-    expect(imports.join('\n')).not.toMatch(/mock/i);
+  it('the only remaining mock is the dev result-set seed, dynamically imported behind DEV', () => {
+    const statics = WORKSPACE.split('\n').filter(l => /^import .*from/.test(l));
+    expect(statics.join('\n')).not.toMatch(/mockPersonResults/);
+    const idx = WORKSPACE.indexOf("import('../../utils/mockPersonResults')");
+    expect(idx).toBeGreaterThan(-1);
+    expect(WORKSPACE.slice(Math.max(0, idx - 400), idx)).toMatch(/import\.meta\.env\.DEV/);
   });
 
-  it('every mocked-flow turn is local-only, so fabricated statements never reach Firestore', () => {
-    // seed, preview, approval and cancel must all carry persist:false
-    const persistFalse = (WORKSPACE.match(/persist:\s*false/g) || []).length;
-    expect(persistFalse).toBeGreaterThanOrEqual(4);
-  });
-
-  it('appendStructuredTurn skips the Firestore write when persist is false', () => {
-    const fn = WORKSPACE.slice(WORKSPACE.indexOf('async function appendStructuredTurn'));
-    const body = fn.slice(0, fn.indexOf('\n  }'));
-    expect(body).toMatch(/if \(!persist\) return;/);
-    // and the skip must come BEFORE the write
-    expect(body.indexOf('if (!persist) return;')).toBeLessThan(body.indexOf('appendTurn(db'));
-  });
-
-  it('seedMockResultSet is unreachable in production', () => {
+  it('fabricated seed people still never reach the canonical conversation', () => {
     const fn = WORKSPACE.slice(WORKSPACE.indexOf('async function seedMockResultSet'));
     const body = fn.slice(0, fn.indexOf('\n  }'));
     expect(body).toMatch(/if \(!import\.meta\.env\.DEV\) return;/);
+    expect(body).toMatch(/persist: false/);
+  });
+
+  it('REAL resolution turns DO persist — they record something that happened', () => {
+    const fn = WORKSPACE.slice(WORKSPACE.indexOf('async function handleSelectionConfirmed'));
+    const body = fn.slice(0, fn.indexOf('\n  /**'));
+    expect(body).toMatch(/kind: 'resolution_preview'/);
+    expect(body).not.toMatch(/persist: false/);
+  });
+
+  it('appendStructuredTurn still skips the write before it happens when persist is false', () => {
+    const fn = WORKSPACE.slice(WORKSPACE.indexOf('async function appendStructuredTurn'));
+    const body = fn.slice(0, fn.indexOf('\n  /**'));
+    expect(body.indexOf('if (!persist) return;')).toBeLessThan(body.indexOf('appendTurn(db'));
   });
 });
 

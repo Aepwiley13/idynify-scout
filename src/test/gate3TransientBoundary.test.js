@@ -8,7 +8,6 @@ import {
   holdResultSet, getResultSet, releaseResultSet, mintSessionRef, _clearAll, _size,
 } from '../utils/barryTransientCandidates.js';
 import { stripIdentity } from '../utils/barryCanonical.js';
-import { mockResolveSaveDryRun } from '../utils/mockResolveSave.js';
 import { previewSentence, summarise, OUTCOME } from '../utils/resolutionContract.js';
 import { buildCandidatePayloads, mintClientRef } from '../utils/candidatePayload.js';
 import { MOCK_PEOPLE, MOCK_SOURCE } from '../utils/mockPersonResults.js';
@@ -53,53 +52,9 @@ describe('turn meta cannot carry identity', () => {
   });
 });
 
-describe('mocked dry-run shape', () => {
-  it('returns the contract envelope and an operationId that bridges preview→commit', async () => {
-    const payloads = buildCandidatePayloads(fixture(), fixture().map(r => r.clientRef), { kind: 'person', source: MOCK_SOURCE });
-    const res = await mockResolveSaveDryRun(payloads, { latencyMs: 0 });
-    expect(res.success).toBe(true);
-    expect(res.operationId).toBeTruthy();
-    expect(res.summary).toHaveProperty('matched');
-    expect(res.summary).toHaveProperty('created');
-  });
-
-  it('exercises every verdict so the UX has to handle all four', async () => {
-    const rows = fixture();
-    const payloads = buildCandidatePayloads(rows, rows.map(r => r.clientRef), { kind: 'person', source: MOCK_SOURCE });
-    const { summary } = await mockResolveSaveDryRun(payloads, { latencyMs: 0 });
-    expect(summary.matched).toBeGreaterThan(0);
-    expect(summary.created).toBeGreaterThan(0);
-    expect(summary.ambiguous).toBeGreaterThan(0);
-    expect(summary.refused).toBeGreaterThan(0);
-  });
-
-  it('an ambiguous result carries options and NO chosen match — Barry must ask', async () => {
-    const rows = fixture();
-    const payloads = buildCandidatePayloads(rows, rows.map(r => r.clientRef), { kind: 'person', source: MOCK_SOURCE });
-    const { results } = await mockResolveSaveDryRun(payloads, { latencyMs: 0 });
-    const amb = results.find(r => r.outcome === OUTCOME.AMBIGUOUS);
-    expect(amb.candidates.length).toBeGreaterThan(1);
-    expect(amb.contactId).toBeNull();      // no silent best guess
-  });
-
-  it('a refusal states a real reason', async () => {
-    const rows = fixture();
-    const payloads = buildCandidatePayloads(rows, rows.map(r => r.clientRef), { kind: 'person', source: MOCK_SOURCE });
-    const { results } = await mockResolveSaveDryRun(payloads, { latencyMs: 0 });
-    const ref = results.find(r => r.outcome === OUTCOME.REFUSED);
-    expect(ref.reason).toMatch(/share this email/i);
-  });
-
-  it('response correlates back by clientRef; contactId flows DOWN only, never up', async () => {
-    const rows = fixture();
-    const payloads = buildCandidatePayloads(rows, [rows[0].clientRef], { kind: 'person', source: MOCK_SOURCE });
-    const { results } = await mockResolveSaveDryRun(payloads, { latencyMs: 0 });
-    expect(results[0].clientRef).toBe(rows[0].clientRef);
-    // The RESPONSE may carry a resolved contactId — that is the resolver's answer.
-    // What must never happen is the UI sending one UP in a candidate.
-    expect(payloads[0].contactId).toBeUndefined();
-  });
-});
+// The 'mocked dry-run shape' block was removed when the real resolver was
+// wired — those shapes are now asserted against the server contract in
+// gate3RealIntegration.test.js using fixtures/resolveSaveFixtures.js.
 
 describe("Barry's sentence", () => {
   it('reports only what is true', () => {

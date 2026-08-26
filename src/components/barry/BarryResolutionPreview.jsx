@@ -108,10 +108,18 @@ export default function BarryResolutionPreview({ preview, onApprove, onCancel, s
                   <button key={o.contactId} type="button" className="bst-option"
                     onClick={() => choose(r.clientRef, o.contactId)}
                     style={{ borderColor: T.border, background: T.surface, color: T.text }}>
-                    <span className="bst-name">{o.existingName} — {o.company_name}</span>
-                    <span className="bst-meta" style={{ color: T.textFaint }}>
-                      {o.title} · last spoke {o.lastInteraction}
+                    <span className="bst-name">
+                      {o.existingName}{o.company_name ? ` — ${o.company_name}` : ''}
                     </span>
+                    {/* The resolver returns contactId / existingName / company_name
+                        and nothing else. Render only what it actually sent —
+                        inventing a title or a "last spoke" would be Barry
+                        implying knowledge the identity layer never gave him. */}
+                    {(o.title || o.lastInteraction) && (
+                      <span className="bst-meta" style={{ color: T.textFaint }}>
+                        {[o.title, o.lastInteraction && `last spoke ${o.lastInteraction}`].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
                   </button>
                 ))}
                 <button type="button" className="bst-option bst-option--quiet"
@@ -129,10 +137,26 @@ export default function BarryResolutionPreview({ preview, onApprove, onCancel, s
         );
       })}
 
-      {/* Refusals stated plainly, with the actual reason. */}
-      {results.filter(r => r.outcome === OUTCOME.REFUSED).map(r => (
-        <p key={r.clientRef} className="bst-refused" style={{ color: T.textFaint }}>
-          I can&apos;t tell which record {r.name || 'one of these'} is — {r.reason}. I&apos;ll leave them out rather than guess.
+      {/* Refusals stated plainly, in the resolver's own terms. `refused` is
+          never written, so saying why matters more than softening it. */}
+      {results.filter(r => r.outcome === OUTCOME.REFUSED).map(r => {
+        const who = r.existingName || r.name || 'one of these';
+        return (
+          <p key={r.clientRef} className="bst-refused" style={{ color: T.textFaint }}>
+            {r.reason === 'insufficient_identity'
+              ? <>I don&apos;t have enough to go on for {who} — {r.detail || 'there is no identifier I could find them by again'}. I&apos;ll leave them out.</>
+              : <>I can&apos;t tell which record {who} is — {r.reason}. I&apos;ll leave them out rather than guess.</>}
+          </p>
+        );
+      })}
+
+      {/* A rejected answer: the id was stale, or was never one of the options.
+          Surfaced as a question again, not swallowed. */}
+      {ambiguous.filter(r => r.reason).map(r => (
+        <p key={`${r.clientRef}_why`} className="bst-refused" style={{ color: T.textFaint }}>
+          {r.reason === 'stale_resolution' || r.reason === 'candidate_not_offered'
+            ? `That answer no longer matches what I'm seeing for ${r.existingName || r.name || 'this person'} — have another look.`
+            : null}
         </p>
       ))}
 

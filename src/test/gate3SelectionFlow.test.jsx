@@ -18,7 +18,7 @@ vi.mock('../theme/tokens', () => ({ BRAND: { pink: '#E91E63', cyan: '#00BCD4' },
 
 import BarryResultSet from '../components/barry/BarryResultSet';
 import BarryResolutionPreview from '../components/barry/BarryResolutionPreview';
-import { mockResolveSaveDryRun } from '../utils/mockResolveSave';
+import { RESOLVED_PREVIEW } from './fixtures/resolveSaveFixtures';
 import { buildCandidatePayloads, mintClientRef } from '../utils/candidatePayload';
 import { MOCK_PEOPLE, MOCK_SOURCE } from '../utils/mockPersonResults';
 
@@ -75,11 +75,8 @@ describe('result_set turn', () => {
 });
 
 describe('resolution_preview turn', () => {
-  async function preview() {
-    const results = rows();
-    const payloads = buildCandidatePayloads(results, results.map(r => r.clientRef), { kind: 'person', source: MOCK_SOURCE });
-    return mockResolveSaveDryRun(payloads, { latencyMs: 0 });
-  }
+  // Real server shape, not a mock — see fixtures/resolveSaveFixtures.js
+  async function preview() { return RESOLVED_PREVIEW; }
 
   it('shows the tallies Barry reported', async () => {
     render(<BarryResolutionPreview preview={await preview()} />);
@@ -117,8 +114,8 @@ describe('resolution_preview turn', () => {
 
   it('states the refusal reason plainly rather than hiding it', async () => {
     render(<BarryResolutionPreview preview={await preview()} />);
-    expect(screen.getByText(/share this email/i)).toBeInTheDocument();
-    expect(screen.getByText(/rather than guess/i)).toBeInTheDocument();
+    expect(screen.getByText(/needs an email, phone, LinkedIn/i)).toBeInTheDocument();
+    expect(screen.getByText(/I'll leave them out/i)).toBeInTheDocument();
   });
 
   it('approval reports the counts it will act on', async () => {

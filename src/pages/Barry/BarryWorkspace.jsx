@@ -45,6 +45,7 @@ import BarryResolutionPreview from '../../components/barry/BarryResolutionPrevie
 import { buildCandidatePayloads, mintClientRef } from '../../utils/candidatePayload';
 import { holdResultSet, getResultSet, mintSessionRef, releaseResultSet } from '../../utils/barryTransientCandidates';
 import { previewSentence, mintOperationId } from '../../utils/resolutionContract';
+import { resolveSave, link, linkSentence } from '../../utils/resolveSaveClient';
 // NOTE: the mock resolver and its fake people are NOT imported here. They are
 // reached only through dynamic import() inside an import.meta.env.DEV branch,
 // so a production build drops them from the module graph entirely rather than
@@ -66,6 +67,8 @@ export default function BarryWorkspace() {
   // instead of staying live.
   const [settled, setSettled] = useState({});   // sessionRef -> {...}
   const [resolving, setResolving] = useState(false);
+  // "Put these into Scout" — offered after a successful commit, in-thread.
+  const [pendingLink, setPendingLink] = useState(null);
   const [who, setWho] = useState(null);
   const [inputValue, setInputValue] = useState('');
   const [sending, setSending] = useState(false);
@@ -655,20 +658,24 @@ export default function BarryWorkspace() {
   }
 
   /**
-   * The ONLY route to a resolution dry-run. Production fails closed.
+   * RESOLVE_SAVE — real, Gate 2 Phase 3. The mock is gone from this path.
    *
-   * When the real endpoint lands this becomes a fetch to barryResolveSave with
-   * { commit:false, operationId, candidates } and the DEV branch is deleted.
+   * commit:false resolves fully and writes nothing. `resolutions` carries the
+   * user's ambiguity answers on the commit pass; on the preview pass it is empty.
    */
-  async function runResolutionDryRun(payloads, operationId) {
-    if (!import.meta.env.DEV) {
-      // No resolver exists yet in production. Refusing is the honest outcome —
-      // showing mocked verdicts to a real user would be fabricated certainty.
-      console.error('[BarryWorkspace] resolution unavailable: no RESOLVE_SAVE endpoint in production');
-      return null;
-    }
-    const { mockResolveSaveDryRun } = await import('../../utils/mockResolveSave');
-    return mockResolveSaveDryRun(payloads, { operationId });
+  async function callResolveSave({ payloads, operationId, commit, resolutions }) {
+    const user = getEffectiveUser() || auth.currentUser;
+    if (!user) throw new Error('not_authenticated');
+    const authToken = await user.getIdToken();
+    return resolveSave({
+      userId: user.uid,
+      authToken,
+      operationId,
+      candidates: payloads,
+      resolutions,
+      commit,
+      actor: 'user',
+    });
   }
 
   /**
@@ -700,38 +707,34 @@ export default function BarryWorkspace() {
     const operationId = mintOperationId();
 
     try {
-      const preview = await runResolutionDryRun(payloads, operationId);
-
-      if (!preview) {
-        await appendStructuredTurn({
-          content: "I can't check these against your existing people yet — that part of me isn't connected. Nothing has been saved.",
-          kind: 'message',
-          persist: !import.meta.env.DEV,
-        });
-        return;
-      }
+      const preview = await callResolveSave({ payloads, operationId, commit: false, resolutions: {} });
 
       const previewRef = mintSessionRef();
       holdResultSet({ sessionRef: previewRef, kind: held.kind, source: held.source, results: preview.results });
-      // The full preview and the operation it belongs to ride with the results,
-      // in memory. operationId is NOT written to the turn — it identifies a
-      // write operation, and this turn records a conversation, not a write.
+      // The preview, the payloads it came from, and the operation it belongs to
+      // ride together in memory. The payloads are kept because commit re-sends
+      // the SAME candidates alongside the user's resolutions.
+      // operationId is NOT written to the turn — it identifies a write
+      // operation, and a turn records a conversation.
       const stored = getResultSet(previewRef);
       stored.preview = preview;
+      stored.payloads = payloads;
       stored.operationId = preview.operationId || operationId;
 
       await appendStructuredTurn({
         content: previewSentence(preview.summary),
         kind: 'resolution_preview',
         meta: { sessionRef: previewRef, ...preview.summary },   // counts only
-        persist: false,   // mocked outcome — never into the canonical record
-      });
+      });   // persists: this is a real resolution Barry actually performed
     } catch (err) {
-      console.error('[BarryWorkspace] dry-run failed:', err);
+      console.error('[BarryWorkspace] resolve dry-run failed:', err);
+      // Say what actually went wrong rather than implying it half-worked.
+      // commit:false writes nothing, so "nothing was saved" is literally true.
       await appendStructuredTurn({
-        content: "I couldn't check those against your existing people just now. Nothing was saved — want me to try again?",
+        content: err.serverError
+          ? `I couldn't check those against your existing people — ${err.serverError}. Nothing was saved.`
+          : "I couldn't reach the part of me that checks against your existing people. Nothing was saved — want me to try again?",
         kind: 'message',
-        persist: false,
       });
     } finally {
       setResolving(false);
@@ -743,27 +746,125 @@ export default function BarryWorkspace() {
    * Team A's RESOLVE_SAVE(commit:true) attaches at this point; until then Barry
    * states plainly that nothing was written rather than implying it was.
    */
+  /**
+   * Approval → RESOLVE_SAVE(commit:true). THIS IS THE PERSISTENCE BOUNDARY.
+   *
+   * The same operationId the preview ran under, the same candidates, plus the
+   * user's ambiguity answers as `resolutions: { [clientRef]: contactId }`.
+   *
+   * Every contactId in `resolutions` came from the candidate list the RESOLVER
+   * offered for that clientRef — the UI never mints one and never chooses one.
+   * The resolver re-validates that the id was actually offered, so a stale or
+   * invented answer comes back as ambiguous with a reason rather than writing.
+   */
   async function handleApprove(sessionRef, decision) {
-    // C1: the SAME operationId the preview was produced under. Team A's
-    // RESOLVE_SAVE(commit:true) attaches here and must receive this exact value
-    // — a freshly minted id would make the commit a different operation from
-    // the one the user actually approved, and would defeat idempotency.
-    const operationId = getResultSet(sessionRef)?.operationId || null;
+    const stored = getResultSet(sessionRef);
+    if (!stored || resolving) return;
 
-    if (import.meta.env.DEV) {
-      console.info('[Gate3] approval — commit would use operationId:', operationId, decision);
+    const operationId = stored.operationId;
+    // decision.choices is { clientRef: contactId | 'neither' }. 'neither' means
+    // "none of these is the person" — it is the ABSENCE of a resolution, which
+    // lets the resolver fall through to create. It must not be sent as an id.
+    const resolutions = {};
+    for (const [clientRef, choice] of Object.entries(decision.choices || {})) {
+      if (choice && choice !== 'neither') resolutions[clientRef] = choice;
     }
 
-    setSettled(prev => ({ ...prev, [sessionRef]: { approved: true, operationId } }));
-    releaseResultSet(sessionRef);
-    await appendStructuredTurn({
-      content:
-        `Ready to save ${decision.willSave}${decision.willCreate ? ` — ${decision.willCreate} of them new` : ''}.\n\n` +
-        `_Nothing has been written yet: the save path is still being built. When it lands, this is the point where these become real contacts._`,
-      kind: 'message',
-      meta: { approvedCount: decision.willSave, newCount: decision.willCreate },
-      persist: false,   // mocked flow — not part of the canonical record
-    });
+    setResolving(true);
+    try {
+      const committed = await callResolveSave({
+        payloads: stored.payloads,
+        operationId,
+        commit: true,
+        resolutions,
+      });
+
+      const s = committed.summary;
+      const contactIds = committed.results.map(r => r.contactId).filter(Boolean);
+
+      setSettled(prev => ({ ...prev, [sessionRef]: { approved: true, operationId, contactIds } }));
+
+      // Report what happened, including what did NOT happen. ambiguous and
+      // refused are never written, so claiming a clean save would be a lie.
+      const parts = [];
+      if (s.matched) parts.push(`${s.matched} linked to people you already had`);
+      if (s.created) parts.push(`${s.created} added as new`);
+      const trailer = [];
+      if (s.ambiguous) trailer.push(`${s.ambiguous} I still can't place`);
+      if (s.refused) trailer.push(`${s.refused} I couldn't save`);
+
+      await appendStructuredTurn({
+        content: parts.length
+          ? `Done — ${parts.join(' and ')}.${trailer.length ? ` ${trailer.join(', ')}, so I left ${s.ambiguous + s.refused === 1 ? 'that one' : 'those'} out.` : ''}`
+          : `I couldn't save any of those.${trailer.length ? ` ${trailer.join(' and ')}.` : ''}`,
+        kind: 'message',
+        meta: { matched: s.matched, created: s.created, ambiguous: s.ambiguous, refused: s.refused },
+      });
+
+      // Offer the workflow placement as the natural next step, not a new screen.
+      if (contactIds.length) {
+        holdResultSet({ sessionRef: `${sessionRef}_saved`, kind: 'person', source: 'resolve_save', results: [] });
+        const saved = getResultSet(`${sessionRef}_saved`);
+        saved.contactIds = contactIds;
+        saved.operationId = operationId;
+        setPendingLink({ sessionRef: `${sessionRef}_saved`, count: contactIds.length });
+      }
+    } catch (err) {
+      console.error('[BarryWorkspace] commit failed:', err);
+      await appendStructuredTurn({
+        content: err.serverError
+          ? `I couldn't save those — ${err.serverError}.`
+          : "I couldn't save those just now. Nothing was written — want me to try again?",
+        kind: 'message',
+      });
+      setSettled(prev => ({ ...prev, [sessionRef]: { approved: false } }));
+    } finally {
+      setResolving(false);
+    }
+  }
+
+  /**
+   * LINK — "put these into Scout".
+   *
+   * Scout is a LENS over the canonical person, not a copy. A contact already at
+   * the target stage returns changed:false, which is a valid no-op — reporting
+   * it as a failure, or reporting the write count, would both be wrong. The
+   * sentence describes the FINAL STATE.
+   */
+  async function handleLinkToScout(sessionRef) {
+    const stored = getResultSet(sessionRef);
+    if (!stored?.contactIds?.length || resolving) return;
+
+    setPendingLink(null);
+    setResolving(true);
+    try {
+      const user = getEffectiveUser() || auth.currentUser;
+      const authToken = await user.getIdToken();
+      const res = await link({
+        userId: user.uid,
+        authToken,
+        operationId: stored.operationId,   // same operation, end to end
+        contactIds: stored.contactIds,
+        targetStage: 'scout',
+        actor: 'user',
+      });
+      releaseResultSet(sessionRef);
+      await appendStructuredTurn({
+        content: linkSentence(res.summary, res.targetStage),
+        kind: 'message',
+        meta: { ...res.summary, targetStage: res.targetStage },
+      });
+    } catch (err) {
+      console.error('[BarryWorkspace] link failed:', err);
+      await appendStructuredTurn({
+        content: err.serverError
+          ? `They're saved, but I couldn't move them into Scout — ${err.serverError}.`
+          : "They're saved, but I couldn't move them into Scout just now.",
+        kind: 'message',
+      });
+    } finally {
+      setResolving(false);
+    }
   }
 
   async function handleCancelPreview(sessionRef) {
@@ -772,7 +873,6 @@ export default function BarryWorkspace() {
     await appendStructuredTurn({
       content: "No problem — I haven't saved anything. Tell me when you want to pick these up again.",
       kind: 'message',
-      persist: false,
     });
   }
 
@@ -913,6 +1013,22 @@ export default function BarryWorkspace() {
           </div>
         )}
       </div>
+
+      {pendingLink && (
+        <div className="barry-workspace-linkoffer">
+          <button
+            type="button"
+            onClick={() => handleLinkToScout(pendingLink.sessionRef)}
+            disabled={resolving}
+            style={{ background: BRAND.pink, color: '#fff' }}
+          >
+            Put {pendingLink.count === 1 ? 'them' : `all ${pendingLink.count}`} into Scout
+          </button>
+          <button type="button" className="quiet" onClick={() => setPendingLink(null)} style={{ color: T.textFaint }}>
+            Not now
+          </button>
+        </div>
+      )}
 
       {import.meta.env.DEV && (
         <div className="barry-workspace-devbar">

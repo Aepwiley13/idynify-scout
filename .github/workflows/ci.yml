@@ -18,10 +18,8 @@ jobs:
         run: |
           npx vitest run \
             --exclude 'src/test/HunterCardStack.test.jsx' \
-            --exclude 'src/test/HunterContactCard.test.jsx' \
             --exclude 'src/test/hunterBootstrap.test.js' \
             --exclude 'src/test/hunterOutcomeLogic.test.js' \
             --exclude 'src/test/hunterSoundHaptics.test.jsx' \
-            --exclude 'src/test/ReconSectionEditor.test.jsx' \
             --exclude 'src/test/ReconErrorBoundary.test.jsx' \
             --exclude 'src/test/ReconModulePage.test.jsx'

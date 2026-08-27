@@ -512,6 +512,197 @@
   }
 }
 
+/* ── First Experience composition layout ────────────────────────────────── */
+
+.barry-fe-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 380px;
+}
+
+.barry-fe-primary {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.barry-fe-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 32px;
+}
+
+/* Hero welcome */
+.barry-fe-hero {
+  padding: 48px 0 32px;
+  max-width: 720px;
+}
+
+.barry-fe-hero-heading {
+  margin: 0 0 12px;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.barry-fe-hero-sub {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* Conversation divider */
+.barry-fe-divider {
+  position: relative;
+  border-top: 1px solid;
+  margin: 0 0 24px;
+  display: flex;
+  justify-content: flex-start;
+  padding-left: 38px;
+}
+
+.barry-fe-divider-label {
+  position: relative;
+  top: -0.7em;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Conversation thread inside FE layout */
+.barry-fe-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 720px;
+  padding-bottom: 32px;
+}
+
+/* Composer — anchored at bottom of primary column */
+.barry-fe-composer {
+  flex-shrink: 0;
+  border-top: 1px solid;
+  padding: 16px 32px;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.03);
+}
+
+.barry-fe-composer-inner {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  max-width: 720px;
+}
+
+.barry-fe-composer-avatar {
+  border-radius: 50%;
+  flex-shrink: 0;
+  margin-bottom: 4px;
+}
+
+.barry-fe-send {
+  padding: 12px 28px;
+  font-size: 15px;
+}
+
+/* Barry presence column */
+.barry-fe-presence {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-left: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.barry-fe-presence-img {
+  max-height: 90vh;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+/* ── First Experience responsive ───────────────────────────────────────── */
+
+/* Tablet: collapse to single column, show Barry smaller at top */
+@media (max-width: 1024px) {
+  .barry-fe-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  .barry-fe-presence {
+    order: -1;
+    max-height: 220px;
+    border-left: none;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  .barry-fe-presence-img {
+    max-height: 200px;
+  }
+
+  .barry-fe-scroll {
+    padding: 0 20px;
+  }
+
+  .barry-fe-composer {
+    padding: 14px 20px;
+  }
+
+  .barry-fe-hero {
+    padding: 32px 0 24px;
+  }
+
+  .barry-fe-hero-heading {
+    font-size: 24px;
+  }
+}
+
+/* Mobile: hide Barry image entirely, tighter spacing */
+@media (max-width: 767px) {
+  .barry-fe-presence {
+    display: none;
+  }
+
+  .barry-fe-scroll {
+    padding: 0 16px;
+  }
+
+  .barry-fe-composer {
+    padding: 12px 16px;
+  }
+
+  .barry-fe-composer-inner {
+    gap: 8px;
+  }
+
+  .barry-fe-hero {
+    padding: 24px 0 20px;
+  }
+
+  .barry-fe-hero-heading {
+    font-size: 22px;
+  }
+
+  .barry-fe-hero-sub {
+    font-size: 14px;
+  }
+
+  .barry-fe-send {
+    padding: 10px 18px;
+    font-size: 14px;
+  }
+
+  .barry-fe-divider {
+    padding-left: 0;
+  }
+}
+
 /* Dev-only affordance for walking the mocked Gate 3 selection flow.
    Stripped from production builds by the import.meta.env.DEV guard. */
 .barry-workspace-devbar { padding: 6px 16px 0; }

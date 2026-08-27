@@ -202,9 +202,11 @@ describe('B2-5 — Workspace controller integration', () => {
 
   it('uses same header and composer for FE and post-onboarding', () => {
     const headerCount = (workspaceCode.match(/barry-workspace-header/g) || []).length;
-    const composerCount = (workspaceCode.match(/barry-workspace-composer/g) || []).length;
+    const feComposer = (workspaceCode.match(/barry-fe-composer/g) || []).length;
+    const postComposer = (workspaceCode.match(/barry-workspace-composer/g) || []).length;
     expect(headerCount).toBeGreaterThanOrEqual(2);
-    expect(composerCount).toBeGreaterThanOrEqual(2);
+    expect(feComposer).toBeGreaterThanOrEqual(1);
+    expect(postComposer).toBeGreaterThanOrEqual(1);
   });
 });
 

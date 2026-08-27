@@ -46,7 +46,7 @@ export const MODULE_COLORS = {
 
 // ─── ASSET PATHS ─────────────────────────────────────────────────────────────
 export const ASSETS = {
-  barryAvatar:  "/assets/barry_AI.jpg",          // Astronaut bear — circular crop
+  barryAvatar:  "/assets/barry/barry-avatar.png", // Astronaut bear — circular crop derived from approved signup asset
   logoFull:     "/assets/Idynify_logo1.png",     // Full wordmark — canonical master (not served directly)
   logoFullOptimized: {
     avif: "/assets/sidebar/idynify-wordmark.avif",

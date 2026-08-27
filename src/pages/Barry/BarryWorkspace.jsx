@@ -354,7 +354,7 @@ export default function BarryWorkspace() {
       <div className="barry-workspace">
         <div className="barry-workspace-loading">
           <div className="barry-workspace-loading-avatar">
-            <img src={ASSETS.barryAvatar} alt="" width={64} height={64} />
+            <img src={ASSETS.barryAvatar} alt="" width={64} height={64} onError={e => { e.target.style.display = 'none'; }} />
           </div>
           <p style={{ color: T.textMuted }}>Loading Barry...</p>
         </div>
@@ -373,26 +373,26 @@ export default function BarryWorkspace() {
     const isBusy = feCtrl.classifying || prospectingBusy;
     const isProspecting = isDelivering && feCtrl.decision?.kind === 'in-place';
     const prospectingReady = isProspecting && prospectingStep && ['asking', 'clarifying'].includes(prospectingStep);
-    const placeholder = isWhoPhase ? 'Your name'
-      : isProspecting ? 'Tell Barry about your target market...'
-      : 'Type your answer...';
+    const placeholder = isProspecting ? 'Tell Barry about your target market...'
+      : 'Reply to Barry...';
     const composerDisabled = isBusy || (isDelivering && !isProspecting) || (isProspecting && !prospectingReady);
 
     return (
-      <div className="barry-workspace">
+      <div className="barry-workspace barry-workspace--first-experience">
         <div className="barry-workspace-header" style={{ borderColor: T.border }}>
           <div className="barry-workspace-header-left">
             <img
               src={ASSETS.barryAvatar}
               alt="Barry"
               className="barry-workspace-avatar"
-              width={40}
-              height={40}
+              width={44}
+              height={44}
+              onError={e => { e.target.style.display = 'none'; }}
             />
             <div>
               <h1 className="barry-workspace-title" style={{ color: T.text }}>Barry</h1>
               <span className="barry-workspace-subtitle" style={{ color: T.textMuted }}>
-                Your sales intelligence co-pilot
+                Relationship intelligence, built around you
               </span>
             </div>
           </div>
@@ -415,13 +415,14 @@ export default function BarryWorkspace() {
                       className="barry-workspace-msg-avatar"
                       width={28}
                       height={28}
+                      onError={e => { e.target.style.display = 'none'; }}
                     />
                   )}
                   <div
                     className="barry-workspace-msg-bubble"
                     style={{
-                      background: turn.role === 'user' ? `${BRAND.pink}18` : T.surface,
-                      borderColor: turn.role === 'user' ? `${BRAND.pink}30` : T.border,
+                      background: turn.role === 'user' ? `${BRAND.pink}12` : T.cardBg,
+                      borderColor: turn.role === 'user' ? `${BRAND.pink}25` : T.border,
                       color: T.text,
                     }}
                   >
@@ -561,10 +562,10 @@ export default function BarryWorkspace() {
             <div className="barry-workspace-fe-skip">
               <button
                 onClick={feCtrl.skipName}
-                className="barry-workspace-skip-btn"
-                style={{ color: T.textMuted }}
+                className="barry-workspace-skip-chip"
+                style={{ color: T.textMuted, borderColor: T.border }}
               >
-                Skip
+                Skip for now
               </button>
             </div>
           )}
@@ -577,10 +578,11 @@ export default function BarryWorkspace() {
                 className="barry-workspace-msg-avatar"
                 width={28}
                 height={28}
+                onError={e => { e.target.style.display = 'none'; }}
               />
               <div
                 className="barry-workspace-msg-bubble barry-workspace-typing"
-                style={{ background: T.surface, borderColor: T.border }}
+                style={{ background: T.cardBg, borderColor: T.border }}
               >
                 <span className="barry-typing-dot" />
                 <span className="barry-typing-dot" />
@@ -590,7 +592,7 @@ export default function BarryWorkspace() {
           )}
         </div>
 
-        <div className="barry-workspace-composer" style={{ borderColor: T.border }}>
+        <div className="barry-workspace-composer" style={{ borderColor: T.border, background: T.cardBg }}>
           <div className="barry-workspace-composer-row">
             <textarea
               ref={inputRef}
@@ -604,10 +606,10 @@ export default function BarryWorkspace() {
               onKeyDown={handleKeyDown}
               placeholder={placeholder}
               disabled={composerDisabled}
-              aria-label={isWhoPhase ? 'Your name' : 'Message Barry'}
+              aria-label="Message Barry"
               className="barry-workspace-input"
               style={{
-                background: T.surface,
+                background: T.cardBg,
                 borderColor: T.border,
                 color: T.text,
               }}
@@ -618,8 +620,9 @@ export default function BarryWorkspace() {
               aria-label="Send"
               className="barry-workspace-send"
               style={{
-                background: inputValue.trim() ? BRAND.pink : T.surface2,
+                background: inputValue.trim() ? BRAND.pink : 'transparent',
                 color: inputValue.trim() ? '#fff' : T.textMuted,
+                border: inputValue.trim() ? 'none' : `1px solid ${T.border}`,
               }}
             >
               Send
@@ -900,13 +903,14 @@ export default function BarryWorkspace() {
             src={ASSETS.barryAvatar}
             alt="Barry"
             className="barry-workspace-avatar"
-            width={40}
-            height={40}
+            width={44}
+            height={44}
+            onError={e => { e.target.style.display = 'none'; }}
           />
           <div>
             <h1 className="barry-workspace-title" style={{ color: T.text }}>Barry</h1>
             <span className="barry-workspace-subtitle" style={{ color: T.textMuted }}>
-              Your sales intelligence co-pilot
+              Relationship intelligence, built around you
             </span>
           </div>
         </div>
@@ -921,6 +925,7 @@ export default function BarryWorkspace() {
               className="barry-workspace-empty-avatar"
               width={80}
               height={80}
+              onError={e => { e.target.style.display = 'none'; }}
             />
             <p style={{ color: T.text, fontWeight: 600, fontSize: 18 }}>
               {who?.name ? `Hey ${who.name}!` : 'Hey there!'}
@@ -943,13 +948,14 @@ export default function BarryWorkspace() {
                   className="barry-workspace-msg-avatar"
                   width={28}
                   height={28}
+                  onError={e => { e.target.style.display = 'none'; }}
                 />
               )}
               <div
                 className="barry-workspace-msg-bubble"
                 style={{
-                  background: turn.role === 'user' ? `${BRAND.pink}18` : T.surface,
-                  borderColor: turn.role === 'user' ? `${BRAND.pink}30` : T.border,
+                  background: turn.role === 'user' ? `${BRAND.pink}12` : T.cardBg,
+                  borderColor: turn.role === 'user' ? `${BRAND.pink}25` : T.border,
                   color: T.text,
                 }}
               >
@@ -1001,10 +1007,11 @@ export default function BarryWorkspace() {
               className="barry-workspace-msg-avatar"
               width={28}
               height={28}
+              onError={e => { e.target.style.display = 'none'; }}
             />
             <div
               className="barry-workspace-msg-bubble barry-workspace-typing"
-              style={{ background: T.surface, borderColor: T.border }}
+              style={{ background: T.cardBg, borderColor: T.border }}
             >
               <span className="barry-typing-dot" />
               <span className="barry-typing-dot" />
@@ -1038,7 +1045,7 @@ export default function BarryWorkspace() {
         </div>
       )}
 
-      <div className="barry-workspace-composer" style={{ borderColor: T.border }}>
+      <div className="barry-workspace-composer" style={{ borderColor: T.border, background: T.cardBg }}>
         <div className="barry-workspace-composer-row">
           <textarea
             ref={inputRef}
@@ -1055,7 +1062,7 @@ export default function BarryWorkspace() {
             aria-label="Message Barry"
             className="barry-workspace-input"
             style={{
-              background: T.surface,
+              background: T.cardBg,
               borderColor: T.border,
               color: T.text,
             }}
@@ -1066,8 +1073,9 @@ export default function BarryWorkspace() {
             aria-label="Send message"
             className="barry-workspace-send"
             style={{
-              background: inputValue.trim() ? BRAND.pink : T.surface2,
+              background: inputValue.trim() ? BRAND.pink : 'transparent',
               color: inputValue.trim() ? '#fff' : T.textMuted,
+              border: inputValue.trim() ? 'none' : `1px solid ${T.border}`,
             }}
           >
             Send

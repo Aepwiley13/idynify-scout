@@ -18,7 +18,7 @@
  */
 
 import { render, screen, fireEvent } from '@testing-library/react';
-import { vi, describe, it, beforeEach, expect } from 'vitest';
+import { vi, describe, it, afterEach, expect } from 'vitest';
 
 // ── Module mocks ─────────────────────────────────────────────────────────────
 
@@ -33,11 +33,6 @@ vi.mock('framer-motion', () => ({
     div: ({ children, ...props }) => <div {...props}>{children}</div>
   },
   AnimatePresence: ({ children }) => <>{children}</>
-}));
-
-// date-fns: deterministic output
-vi.mock('date-fns', () => ({
-  formatDistanceToNow: () => '3 days ago'
 }));
 
 // Suppress fetch calls in Barry read useEffect
@@ -63,9 +58,22 @@ const baseContact = {
   barry_hunter_read_state: 'unaware'
 };
 
+// ── Frozen clock ─────────────────────────────────────────────────────────────
+//
+// The card's "Last contact" label goes through `formatRelativeTime`, which
+// compares the contact's timestamp against `new Date()`. Both ends are pinned
+// so the label under test is a property of the fixture rather than of the day
+// the suite happens to run.
+const FROZEN_NOW = new Date('2026-03-15T12:00:00.000Z');
+const THREE_DAYS_BEFORE_FROZEN_NOW = '2026-03-12T12:00:00.000Z';
+
 // ── Rendering tests ───────────────────────────────────────────────────────────
 
 describe('HunterContactCard — rendering', () => {
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
   it('renders the contact name', () => {
     render(
@@ -123,15 +131,21 @@ describe('HunterContactCard — rendering', () => {
     expect(screen.getByText('High')).toBeInTheDocument();
   });
 
-  it('shows last interaction label from date-fns', () => {
+  it('shows the last interaction label from the shared relative-time formatter', () => {
+    // Only `Date` is faked. Timers stay real so the card's Barry-read effect
+    // and its mocked fetch resolve normally.
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(FROZEN_NOW);
+
     render(
       <HunterContactCard
-        contact={{ ...baseContact, last_interaction_at: new Date().toISOString() }}
+        contact={{ ...baseContact, last_interaction_at: THREE_DAYS_BEFORE_FROZEN_NOW }}
         onEngage={vi.fn()}
         onArchive={vi.fn()}
       />
     );
-    expect(screen.getByText('3 days ago')).toBeInTheDocument();
+    // `formatRelativeTime` emits the compact form for 1-6 days.
+    expect(screen.getByText('3d ago')).toBeInTheDocument();
   });
 
   it('shows Never when no last interaction date exists', () => {

@@ -123,8 +123,8 @@ export default function useFirstExperienceController(arrival = null) {
       const wantsName = resolved.shouldAsk && !alreadyAsked && shouldIntroduce(mode);
 
       const greeting = resolved.name
-        ? `Hey ${resolved.name}! I'm Barry, your sales intelligence co-pilot. I'm here to help you find the right people to reach and figure out the best way to get in front of them.`
-        : `Hey there! I'm Barry, your sales intelligence co-pilot. I'm here to help you find the right people to reach and figure out the best way to get in front of them.`;
+        ? `Hey ${resolved.name} — I'm Barry. I'll help you figure out who matters, why they matter, and what to do next.`
+        : `Hey — I'm Barry. I'll help you figure out who matters, why they matter, and what to do next.`;
 
       const openingTurns = [{ role: 'assistant', content: greeting }];
 

@@ -84,7 +84,7 @@ describe('B2-2 — Controller WHO flow and skip', () => {
   });
 
   it('generates greeting turn without name when unknown', () => {
-    expect(controllerCode).toMatch(/Hey there!/);
+    expect(controllerCode).toMatch(/Hey —/);
   });
 
   it('provides skipName callback', () => {
@@ -306,16 +306,16 @@ describe('B2-9 — Skip button CSS', () => {
     expect(workspaceCss).toMatch(/\.barry-workspace-fe-skip/);
   });
 
-  it('defines .barry-workspace-skip-btn', () => {
-    expect(workspaceCss).toMatch(/\.barry-workspace-skip-btn/);
+  it('defines .barry-workspace-skip-chip', () => {
+    expect(workspaceCss).toMatch(/\.barry-workspace-skip-chip/);
   });
 
-  it('skip button has no visible background', () => {
-    expect(workspaceCss).toMatch(/\.barry-workspace-skip-btn[\s\S]*?background:\s*none/);
+  it('skip chip has no visible background', () => {
+    expect(workspaceCss).toMatch(/\.barry-workspace-skip-chip[\s\S]*?background:\s*none/);
   });
 
-  it('skip button has underline decoration', () => {
-    expect(workspaceCss).toMatch(/\.barry-workspace-skip-btn[\s\S]*?text-decoration:\s*underline/);
+  it('skip chip has border-radius for pill shape', () => {
+    expect(workspaceCss).toMatch(/\.barry-workspace-skip-chip[\s\S]*?border-radius/);
   });
 });
 

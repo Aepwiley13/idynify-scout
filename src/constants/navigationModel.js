@@ -193,7 +193,20 @@ export const COMMAND_CENTER = {
  * INTELLIGENCE. SIDEBAR_ORDER, below, is what decides who draws in the
  * sidebar.
  */
-export const UNGROUPED_DESTINATIONS = [COMMAND_CENTER, SETTINGS];
+/**
+ * Barry Workspace. A destination, not a module — reached from the sidebar
+ * Barry card or direct navigation to /barry. Registered here so
+ * resolveModule('/barry') returns "Barry" instead of the Mission Control
+ * fallback.
+ */
+export const BARRY = {
+  id: 'barry',
+  label: 'Barry',
+  path: '/barry',
+  barryModule: 'default',
+};
+
+export const UNGROUPED_DESTINATIONS = [COMMAND_CENTER, SETTINGS, BARRY];
 
 const ALL_DESTINATIONS = [MISSION_CONTROL, ...MODULES, ...UNGROUPED_DESTINATIONS];
 

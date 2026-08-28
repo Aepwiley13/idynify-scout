@@ -17,6 +17,7 @@ accurate even when the implementation moves.
 | [003](ADR-003-company-identity.md) | Company identity — `apollo_organization_id`, preview as permissions | Accepted |
 | [004](ADR-004-navigation-contract.md) | Navigation contract — `openContact()` / `openCompany()` only | Accepted |
 | [005](ADR-005-barry-context.md) | Barry context — persistent intelligence vs ephemeral session intent | Accepted |
+| [006](ADR-006-canonical-relationship-event.md) | Canonical relationship event — immutable event log, derived state, compatibility mirrors | Accepted |
 
 **Superseding an ADR:** do not edit an accepted one beyond typo fixes. Add a new
 ADR that supersedes it, and change the old one's status to

@@ -486,6 +486,7 @@ describe('sign in', () => {
     <MemoryRouter initialEntries={['/login']}>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/" element={<div>HOME</div>} />
         <Route path="/mission-control-v2" element={<div>MISSION CONTROL</div>} />
       </Routes>
     </MemoryRouter>
@@ -494,7 +495,7 @@ describe('sign in', () => {
     return utils;
   };
 
-  it('signs in and lands on mission control', async () => {
+  it('signs in and lands on the root (SmartRedirect decides destination)', async () => {
     const user = userEvent.setup();
     signIn.mockResolvedValue({});
     await renderLogin();
@@ -504,7 +505,7 @@ describe('sign in', () => {
     await user.click(screen.getByRole('button', { name: /^sign in$/i }));
 
     expect(signIn).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(screen.getByText('MISSION CONTROL')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('HOME')).toBeInTheDocument());
   });
 
   it('uses current-password so managers offer the saved credential', async () => {
@@ -530,7 +531,7 @@ describe('sign in', () => {
     await user.click(screen.getByRole('button', { name: /verify and continue/i }));
 
     expect(resolveMfa).toHaveBeenCalledWith(mfaErr, '123456');
-    await waitFor(() => expect(screen.getByText('MISSION CONTROL')).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText('HOME')).toBeInTheDocument());
   });
 
   it('keeps the verify button disabled until six digits are entered', async () => {

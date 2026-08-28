@@ -532,10 +532,10 @@
 .barry-fe-hero {
   display: flex;
   align-items: center;
-  gap: 32px;
-  padding: 48px 0 32px;
-  border-bottom: 1px solid;
-  margin-bottom: 24px;
+  gap: 20px;
+  padding: 28px 0 20px;
+  border-bottom: none;
+  margin-bottom: 0;
 }
 
 .barry-fe-hero-text {
@@ -544,8 +544,8 @@
 }
 
 .barry-fe-hero-heading {
-  margin: 0 0 12px;
-  font-size: 28px;
+  margin: 0 0 6px;
+  font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.02em;
   line-height: 1.2;
@@ -562,7 +562,7 @@
 }
 
 .barry-fe-hero-img {
-  height: 280px;
+  height: 200px;
   width: auto;
   object-fit: contain;
 }
@@ -571,7 +571,7 @@
 .barry-fe-divider {
   position: relative;
   border-top: 1px solid;
-  margin: 0 0 24px;
+  margin: 0 0 12px;
   display: flex;
   justify-content: flex-start;
   padding-left: 38px;
@@ -635,16 +635,16 @@
   }
 
   .barry-fe-hero {
-    padding: 32px 0 24px;
-    gap: 24px;
+    padding: 24px 0 16px;
+    gap: 18px;
   }
 
   .barry-fe-hero-heading {
-    font-size: 24px;
+    font-size: 23px;
   }
 
   .barry-fe-hero-img {
-    height: 220px;
+    height: 170px;
   }
 }
 
@@ -665,8 +665,8 @@
   .barry-fe-hero {
     flex-direction: column;
     align-items: flex-start;
-    padding: 24px 0 20px;
-    gap: 16px;
+    padding: 20px 0 14px;
+    gap: 12px;
   }
 
   .barry-fe-hero-heading {
@@ -678,7 +678,7 @@
   }
 
   .barry-fe-hero-img {
-    height: 160px;
+    height: 140px;
     align-self: center;
   }
 

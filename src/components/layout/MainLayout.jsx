@@ -118,6 +118,7 @@ function ShellChrome({ children, user }) {
     navigationContext,
     quickEngage,
     arrival,
+    isFirstExperience,
   } = useShell();
 
   const barryButtonRef = useRef(null);
@@ -354,7 +355,15 @@ function ShellChrome({ children, user }) {
           of barryOpen. */}
       {(() => {
         const onBarryPage = location.pathname === '/barry';
-        const hidden = !barryOpen || onBarryPage;
+
+        // During First Experience, redirect sidecar opens to /barry instead
+        // of showing the legacy orientation panel as a competing surface.
+        if (isFirstExperience && barryOpen && !onBarryPage) {
+          closeBarry();
+          navigate('/barry');
+        }
+
+        const hidden = !barryOpen || onBarryPage || isFirstExperience;
         return (
           <div
             ref={barryHostRef}

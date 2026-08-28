@@ -601,15 +601,7 @@ export default function BarryWorkspace() {
                 )}
 
                 {isBusy && (
-                  <div className="barry-workspace-message assistant">
-                    <img
-                      src={ASSETS.barryAvatar}
-                      alt=""
-                      className="barry-workspace-msg-avatar"
-                      width={28}
-                      height={28}
-                      onError={e => { e.target.style.display = 'none'; }}
-                    />
+                  <div className="barry-workspace-message barry-workspace-message--fe assistant">
                     <div
                       className="barry-workspace-msg-bubble barry-workspace-typing"
                       style={{ background: T.surface, borderColor: T.border }}
@@ -626,14 +618,6 @@ export default function BarryWorkspace() {
           {/* Composer — anchored at bottom */}
           <div className="barry-fe-composer" style={{ borderColor: T.border, background: T.cardBg }}>
             <div className="barry-fe-composer-inner">
-              <img
-                src={ASSETS.barryAvatar}
-                alt=""
-                className="barry-fe-composer-avatar"
-                width={36}
-                height={36}
-                onError={e => { e.target.style.display = 'none'; }}
-              />
               <textarea
                 ref={inputRef}
                 value={inputValue}

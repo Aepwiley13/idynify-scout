@@ -34,6 +34,39 @@ function clean(value) {
   return trimmed.length > 0 ? trimmed : null;
 }
 
+const NAME_INTROS = [
+  /^i'm\s+/i,
+  /^im\s+/i,
+  /^i am\s+/i,
+  /^my name is\s+/i,
+  /^my name's\s+/i,
+  /^the name is\s+/i,
+  /^the name's\s+/i,
+  /^call me\s+/i,
+  /^you can call me\s+/i,
+  /^just call me\s+/i,
+  /^they call me\s+/i,
+  /^people call me\s+/i,
+  /^i go by\s+/i,
+  /^it's\s+/i,
+  /^its\s+/i,
+];
+
+export function normalizeName(raw) {
+  if (typeof raw !== 'string') return null;
+  let name = raw.trim();
+  name = name.replace(/^(?:hi|hey|hello|yo)[,.\s]+/i, '');
+  for (const pattern of NAME_INTROS) {
+    const stripped = name.replace(pattern, '');
+    if (stripped !== name) {
+      name = stripped;
+      break;
+    }
+  }
+  name = name.replace(/[.!,]+$/, '').trim();
+  return name || null;
+}
+
 /**
  * A display name is only useful if it reads like a name. An email address in
  * the displayName slot ("dana@example.com") would have Barry greet someone by

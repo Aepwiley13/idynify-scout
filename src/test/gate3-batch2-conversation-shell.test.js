@@ -287,13 +287,13 @@ describe('B2-8 — rememberName preservation', () => {
     expect(controller).toMatch(/import.*rememberName.*from.*resolveWho/);
   });
 
-  it('controller calls rememberName when user provides name', () => {
-    expect(controllerCode).toMatch(/rememberName\(user\.uid,\s*trimmed\)/);
+  it('controller calls rememberName with normalized name', () => {
+    expect(controllerCode).toMatch(/rememberName\(user\.uid,\s*preferred\)/);
   });
 
-  it('controller updates who state optimistically', () => {
+  it('controller updates who state with normalized name', () => {
     expect(controllerCode).toMatch(/setWho\(/);
-    expect(controllerCode).toMatch(/name:\s*trimmed/);
+    expect(controllerCode).toMatch(/name:\s*preferred/);
   });
 
   it('controller sets sessionStorage ASKED_KEY on name submission', () => {

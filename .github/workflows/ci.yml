@@ -14,12 +14,11 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm install
+      # Test exclusions (policy, 2026-08-28): this gate runs the whole corpus.
+      # An exclusion added here must carry, in a comment beside it: the reason,
+      # a named owner, and the condition or date on which it is removed. An
+      # exclusion with no removal condition is a permanent blind spot — the
+      # previous list was added for one red run on 2026-07-24 and silently
+      # outlived its cause by five weeks, hiding a real failure from CI.
       - name: Run tests
-        run: |
-          npx vitest run \
-            --exclude 'src/test/HunterCardStack.test.jsx' \
-            --exclude 'src/test/hunterBootstrap.test.js' \
-            --exclude 'src/test/hunterOutcomeLogic.test.js' \
-            --exclude 'src/test/hunterSoundHaptics.test.jsx' \
-            --exclude 'src/test/ReconErrorBoundary.test.jsx' \
-            --exclude 'src/test/ReconModulePage.test.jsx'
+        run: npx vitest run

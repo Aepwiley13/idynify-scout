@@ -203,6 +203,14 @@ export default function BarryWorkspace() {
       setConversationTurns(turns);
       setConversationHistory(turns.map(t => ({ role: t.role, content: t.content })));
       setWho(resolveWho(user, userData));
+
+      // Hydrate the FE dedup set from already-persisted canonical turns so a
+      // page reload does not re-append the same greeting/name-ask turns.
+      for (const t of turns) {
+        if (t.kind === 'first-experience' && t.content) {
+          feAppendedRef.current.add(`${t.role}::${t.content}`);
+        }
+      }
     } catch (err) {
       console.warn('[BarryWorkspace] init failed:', err.message);
     }

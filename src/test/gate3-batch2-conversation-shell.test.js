@@ -359,4 +359,23 @@ describe('B2-C1 — FE turn canonical persistence', () => {
   it('controller still does not call appendTurn (write stays in workspace)', () => {
     expect(controllerCode).not.toMatch(/appendTurn\(/);
   });
+
+  it('hydrates feAppendedRef from persisted canonical FE turns on init', () => {
+    expect(workspaceCode).toMatch(/kind === 'first-experience'/);
+    expect(workspaceCode).toMatch(/feAppendedRef\.current\.add\(`\$\{t\.role\}::\$\{t\.content\}`\)/);
+  });
+
+  it('dedup Set is populated before the FE append effect can fire', () => {
+    const initBlock = workspaceCode.slice(workspaceCode.indexOf('async function init'));
+    const hydratePos = initBlock.indexOf("kind === 'first-experience'");
+    expect(hydratePos).toBeGreaterThan(-1);
+    expect(initBlock.indexOf('feAppendedRef.current.add')).toBeGreaterThan(-1);
+  });
+
+  it('dedup key format matches between hydration and append guard', () => {
+    const hydratePattern = workspaceCode.match(/feAppendedRef\.current\.add\(`\$\{t\.role\}::\$\{t\.content\}`\)/);
+    const guardPattern = workspaceCode.match(/`\$\{turn\.role\}::\$\{turn\.content\}`/);
+    expect(hydratePattern).not.toBeNull();
+    expect(guardPattern).not.toBeNull();
+  });
 });

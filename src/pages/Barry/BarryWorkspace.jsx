@@ -28,7 +28,7 @@ import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { useShell } from '../../context/ShellContext';
 import { useLocation } from 'react-router-dom';
 import { useT } from '../../theme/ThemeContext';
-import { BRAND, ASSETS } from '../../theme/tokens';
+import { BRAND, ASSETS, AUTH_ASSETS } from '../../theme/tokens';
 import { appendTurn, loadOrSeedRecentTurns } from '../../utils/barryCanonical';
 import { resolveWho } from '../../utils/resolveWho';
 import { buildContextStack } from '../../utils/barryContextStack';
@@ -378,8 +378,8 @@ export default function BarryWorkspace() {
     const composerDisabled = isBusy || (isDelivering && !isProspecting) || (isProspecting && !prospectingReady);
 
     return (
-      <div className="barry-workspace barry-workspace--first-experience">
-        <div className="barry-workspace-header" style={{ borderColor: T.border }}>
+      <div className="barry-workspace barry-workspace--first-experience" style={{ background: T.cardBg }}>
+        <div className="barry-workspace-header" style={{ borderColor: T.border, background: T.cardBg }}>
           <div className="barry-workspace-header-left">
             <img
               src={ASSETS.barryAvatar}
@@ -398,17 +398,201 @@ export default function BarryWorkspace() {
           </div>
         </div>
 
-        <div className="barry-workspace-thread" ref={threadRef}>
-          {feTurns.map((turn, i) => {
-            // Structured card turns render their card below the message bubble
-            const hasCard = turn._feCard && i === feTurns.length - 1;
+        <div className="barry-fe-layout">
+          {/* ── Primary column: hero + conversation + composer ── */}
+          <div className="barry-fe-primary">
+            <div className="barry-fe-scroll" ref={threadRef}>
+              {/* Hero welcome */}
+              <div className="barry-fe-hero">
+                <h2 className="barry-fe-hero-heading" style={{ color: T.text }}>
+                  Welcome to <span style={{ color: BRAND.purple || '#6d4aff' }}>IDYNIFY</span>
+                </h2>
+                <p className="barry-fe-hero-sub" style={{ color: T.textMuted }}>
+                  I'm Barry, the intelligence inside IDYNIFY.
+                  <br />
+                  I'll help you know who matters, why they matter, and what to do next.
+                </p>
+              </div>
 
-            return (
-              <div key={i}>
-                <div
-                  className={`barry-workspace-message ${turn.role === 'user' ? 'user' : 'assistant'}`}
-                >
-                  {turn.role === 'assistant' && (
+              {/* Conversation divider */}
+              <div className="barry-fe-divider" style={{ borderColor: T.border }}>
+                <span className="barry-fe-divider-label" style={{ color: T.textMuted, background: T.cardBg }}>Barry</span>
+              </div>
+
+              {/* Conversation thread */}
+              <div className="barry-fe-thread">
+                {feTurns.map((turn, i) => {
+                  const hasCard = turn._feCard && i === feTurns.length - 1;
+
+                  return (
+                    <div key={i}>
+                      <div
+                        className={`barry-workspace-message ${turn.role === 'user' ? 'user' : 'assistant'}`}
+                      >
+                        {turn.role === 'assistant' && (
+                          <img
+                            src={ASSETS.barryAvatar}
+                            alt=""
+                            className="barry-workspace-msg-avatar"
+                            width={28}
+                            height={28}
+                            onError={e => { e.target.style.display = 'none'; }}
+                          />
+                        )}
+                        <div
+                          className="barry-workspace-msg-bubble"
+                          style={{
+                            background: turn.role === 'user' ? `${BRAND.pink}12` : T.surface,
+                            borderColor: turn.role === 'user' ? `${BRAND.pink}25` : T.border,
+                            color: T.text,
+                          }}
+                        >
+                          <p>{turn.content}</p>
+                        </div>
+                      </div>
+
+                      {hasCard && turn._feCard === 'prospecting' && (
+                        <div className="barry-workspace-fe-card">
+                          <BarryOnboarding
+                            ref={onboardingRef}
+                            embedded
+                            knownName={feCtrl.who?.name || null}
+                            goal={feCtrl.pending?.restatement || null}
+                            onBarryMessage={(content) => feCtrl.addTurn({ role: 'assistant', content })}
+                            onProcessing={setProspectingBusy}
+                            onStepChange={setProspectingStep}
+                          />
+                        </div>
+                      )}
+
+                      {hasCard && turn._feCard === 'relationship' && (
+                        <div className="barry-workspace-fe-card">
+                          <RelationshipFirstValue
+                            decision={feCtrl.decision}
+                            knownName={feCtrl.who?.name || null}
+                          />
+                        </div>
+                      )}
+
+                      {hasCard && turn._feCard === 'results' && resultCompanies && (
+                        <div className="barry-workspace-fe-card">
+                          <CompanyResultsCard
+                            companies={resultCompanies}
+                            totalCount={companiesFoundCount || resultCompanies.length}
+                            onAccept={(company) => {
+                              feCtrl.addTurn({
+                                role: 'assistant',
+                                content: `Got it — I'll keep ${company.name || company.company_name}. We can look at the right people there next.`,
+                              });
+                            }}
+                          />
+                          <div className="barry-workspace-fe-actions" style={{ marginTop: 12 }}>
+                            <button
+                              className="barry-workspace-fe-btn barry-workspace-fe-btn--go"
+                              style={{ background: BRAND.pink, color: '#fff' }}
+                              onClick={() => navigate('/scout', { state: { activeTab: 'daily-leads' } })}
+                            >
+                              Review these in Scout
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {hasCard && turn._feCard === 'navigate' && feCtrl.decision?.destination && (
+                        <div className="barry-workspace-fe-actions">
+                          <button
+                            className="barry-workspace-fe-btn barry-workspace-fe-btn--go"
+                            style={{ background: BRAND.pink, color: '#fff' }}
+                            onClick={() => navigate(feCtrl.decision.destination.path)}
+                          >
+                            Take me there
+                          </button>
+                          {feCtrl.held && (
+                            <button
+                              className="barry-workspace-fe-btn barry-workspace-fe-btn--quiet"
+                              style={{ borderColor: T.border, color: T.text }}
+                              onClick={() => feCtrl.chooseIntent(feCtrl.held)}
+                            >
+                              Then {intentLabel(feCtrl.held)}
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {hasCard && turn._feCard === 'blocked' && (
+                        <div className="barry-workspace-fe-actions">
+                          {feCtrl.decision?.destination && (
+                            <button
+                              className="barry-workspace-fe-btn barry-workspace-fe-btn--go"
+                              style={{ background: BRAND.pink, color: '#fff' }}
+                              onClick={() => navigate(feCtrl.decision.destination.path)}
+                            >
+                              Set that up
+                            </button>
+                          )}
+                          {(feCtrl.decision?.options || []).map(o => (
+                            <button
+                              key={o.id}
+                              className="barry-workspace-fe-btn barry-workspace-fe-btn--quiet"
+                              style={{ borderColor: T.border, color: T.text }}
+                              onClick={() => feCtrl.chooseIntent(o.intent)}
+                            >
+                              {o.label}
+                            </button>
+                          ))}
+                          {feCtrl.held && (
+                            <button
+                              className="barry-workspace-fe-btn barry-workspace-fe-btn--quiet"
+                              style={{ borderColor: T.border, color: T.text }}
+                              onClick={() => feCtrl.chooseIntent(feCtrl.held)}
+                            >
+                              Then {intentLabel(feCtrl.held)}
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {hasCard && turn._feCard === 'action' && (
+                        <div className="barry-workspace-fe-actions">
+                          {feCtrl.decision?.destination && (
+                            <button
+                              className="barry-workspace-fe-btn barry-workspace-fe-btn--go"
+                              style={{ background: BRAND.pink, color: '#fff' }}
+                              onClick={() => navigate(feCtrl.decision.destination.path)}
+                            >
+                              Take me there
+                            </button>
+                          )}
+                          {(feCtrl.decision?.options || []).map(o => (
+                            <button
+                              key={o.id}
+                              className="barry-workspace-fe-btn barry-workspace-fe-btn--quiet"
+                              style={{ borderColor: T.border, color: T.text }}
+                              onClick={() => feCtrl.chooseIntent(o.intent)}
+                            >
+                              {o.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {isWhoPhase && (
+                  <div className="barry-workspace-fe-skip">
+                    <button
+                      onClick={feCtrl.skipName}
+                      className="barry-workspace-skip-chip"
+                      style={{ color: T.textMuted, borderColor: T.border }}
+                    >
+                      Skip for now
+                    </button>
+                  </div>
+                )}
+
+                {isBusy && (
+                  <div className="barry-workspace-message assistant">
                     <img
                       src={ASSETS.barryAvatar}
                       alt=""
@@ -417,216 +601,78 @@ export default function BarryWorkspace() {
                       height={28}
                       onError={e => { e.target.style.display = 'none'; }}
                     />
-                  )}
-                  <div
-                    className="barry-workspace-msg-bubble"
-                    style={{
-                      background: turn.role === 'user' ? `${BRAND.pink}12` : T.cardBg,
-                      borderColor: turn.role === 'user' ? `${BRAND.pink}25` : T.border,
-                      color: T.text,
-                    }}
-                  >
-                    <p>{turn.content}</p>
-                  </div>
-                </div>
-
-                {hasCard && turn._feCard === 'prospecting' && (
-                  <div className="barry-workspace-fe-card">
-                    <BarryOnboarding
-                      ref={onboardingRef}
-                      embedded
-                      knownName={feCtrl.who?.name || null}
-                      goal={feCtrl.pending?.restatement || null}
-                      onBarryMessage={(content) => feCtrl.addTurn({ role: 'assistant', content })}
-                      onProcessing={setProspectingBusy}
-                      onStepChange={setProspectingStep}
-                    />
-                  </div>
-                )}
-
-                {hasCard && turn._feCard === 'relationship' && (
-                  <div className="barry-workspace-fe-card">
-                    <RelationshipFirstValue
-                      decision={feCtrl.decision}
-                      knownName={feCtrl.who?.name || null}
-                    />
-                  </div>
-                )}
-
-                {hasCard && turn._feCard === 'results' && resultCompanies && (
-                  <div className="barry-workspace-fe-card">
-                    <CompanyResultsCard
-                      companies={resultCompanies}
-                      totalCount={companiesFoundCount || resultCompanies.length}
-                      onAccept={(company) => {
-                        feCtrl.addTurn({
-                          role: 'assistant',
-                          content: `Got it — I'll keep ${company.name || company.company_name}. We can look at the right people there next.`,
-                        });
-                      }}
-                    />
-                    <div className="barry-workspace-fe-actions" style={{ marginTop: 12 }}>
-                      <button
-                        className="barry-workspace-fe-btn barry-workspace-fe-btn--go"
-                        style={{ background: BRAND.pink, color: '#fff' }}
-                        onClick={() => navigate('/scout', { state: { activeTab: 'daily-leads' } })}
-                      >
-                        Review these in Scout
-                      </button>
+                    <div
+                      className="barry-workspace-msg-bubble barry-workspace-typing"
+                      style={{ background: T.surface, borderColor: T.border }}
+                    >
+                      <span className="barry-typing-dot" />
+                      <span className="barry-typing-dot" />
+                      <span className="barry-typing-dot" />
                     </div>
                   </div>
                 )}
-
-                {hasCard && turn._feCard === 'navigate' && feCtrl.decision?.destination && (
-                  <div className="barry-workspace-fe-actions">
-                    <button
-                      className="barry-workspace-fe-btn barry-workspace-fe-btn--go"
-                      style={{ background: BRAND.pink, color: '#fff' }}
-                      onClick={() => navigate(feCtrl.decision.destination.path)}
-                    >
-                      Take me there
-                    </button>
-                    {feCtrl.held && (
-                      <button
-                        className="barry-workspace-fe-btn barry-workspace-fe-btn--quiet"
-                        style={{ borderColor: T.border, color: T.text }}
-                        onClick={() => feCtrl.chooseIntent(feCtrl.held)}
-                      >
-                        Then {intentLabel(feCtrl.held)}
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {hasCard && turn._feCard === 'blocked' && (
-                  <div className="barry-workspace-fe-actions">
-                    {feCtrl.decision?.destination && (
-                      <button
-                        className="barry-workspace-fe-btn barry-workspace-fe-btn--go"
-                        style={{ background: BRAND.pink, color: '#fff' }}
-                        onClick={() => navigate(feCtrl.decision.destination.path)}
-                      >
-                        Set that up
-                      </button>
-                    )}
-                    {(feCtrl.decision?.options || []).map(o => (
-                      <button
-                        key={o.id}
-                        className="barry-workspace-fe-btn barry-workspace-fe-btn--quiet"
-                        style={{ borderColor: T.border, color: T.text }}
-                        onClick={() => feCtrl.chooseIntent(o.intent)}
-                      >
-                        {o.label}
-                      </button>
-                    ))}
-                    {feCtrl.held && (
-                      <button
-                        className="barry-workspace-fe-btn barry-workspace-fe-btn--quiet"
-                        style={{ borderColor: T.border, color: T.text }}
-                        onClick={() => feCtrl.chooseIntent(feCtrl.held)}
-                      >
-                        Then {intentLabel(feCtrl.held)}
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {hasCard && turn._feCard === 'action' && (
-                  <div className="barry-workspace-fe-actions">
-                    {feCtrl.decision?.destination && (
-                      <button
-                        className="barry-workspace-fe-btn barry-workspace-fe-btn--go"
-                        style={{ background: BRAND.pink, color: '#fff' }}
-                        onClick={() => navigate(feCtrl.decision.destination.path)}
-                      >
-                        Take me there
-                      </button>
-                    )}
-                    {(feCtrl.decision?.options || []).map(o => (
-                      <button
-                        key={o.id}
-                        className="barry-workspace-fe-btn barry-workspace-fe-btn--quiet"
-                        style={{ borderColor: T.border, color: T.text }}
-                        onClick={() => feCtrl.chooseIntent(o.intent)}
-                      >
-                        {o.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
               </div>
-            );
-          })}
-
-          {isWhoPhase && (
-            <div className="barry-workspace-fe-skip">
-              <button
-                onClick={feCtrl.skipName}
-                className="barry-workspace-skip-chip"
-                style={{ color: T.textMuted, borderColor: T.border }}
-              >
-                Skip for now
-              </button>
             </div>
-          )}
 
-          {isBusy && (
-            <div className="barry-workspace-message assistant">
+            {/* Composer — anchored at bottom of primary column */}
+            <div className="barry-fe-composer" style={{ borderColor: T.border, background: T.cardBg }}>
+              <div className="barry-fe-composer-inner">
+                <img
+                  src={ASSETS.barryAvatar}
+                  alt=""
+                  className="barry-fe-composer-avatar"
+                  width={36}
+                  height={36}
+                  onError={e => { e.target.style.display = 'none'; }}
+                />
+                <textarea
+                  ref={inputRef}
+                  value={inputValue}
+                  rows={1}
+                  onChange={(e) => {
+                    setInputValue(e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+                  }}
+                  onKeyDown={handleKeyDown}
+                  placeholder={placeholder}
+                  disabled={composerDisabled}
+                  aria-label="Message Barry"
+                  className="barry-workspace-input"
+                  style={{
+                    background: T.cardBg,
+                    borderColor: 'transparent',
+                    color: T.text,
+                  }}
+                />
+                <button
+                  onClick={handleFirstExperienceSubmit}
+                  disabled={composerDisabled || !inputValue.trim()}
+                  aria-label="Send"
+                  className="barry-workspace-send barry-fe-send"
+                  style={{
+                    background: inputValue.trim() ? BRAND.pink : T.surface,
+                    color: inputValue.trim() ? '#fff' : T.textMuted,
+                  }}
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Barry presence column ── */}
+          <div className="barry-fe-presence" style={{ background: T.surface }}>
+            <picture>
+              <source srcSet={AUTH_ASSETS.barry.signup.avif} type="image/avif" />
+              <source srcSet={AUTH_ASSETS.barry.signup.webp} type="image/webp" />
               <img
-                src={ASSETS.barryAvatar}
-                alt=""
-                className="barry-workspace-msg-avatar"
-                width={28}
-                height={28}
+                src={AUTH_ASSETS.barry.signup.png}
+                alt={AUTH_ASSETS.barry.signup.alt}
+                className="barry-fe-presence-img"
                 onError={e => { e.target.style.display = 'none'; }}
               />
-              <div
-                className="barry-workspace-msg-bubble barry-workspace-typing"
-                style={{ background: T.cardBg, borderColor: T.border }}
-              >
-                <span className="barry-typing-dot" />
-                <span className="barry-typing-dot" />
-                <span className="barry-typing-dot" />
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="barry-workspace-composer" style={{ borderColor: T.border, background: T.cardBg }}>
-          <div className="barry-workspace-composer-row">
-            <textarea
-              ref={inputRef}
-              value={inputValue}
-              rows={1}
-              onChange={(e) => {
-                setInputValue(e.target.value);
-                e.target.style.height = 'auto';
-                e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder={placeholder}
-              disabled={composerDisabled}
-              aria-label="Message Barry"
-              className="barry-workspace-input"
-              style={{
-                background: T.cardBg,
-                borderColor: T.border,
-                color: T.text,
-              }}
-            />
-            <button
-              onClick={handleFirstExperienceSubmit}
-              disabled={composerDisabled || !inputValue.trim()}
-              aria-label="Send"
-              className="barry-workspace-send"
-              style={{
-                background: inputValue.trim() ? BRAND.pink : 'transparent',
-                color: inputValue.trim() ? '#fff' : T.textMuted,
-                border: inputValue.trim() ? 'none' : `1px solid ${T.border}`,
-              }}
-            >
-              Send
-            </button>
+            </picture>
           </div>
         </div>
       </div>

@@ -218,8 +218,8 @@ describe('B3-7 — Continuous workspace shell', () => {
     expect(workspaceCode).toMatch(/isDelivering/);
     const feBlock = workspaceCode.slice(workspaceCode.indexOf("feCtrl.phase !== 'loading'"));
     expect(feBlock).toMatch(/barry-workspace-header/);
-    expect(feBlock).toMatch(/barry-workspace-thread/);
-    expect(feBlock).toMatch(/barry-workspace-composer/);
+    expect(feBlock).toMatch(/barry-fe-thread/);
+    expect(feBlock).toMatch(/barry-fe-composer/);
   });
 });
 

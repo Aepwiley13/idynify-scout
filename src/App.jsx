@@ -344,9 +344,9 @@ function App() {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={!user ? <Homepage /> : <SmartRedirect />} />
-        <Route path="/login" element={!user ? <Login /> : <Navigate to="/mission-control-v2" />} />
+        <Route path="/login" element={!user ? <Login /> : <SmartRedirect />} />
         <Route path="/signup" element={!user ? <Signup /> : <Navigate to="/checkout" />} />
-        <Route path="/forgot-password" element={!user ? <ForgotPassword /> : <Navigate to="/mission-control-v2" />} />
+        <Route path="/forgot-password" element={!user ? <ForgotPassword /> : <SmartRedirect />} />
 
         {/* Getting Started (Auth Required) */}
         <Route path="/getting-started" element={<ProtectedRoute><GettingStarted /></ProtectedRoute>} />

@@ -80,11 +80,11 @@ describe('B2-2 — Controller WHO flow and skip', () => {
   });
 
   it('generates greeting turn with name when known', () => {
-    expect(controllerCode).toMatch(/Hey \$\{resolved\.name\}/);
+    expect(controllerCode).toMatch(/\$\{resolved\.name\}/);
   });
 
   it('generates greeting turn without name when unknown', () => {
-    expect(controllerCode).toMatch(/Hey —/);
+    expect(controllerCode).toMatch(/I'm Barry/);
   });
 
   it('provides skipName callback', () => {

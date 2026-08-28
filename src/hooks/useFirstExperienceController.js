@@ -21,7 +21,8 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { auth, db } from '../firebase/config';
 import { doc, getDoc, getDocs, collection, query, limit } from 'firebase/firestore';
 import { getEffectiveUser } from '../context/ImpersonationContext';
-import { resolveWho, rememberName } from '../utils/resolveWho';
+import { resolveWho, rememberName, normalizeName } from '../utils/resolveWho';
+import { loadRecentTurns } from '../utils/barryCanonical';
 import { resolveActiveIcp } from '../utils/resolveActiveIcp';
 import {
   resolveFirstExperienceMode,
@@ -122,6 +123,16 @@ export default function useFirstExperienceController(arrival = null) {
       const alreadyAsked = sessionStorage.getItem(ASKED_KEY) === '1';
       const wantsName = resolved.shouldAsk && !alreadyAsked && shouldIntroduce(mode);
 
+      if (!wantsName) {
+        const recentTurns = await loadRecentTurns(db, user.uid, 50);
+        const persistedFe = recentTurns.filter(t => t.kind === 'first-experience' && t.content);
+        if (persistedFe.length > 0) {
+          setTurns(persistedFe.map(t => ({ role: t.role, content: t.content })));
+          setPhase('intent');
+          return;
+        }
+      }
+
       const openingTurns = [];
 
       if (wantsName) {
@@ -157,19 +168,20 @@ export default function useFirstExperienceController(arrival = null) {
     if (phase === 'who') {
       sessionStorage.setItem(ASKED_KEY, '1');
       const user = getEffectiveUser() || auth.currentUser;
+      const preferred = normalizeName(trimmed) || trimmed;
 
       setTurns(prev => [...prev, { role: 'user', content: trimmed }]);
 
       logEvent(EVENTS.WHO_PROVIDED, { source: 'conversational' });
-      const updatedWho = { name: trimmed, source: 'stored', shouldAsk: false };
+      const updatedWho = { name: preferred, source: 'stored', shouldAsk: false };
       setWho(updatedWho);
 
       if (user) {
-        rememberName(user.uid, trimmed);
+        rememberName(user.uid, preferred);
       }
 
       setTurns(prev => [...prev,
-        { role: 'assistant', content: `Right on, ${trimmed}. Let's get started.` },
+        { role: 'assistant', content: `Right on, ${preferred}. Let's get started.` },
         { role: 'assistant', content: `What are you hoping to get done?` },
       ]);
       setPhase('intent');

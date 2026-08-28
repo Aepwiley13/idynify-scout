@@ -102,9 +102,12 @@ describe('B2-2 — Controller WHO flow and skip', () => {
     expect(skipBlock).toMatch(/setPhase\('intent'\)/);
   });
 
-  it('marks WHO turn with _fePhase and _feSkippable metadata', () => {
+  it('marks WHO turn with _fePhase metadata', () => {
     expect(controllerCode).toMatch(/_fePhase:\s*'who'/);
-    expect(controllerCode).toMatch(/_feSkippable:\s*true/);
+  });
+
+  it('name is required — no _feSkippable on WHO turn', () => {
+    expect(controllerCode).not.toMatch(/_feSkippable/);
   });
 });
 
@@ -190,9 +193,9 @@ describe('B2-5 — Workspace controller integration', () => {
     expect(workspaceCode).toMatch(/feCtrl\.handleUserInput/);
   });
 
-  it('renders skip button during WHO phase', () => {
-    expect(workspaceCode).toMatch(/feCtrl\.skipName/);
-    expect(workspaceCode).toMatch(/isWhoPhase/);
+  it('does not render skip button — name is required', () => {
+    expect(workspaceCode).not.toMatch(/feCtrl\.skipName/);
+    expect(workspaceCode).not.toMatch(/Skip for now/);
   });
 
   it('renders typing indicator during classification', () => {
@@ -300,24 +303,18 @@ describe('B2-8 — rememberName preservation', () => {
 });
 
 // ═══════════════════════════════════════════════════════════════════════════
-// B2-9 — Skip button CSS
+// B2-9 — Name is required (skip removed)
 // ═══════════════════════════════════════════════════════════════════════════
 
-describe('B2-9 — Skip button CSS', () => {
-  it('defines .barry-workspace-fe-skip', () => {
-    expect(workspaceCss).toMatch(/\.barry-workspace-fe-skip/);
+describe('B2-9 — Name required, skip removed', () => {
+  it('skip CSS classes removed from stylesheet', () => {
+    expect(workspaceCss).not.toMatch(/\.barry-workspace-fe-skip/);
+    expect(workspaceCss).not.toMatch(/\.barry-workspace-skip-chip/);
   });
 
-  it('defines .barry-workspace-skip-chip', () => {
-    expect(workspaceCss).toMatch(/\.barry-workspace-skip-chip/);
-  });
-
-  it('skip chip has no visible background', () => {
-    expect(workspaceCss).toMatch(/\.barry-workspace-skip-chip[\s\S]*?background:\s*none/);
-  });
-
-  it('skip chip has border-radius for pill shape', () => {
-    expect(workspaceCss).toMatch(/\.barry-workspace-skip-chip[\s\S]*?border-radius/);
+  it('workspace does not render skip UI', () => {
+    expect(workspaceCode).not.toMatch(/Skip for now/);
+    expect(workspaceCode).not.toMatch(/skip-chip/);
   });
 });
 

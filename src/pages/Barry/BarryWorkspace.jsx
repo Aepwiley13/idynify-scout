@@ -414,15 +414,7 @@ export default function BarryWorkspace() {
           <div className="barry-fe-scroll" ref={threadRef}>
             {/* Hero welcome — visible during introduction, collapses after name */}
             {showHero && (
-              <div className="barry-fe-hero" style={{ borderColor: T.border }}>
-                <div className="barry-fe-hero-text">
-                  <h2 className="barry-fe-hero-heading" style={{ color: T.text }}>
-                    Welcome to <span style={{ color: BRAND.purple || '#6d4aff' }}>IDYNIFY</span>
-                  </h2>
-                  <p className="barry-fe-hero-sub" style={{ color: T.textMuted }}>
-                    Meet Barry — the AI and intelligence inside IDYNIFY.
-                  </p>
-                </div>
+              <div className="barry-fe-hero">
                 <div className="barry-fe-hero-presence">
                   <picture>
                     <source srcSet={AUTH_ASSETS.barry.signup.avif} type="image/avif" />
@@ -435,6 +427,12 @@ export default function BarryWorkspace() {
                     />
                   </picture>
                 </div>
+                <h2 className="barry-fe-hero-heading" style={{ color: T.text }}>
+                  Welcome to <span style={{ color: BRAND.purple || '#6d4aff' }}>IDYNIFY</span>
+                </h2>
+                <p className="barry-fe-hero-sub" style={{ color: T.textMuted }}>
+                  Meet Barry — the AI and intelligence inside IDYNIFY.
+                </p>
               </div>
             )}
 
@@ -587,18 +585,6 @@ export default function BarryWorkspace() {
                     </div>
                   );
                 })}
-
-                {isWhoPhase && (
-                  <div className="barry-workspace-fe-skip">
-                    <button
-                      onClick={feCtrl.skipName}
-                      className="barry-workspace-skip-chip"
-                      style={{ color: T.textMuted, borderColor: T.border }}
-                    >
-                      Skip for now
-                    </button>
-                  </div>
-                )}
 
                 {isBusy && (
                   <div className="barry-workspace-message barry-workspace-message--fe assistant">

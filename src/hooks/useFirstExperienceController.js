@@ -130,7 +130,6 @@ export default function useFirstExperienceController(arrival = null) {
           role: 'assistant',
           content: "What's up — I'm Barry. I've got your back. What's your name?",
           _fePhase: 'who',
-          _feSkippable: true,
         });
         setTurns(openingTurns);
         setPhase('who');

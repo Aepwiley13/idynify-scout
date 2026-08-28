@@ -41,7 +41,16 @@
 .barry-workspace-fe-card {
   max-width: 720px;
   width: 100%;
-  padding-left: 38px;
+  padding-left: 0;
+}
+
+/* FE messages: no per-message avatar — Barry is established by the hero */
+.barry-workspace-message--fe.assistant {
+  padding-left: 0;
+}
+
+.barry-workspace-message--fe.assistant .barry-workspace-msg-bubble {
+  border-radius: 14px 14px 14px 4px;
 }
 
 /* B4: Flatten the embedded BarryOnboarding container so structured objects

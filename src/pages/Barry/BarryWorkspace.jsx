@@ -446,18 +446,8 @@ export default function BarryWorkspace() {
                   return (
                     <div key={i}>
                       <div
-                        className={`barry-workspace-message ${turn.role === 'user' ? 'user' : 'assistant'}`}
+                        className={`barry-workspace-message barry-workspace-message--fe ${turn.role === 'user' ? 'user' : 'assistant'}`}
                       >
-                        {turn.role === 'assistant' && (
-                          <img
-                            src={ASSETS.barryAvatar}
-                            alt=""
-                            className="barry-workspace-msg-avatar"
-                            width={28}
-                            height={28}
-                            onError={e => { e.target.style.display = 'none'; }}
-                          />
-                        )}
                         <div
                           className="barry-workspace-msg-bubble"
                           style={{

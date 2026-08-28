@@ -406,9 +406,6 @@ export default function BarryWorkspace() {
             />
             <div>
               <h1 className="barry-workspace-title" style={{ color: T.text }}>Barry</h1>
-              <span className="barry-workspace-subtitle" style={{ color: T.textMuted }}>
-                Relationship intelligence, built around you
-              </span>
             </div>
           </div>
         </div>

@@ -169,8 +169,10 @@ export default function useFirstExperienceController(arrival = null) {
         rememberName(user.uid, trimmed);
       }
 
-      const intentPrompt = `Right on, ${trimmed}. Let's get started. What are you hoping to get done?`;
-      setTurns(prev => [...prev, { role: 'assistant', content: intentPrompt }]);
+      setTurns(prev => [...prev,
+        { role: 'assistant', content: `Right on, ${trimmed}. Let's get started.` },
+        { role: 'assistant', content: `What are you hoping to get done?` },
+      ]);
       setPhase('intent');
       return;
     }

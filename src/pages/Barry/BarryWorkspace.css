@@ -517,15 +517,8 @@
 .barry-fe-layout {
   flex: 1;
   min-height: 0;
-  display: grid;
-  grid-template-columns: 1fr 380px;
-}
-
-.barry-fe-primary {
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
 }
 
 .barry-fe-scroll {
@@ -535,10 +528,19 @@
   padding: 0 32px;
 }
 
-/* Hero welcome */
+/* Hero welcome — text + Barry inline */
 .barry-fe-hero {
+  display: flex;
+  align-items: center;
+  gap: 32px;
   padding: 48px 0 32px;
-  max-width: 720px;
+  border-bottom: 1px solid;
+  margin-bottom: 24px;
+}
+
+.barry-fe-hero-text {
+  flex: 1;
+  min-width: 0;
 }
 
 .barry-fe-hero-heading {
@@ -553,6 +555,16 @@
   margin: 0;
   font-size: 15px;
   line-height: 1.6;
+}
+
+.barry-fe-hero-presence {
+  flex-shrink: 0;
+}
+
+.barry-fe-hero-img {
+  height: 280px;
+  width: auto;
+  object-fit: contain;
 }
 
 /* Conversation divider */
@@ -584,7 +596,7 @@
   padding-bottom: 32px;
 }
 
-/* Composer — anchored at bottom of primary column */
+/* Composer — anchored at bottom */
 .barry-fe-composer {
   flex-shrink: 0;
   border-top: 1px solid;
@@ -610,42 +622,10 @@
   font-size: 15px;
 }
 
-/* Barry presence column */
-.barry-fe-presence {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-  border-left: 1px solid rgba(0, 0, 0, 0.06);
-}
-
-.barry-fe-presence-img {
-  max-height: 90vh;
-  width: auto;
-  max-width: 100%;
-  object-fit: contain;
-}
-
 /* ── First Experience responsive ───────────────────────────────────────── */
 
-/* Tablet: collapse to single column, show Barry smaller at top */
+/* Tablet */
 @media (max-width: 1024px) {
-  .barry-fe-layout {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
-  }
-
-  .barry-fe-presence {
-    order: -1;
-    max-height: 220px;
-    border-left: none;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
-  }
-
-  .barry-fe-presence-img {
-    max-height: 200px;
-  }
-
   .barry-fe-scroll {
     padding: 0 20px;
   }
@@ -656,19 +636,20 @@
 
   .barry-fe-hero {
     padding: 32px 0 24px;
+    gap: 24px;
   }
 
   .barry-fe-hero-heading {
     font-size: 24px;
   }
+
+  .barry-fe-hero-img {
+    height: 220px;
+  }
 }
 
-/* Mobile: hide Barry image entirely, tighter spacing */
+/* Mobile */
 @media (max-width: 767px) {
-  .barry-fe-presence {
-    display: none;
-  }
-
   .barry-fe-scroll {
     padding: 0 16px;
   }
@@ -682,7 +663,10 @@
   }
 
   .barry-fe-hero {
+    flex-direction: column;
+    align-items: flex-start;
     padding: 24px 0 20px;
+    gap: 16px;
   }
 
   .barry-fe-hero-heading {
@@ -691,6 +675,11 @@
 
   .barry-fe-hero-sub {
     font-size: 14px;
+  }
+
+  .barry-fe-hero-img {
+    height: 160px;
+    align-self: center;
   }
 
   .barry-fe-send {

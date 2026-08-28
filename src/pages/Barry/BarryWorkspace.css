@@ -533,7 +533,7 @@
 }
 
 .barry-fe-hero-img {
-  height: clamp(240px, 28vh, 340px);
+  height: clamp(280px, 32vh, 400px);
   width: auto;
   object-fit: contain;
 }
@@ -614,7 +614,7 @@
   }
 
   .barry-fe-composer {
-    padding: 10px 16px;
+    padding: 8px 16px;
   }
 
   .barry-fe-composer-inner {
@@ -622,19 +622,34 @@
   }
 
   .barry-fe-hero {
-    padding: 16px 0 12px;
+    padding: 8px 0 6px;
+  }
+
+  .barry-fe-hero-presence {
+    margin-bottom: 6px;
   }
 
   .barry-fe-hero-heading {
-    font-size: 22px;
+    font-size: 20px;
+    margin-bottom: 2px;
   }
 
   .barry-fe-hero-sub {
-    font-size: 14px;
+    font-size: 13px;
+    line-height: 1.4;
   }
 
   .barry-fe-hero-img {
-    height: clamp(180px, 30vh, 260px);
+    height: clamp(160px, 26vh, 240px);
+  }
+
+  .barry-fe-thread {
+    gap: 6px;
+    padding-bottom: 8px;
+  }
+
+  .barry-fe-thread .barry-workspace-msg-bubble {
+    padding: 10px 14px;
   }
 
   .barry-fe-send {

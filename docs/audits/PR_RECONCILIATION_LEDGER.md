@@ -8,7 +8,7 @@
 
 **Standing rule for every PR:** compare against current `main` and current architecture, never against the state that existed when the PR was opened. A green CI check means checks passed — it says nothing about whether the work still belongs in the product.
 
-**Standing rule, added 2026-08-27:** "CI green" is not sufficient evidence unless the relevant test files are confirmed to be *included* in CI. Green checks mislead not only about product relevance but about coverage — they may not be running the tests you think they are. See "CI Gate Integrity" below for the discovery that produced this rule.
+**Standing rule, added 2026-08-27:** "CI green" is not sufficient evidence unless the relevant test files are confirmed to be *included* in CI. Green checks mislead not only about product relevance but about coverage — they may not be running the tests you think they are. See "CI Gate Integrity" below for the discovery that produced this rule. **As of PR #590 the gate excludes nothing**, so the rule now guards against regression rather than describing a live gap.
 
 **Standing rule, added 2026-08-27:** A passing test count is not a passing test run. Test evidence must include the process exit code and any unhandled error count. Vitest reports `Test Files`/`Tests` as passed while a run carrying unhandled errors still exits non-zero — a filter that reads only the pass lines will call that run green.
 
@@ -81,10 +81,10 @@ The list came from a single commit, `354b1b2` (2026-07-24, "Add vitest CI workfl
 |-------|-------|---------|
 | Excluded by association | `HunterCardStack`, `hunterBootstrap`, `hunterOutcomeLogic`, `ReconErrorBoundary` | Neither test nor subject has changed since the exclusion; `setup.js` and `vite.config.js` unchanged in that window. Two are pure unit tests with no DOM. Evidence says they were never failing. 104 tests, including the relationship-seeding and `relationship_state` transition engines. |
 | Genuinely failing, since repaired | `hunterSoundHaptics` | Repaired 2026-07-31 by `cc48c80`, seven days after exclusion. Green for four weeks. |
-| Unknown | `ReconModulePage` | Passes today, but its subject moved during the window (five RECON copy rewrites, 2026-08-16/17). July status not establishable from history. The only one where "it may have had a reason" is still live. |
+| Resolved (was Unknown) | `ReconModulePage` | Its subject took five RECON copy rewrites (2026-08-16/17), which is why it was held back. Resolved three ways: none of the strings the test asserts on — `Loading module...`, `Firestore permission denied`, the `Retry` button, `Business Foundation`, `mockNavigate('/recon')` — appears anywhere in that diff (the rewrites only touched `CONTEXTUAL_TIPS` copy); replaying the July state of both test and component passes 7/7, exit 0; and its July render tree has zero `matchMedia` references, so today's shims do not explain the pass. Never failing either. |
 
 **PR B — `ci: run the two repaired test files again`**
-Branch `claude/ci-restore-repaired-tests`, commit `6e72f25`, from `main` @ `1dcb4be`. Removes only the two exclusions for the files #586 repaired; the other six stay pending their own audit. One file changed.
+Branch `claude/ci-restore-repaired-tests`, commit `6e72f25`, from `main` @ `1dcb4be`. Removes only the two exclusions for the files #586 repaired; the other six stayed in place pending their own audit, which PR C later completed. One file changed.
 
 | | Files executed | Tests executed | Repaired files |
 |---|---|---|---|
@@ -93,11 +93,70 @@ Branch `claude/ci-restore-repaired-tests`, commit `6e72f25`, from `main` @ `1dcb
 
 Verified from vitest's JSON reporter rather than by reading the flag list. Full suite unchanged at 98 files / 2502 tests passed — with 1 unhandled error and exit code `1`, the same `scrollIntoView` error described above.
 
-**#587 GitHub CI result: `test` FAILURE.** Both repaired files did execute — the failure originates inside `ReconSectionEditor.test.jsx`, which is itself the proof of inclusion. #587's change is correct; its precondition is not yet met. A `scrollIntoView` test-environment shim must land first. Measured with a prototype shim (not committed): the full 98-file suite exits `0` with zero unhandled errors, and the 92-file post-#587 command exits `0` at 92 files / 2377 tests. `scrollIntoView` is the only immediate blocker in the current corpus.
+**#587 first CI result: `test` FAILURE — and it was correct to fail.** Both repaired files executed; the failure originated inside `ReconSectionEditor.test.jsx`, which is itself the proof of inclusion. The cause was `scrollIntoView`, not #587.
 
-**Recommended sequence for the remaining six (a later PR C, not yet started):** `hunterSoundHaptics` first, then the four association-excluded files as one change, holding `ReconModulePage` for a targeted look.
+**#589 — `test: shim scrollIntoView for jsdom`.** Commit `dfe6124`, merged `d6c3f29`. Two test-only files: `src/test/helpers/scrollIntoView.js` and the `setup.js` wiring. Guarded no-op, never replaces an existing implementation. Took the full suite from exit `1` to **98 files / 2502 tests / 0 unhandled errors / exit 0**.
 
-**Structural recommendation:** any CI exclusion should carry a dated comment naming why it exists and who reviews it, so the next one cannot silently outlive its cause.
+**#587 — merged `942aaee`** (commit `6e72f25`, unchanged). After #589 landed, #587's red tick was stale: GitHub's cached merge ref `9790dc5` had parents `1dcb4be` + `6e72f25`, i.e. the pre-#589 base, and a re-run would have replayed that same stale merge SHA. Closing and reopening the PR — no branch edit, no "Update branch" — made GitHub rebuild the merge ref as `5e143b5` (parents `d6c3f29` + `6e72f25`) and dispatch a fresh run, which passed. **Operational note worth keeping: when a PR's base moves, "Re-run all jobs" replays the old merge commit. Close/reopen is what forces a fresh merge ref.**
+
+**PR C — `ci: run the whole test corpus` — MERGED.** Commit `2e805d0`, merge commit **`e073e89`**, merged 2026-08-28T02:55:39Z. One file. Removes **all six** remaining exclusions; `.github/workflows/ci.yml` now contains **0 `--exclude` entries** and the gate runs `npx vitest run` over everything.
+
+Every one of the six was audited individually before removal, and **all six are PROVEN**:
+
+| File | Why it was excluded | Evidence | Level |
+|---|---|---|---|
+| `hunterSoundHaptics.test.jsx` | Genuinely failing on 2026-07-24 | Repaired by `cc48c80` (2026-07-31), seven days after the exclusion; that commit records the diagnosis in-file. Green four weeks before removal. | PROVEN |
+| `HunterCardStack.test.jsx` | Swept in by feature area | No commit to test or subject since `354b1b2`; `setup.js` and `vite.config.js` unchanged in that window. | PROVEN |
+| `hunterBootstrap.test.js` | Swept in by feature area | Same, and it is a pure unit test — no DOM, no render, no browser API. No mechanism by which it could have failed. | PROVEN |
+| `hunterOutcomeLogic.test.js` | Swept in by feature area | Same. | PROVEN |
+| `ReconErrorBoundary.test.jsx` | Swept in by feature area | Same; no `matchMedia`/`scrollIntoView`/`ResizeObserver`/`clipboard` references. | PROVEN |
+| `ReconModulePage.test.jsx` | Held as ambiguous | Resolved three ways — see the table above. | PROVEN |
+
+Gate impact measured one file at a time, then together, rather than assuming isolation:
+
+| Restored | Files | Tests | Unhandled | Exit |
+|---|---|---|---|---|
+| *baseline (6 excluded)* | 92 | 2377 | 0 | 0 |
+| `hunterSoundHaptics` | 93 | 2391 | 0 | 0 |
+| `HunterCardStack` | 93 | 2386 | 0 | 0 |
+| `hunterBootstrap` | 93 | 2409 | 0 | 0 |
+| `hunterOutcomeLogic` | 93 | 2435 | 0 | 0 |
+| `ReconErrorBoundary` | 93 | 2382 | 0 | 0 |
+| `ReconModulePage` | 93 | 2384 | 0 | 0 |
+| **all six** | **98** | **2502** | **0** | **0** |
+
+No new failure and no jsdom or runtime gap appeared when any file was restored. Re-running all six with the `matchMedia` and `scrollIntoView` shims disabled also passes, so the exclusions were never protecting against the gaps #586 and #589 closed.
+
+**Final CI corpus: 98 files / 2502 tests / 0 unhandled errors / exit code 0.** Recovered by PR C: 125 tests, including the relationship-seeding rule (*"wrong seeds here corrupts Barry's recommendations platform-wide"*) and the `relationship_state` transition engine. Gate coverage over the whole sequence: 90 → 92 → **98** files, 2350 → 2377 → **2502** tests.
+
+**#590 GitHub CI evidence, kept separate from the local runs above:** run 33136907337, `run_attempt: 1`, created 4s after the PR opened, recorded base `f32dfc7` matching `main`, merge ref `d76ed5c` with parents `f32dfc7` + `2e805d0`. `test` **success**, zero failure-level annotations. Workflow at the PR head confirmed to hold 0 `--exclude` entries — so for the first time in this sequence the green tick and the thing being verified were the same object. CI's own file and test counts remain unreadable (job logs return `403 — admin rights`).
+
+## Permanent CI exclusion policy
+
+In force from 2026-08-28, recorded as a comment in `.github/workflows/ci.yml` itself so it is unavoidable at the point of use. **Any exclusion added to the test gate must carry, beside it:**
+
+1. **the reason** it exists,
+2. **a named owner**, and
+3. **a review/removal condition or expiry date.**
+
+An exclusion with no removal condition is a permanent blind spot. The previous list was added for one red run on 2026-07-24, had none of the three, and silently outlived its cause by five weeks — hiding a real failure from CI the entire time.
+
+## Latent jsdom gaps — documented risk only, deliberately unshimmed
+
+Found by a read-only scan of browser APIs jsdom does not implement, probed empirically in the real vitest environment (jsdom 28.1.0).
+
+| API | Call sites | Guarding | Status |
+|---|---|---|---|
+| `ResizeObserver` | 4 sites — `ContactSnapshot`, `ContactDetailModal`, `CompanyDetailModal`, `MissionControl` | None. All are bare `new ResizeObserver(...)` inside `useEffect`. | **Latent.** No current test mounts these components. |
+| `navigator.clipboard` | 13 sites across 8 files | Mixed. `IdentityCard.jsx:168,476` use `try/catch` and are safe; `sendActionResolver.js:251,271,317` and `InlineEngagementSection.jsx:87` only handle a rejected promise, so an undefined `navigator.clipboard` throws synchronously first. | **Latent.** Not reached by any test. |
+
+**Do not shim these without a test that actually exercises them.** A shim added now would be a mock with no test behind it. They become real the moment someone writes a test that mounts one of those components — that change carries the shim.
+
+Checked and found irrelevant: `IntersectionObserver`, `requestIdleCallback`, `Element.animate`, `speechSynthesis`, `Notification`, `checkVisibility` (zero call sites); `window.scrollTo`, `requestAnimationFrame`, `MutationObserver`, `getComputedStyle` (jsdom implements them); `visualViewport` (3 sites, properly guarded); `dialog.showModal` (false positive — a React state variable). `navigator.vibrate` and `AudioContext` are absent from jsdom but the application guards availability by design and `hunterSoundHaptics.test.jsx` covers them.
+
+**Open follow-ups, recorded not done:** retire the six local `matchMedia` stubs now that a canonical shim exists; add direct unit coverage for `formatRelativeTime` (its `Yesterday` / `Xw ago` / `Xmo ago` boundaries are untested).
+
+*(The structural recommendation that stood here — that every exclusion carry a dated reason and reviewer — is now the enforced policy above, committed into `ci.yml` by PR #590.)*
 
 ---
 

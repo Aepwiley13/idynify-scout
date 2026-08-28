@@ -10,6 +10,8 @@
 
 **Standing rule, added 2026-08-27:** "CI green" is not sufficient evidence unless the relevant test files are confirmed to be *included* in CI. Green checks mislead not only about product relevance but about coverage — they may not be running the tests you think they are. See "CI Gate Integrity" below for the discovery that produced this rule.
 
+**Standing rule, added 2026-08-27:** A passing test count is not a passing test run. Test evidence must include the process exit code and any unhandled error count. Vitest reports `Test Files`/`Tests` as passed while a run carrying unhandled errors still exits non-zero — a filter that reads only the pass lines will call that run green.
+
 **Reconciliation policy:** No PR may be merged, closed, or deleted based only on CI status or age. Every disposition must have a documented comparison against current `main`, an A–F classification, an evidence level, an owner decision, and a closure condition.
 
 ---
@@ -47,7 +49,21 @@ Merged 2026-08-27 by Aepwiley13. Four files, all under `src/test/`, +175/−16, 
 - **Relative time:** the spec mocked `date-fns` and asserted `'3 days ago'`, but the card stopped importing `date-fns` when `formatRelativeTime` landed (D3.09 format divergence). The mock was dead and the assertion checked a string the product cannot emit. Now freezes `Date` only and asserts the real formatter's real output, `'3d ago'`.
 - **Side effect:** fixing the shim let `ReconSectionEditor`'s four specs execute for the first time; three asserted a redirect the product no longer performs. **Owner-confirmed contract (2026-08-27):** a locked or unreadable Recon section renders the lock gate in place and does not automatically redirect; Back is the explicit path out. Assertions updated to that contract, with the Bug 3 guarantee preserved and strengthened.
 
-Result: full suite 98 files / 2502 tests green, from 96 files / 2497 passed / 5 failed.
+Result — corrected 2026-08-27, see "Correction" below: full suite **98 test files passed, 2502 tests passed, 1 unhandled error, process exit code 1**, from 96 files / 2497 passed / 5 failed. The two tracked failures are genuinely fixed; the run as a whole is not green.
+
+**Correction to the evidence originally recorded for #586.** This was first reported as "98 files / 2502 tests, all passing." That was wrong. The pass counts were right, the run was not: vitest also printed `Errors 1 error` and exited `1`. The reporting filter matched only the `Tests` / `Test Files` summary lines and the exit code was never checked, so an unhandled-error block went unseen. #586 was merged on that incomplete evidence.
+
+**The unhandled error, newly exposed by #586:**
+
+```
+TypeError: messagesEndRef.current?.scrollIntoView is not a function
+  src/components/recon/BarryReconGuide.jsx:219
+  originating in src/test/ReconSectionEditor.test.jsx
+```
+
+jsdom does not implement `scrollIntoView` (confirmed: `typeof el.scrollIntoView === 'undefined'` in jsdom 28.1.0). The `?.` guards a null ref, not a missing method. Provenance, established by running each revision: pre-#586 at `44c14a8` the file failed on `matchMedia` and never mentioned `scrollIntoView` — the component never mounted far enough to reach it. #586 fixed `matchMedia`, the component now mounts, `BarryReconGuide`'s effect fires, and the missing method throws. Not an application defect: `scrollIntoView` exists in every real browser. It is the same class of test-environment gap as `matchMedia`, and a wider one — 24 call sites across 20 application files, with no test stubbing it.
+
+CI could not see any of this, because `ReconSectionEditor.test.jsx` was on the exclusion list. The 90-file CI command exits `0` legitimately: it never runs the file. PR B (#587) removes the exclusion and CI fails immediately — the gate catching a latent defect on its first look at that file.
 
 **Follow-up recorded, not done:** `formatRelativeTime` still has no direct unit test; its `Yesterday` / `Xw ago` / `Xmo ago` boundaries are uncovered.
 
@@ -75,7 +91,9 @@ Branch `claude/ci-restore-repaired-tests`, commit `6e72f25`, from `main` @ `1dcb
 | Before | 90 | 2350 | both absent |
 | After | 92 | 2377 | both present, 23/23 and 4/4 passing |
 
-Verified from vitest's JSON reporter rather than by reading the flag list. Full suite unchanged at 98 / 2502.
+Verified from vitest's JSON reporter rather than by reading the flag list. Full suite unchanged at 98 files / 2502 tests passed — with 1 unhandled error and exit code `1`, the same `scrollIntoView` error described above.
+
+**#587 GitHub CI result: `test` FAILURE.** Both repaired files did execute — the failure originates inside `ReconSectionEditor.test.jsx`, which is itself the proof of inclusion. #587's change is correct; its precondition is not yet met. A `scrollIntoView` test-environment shim must land first. Measured with a prototype shim (not committed): the full 98-file suite exits `0` with zero unhandled errors, and the 92-file post-#587 command exits `0` at 92 files / 2377 tests. `scrollIntoView` is the only immediate blocker in the current corpus.
 
 **Recommended sequence for the remaining six (a later PR C, not yet started):** `hunterSoundHaptics` first, then the four association-excluded files as one change, holding `ReconModulePage` for a targeted look.
 

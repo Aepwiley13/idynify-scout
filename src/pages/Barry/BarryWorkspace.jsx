@@ -87,9 +87,12 @@ export default function BarryWorkspace() {
   const { barryState, companiesFoundCount } = useOnboardingState();
   const feCtrl = useFirstExperienceController(arrival);
   const feTurnCountRef = useRef(0);
+  const feAppendedRef = useRef(new Set());
 
   // B2-C1: Persist FE conversation turns to the canonical store so they
   // survive refresh and remain visible after handoff.
+  // Dedup guard: track appended content keys to prevent duplicate canonical
+  // entries on re-mount (React strict mode, mobile browser backgrounding).
   useEffect(() => {
     const turns = feCtrl.turns;
     const prevCount = feTurnCountRef.current;
@@ -104,6 +107,9 @@ export default function BarryWorkspace() {
     (async () => {
       for (const turn of newTurns) {
         if (!turn.content) continue;
+        const key = `${turn.role}::${turn.content}`;
+        if (feAppendedRef.current.has(key)) continue;
+        feAppendedRef.current.add(key);
         try {
           await appendTurn(db, user.uid, {
             role: turn.role,
@@ -399,11 +405,10 @@ export default function BarryWorkspace() {
         </div>
 
         <div className="barry-fe-layout">
-          {/* ── Primary column: hero + conversation + composer ── */}
-          <div className="barry-fe-primary">
-            <div className="barry-fe-scroll" ref={threadRef}>
-              {/* Hero welcome */}
-              <div className="barry-fe-hero">
+          <div className="barry-fe-scroll" ref={threadRef}>
+            {/* Hero welcome — text + Barry inline */}
+            <div className="barry-fe-hero" style={{ borderColor: T.border }}>
+              <div className="barry-fe-hero-text">
                 <h2 className="barry-fe-hero-heading" style={{ color: T.text }}>
                   Welcome to <span style={{ color: BRAND.purple || '#6d4aff' }}>IDYNIFY</span>
                 </h2>
@@ -413,14 +418,27 @@ export default function BarryWorkspace() {
                   I'll help you know who matters, why they matter, and what to do next.
                 </p>
               </div>
-
-              {/* Conversation divider */}
-              <div className="barry-fe-divider" style={{ borderColor: T.border }}>
-                <span className="barry-fe-divider-label" style={{ color: T.textMuted, background: T.cardBg }}>Barry</span>
+              <div className="barry-fe-hero-presence">
+                <picture>
+                  <source srcSet={AUTH_ASSETS.barry.signup.avif} type="image/avif" />
+                  <source srcSet={AUTH_ASSETS.barry.signup.webp} type="image/webp" />
+                  <img
+                    src={AUTH_ASSETS.barry.signup.png}
+                    alt={AUTH_ASSETS.barry.signup.alt}
+                    className="barry-fe-hero-img"
+                    onError={e => { e.target.style.display = 'none'; }}
+                  />
+                </picture>
               </div>
+            </div>
 
-              {/* Conversation thread */}
-              <div className="barry-fe-thread">
+            {/* Conversation divider */}
+            <div className="barry-fe-divider" style={{ borderColor: T.border }}>
+              <span className="barry-fe-divider-label" style={{ color: T.textMuted, background: T.cardBg }}>Barry</span>
+            </div>
+
+            {/* Conversation thread */}
+            <div className="barry-fe-thread">
                 {feTurns.map((turn, i) => {
                   const hasCard = turn._feCard && i === feTurns.length - 1;
 
@@ -614,65 +632,50 @@ export default function BarryWorkspace() {
               </div>
             </div>
 
-            {/* Composer — anchored at bottom of primary column */}
-            <div className="barry-fe-composer" style={{ borderColor: T.border, background: T.cardBg }}>
-              <div className="barry-fe-composer-inner">
-                <img
-                  src={ASSETS.barryAvatar}
-                  alt=""
-                  className="barry-fe-composer-avatar"
-                  width={36}
-                  height={36}
-                  onError={e => { e.target.style.display = 'none'; }}
-                />
-                <textarea
-                  ref={inputRef}
-                  value={inputValue}
-                  rows={1}
-                  onChange={(e) => {
-                    setInputValue(e.target.value);
-                    e.target.style.height = 'auto';
-                    e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
-                  }}
-                  onKeyDown={handleKeyDown}
-                  placeholder={placeholder}
-                  disabled={composerDisabled}
-                  aria-label="Message Barry"
-                  className="barry-workspace-input"
-                  style={{
-                    background: T.cardBg,
-                    borderColor: 'transparent',
-                    color: T.text,
-                  }}
-                />
-                <button
-                  onClick={handleFirstExperienceSubmit}
-                  disabled={composerDisabled || !inputValue.trim()}
-                  aria-label="Send"
-                  className="barry-workspace-send barry-fe-send"
-                  style={{
-                    background: inputValue.trim() ? BRAND.pink : T.surface,
-                    color: inputValue.trim() ? '#fff' : T.textMuted,
-                  }}
-                >
-                  Send
-                </button>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Barry presence column ── */}
-          <div className="barry-fe-presence" style={{ background: T.surface }}>
-            <picture>
-              <source srcSet={AUTH_ASSETS.barry.signup.avif} type="image/avif" />
-              <source srcSet={AUTH_ASSETS.barry.signup.webp} type="image/webp" />
+          {/* Composer — anchored at bottom */}
+          <div className="barry-fe-composer" style={{ borderColor: T.border, background: T.cardBg }}>
+            <div className="barry-fe-composer-inner">
               <img
-                src={AUTH_ASSETS.barry.signup.png}
-                alt={AUTH_ASSETS.barry.signup.alt}
-                className="barry-fe-presence-img"
+                src={ASSETS.barryAvatar}
+                alt=""
+                className="barry-fe-composer-avatar"
+                width={36}
+                height={36}
                 onError={e => { e.target.style.display = 'none'; }}
               />
-            </picture>
+              <textarea
+                ref={inputRef}
+                value={inputValue}
+                rows={1}
+                onChange={(e) => {
+                  setInputValue(e.target.value);
+                  e.target.style.height = 'auto';
+                  e.target.style.height = Math.min(e.target.scrollHeight, 160) + 'px';
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder={placeholder}
+                disabled={composerDisabled}
+                aria-label="Message Barry"
+                className="barry-workspace-input"
+                style={{
+                  background: T.cardBg,
+                  borderColor: 'transparent',
+                  color: T.text,
+                }}
+              />
+              <button
+                onClick={handleFirstExperienceSubmit}
+                disabled={composerDisabled || !inputValue.trim()}
+                aria-label="Send"
+                className="barry-workspace-send barry-fe-send"
+                style={{
+                  background: inputValue.trim() ? BRAND.pink : T.surface,
+                  color: inputValue.trim() ? '#fff' : T.textMuted,
+                }}
+              >
+                Send
+              </button>
+            </div>
           </div>
         </div>
       </div>

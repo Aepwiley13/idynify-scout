@@ -15,7 +15,23 @@
  *   4. Cold/unknown contact + overly warm/familiar intent → Barry flags (reverse)
  *
  * Returns null if no mismatch detected.
+ *
+ * ─── MIGRATED TO THE CANONICAL RELATIONSHIP CONTRACT (ADR-006) ──────────────
+ *
+ * `hasReplied` used to be read straight off
+ * `engagement_summary.replies_received`, a counter that only manual outcome
+ * recording ever incremented. No Gmail path touched it, so for any reply that
+ * arrived through automatic ingestion this guardrail was inert — the Gate 2
+ * audit found nine contacts mid-conversation that it could not protect, and
+ * zero contacts in production where the counter was above zero.
+ *
+ * It now asks `relationshipRead`, which prefers the canonical event count and
+ * falls back to that same counter only while the historical backfill is
+ * pending. Rule 2 therefore fires for a Gmail-detected reply for the first
+ * time.
  */
+
+import { hasReplied as contactHasReplied } from '../../../src/utils/relationshipRead.js';
 
 /**
  * Run the pre-generation guardrail check.
@@ -34,7 +50,7 @@ export function checkRelationshipGuardrail(contact, engagementIntent, userIntent
   const relState = contact.relationship_state;
   const isKnown = contact.known_contact === true;
   const addedManually = contact.addedFrom === 'manual' || contact.addedFrom === 'business_card';
-  const hasReplied = (contact.engagement_summary?.replies_received || 0) > 0;
+  const hasReplied = contactHasReplied(contact);
   const hasPositiveReply = (contact.engagement_summary?.positive_replies || 0) > 0;
   const messagesSent = contact.engagement_summary?.total_messages_sent || 0;
   const firstName = contact.first_name || contact.firstName || contact.name?.split(' ')[0] || 'this contact';

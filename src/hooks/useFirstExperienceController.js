@@ -122,23 +122,23 @@ export default function useFirstExperienceController(arrival = null) {
       const alreadyAsked = sessionStorage.getItem(ASKED_KEY) === '1';
       const wantsName = resolved.shouldAsk && !alreadyAsked && shouldIntroduce(mode);
 
-      const greeting = resolved.name
-        ? `Hey ${resolved.name} — I'm Barry. I'll help you figure out who matters, why they matter, and what to do next.`
-        : `Hey — I'm Barry. I'll help you figure out who matters, why they matter, and what to do next.`;
-
-      const openingTurns = [{ role: 'assistant', content: greeting }];
+      const openingTurns = [];
 
       if (wantsName) {
         logEvent(EVENTS.WHO_ASKED);
         openingTurns.push({
           role: 'assistant',
-          content: 'What should I call you?',
+          content: "What's up — I'm Barry. I've got your back. What's your name?",
           _fePhase: 'who',
           _feSkippable: true,
         });
         setTurns(openingTurns);
         setPhase('who');
       } else {
+        const greeting = resolved.name
+          ? `What's up, ${resolved.name} — I'm Barry. I've got your back.`
+          : "What's up — I'm Barry. I've got your back.";
+        openingTurns.push({ role: 'assistant', content: greeting });
         const intentPrompt = resolved.name
           ? `So ${resolved.name}, what are you hoping to get done?`
           : `What are you hoping to get done?`;
@@ -169,7 +169,7 @@ export default function useFirstExperienceController(arrival = null) {
         rememberName(user.uid, trimmed);
       }
 
-      const intentPrompt = `Nice to meet you, ${trimmed}! What are you hoping to get done?`;
+      const intentPrompt = `Right on, ${trimmed}. Let's get started. What are you hoping to get done?`;
       setTurns(prev => [...prev, { role: 'assistant', content: intentPrompt }]);
       setPhase('intent');
       return;

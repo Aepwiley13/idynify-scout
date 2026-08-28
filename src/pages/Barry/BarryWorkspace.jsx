@@ -383,6 +383,7 @@ export default function BarryWorkspace() {
     const fePhase = feCtrl.phase;
     const feTurns = feCtrl.turns;
     const isWhoPhase = fePhase === 'who';
+    const showHero = isWhoPhase || fePhase === 'loading';
     const isDelivering = fePhase === 'delivering';
     const isBusy = feCtrl.classifying || prospectingBusy;
     const isProspecting = isDelivering && feCtrl.decision?.kind === 'in-place';
@@ -414,36 +415,31 @@ export default function BarryWorkspace() {
 
         <div className="barry-fe-layout">
           <div className="barry-fe-scroll" ref={threadRef}>
-            {/* Hero welcome — text + Barry inline */}
-            <div className="barry-fe-hero" style={{ borderColor: T.border }}>
-              <div className="barry-fe-hero-text">
-                <h2 className="barry-fe-hero-heading" style={{ color: T.text }}>
-                  Welcome to <span style={{ color: BRAND.purple || '#6d4aff' }}>IDYNIFY</span>
-                </h2>
-                <p className="barry-fe-hero-sub" style={{ color: T.textMuted }}>
-                  I'm Barry, the intelligence inside IDYNIFY.
-                  <br />
-                  I'll help you know who matters, why they matter, and what to do next.
-                </p>
+            {/* Hero welcome — visible during introduction, collapses after name */}
+            {showHero && (
+              <div className="barry-fe-hero" style={{ borderColor: T.border }}>
+                <div className="barry-fe-hero-text">
+                  <h2 className="barry-fe-hero-heading" style={{ color: T.text }}>
+                    Welcome to <span style={{ color: BRAND.purple || '#6d4aff' }}>IDYNIFY</span>
+                  </h2>
+                  <p className="barry-fe-hero-sub" style={{ color: T.textMuted }}>
+                    Meet Barry — the AI and intelligence inside IDYNIFY.
+                  </p>
+                </div>
+                <div className="barry-fe-hero-presence">
+                  <picture>
+                    <source srcSet={AUTH_ASSETS.barry.signup.avif} type="image/avif" />
+                    <source srcSet={AUTH_ASSETS.barry.signup.webp} type="image/webp" />
+                    <img
+                      src={AUTH_ASSETS.barry.signup.png}
+                      alt={AUTH_ASSETS.barry.signup.alt}
+                      className="barry-fe-hero-img"
+                      onError={e => { e.target.style.display = 'none'; }}
+                    />
+                  </picture>
+                </div>
               </div>
-              <div className="barry-fe-hero-presence">
-                <picture>
-                  <source srcSet={AUTH_ASSETS.barry.signup.avif} type="image/avif" />
-                  <source srcSet={AUTH_ASSETS.barry.signup.webp} type="image/webp" />
-                  <img
-                    src={AUTH_ASSETS.barry.signup.png}
-                    alt={AUTH_ASSETS.barry.signup.alt}
-                    className="barry-fe-hero-img"
-                    onError={e => { e.target.style.display = 'none'; }}
-                  />
-                </picture>
-              </div>
-            </div>
-
-            {/* Conversation divider */}
-            <div className="barry-fe-divider" style={{ borderColor: T.border }}>
-              <span className="barry-fe-divider-label" style={{ color: T.textMuted, background: T.cardBg }}>Barry</span>
-            </div>
+            )}
 
             {/* Conversation thread */}
             <div className="barry-fe-thread">

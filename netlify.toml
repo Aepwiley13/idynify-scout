@@ -1,5 +1,9 @@
 [build]
-  command = "npm run build"
+  # The staging step is a no-op unless VALIDATION_SITE=true, which is set on
+  # the validation site and nowhere else. Production therefore never gains a
+  # validation function, and the guarantee does not depend on a secret
+  # staying unset. See scripts/stageValidationFunction.mjs.
+  command = "npm run build && node scripts/stageValidationFunction.mjs"
   publish = "dist"
 
 [build.environment]

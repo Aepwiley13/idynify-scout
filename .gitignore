@@ -27,3 +27,8 @@ dist-ssr
 # Local Netlify folder
 .netlify
 .phase5-accounts.log
+
+# Staged at build time on the validation site only (see
+# scripts/stageValidationFunction.mjs). Never committed into the deployed
+# functions directory, or the build-time exclusion would be pointless.
+netlify/functions/validation-*.js

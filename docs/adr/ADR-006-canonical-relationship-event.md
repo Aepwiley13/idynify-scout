@@ -217,12 +217,16 @@ the `conversationState` value-domain defect and are unrelated to it.
 | Finding | Note |
 |---|---|
 | Fourth reply-state writer in `check-replies.js` | Writes `last_replied_at` + `contact_status`, outside the single-writer rule |
-| `last_reply_at` vs `last_replied_at` | Two spellings of one fact; only the first is mirrored |
 | Phantom-schema consumer in `gmailMessageService.js` | `isKnownContact()` still queries `primaryEmail` / `secondaryEmails`, which no contact carries |
 | Canonical event authority | Whether a superseding correction may ever re-attribute an event |
 | Quarantine/retry idempotency | Interaction between quarantine replay and exactly-once event creation |
 | Health visibility | Coverage beyond the single settings surface now mounted |
 | Legacy-read boundary enforcement | Allowlist still holds 22 unmigrated consumers |
-| Concurrent duplicate timeline | Timeline write is inside the event transaction, but the queue consumer's own write is not |
+| **Concurrent duplicate timeline** | **Open.** The timeline write happens in `messageProcessor` Step 4, *before and outside* the writer's transaction. Two concurrent runs on the same message can each create a timeline event; only the canonical event itself is protected by document-id uniqueness. An earlier draft of this table claimed transaction protection here — that was wrong. |
 | Equal-`occurredAt` tie determinism | Monotonic guard uses strict `>`, so two events sharing a timestamp leave the first winner in place |
 | Null quarantine `gmailThreadId` | Recorded as `null` when the ingest failed before the thread was known |
+
+**Closed since first written:** `last_reply_at` vs `last_replied_at` was listed as an open
+divergence. It is not one — `buildCompatibilityMirrors` writes both from the same
+`state.last_inbound_at`, so they cannot disagree. They remain two spellings of one fact and
+both retire together, but there is no correctness gap to track.

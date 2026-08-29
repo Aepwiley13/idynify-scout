@@ -85,6 +85,10 @@ const MESSAGE = {
   gmailThreadId: 'thread_fixture_reply',
   receivedAt: '2020-06-01T10:00:00.000Z',
   subject: 'Re: fixture',
+  // An ordinary human reply. Deliberately carries no scheduling language, so
+  // the meeting_requested case exercises its non-scheduling branch.
+  category: 'reply',
+  bodyText: 'Thanks for sending this over — appreciated.',
 };
 
 /** Run the real writer against a contact mid-outreach, and return the contact. */
@@ -144,6 +148,80 @@ describe('handoff 2 — the queue to every user-visible surface', () => {
   ])('is visible to %s', async (_surface, expectedValue) => {
     const { contact } = await recordReply();
     expect(afterQueueTransition(contact).conversationState).toBe(expectedValue);
+  });
+});
+
+describe('prior workflow state survives an inbound reply', () => {
+  /**
+   * `conversationState` is a twelve-state WORKFLOW field, not a reply flag.
+   * Writing `response_received` unconditionally on every qualifying reply
+   * reopened conversations that were finished: a won deal became an unread
+   * reply because someone sent a thank-you note.
+   *
+   * `resolveInboundTransition` already encodes the correct rules and is a pure
+   * module with no imports. The fix is to call it, not to approximate it.
+   *
+   * Expected column reads: given this state, an ordinary inbound reply with no
+   * scheduling language produces this next state.
+   */
+  const CASES = [
+    // prior state,                              expected next state,                       reaches user surface
+    ['awaiting_response',    CONVERSATION_STATES.AWAITING_RESPONSE,   CONVERSATION_STATES.RESPONSE_RECEIVED,    true],
+    ['user_action_required', CONVERSATION_STATES.USER_ACTION_REQUIRED, CONVERSATION_STATES.USER_ACTION_REQUIRED, true],
+    ['meeting_requested',    CONVERSATION_STATES.MEETING_REQUESTED,   CONVERSATION_STATES.USER_ACTION_REQUIRED, true],
+    ['meeting_scheduled',    CONVERSATION_STATES.MEETING_SCHEDULED,   CONVERSATION_STATES.MEETING_SCHEDULED,    false],
+    ['closed_won',           CONVERSATION_STATES.CLOSED_WON,          CONVERSATION_STATES.CLOSED_WON,           false],
+    ['closed_lost',          CONVERSATION_STATES.CLOSED_LOST,         CONVERSATION_STATES.CLOSED_LOST,          false],
+  ];
+
+  /** What process-barry-inbox-queue Step 8 does once its gate is satisfied. */
+  const afterQueueTransition = (contact) =>
+    contact.conversationState === QUEUE_GATE_EXPECTS
+      ? { ...contact, conversationState: CONVERSATION_STATES.USER_ACTION_REQUIRED }
+      : contact;
+
+  it.each(CASES)('a reply to a %s contact resolves to the right state',
+    async (_label, priorState, expectedNext) => {
+      const { contact } = await recordReply({ conversationState: priorState });
+      expect(contact.conversationState ?? priorState).toBe(expectedNext);
+    });
+
+  it.each(CASES)('a reply to a %s contact reaches the user surface: %s',
+    async (_label, priorState, _expectedNext, shouldReachUser) => {
+      const { contact } = await recordReply({ conversationState: priorState });
+      const settled = afterQueueTransition({
+        ...contact,
+        conversationState: contact.conversationState ?? priorState,
+      });
+      expect(awaitsUserAction(settled)).toBe(shouldReachUser);
+    });
+
+  it('never reopens a closed conversation', async () => {
+    for (const closed of [CONVERSATION_STATES.CLOSED_WON, CONVERSATION_STATES.CLOSED_LOST]) {
+      const { contact } = await recordReply({ conversationState: closed });
+      const settled = contact.conversationState ?? closed;
+
+      expect(settled).toBe(closed);
+      expect(settled).not.toBe(CONVERSATION_STATES.RESPONSE_RECEIVED);
+      expect(awaitsUserAction({ conversationState: settled })).toBe(false);
+    }
+  });
+
+  it('still records the reply itself on a closed conversation', async () => {
+    // Closed is a WORKFLOW judgement, not a claim that the message never
+    // arrived. The canonical event and the relationship state must still be
+    // written — only the workflow field is left alone.
+    const { result, contact } = await recordReply({
+      conversationState: CONVERSATION_STATES.CLOSED_WON,
+    });
+    expect(result.created).toBe(true);
+    expect(contact['relationship.reply_count']).toBe(1);
+    expect(contact['relationship.last_inbound_at']).toBe(MESSAGE.receivedAt);
+  });
+
+  it('sets an initial state when the contact had none', async () => {
+    const { contact } = await recordReply({});
+    expect(contact.conversationState).toBe(CONVERSATION_STATES.RESPONSE_RECEIVED);
   });
 });
 

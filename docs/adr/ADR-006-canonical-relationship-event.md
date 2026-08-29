@@ -188,3 +188,41 @@ is subsequently created.
 `GMAIL_IDENTITY_MODE=live` is prohibited until the cursor-wedge defect is resolved at the
 ingestion layer. The identity engine's fail-closed behaviour must not be weakened to
 satisfy it. This is a pre-live blocker, not a Gate 3 opening blocker.
+
+### What `dry_run` actually guarantees — and what it does not
+
+`dry_run` is **relationship-truth safe**: no canonical event is created, no
+`contact.relationship.*` is written, no compatibility mirror is written, no workflow
+transition fires, nothing is queued for Barry, and no AI call is made.
+
+It is **not write-free.** Stages earlier than the writer still persist:
+
+- `communication_records` — the stored message
+- `unmatched_messages` — when identity does not resolve
+- the contact `timeline` subcollection
+- `relationship_context`
+- `identity_resolution_probe` — the dry-run diagnostic itself
+
+So a dry run against a database containing real customer data still mutates that database.
+**Environment isolation therefore remains mandatory before Step 5**, and `dry_run` must not
+be mistaken for it. Note also that `branch-deploy` and `production` resolve to the same
+Firebase project (`idynify-scout-dev`), so the Netlify deploy context isolates the deploy
+and not the data.
+
+### Open Gate 3 findings — recorded, not repaired
+
+Documented under audit freeze. None is repaired here; several were surfaced while fixing
+the `conversationState` value-domain defect and are unrelated to it.
+
+| Finding | Note |
+|---|---|
+| Fourth reply-state writer in `check-replies.js` | Writes `last_replied_at` + `contact_status`, outside the single-writer rule |
+| `last_reply_at` vs `last_replied_at` | Two spellings of one fact; only the first is mirrored |
+| Phantom-schema consumer in `gmailMessageService.js` | `isKnownContact()` still queries `primaryEmail` / `secondaryEmails`, which no contact carries |
+| Canonical event authority | Whether a superseding correction may ever re-attribute an event |
+| Quarantine/retry idempotency | Interaction between quarantine replay and exactly-once event creation |
+| Health visibility | Coverage beyond the single settings surface now mounted |
+| Legacy-read boundary enforcement | Allowlist still holds 22 unmigrated consumers |
+| Concurrent duplicate timeline | Timeline write is inside the event transaction, but the queue consumer's own write is not |
+| Equal-`occurredAt` tie determinism | Monotonic guard uses strict `>`, so two events sharing a timestamp leave the first winner in place |
+| Null quarantine `gmailThreadId` | Recorded as `null` when the ingest failed before the thread was known |

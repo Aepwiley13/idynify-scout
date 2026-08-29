@@ -25,6 +25,7 @@ import {
   IdentityConflictError,
 } from '../../../src/utils/identityResolution.js';
 import { recordInboundEvent } from './relationshipEventWriter.js';
+import { getConversationState } from '../../../src/utils/relationshipRead.js';
 import { upsertRelationshipContext } from './relationshipContext.js';
 
 /**
@@ -150,7 +151,9 @@ export async function processNormalizedMessage(db, message) {
           matchedAutomatically: existingData.matchedAutomatically,
           requiresReview: existingData.requiresReview,
         },
-        conversationState: existingData.conversationState || null,
+        // Echoing back what the duplicate record already stored; read via the
+        // canonical accessor so the boundary holds even on this path.
+        conversationState: getConversationState(existingData),
         processingMs: Date.now() - startMs,
       });
     }

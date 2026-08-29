@@ -21,6 +21,7 @@ import {
   IDENTITY_MODES,
   EVENTS_COLLECTION,
   PROBE_COLLECTION,
+  CONVERSATION_STATE_FOR_INBOUND_REPLY,
 } from '../../netlify/functions/utils/relationshipEventWriter.js';
 import { EVENT_TYPES, RELATIONSHIP_STATES } from '../utils/relationshipMaterialization';
 
@@ -181,7 +182,12 @@ describe('live records the event and materializes state', () => {
     expect(contact.last_reply_at).toBe(MESSAGE.receivedAt);
     expect(contact.last_replied_at).toBe(MESSAGE.receivedAt);
     expect(contact['engagement_summary.replies_received']).toBe(1);
-    expect(contact.conversationState).toBe(RELATIONSHIP_STATES.IN_CONVERSATION);
+    // The WORKFLOW value, not the relationship value. This assertion used to
+    // expect RELATIONSHIP_STATES.IN_CONVERSATION and so encoded the defect it
+    // was meant to guard: conversationState and relationship.state are
+    // different vocabularies, and writing one into the other strands the reply
+    // before process-barry-inbox-queue. See replyReachesUser.test.js.
+    expect(contact.conversationState).toBe(CONVERSATION_STATE_FOR_INBOUND_REPLY);
   });
 
   it('does not mirror the two fields that have no readers', async () => {

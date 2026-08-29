@@ -27,6 +27,12 @@ import { google } from 'googleapis';
 import { validateNormalizedMessage } from '../../src/types/normalizedMessage.js';
 import { processNormalizedMessage } from './utils/messageProcessor.js';
 import {
+  recordIngestFailure,
+  clearIngestFailure,
+  countQuarantined,
+  MAX_ATTEMPTS,
+} from './utils/ingestQuarantine.js';
+import {
   getOAuthClient,
   fetchMessage,
   fetchThread,
@@ -283,6 +289,7 @@ export async function syncUserInbox(db, user) {
     deleted: 0,   // subset of `skipped` — messages Gmail no longer has
     invalid: 0,
     failed: 0,
+    quarantined: 0, // set aside after MAX_ATTEMPTS so later mail can flow
     mode: null,
     status: SYNC_STATUS.IDLE,
     error: null,
@@ -380,7 +387,12 @@ export async function syncUserInbox(db, user) {
           db, gmail, entry.id, userId, gmailAccountId, threadCountCache
         );
 
-        if (outcome.status === 'processed') summary.processed += 1;
+        if (outcome.status === 'processed') {
+          summary.processed += 1;
+          // Cleared on success so a message that failed twice and then worked
+          // does not carry its attempt count into an unrelated future hiccup.
+          await clearIngestFailure(db, { userId, gmailMessageId: entry.id });
+        }
         else if (outcome.status === 'skipped') summary.skipped += 1;
         else if (outcome.status === 'deleted') {
           // Counted as skipped for the run tally, tracked separately so the
@@ -391,10 +403,30 @@ export async function syncUserInbox(db, user) {
         }
         else if (outcome.status === 'invalid') summary.invalid += 1;
         else if (outcome.status === 'failed') {
-          summary.failed += 1;
-          summary.error = outcome.reason;
-          console.error(`[gmail-sync] Processing failed for ${entry.id}: ${outcome.reason}`);
-          break; // Stop here so the cursor cannot skip past this message.
+          // Bounded retry, then set aside. Holding the cursor is right for a
+          // transient fault and catastrophic for a permanent one — see
+          // ingestQuarantine.js. After MAX_ATTEMPTS the message becomes a
+          // recorded, visible failure instead of an invisible blockade.
+          const failure = await recordIngestFailure(db, {
+            userId, gmailMessageId: entry.id, reason: outcome.reason, threadId: entry.threadId,
+          });
+
+          if (failure.holdCursor) {
+            summary.failed += 1;
+            summary.error = outcome.reason;
+            console.error(
+              `[gmail-sync] Processing failed for ${entry.id} ` +
+              `(attempt ${failure.attempts}/${MAX_ATTEMPTS}): ${outcome.reason}`
+            );
+            break; // Retry next run; do not advance past it yet.
+          }
+
+          summary.quarantined += 1;
+          console.error(
+            `[gmail-sync] QUARANTINED ${entry.id} after ${failure.attempts} attempts: ` +
+            `${outcome.reason}. Later messages will now be processed.`
+          );
+          // Fall through: the cursor may advance past a quarantined message.
         }
 
         if (entry.historyId) lastGoodHistoryId = entry.historyId;
@@ -408,16 +440,50 @@ export async function syncUserInbox(db, user) {
           if (entry.historyId) lastGoodHistoryId = entry.historyId;
           continue;
         }
-        summary.failed += 1;
-        summary.error = err.message;
-        console.error(`[gmail-sync] Message ${entry.id} threw:`, err.message);
-        break;
+        // THE WEDGE PATH. A Firestore error raised inside identity resolution
+        // arrives here — the engine rethrows by contract so that a query
+        // failure can never read as "no duplicate", and that guarantee is
+        // untouched. What must not happen is this message holding the cursor
+        // forever: before the quarantine it did exactly that, and every later
+        // Gmail event sat behind it indefinitely and silently.
+        const failure = await recordIngestFailure(db, {
+          userId, gmailMessageId: entry.id, reason: err.message, threadId: entry.threadId,
+        });
+
+        if (failure.holdCursor) {
+          summary.failed += 1;
+          summary.error = err.message;
+          console.error(
+            `[gmail-sync] Message ${entry.id} threw ` +
+            `(attempt ${failure.attempts}/${MAX_ATTEMPTS}):`, err.message
+          );
+          break;
+        }
+
+        summary.quarantined += 1;
+        console.error(
+          `[gmail-sync] QUARANTINED ${entry.id} after ${failure.attempts} attempts:`,
+          err.message
+        );
+        if (entry.historyId) lastGoodHistoryId = entry.historyId;
+        continue;
       }
     }
 
     // ── Advance the cursor only when the whole batch succeeded ──────────────
+    // A quarantined message is not a success, but it is no longer a blocker:
+    // the run is allowed to advance past it. Only messages still inside their
+    // retry budget hold the cursor.
     const allSucceeded = summary.failed === 0;
     const update = { nextSyncAt: nextSyncAtIso() };
+
+    // Health, written every run so it is observable rather than inferred.
+    // The Gate 2 audit found these fields were already being written and read
+    // by nothing; `quarantinedCount` is the one that makes a silent blockade
+    // visible, so it is surfaced deliberately.
+    const quarantinedCount = await countQuarantined(db, userId);
+    if (quarantinedCount !== null) update.quarantinedCount = quarantinedCount;
+    update.lastRunAt = new Date().toISOString();
 
     if (allSucceeded) {
       // With a truncated batch the mailbox-wide historyId is ahead of what we
@@ -498,8 +564,9 @@ export async function runGmailSync(db, options = {}) {
       deleted: acc.deleted + (r.deleted || 0),
       invalid: acc.invalid + r.invalid,
       failed: acc.failed + r.failed,
+      quarantined: acc.quarantined + (r.quarantined || 0),
     }),
-    { processed: 0, skipped: 0, deleted: 0, invalid: 0, failed: 0 }
+    { processed: 0, skipped: 0, deleted: 0, invalid: 0, failed: 0, quarantined: 0 }
   );
 
   log(

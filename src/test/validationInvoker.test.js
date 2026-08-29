@@ -188,6 +188,68 @@ describe('token handling', () => {
         .toBe(REFUSAL.DISABLED);
     });
 
+    /**
+     * A whitespace-only secret is not a secret.
+     *
+     * The earlier guard rejected only the empty string, so `" "`, `"\n"` and
+     * `"\t"` survived — and because each hashes to itself, a whitespace-only
+     * configured token authorized a whitespace-only presented one. An operator
+     * who "cleared" the variable by leaving a space would have had a live
+     * endpoint protected by a single character.
+     */
+    describe('whitespace-only secrets never authorize', () => {
+      it.each([
+        ['space', ' '],
+        ['double space', '  '],
+        ['newline', '\n'],
+        ['tab', '\t'],
+        ['carriage return', '\r'],
+        ['mixed whitespace', ' \t\n\r '],
+      ])('refuses configured %s matching itself', (_label, ws) => {
+        const result = authorizeValidationRequest(
+          { ...validBody, token: ws },
+          { ...ENV, VALIDATION_INVOKER_TOKEN: ws }
+        );
+        expect(result.ok).toBe(false);
+        expect(result.reason).toBe(REFUSAL.BAD_TOKEN);
+      });
+
+      it('refuses a whitespace-only presented token against a real secret', () => {
+        expect(authorizeValidationRequest({ ...validBody, token: '   ' }, ENV).reason)
+          .toBe(REFUSAL.BAD_TOKEN);
+      });
+
+      it('refuses a real presented token against a whitespace-only secret', () => {
+        const result = authorizeValidationRequest(
+          validBody, { ...ENV, VALIDATION_INVOKER_TOKEN: ' ' }
+        );
+        expect(result.ok).toBe(false);
+      });
+
+      it('still accepts a normal non-whitespace token', () => {
+        expect(authorizeValidationRequest(validBody, ENV).ok).toBe(true);
+      });
+
+      it('still refuses a normal wrong token', () => {
+        expect(authorizeValidationRequest({ ...validBody, token: 'wrong-value' }, ENV).reason)
+          .toBe(REFUSAL.BAD_TOKEN);
+      });
+
+      it('does not trim a real token into matching a different one', () => {
+        // Trimming is a validity check, not normalization: a padded token must
+        // not become equal to its unpadded twin.
+        expect(authorizeValidationRequest({ ...validBody, token: ` ${TOKEN} ` }, ENV).reason)
+          .toBe(REFUSAL.BAD_TOKEN);
+      });
+
+      it('keeps hashing and constant-time comparison', () => {
+        const src = read('../../netlify/functions/utils/validationInvoker.js');
+        expect(src).toContain("createHash('sha256')");
+        expect(src).toContain('timingSafeEqual');
+        expect(src).not.toMatch(/if\s*\(a\.length\s*!==\s*b\.length\)/);
+      });
+    });
+
     it('leaks neither the presented nor the expected token on any path', () => {
       for (const token of ['', 'x', TOKEN.slice(0, -1), `${TOKEN}x`, 'X'.repeat(TOKEN.length)]) {
         const verdict = authorizeValidationRequest({ ...validBody, token }, ENV);

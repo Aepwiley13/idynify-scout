@@ -84,7 +84,19 @@ export const REFUSAL = Object.freeze({
  */
 function secretsMatch(presented, expected) {
   if (typeof presented !== 'string' || typeof expected !== 'string') return false;
-  if (presented.length === 0 || expected.length === 0) return false;
+
+  // A secret that is only whitespace is not a secret. The previous guard
+  // rejected the empty string but let `" "`, `"\n"` and `"\t"` through, and
+  // since each hashes to itself, a whitespace-only configured token would
+  // authorize a whitespace-only presented one. That defeats the intent of the
+  // disabled-token gate: an operator who "cleared" the variable by leaving a
+  // space would have a live endpoint with a one-character secret.
+  //
+  // Trimming is applied to each value INDEPENDENTLY, as a validity check. It is
+  // not a comparison between the two lengths, so it reintroduces no length
+  // signal — and it happens before hashing, so the comparison itself remains
+  // fixed-width and constant-time.
+  if (presented.trim().length === 0 || expected.trim().length === 0) return false;
 
   const a = createHash('sha256').update(presented, 'utf8').digest();
   const b = createHash('sha256').update(expected, 'utf8').digest();

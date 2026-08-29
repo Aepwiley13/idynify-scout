@@ -37,6 +37,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { analyzeInboundMessage } from './utils/barryInboxAnalyzer.js';
 import { composeDraftReply } from './utils/barryDraftComposer.js';
 import { CONVERSATION_STATES } from '../../src/types/conversationState.js';
+import { getConversationState } from '../../src/utils/relationshipRead.js';
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -200,7 +201,12 @@ export const processInboxQueue = async (event = {}) => {
 
         const contactSnap = await contactRef.get();
         if (contactSnap.exists) {
-          const currentState = contactSnap.data().conversationState;
+          // Read through the canonical accessor rather than off the document.
+          // The value is still the legacy workflow vocabulary — this contract
+          // does not own it — but routing the read through one module is what
+          // lets it be retired in one edit later, and is what the ADR-006
+          // boundary enforces.
+          const currentState = getConversationState(contactSnap.data());
           if (currentState === CONVERSATION_STATES.RESPONSE_RECEIVED) {
             await contactRef.update({
               conversationState: CONVERSATION_STATES.USER_ACTION_REQUIRED,

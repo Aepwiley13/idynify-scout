@@ -40,6 +40,7 @@ import {
 } from 'lucide-react';
 import { db, auth } from '../firebase/config';
 import { useMissionSounds } from '../hooks/useMissionSounds';
+import { useGmailSyncHealth } from '../hooks/useGmailSyncHealth';
 import {
   isMfaEnrolled,
   getEnrolledFactors,
@@ -415,6 +416,7 @@ export default function UserSettings() {
   const [gmailLoading, setGmailLoading]   = useState(true);
   const [gmailAction, setGmailAction]     = useState(null);
   const [gmailError, setGmailError]       = useState(null);
+  const { health: gmailSyncHealth }       = useGmailSyncHealth();
 
   /* ── google calendar ── */
   const [calStatus, setCalStatus]         = useState(null);
@@ -1172,6 +1174,16 @@ export default function UserSettings() {
                   </span>
                   {gmailError && (
                     <span className="us-inline-error"><AlertTriangle className="w-3 h-3" />{gmailError}</span>
+                  )}
+                  {/* Barry's reading state. "Connected" above is about the OAuth
+                      grant and stays green while sync is wedged — which is the
+                      exact signal the Gate 2 audit found reassuring users while
+                      978 replies sat unprocessed. This line is the one that can
+                      say otherwise. */}
+                  {gmailSyncHealth?.actionable && (
+                    <span className="us-inline-error" role="status">
+                      <AlertTriangle className="w-3 h-3" />{gmailSyncHealth.message}
+                    </span>
                   )}
                 </div>
                 <div className="us-gmail-actions">

@@ -38,6 +38,32 @@ import {
   createEmptyState,
   EVENT_TYPES,
 } from '../../../src/utils/relationshipMaterialization.js';
+import { CONVERSATION_STATES } from '../../../src/types/conversationState.js';
+
+/**
+ * The workflow state a confirmed inbound reply puts a conversation into.
+ *
+ * ─── WHY THIS IS A NAMED CONSTANT AND NOT AN INLINE STRING ──────────────────
+ *
+ * `conversationState` is a WORKFLOW vocabulary (twelve values — where a
+ * conversation sits in the outreach lifecycle). `relationship.state` is a
+ * RELATIONSHIP vocabulary (three values — who owes whom a message). They are
+ * different domains that happen to both be strings on the same document.
+ *
+ * The mirror originally wrote the relationship value into the workflow field.
+ * Nothing threw: Firestore does not police value domains, and every consumer
+ * compares with `===`, so the chain went silent instead of loud.
+ * `process-barry-inbox-queue` gates on `response_received` and never saw it, so
+ * it never advanced the contact to `user_action_required` — the value that
+ * `usePendingReplies`, `barryOrientationBrief` and `HunterContactDrawer` all
+ * query. A reply could be ingested, matched, analysed and drafted and still
+ * never reach a screen.
+ *
+ * Naming the handoff makes the coupling visible and lets a test assert that the
+ * writer and the queue still agree, which is the only thing that stops them
+ * drifting apart again.
+ */
+export const CONVERSATION_STATE_FOR_INBOUND_REPLY = CONVERSATION_STATES.RESPONSE_RECEIVED;
 
 export const EVENTS_COLLECTION = 'relationship_events';
 export const PROBE_COLLECTION = 'identity_resolution_probe';
@@ -102,7 +128,10 @@ export function buildInboundEvent({ message, contactId, identity, source, thread
  */
 function buildCompatibilityMirrors(state, event, currentContact) {
   const mirrors = {
-    conversationState: state.state,
+    // The WORKFLOW value, not the relationship value. See
+    // CONVERSATION_STATE_FOR_INBOUND_REPLY — these are different vocabularies
+    // and writing one into the other silently strands the reply.
+    conversationState: CONVERSATION_STATE_FOR_INBOUND_REPLY,
     lastInboundSubject: event.subject ?? null,
     last_reply_at: state.last_inbound_at,
     last_replied_at: state.last_inbound_at,

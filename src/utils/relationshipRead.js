@@ -84,7 +84,37 @@ export function isInConversation(contact) {
     || contact?.hunter_status === 'in_conversation';
 }
 
+/**
+ * The WORKFLOW state — where this conversation sits in the outreach lifecycle.
+ *
+ * Deliberately separate from `getRelationshipState`, which answers a different
+ * question in a different vocabulary. Conflating the two is what stranded every
+ * Gmail reply behind `process-barry-inbox-queue`: the writer put
+ * `in_conversation` (a relationship value) into `conversationState` (a workflow
+ * field), the queue gate compared it to `response_received`, and the reply
+ * silently never reached a screen.
+ *
+ * Reading it through here rather than off the document gives that coupling one
+ * place to live, and one place to delete when the workflow vocabulary is
+ * eventually folded into the canonical contract.
+ */
+export function getConversationState(contact) {
+  return contact?.conversationState ?? null;
+}
+
+/**
+ * True when Barry has produced something the user is expected to act on.
+ *
+ * The single question `usePendingReplies`, `barryOrientationBrief` and
+ * `HunterContactDrawer` each ask by hand today, in three separate string
+ * comparisons against the same literal.
+ */
+export function awaitsUserAction(contact) {
+  return getConversationState(contact) === 'user_action_required';
+}
+
 export default {
   getReplyCount, hasReplied, getLastInboundAt,
   daysSinceLastInbound, getRelationshipState, isInConversation,
+  getConversationState, awaitsUserAction,
 };

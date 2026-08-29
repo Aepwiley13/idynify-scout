@@ -37,22 +37,32 @@ export function useGmailSyncHealth() {
     const user = getEffectiveUser();
     if (!user) return;
 
-    const ref = doc(db, 'users', user.uid, 'integrations', 'gmail');
-    return onSnapshot(
-      ref,
-      (snap) => {
-        setState({
-          health: deriveSyncHealth(snap.exists() ? snap.data() : null),
-          loading: false,
-        });
-      },
-      (err) => {
-        // A failed read is not evidence of health, so it must not render as
-        // healthy. Report nothing rather than something reassuring.
-        console.error('[useGmailSyncHealth] subscription failed:', err);
-        setState({ health: null, loading: false });
-      }
-    );
+    // `doc()` throws SYNCHRONOUSLY when Firestore is not configured — the
+    // onSnapshot error callback never gets the chance to see it. Unguarded,
+    // that turns a diagnostic banner into a crash of whatever page mounted it,
+    // which is a spectacularly bad trade for a health indicator.
+    try {
+      const ref = doc(db, 'users', user.uid, 'integrations', 'gmail');
+      return onSnapshot(
+        ref,
+        (snap) => {
+          setState({
+            health: deriveSyncHealth(snap.exists() ? snap.data() : null),
+            loading: false,
+          });
+        },
+        (err) => {
+          // A failed read is not evidence of health, so it must not render as
+          // healthy. Report nothing rather than something reassuring.
+          console.error('[useGmailSyncHealth] subscription failed:', err);
+          setState({ health: null, loading: false });
+        }
+      );
+    } catch (err) {
+      console.error('[useGmailSyncHealth] could not subscribe:', err);
+      setState({ health: null, loading: false });
+      return undefined;
+    }
   }, []);
 
   return state;

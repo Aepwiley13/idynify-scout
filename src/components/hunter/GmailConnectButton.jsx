@@ -1,26 +1,10 @@
 import { useState } from 'react';
 import { auth } from '../../firebase/config';
-import { Mail, Loader, AlertTriangle } from 'lucide-react';
-import { useGmailSyncHealth, SYNC_HEALTH } from '../../hooks/useGmailSyncHealth';
-
-/**
- * Whether a health verdict is worth interrupting someone over.
- *
- * `disconnected` is excluded deliberately — the Connect button beside this is
- * already saying that, and repeating it as a warning reads as an error rather
- * than an invitation.
- */
-const WARNING_STATUSES = [
-  SYNC_HEALTH.NEEDS_RECONNECT,
-  SYNC_HEALTH.STALE,
-  SYNC_HEALTH.ERROR,
-  SYNC_HEALTH.DEGRADED,
-];
+import { Mail, Loader } from 'lucide-react';
 
 export default function GmailConnectButton({ onSuccess }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const { health } = useGmailSyncHealth();
 
   async function handleConnect() {
     setLoading(true);
@@ -80,19 +64,6 @@ export default function GmailConnectButton({ onSuccess }) {
       </button>
       {error && (
         <div className="mt-2 text-sm text-red-400">{error}</div>
-      )}
-
-      {/* Barry's reading state, surfaced. Until now this was written every ten
-          minutes and read by nothing, so a mailbox could stop syncing without
-          anything on screen changing. */}
-      {health && WARNING_STATUSES.includes(health.status) && (
-        <div
-          role="status"
-          className="mt-2 flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-300"
-        >
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>{health.message}</span>
-        </div>
       )}
     </div>
   );

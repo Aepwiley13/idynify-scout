@@ -41,7 +41,7 @@
  */
 
 import { FieldValue } from 'firebase-admin/firestore';
-import { timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual, createHash } from 'node:crypto';
 
 export const INVOCATION_LOG_COLLECTION = 'validation_invocations';
 
@@ -62,22 +62,34 @@ export const REFUSAL = Object.freeze({
 /**
  * Constant-time secret comparison.
  *
- * `timingSafeEqual` throws on length mismatch, which would itself leak length,
- * so both sides are hashed to a fixed width first. Returns false rather than
- * throwing for any non-string input — a malformed token is a refusal, never an
- * exception.
+ * ─── WHY HASH FIRST ─────────────────────────────────────────────────────────
+ *
+ * `timingSafeEqual` throws when its two buffers differ in length, so comparing
+ * raw token bytes forces a length branch — and that branch is itself a signal:
+ * an attacker learns the secret's length by watching which path runs, which is
+ * exactly what the function is supposed to conceal.
+ *
+ * Hashing both sides to a SHA-256 digest makes every comparison 32 bytes
+ * against 32 bytes, so there is no length branch left to observe. Length,
+ * content and encoding all collapse into a fixed-width value before anything is
+ * compared.
+ *
+ * An earlier version documented this and did not do it — it compared raw
+ * buffers with a length shortcut. That is the same defect class as the mode
+ * gate that was described but never implemented, so the guarantee is now the
+ * code rather than the comment.
+ *
+ * Total: any non-string, empty, or malformed input returns false rather than
+ * throwing. A malformed token is a refusal, never an exception.
  */
 function secretsMatch(presented, expected) {
   if (typeof presented !== 'string' || typeof expected !== 'string') return false;
   if (presented.length === 0 || expected.length === 0) return false;
 
-  const a = Buffer.from(presented, 'utf8');
-  const b = Buffer.from(expected, 'utf8');
-  if (a.length !== b.length) {
-    // Compare against itself so the work is done either way, then refuse.
-    timingSafeEqual(a, a);
-    return false;
-  }
+  const a = createHash('sha256').update(presented, 'utf8').digest();
+  const b = createHash('sha256').update(expected, 'utf8').digest();
+
+  // Both digests are always 32 bytes, so this cannot throw and cannot branch.
   return timingSafeEqual(a, b);
 }
 

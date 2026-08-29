@@ -25,7 +25,14 @@ import {
   ALLOWED_REQUEST_KEYS,
   LOGGABLE_FIELDS,
 } from '../../netlify/functions/utils/validationInvoker.js';
-import { shouldStage, VALIDATION_SITE_FLAG } from '../../scripts/stageValidationFunction.mjs';
+import {
+  shouldStage,
+  VALIDATION_SITE_FLAG,
+  isStageable,
+  STAGED_FILE_PREFIX,
+  GITIGNORE_PATTERN,
+} from '../../scripts/stageValidationFunction.mjs';
+import { readdirSync } from 'node:fs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(resolve(here, rel), 'utf8');
@@ -122,6 +129,73 @@ describe('token handling', () => {
     const src = read('../../netlify/functions/utils/validationInvoker.js');
     expect(src).toContain('timingSafeEqual');
     expect(src).not.toMatch(/body\.token\s*!==\s*expectedToken/);
+  });
+
+  /**
+   * Finding A — the hash the comment promised.
+   *
+   * timingSafeEqual throws on differing buffer lengths, so comparing raw token
+   * bytes forces a length branch, and that branch leaks the secret's length —
+   * the very thing the function is meant to hide. Hashing both sides first
+   * makes every comparison 32 bytes against 32 bytes.
+   */
+  describe('fixed-width hashing before comparison', () => {
+    it('hashes both sides rather than comparing raw bytes', () => {
+      const src = read('../../netlify/functions/utils/validationInvoker.js');
+      expect(src).toContain("createHash('sha256')");
+      // The old length shortcut must be gone — it was the observable branch.
+      expect(src).not.toMatch(/if\s*\(a\.length\s*!==\s*b\.length\)/);
+    });
+
+    it('accepts equal tokens', () => {
+      expect(authorizeValidationRequest(validBody, ENV).ok).toBe(true);
+    });
+
+    it('refuses unequal tokens of the SAME length', () => {
+      const same = 'X'.repeat(TOKEN.length);
+      expect(same.length).toBe(TOKEN.length);
+      expect(authorizeValidationRequest({ ...validBody, token: same }, ENV).reason)
+        .toBe(REFUSAL.BAD_TOKEN);
+    });
+
+    it.each([
+      ['much shorter', 'x'],
+      ['one char short', TOKEN.slice(0, -1)],
+      ['one char long', `${TOKEN}x`],
+      ['much longer', TOKEN.repeat(4)],
+    ])('refuses an unequal token of different length (%s)', (_label, token) => {
+      expect(authorizeValidationRequest({ ...validBody, token }, ENV).reason)
+        .toBe(REFUSAL.BAD_TOKEN);
+    });
+
+    it.each([
+      ['empty presented', ''],
+      ['null', null],
+      ['undefined', undefined],
+      ['number', 1234],
+      ['array', [TOKEN]],
+      ['object', {}],
+      ['boolean', true],
+    ])('refuses %s without throwing', (_label, token) => {
+      let verdict;
+      expect(() => { verdict = authorizeValidationRequest({ ...validBody, token }, ENV); })
+        .not.toThrow();
+      expect(verdict.ok).toBe(false);
+    });
+
+    it('refuses when the configured secret is empty', () => {
+      expect(authorizeValidationRequest(validBody, { ...ENV, VALIDATION_INVOKER_TOKEN: '' }).reason)
+        .toBe(REFUSAL.DISABLED);
+    });
+
+    it('leaks neither the presented nor the expected token on any path', () => {
+      for (const token of ['', 'x', TOKEN.slice(0, -1), `${TOKEN}x`, 'X'.repeat(TOKEN.length)]) {
+        const verdict = authorizeValidationRequest({ ...validBody, token }, ENV);
+        const serialized = JSON.stringify(verdict);
+        expect(serialized).not.toContain(TOKEN);
+        if (token) expect(serialized).not.toContain(token);
+      }
+    });
   });
 
   it('never returns the presented or expected token in its verdict', () => {
@@ -334,5 +408,51 @@ describe('production exclusion is structural, not a missing secret', () => {
 
   it('cannot be committed back into the functions directory', () => {
     expect(read('../../.gitignore')).toContain('netlify/functions/validation-*.js');
+  });
+});
+
+/**
+ * Finding B — the two halves of the exclusion must agree.
+ *
+ * Staging decides what is copied INTO netlify/functions/; .gitignore decides
+ * what may never be committed there. The audit found they disagreed: staging
+ * took any `*.js`, the ignore rule covered only `validation-*.js`. A file named
+ * `helper.js` would have been staged into the deployed directory and remained
+ * git-visible — the exact leak the exclusion exists to prevent.
+ */
+describe('staging invariant — everything stageable is also ignorable', () => {
+  it('accepts only the validation- convention', () => {
+    expect(isStageable('validation-process-one-message.js')).toBe(true);
+    expect(isStageable('validation-x.js')).toBe(true);
+  });
+
+  it.each([
+    'helper.js', 'index.js', 'utils.js', 'Validation-x.js',
+    'my-validation-thing.js', 'validation.js', 'validation-x.mjs', 'validation-x.js.bak',
+  ])('refuses "%s"', (name) => {
+    expect(isStageable(name)).toBe(false);
+  });
+
+  it('every real file in netlify/validation/ satisfies the convention', () => {
+    const dir = resolve(here, '../../netlify/validation');
+    const files = readdirSync(dir).filter(f => f.endsWith('.js'));
+    expect(files.length).toBeGreaterThan(0);
+    for (const f of files) expect(isStageable(f)).toBe(true);
+  });
+
+  it('derives the gitignore pattern from the same constant', () => {
+    expect(GITIGNORE_PATTERN).toBe(`netlify/functions/${STAGED_FILE_PREFIX}*.js`);
+    // A text file cannot import a constant, so assert the file still carries it.
+    expect(read('../../.gitignore')).toContain(GITIGNORE_PATTERN);
+  });
+
+  it('every staged filename is covered by the gitignore glob', () => {
+    const dir = resolve(here, '../../netlify/validation');
+    const globToRe = new RegExp(
+      '^' + GITIGNORE_PATTERN.replace(/[.]/g, '\\.').replace(/\*/g, '[^/]*') + '$'
+    );
+    for (const f of readdirSync(dir).filter(x => x.endsWith('.js'))) {
+      expect(globToRe.test(`netlify/functions/${f}`)).toBe(true);
+    }
   });
 });

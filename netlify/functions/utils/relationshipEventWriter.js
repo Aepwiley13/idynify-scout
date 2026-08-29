@@ -38,7 +38,10 @@ import {
   createEmptyState,
   EVENT_TYPES,
 } from '../../../src/utils/relationshipMaterialization.js';
-import { CONVERSATION_STATES } from '../../../src/types/conversationState.js';
+import {
+  CONVERSATION_STATES,
+  resolveInboundTransition,
+} from '../../../src/types/conversationState.js';
 
 /**
  * The workflow state a confirmed inbound reply puts a conversation into.
@@ -126,17 +129,34 @@ export function buildInboundEvent({ message, contactId, identity, source, thread
  * anywhere in the tree, so they are not mirrored, only deleted. Mirroring a
  * field nobody reads would manufacture the drift this contract exists to end.
  */
-function buildCompatibilityMirrors(state, event, currentContact) {
+function buildCompatibilityMirrors(state, event, currentContact, message) {
   const mirrors = {
-    // The WORKFLOW value, not the relationship value. See
-    // CONVERSATION_STATE_FOR_INBOUND_REPLY — these are different vocabularies
-    // and writing one into the other silently strands the reply.
-    conversationState: CONVERSATION_STATE_FOR_INBOUND_REPLY,
     lastInboundSubject: event.subject ?? null,
     last_reply_at: state.last_inbound_at,
     last_replied_at: state.last_inbound_at,
     'engagement_summary.replies_received': state.reply_count,
   };
+
+  // ── conversationState: conditional, never unconditional ───────────────────
+  //
+  // This is a twelve-state WORKFLOW field, not a reply flag. Writing
+  // `response_received` on every qualifying reply reopened finished
+  // conversations — a won deal became an unread reply because someone sent a
+  // thank-you note, and `meeting_scheduled` regressed to "they replied".
+  //
+  // `resolveInboundTransition` already encodes the correct rules: which states
+  // advance, which are terminal, and the meeting_requested branch that depends
+  // on scheduling language. It is a pure module with no imports, so the writer
+  // calls it rather than approximating it. A second transition implementation
+  // is exactly the drift this codebase keeps paying for.
+  //
+  // The key is omitted entirely when the state does not change, so a closed
+  // conversation's workflow field is not merely rewritten with its own value —
+  // it is never written at all.
+  const transition = resolveInboundTransition(currentContact?.conversationState ?? null, message ?? {});
+  if (transition.newState !== currentContact?.conversationState) {
+    mirrors.conversationState = transition.newState;
+  }
 
   // The two approved workflow transitions, and ONLY from the stated current
   // value. Every other current value is left exactly as it is — `contact_status`
@@ -236,7 +256,7 @@ export async function recordInboundEvent({
     tx.create(eventRef, { ...event, recordedAt: FieldValue.serverTimestamp() });
     tx.update(contactRef, {
       ...relationshipUpdatePaths(state),
-      ...buildCompatibilityMirrors(state, event, currentContact),
+      ...buildCompatibilityMirrors(state, event, currentContact, message),
       updatedAt: FieldValue.serverTimestamp(),
     });
 

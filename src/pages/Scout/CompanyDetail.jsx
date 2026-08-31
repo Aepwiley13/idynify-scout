@@ -777,17 +777,22 @@ export default function CompanyDetail({
       const result = await response.json();
       if (!result.success) throw new Error(result.error || 'Enrichment failed');
 
-      await updateDoc(companyRef, {
+      const updates = {
         apolloEnrichment: result.data,
         apolloEnrichedAt: Date.now(),
         apollo_id: result.data._raw?.apolloOrgId || null
-      });
+      };
+      if (result.data.snapshot?.industry) {
+        updates.industry = result.data.snapshot.industry;
+      }
+      await updateDoc(companyRef, updates);
 
       // Update local company state with fresh enrichment data
       setCompany(prev => ({
         ...prev,
         apolloEnrichment: result.data,
-        apolloEnrichedAt: Date.now()
+        apolloEnrichedAt: Date.now(),
+        ...(result.data.snapshot?.industry ? { industry: result.data.snapshot.industry } : {}),
       }));
 
       console.log('✅ Company enriched successfully');

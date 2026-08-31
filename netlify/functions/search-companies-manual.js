@@ -161,7 +161,7 @@ export async function handler(event, context) {
       return {
         apollo_organization_id: company.id,
         name: company.name,
-        industry: company.industry || company.primary_industry || 'Unknown',
+        industry: company.industry || company.primary_industry || null,
         employee_count: company.estimated_num_employees || 0,
         revenue: revenue,
         founded_year: company.founded_year || null,

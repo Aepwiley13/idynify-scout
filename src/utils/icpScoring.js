@@ -52,10 +52,15 @@ const REVENUE_RANGES = [
 // LinkedIn import) with inconsistent field names. Resolve each dimension from
 // whatever is present rather than assuming one canonical name.
 
+const INDUSTRY_POISON = new Set(['unknown', 'unknown industry', 'not specified', 'n/a']);
+
 /** Company's industry, across the known field names. */
 function resolveIndustry(company) {
   const v = company.industry || company.primary_industry || company.company_industry;
-  return typeof v === 'string' && v.trim() ? v.trim() : null;
+  if (typeof v !== 'string') return null;
+  const trimmed = v.trim();
+  if (!trimmed || INDUSTRY_POISON.has(trimmed.toLowerCase())) return null;
+  return trimmed;
 }
 
 /** Company's state/location, across the known field names. */

@@ -182,11 +182,15 @@ export default function CompanyProfileView({ companyId, onBack }) {
       });
       const result = await res.json();
       if (result.success) {
-        await updateDoc(doc(db, 'users', user.uid, 'companies', companyId), {
+        const updates = {
           apolloEnrichment: result.data,
           apolloEnrichedAt: Date.now(),
           apollo_id: result.data._raw?.apolloOrgId || null,
-        });
+        };
+        if (result.data.snapshot?.industry) {
+          updates.industry = result.data.snapshot.industry;
+        }
+        await updateDoc(doc(db, 'users', user.uid, 'companies', companyId), updates);
         setEnrichedData(result.data);
       }
     } catch (err) {

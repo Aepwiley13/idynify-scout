@@ -54,9 +54,9 @@ const REVENUE_RANGES = [
 
 const INDUSTRY_POISON = new Set(['unknown', 'unknown industry', 'not specified', 'n/a']);
 
-/** Company's industry, across the known field names. */
+/** Company's industry — canonical field only, no zombie fallbacks. */
 function resolveIndustry(company) {
-  const v = company.industry || company.primary_industry || company.company_industry;
+  const v = company.industry;
   if (typeof v !== 'string') return null;
   const trimmed = v.trim();
   if (!trimmed || INDUSTRY_POISON.has(trimmed.toLowerCase())) return null;

@@ -907,7 +907,7 @@ async function getExistingCompanyIds(userId, authToken) {
  */
 function buildBarryIntel(company, companyProfile) {
   const name = company.name || 'This company';
-  const industry = company.industry || company.primary_industry || companyProfile.industries?.[0] || 'this sector';
+  const industry = company.industry || 'this sector';
   const currentYear = new Date().getFullYear();
 
   let summary = `${name} is a ${industry} company`;
@@ -1147,35 +1147,6 @@ function enrichCompanyData(company, companyProfile) {
     fit_reasons: fitReasons,
     status: 'pending'
   };
-}
-
-/**
- * Validate company data before saving
- */
-function validateCompanyData(company) {
-  // Require minimum fit score of 50%
-  if (company.fit_score < 50) {
-    console.log(`⚠️  Filtering out ${company.name}: Low fit score (${company.fit_score}%)`);
-    return false;
-  }
-
-  // Require at least name and one other key field
-  const hasName = company.name && company.name !== 'Unknown Company';
-  const hasIndustry = company.industry && company.industry !== 'Unknown Industry' && company.industry !== 'Unknown';
-  const hasLocation = company.headquarters_location && company.headquarters_location !== 'Unknown';
-
-  if (!hasName) {
-    console.log(`⚠️  Filtering out company: No name`);
-    return false;
-  }
-
-  // Reject if both industry and location are unknown
-  if (!hasIndustry && !hasLocation) {
-    console.log(`⚠️  Filtering out ${company.name}: Missing industry AND location`);
-    return false;
-  }
-
-  return true;
 }
 
 /**

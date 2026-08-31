@@ -88,7 +88,7 @@ function SharedCompanyCard({
               {company.name || 'Unnamed Company'}
             </div>
             <div style={{ fontSize: 10, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {company.apolloEnrichment?.snapshot?.industry || company.industry || 'Industry not available'}
+              {company.apolloEnrichment?.snapshot?.industry || company.industry || 'Unknown'}
             </div>
           </div>
           {/* Contact count badge — tappable: navigates to company contacts */}

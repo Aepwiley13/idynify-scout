@@ -907,7 +907,7 @@ async function getExistingCompanyIds(userId, authToken) {
  */
 function buildBarryIntel(company, companyProfile) {
   const name = company.name || 'This company';
-  const industry = company.industry || company.primary_industry || companyProfile.industries?.[0] || 'this sector';
+  const industry = company.industry || 'this sector';
   const currentYear = new Date().getFullYear();
 
   let summary = `${name} is a ${industry} company`;
@@ -977,8 +977,8 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
         console.log(`  ⚠️  NOTE: Apollo search endpoint does NOT return employee_count or location`);
       }
 
-      // Use Apollo's actual industry data; fall back to ICP's first industry only if Apollo doesn't provide one
-      const industry = company.industry || company.primary_industry || companyProfile.industries?.[0] || 'Unknown';
+      // Use Apollo's actual industry data; store null when absent (never a synthetic default)
+      const industry = company.industry || company.primary_industry || null;
 
       const companyObj = {
         // IDs
@@ -1027,7 +1027,7 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
         fields: {
           apollo_organization_id: { stringValue: String(company.apollo_organization_id) },
           name: { stringValue: String(company.name) },
-          industry: { stringValue: String(company.industry) },
+          industry: company.industry ? { stringValue: String(company.industry) } : { nullValue: null },
           revenue: { stringValue: String(company.revenue || '') },
           founded_year: { integerValue: String(company.founded_year || 0) },
           phone: { stringValue: String(company.phone || '') },
@@ -1108,10 +1108,10 @@ function enrichCompanyData(company, companyProfile) {
                        extractMidpoint(company.organization_num_employees_ranges) ||
                        0;
 
-  // Extract industry with fallbacks
+  // Extract industry with fallbacks — null when absent
   const industry = company.industry ||
                   company.primary_industry ||
-                  'Unknown Industry';
+                  null;
 
   // Extract location with multiple fallbacks
   const location = extractLocation(company);
@@ -1147,35 +1147,6 @@ function enrichCompanyData(company, companyProfile) {
     fit_reasons: fitReasons,
     status: 'pending'
   };
-}
-
-/**
- * Validate company data before saving
- */
-function validateCompanyData(company) {
-  // Require minimum fit score of 50%
-  if (company.fit_score < 50) {
-    console.log(`⚠️  Filtering out ${company.name}: Low fit score (${company.fit_score}%)`);
-    return false;
-  }
-
-  // Require at least name and one other key field
-  const hasName = company.name && company.name !== 'Unknown Company';
-  const hasIndustry = company.industry && company.industry !== 'Unknown Industry';
-  const hasLocation = company.headquarters_location && company.headquarters_location !== 'Unknown';
-
-  if (!hasName) {
-    console.log(`⚠️  Filtering out company: No name`);
-    return false;
-  }
-
-  // Reject if both industry and location are unknown
-  if (!hasIndustry && !hasLocation) {
-    console.log(`⚠️  Filtering out ${company.name}: Missing industry AND location`);
-    return false;
-  }
-
-  return true;
 }
 
 /**

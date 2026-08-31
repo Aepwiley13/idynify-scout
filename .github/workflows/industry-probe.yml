@@ -1,0 +1,38 @@
+name: "Industry Production Probe — READ ONLY"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  probe:
+    name: Read-only industry population probe
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm install
+
+      - name: Write service account to temp file
+        run: |
+          SA_PATH="$(mktemp)"
+          echo "$FIREBASE_SA_JSON" > "$SA_PATH"
+          echo "::add-mask::$SA_PATH"
+          echo "SA_PATH=$SA_PATH" >> "$GITHUB_ENV"
+        env:
+          FIREBASE_SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      - name: Run industry probe (read-only)
+        run: node scripts/industryProbe.mjs
+        env:
+          FIREBASE_SERVICE_ACCOUNT_PATH: ${{ env.SA_PATH }}
+
+      - name: Clean up credentials
+        if: always()
+        run: rm -f "$SA_PATH"

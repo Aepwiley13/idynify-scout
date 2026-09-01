@@ -230,7 +230,7 @@ export const handler = async (event) => {
   }
 
   try {
-    const { userId, authToken, companyProfile, icpId, adaptiveSignals, reconConfidence = 0 } = JSON.parse(event.body);
+    const { userId, authToken, companyProfile, icpId, adaptiveSignals, reconConfidence = 0, forceRefresh = false } = JSON.parse(event.body);
 
     if (!userId || !authToken || !companyProfile) {
       throw new Error('Missing required parameters');
@@ -479,8 +479,15 @@ export const handler = async (event) => {
       debugInfo.afterValidation = companies.length;
     }
 
+    // When a user edits an ICP and explicitly refreshes, mark old pending
+    // companies for that ICP as replaced so the new search criteria take effect.
+    if (forceRefresh && icpId) {
+      const cleared = await clearPendingCompaniesForIcp(userId, authToken, icpId);
+      console.log(`🔄 forceRefresh: marked ${cleared} old pending companies as replaced for ICP ${icpId}`);
+    }
+
     // Top-off model: Only add companies if queue needs refilling
-    const pendingCount = await countPendingCompanies(userId, authToken);
+    const pendingCount = await countPendingCompanies(userId, authToken, icpId);
     const TARGET_QUEUE_SIZE = Math.min(50 + Math.floor(reconConfidence * 0.5), 100);
 
     console.log(`📊 Current pending companies: ${pendingCount}`);
@@ -794,9 +801,9 @@ function convertRevenueToNumeric(revenueRange) {
 }
 
 /**
- * Count pending companies in the queue
+ * Count pending companies in the queue for a specific ICP.
  */
-async function countPendingCompanies(userId, authToken) {
+async function countPendingCompanies(userId, authToken, icpId) {
   try {
     const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
 
@@ -807,18 +814,38 @@ async function countPendingCompanies(userId, authToken) {
 
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
 
+    const statusFilter = {
+      fieldFilter: {
+        field: { fieldPath: 'status' },
+        op: 'EQUAL',
+        value: { stringValue: 'pending' }
+      }
+    };
+
+    const whereClause = icpId
+      ? {
+          compositeFilter: {
+            op: 'AND',
+            filters: [
+              statusFilter,
+              {
+                fieldFilter: {
+                  field: { fieldPath: 'icpId' },
+                  op: 'EQUAL',
+                  value: { stringValue: icpId }
+                }
+              }
+            ]
+          }
+        }
+      : statusFilter;
+
     const queryBody = {
       structuredQuery: {
         from: [{
           collectionId: 'companies'
         }],
-        where: {
-          fieldFilter: {
-            field: { fieldPath: 'status' },
-            op: 'EQUAL',
-            value: { stringValue: 'pending' }
-          }
-        }
+        where: whereClause
       }
     };
 
@@ -844,6 +871,72 @@ async function countPendingCompanies(userId, authToken) {
 
   } catch (error) {
     console.error('❌ Error counting pending companies:', error);
+    return 0;
+  }
+}
+
+/**
+ * Mark all pending companies for a given ICP as 'replaced' so a fresh search
+ * populates the queue with results matching the updated ICP criteria.
+ */
+async function clearPendingCompaniesForIcp(userId, authToken, icpId) {
+  try {
+    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    if (!projectId) return 0;
+
+    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+
+    const queryBody = {
+      structuredQuery: {
+        from: [{ collectionId: 'companies' }],
+        where: {
+          compositeFilter: {
+            op: 'AND',
+            filters: [
+              { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'pending' } } },
+              { fieldFilter: { field: { fieldPath: 'icpId' }, op: 'EQUAL', value: { stringValue: icpId } } }
+            ]
+          }
+        }
+      }
+    };
+
+    const queryResponse = await fetch(`${firestoreUrl}/users/${userId}:runQuery`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+      body: JSON.stringify(queryBody)
+    });
+
+    if (!queryResponse.ok) return 0;
+
+    const results = await queryResponse.json();
+    const docs = results.filter(r => r.document);
+    if (docs.length === 0) return 0;
+
+    const writes = docs.map(r => ({
+      update: {
+        name: r.document.name,
+        fields: {
+          ...r.document.fields,
+          status: { stringValue: 'replaced' },
+          replacedAt: { stringValue: new Date().toISOString() }
+        }
+      }
+    }));
+
+    const batchSize = 500;
+    for (let i = 0; i < writes.length; i += batchSize) {
+      const batch = writes.slice(i, i + batchSize);
+      await fetch(`${firestoreUrl}:commit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+        body: JSON.stringify({ writes: batch })
+      });
+    }
+
+    return docs.length;
+  } catch (error) {
+    console.error('❌ Error clearing pending companies for ICP:', error);
     return 0;
   }
 }

@@ -287,7 +287,8 @@ export default function ICPSettings() {
           userId: user.uid,
           authToken,
           companyProfile: profile,
-          icpId: selectedICPId
+          icpId: selectedICPId,
+          forceRefresh: true
         })
       });
 

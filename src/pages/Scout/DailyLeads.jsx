@@ -1534,6 +1534,19 @@ export default function DailyLeads({ onNavigate }) {
   const resolveSearchIcp = useCallback(async (user) => {
     const selected = activeICPId ? icpList.find(i => i.id === activeICPId) : null;
     if (selected) {
+      // `icpList` is loaded once on mount, so it can be behind an edit made
+      // without leaving this page (Barry refinement, the reclarification modal).
+      // The tab decides WHICH ICP is searched; Firestore decides what that ICP
+      // currently says. Sending the in-memory copy would search — and stamp the
+      // resulting companies with — criteria the user has already changed.
+      try {
+        const fresh = await getDoc(doc(db, 'users', user.uid, 'icpProfiles', selected.id));
+        if (fresh.exists()) {
+          return { icpId: selected.id, profile: { id: selected.id, ...fresh.data() }, source: 'explicit-tab' };
+        }
+      } catch (err) {
+        console.warn('[DailyLeads] could not re-read selected ICP, using loaded copy:', err.message);
+      }
       return { icpId: selected.id, profile: selected, source: 'explicit-tab' };
     }
 

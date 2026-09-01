@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
 import { logApolloError } from './utils/apolloErrorLogger.js';
@@ -479,16 +480,36 @@ export const handler = async (event) => {
       debugInfo.afterValidation = companies.length;
     }
 
-    // When a user edits an ICP and explicitly refreshes, mark old pending
-    // companies for that ICP as replaced so the new search criteria take effect.
-    if (forceRefresh && icpId) {
-      const cleared = await clearPendingCompaniesForIcp(userId, authToken, icpId);
-      console.log(`🔄 forceRefresh: marked ${cleared} old pending companies as replaced for ICP ${icpId}`);
+    // ---------------------------------------------------------------------
+    // Queue reconciliation, keyed on ICP CRITERIA (not ICP identity).
+    //
+    // Editing an ICP mutates the profile document in place, so `icpId` is
+    // unchanged by an edit. Keying the queue on icpId alone therefore cannot
+    // detect an edit — the stale companies carry the same id and still count
+    // as a full queue. The criteria fingerprint is what actually changes, so
+    // it is what the queue is keyed on.
+    //
+    // Anything pending that was discovered under different criteria is retired
+    // before the count, which makes the effect of an ICP edit deterministic:
+    // it no longer depends on which refresh button the user happened to press.
+    // ---------------------------------------------------------------------
+    const criteriaFingerprint = computeIcpCriteriaFingerprint(companyProfile);
+    const { retired, pendingCount } = await reconcilePendingQueue(
+      userId, authToken, icpId, criteriaFingerprint, forceRefresh
+    );
+
+    if (retired > 0) {
+      console.log(`🔄 Retired ${retired} pending companies discovered under superseded ICP criteria`);
     }
 
-    // Top-off model: Only add companies if queue needs refilling
-    const pendingCount = await countPendingCompanies(userId, authToken, icpId);
     const TARGET_QUEUE_SIZE = Math.min(50 + Math.floor(reconConfidence * 0.5), 100);
+
+    // A failed queue read is unknown, not empty. Treating it as 0 (the previous
+    // behaviour) would refill the queue on every transient Firestore error and
+    // grow it without bound, so this declines instead of guessing.
+    if (pendingCount === null) {
+      throw new Error('Could not read your current queue. Please try again.');
+    }
 
     console.log(`📊 Current pending companies: ${pendingCount}`);
 
@@ -551,7 +572,7 @@ export const handler = async (event) => {
     console.log(`📊 Adding ${toAdd.length} companies to reach target of ${TARGET_QUEUE_SIZE}`);
 
     // Save companies to Firestore
-    await saveCompaniesToFirestore(userId, authToken, toAdd, companyProfile, icpId);
+    await saveCompaniesToFirestore(userId, authToken, toAdd, companyProfile, icpId, criteriaFingerprint);
 
     // Barry state contract: companies are saved and available → READY.
     // Same REST pattern as the company writes (authToken Bearer + updateMask
@@ -801,143 +822,186 @@ function convertRevenueToNumeric(revenueRange) {
 }
 
 /**
- * Count pending companies in the queue for a specific ICP.
+ * Canonical, order-insensitive fingerprint of the ICP criteria that actually
+ * shape a Discovery search.
+ *
+ * Only fields that reach buildApolloQuery are included. `targetTitles` is
+ * deliberately excluded: it is a person filter that never reaches Apollo's
+ * organisation search (see buildApolloQuery), so editing it must NOT invalidate
+ * a company queue that it could not have influenced.
+ *
+ * Fields gated by a flag are normalised through that flag, so toggling
+ * `skipRevenue` or `isNationwide` changes the fingerprint while editing an
+ * ignored list does not.
+ *
+ * Exported for testing.
  */
-async function countPendingCompanies(userId, authToken, icpId) {
-  try {
-    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+export function computeIcpCriteriaFingerprint(companyProfile) {
+  const p = companyProfile || {};
 
-    if (!projectId) {
-      console.error('❌ Firebase Project ID not configured');
-      return 0;
-    }
+  const norm = (arr) => Array.from(
+    new Set((Array.isArray(arr) ? arr : []).map(v => String(v).trim().toLowerCase()).filter(Boolean))
+  ).sort();
 
-    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+  const canonical = {
+    industries: norm(p.industries),
+    companyKeywords: norm(p.companyKeywords),
+    companySizes: norm(p.companySizes),
+    skipRevenue: !!p.skipRevenue,
+    revenueRanges: p.skipRevenue ? [] : norm(p.revenueRanges),
+    isNationwide: !!p.isNationwide,
+    locations: p.isNationwide ? [] : norm(p.locations),
+    foundedAgeRange: p.foundedAgeRange
+      ? { minAge: p.foundedAgeRange.minAge ?? null, maxAge: p.foundedAgeRange.maxAge ?? null }
+      : null,
+    searchStrategy: p.searchStrategy || null,
+    lookalikeSeed: p.lookalikeSeed?.name ? String(p.lookalikeSeed.name).trim().toLowerCase() : null,
+  };
 
-    const statusFilter = {
-      fieldFilter: {
-        field: { fieldPath: 'status' },
-        op: 'EQUAL',
-        value: { stringValue: 'pending' }
-      }
-    };
-
-    const whereClause = icpId
-      ? {
-          compositeFilter: {
-            op: 'AND',
-            filters: [
-              statusFilter,
-              {
-                fieldFilter: {
-                  field: { fieldPath: 'icpId' },
-                  op: 'EQUAL',
-                  value: { stringValue: icpId }
-                }
-              }
-            ]
-          }
-        }
-      : statusFilter;
-
-    const queryBody = {
-      structuredQuery: {
-        from: [{
-          collectionId: 'companies'
-        }],
-        where: whereClause
-      }
-    };
-
-    const queryResponse = await fetch(`${firestoreUrl}/users/${userId}:runQuery`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken}`
-      },
-      body: JSON.stringify(queryBody)
-    });
-
-    if (!queryResponse.ok) {
-      console.error(`❌ Failed to query pending companies`);
-      return 0;
-    }
-
-    const queryResults = await queryResponse.json();
-
-    const count = queryResults.filter(result => result.document).length;
-
-    return count;
-
-  } catch (error) {
-    console.error('❌ Error counting pending companies:', error);
-    return 0;
-  }
+  return createHash('sha1').update(JSON.stringify(canonical)).digest('hex').slice(0, 16);
 }
 
 /**
- * Mark all pending companies for a given ICP as 'replaced' so a fresh search
- * populates the queue with results matching the updated ICP criteria.
+ * Split the pending queue into the part that still reflects the current ICP
+ * criteria and the part that does not.
+ *
+ * `relevant` mirrors Scout's own display filter (DailyLeads: `!c.icpId ||
+ * c.icpId === activeId`) so the count used for the queue-full decision matches
+ * what the user actually sees. Legacy companies written before `icpId` existed
+ * are therefore included — and, having no fingerprint, are treated as stale.
+ *
+ * Exported for testing.
  */
-async function clearPendingCompaniesForIcp(userId, authToken, icpId) {
-  try {
-    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
-    if (!projectId) return 0;
+export function partitionPendingQueue(companies, icpId, fingerprint) {
+  const relevant = (companies || []).filter(c => !c.icpId || c.icpId === icpId);
+  const current = relevant.filter(c => c.icpCriteriaFingerprint === fingerprint);
+  const stale = relevant.filter(c => c.icpCriteriaFingerprint !== fingerprint);
+  return { relevant, current, stale };
+}
 
-    const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+/**
+ * Fetch every pending company for the user, projected to the fields the queue
+ * decision needs.
+ */
+async function fetchPendingCompanyDocs(userId, authToken) {
+  const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+  if (!projectId) {
+    console.error('❌ Firebase Project ID not configured');
+    return null;
+  }
 
-    const queryBody = {
-      structuredQuery: {
-        from: [{ collectionId: 'companies' }],
-        where: {
-          compositeFilter: {
-            op: 'AND',
-            filters: [
-              { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'pending' } } },
-              { fieldFilter: { field: { fieldPath: 'icpId' }, op: 'EQUAL', value: { stringValue: icpId } } }
-            ]
-          }
+  const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
+
+  const queryBody = {
+    structuredQuery: {
+      from: [{ collectionId: 'companies' }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: 'status' },
+          op: 'EQUAL',
+          value: { stringValue: 'pending' }
         }
+      },
+      select: {
+        fields: [{ fieldPath: 'icpId' }, { fieldPath: 'icpCriteriaFingerprint' }]
       }
-    };
+    }
+  };
 
-    const queryResponse = await fetch(`${firestoreUrl}/users/${userId}:runQuery`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
-      body: JSON.stringify(queryBody)
-    });
+  const queryResponse = await fetch(`${firestoreUrl}/users/${userId}:runQuery`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+    body: JSON.stringify(queryBody)
+  });
 
-    if (!queryResponse.ok) return 0;
+  if (!queryResponse.ok) {
+    console.error('❌ Failed to query pending companies');
+    return null;
+  }
 
-    const results = await queryResponse.json();
-    const docs = results.filter(r => r.document);
-    if (docs.length === 0) return 0;
+  const queryResults = await queryResponse.json();
 
-    const writes = docs.map(r => ({
-      update: {
+  return {
+    firestoreUrl,
+    docs: queryResults
+      .filter(r => r.document)
+      .map(r => ({
         name: r.document.name,
+        icpId: r.document.fields?.icpId?.stringValue,
+        icpCriteriaFingerprint: r.document.fields?.icpCriteriaFingerprint?.stringValue,
+      })),
+  };
+}
+
+/**
+ * Retire pending companies discovered under superseded ICP criteria, then
+ * report how many genuinely-current companies remain queued.
+ *
+ * `forceRefresh` retires the current-criteria remainder as well, for the
+ * explicit "refresh my results" action where the user wants a new set even
+ * though the criteria did not change.
+ *
+ * A failed read returns `pendingCount: null` — the caller must treat that as
+ * "unknown", never as "empty", or a transient Firestore error would refill the
+ * queue on every retry.
+ */
+async function reconcilePendingQueue(userId, authToken, icpId, fingerprint, forceRefresh = false) {
+  try {
+    const fetched = await fetchPendingCompanyDocs(userId, authToken);
+    if (!fetched) return { retired: 0, pendingCount: null };
+
+    const { firestoreUrl, docs } = fetched;
+    const { current, stale } = partitionPendingQueue(docs, icpId, fingerprint);
+
+    const toRetire = forceRefresh ? [...stale, ...current] : stale;
+    if (toRetire.length === 0) {
+      return { retired: 0, pendingCount: current.length };
+    }
+
+    const retiredAt = new Date().toISOString();
+
+    // updateMask scopes the write to these two fields only. Without it a REST
+    // `update` REPLACES the document, which would clobber any concurrent write
+    // — e.g. a swipe landing between this read and this write.
+    const writes = toRetire.map(d => ({
+      update: {
+        name: d.name,
         fields: {
-          ...r.document.fields,
           status: { stringValue: 'replaced' },
-          replacedAt: { stringValue: new Date().toISOString() }
+          replacedAt: { stringValue: retiredAt },
         }
-      }
+      },
+      updateMask: { fieldPaths: ['status', 'replacedAt'] },
+      currentDocument: { exists: true },
     }));
 
+    let committed = 0;
     const batchSize = 500;
     for (let i = 0; i < writes.length; i += batchSize) {
       const batch = writes.slice(i, i + batchSize);
-      await fetch(`${firestoreUrl}:commit`, {
+      const res = await fetch(`${firestoreUrl}:commit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({ writes: batch })
       });
+      if (!res.ok) {
+        console.error('❌ Failed to retire superseded companies:', await res.text());
+        // Partial retirement is safe: whatever remains pending is simply
+        // counted below and retried on the next run.
+        break;
+      }
+      committed += batch.length;
     }
 
-    return docs.length;
+    // Writes are ordered [stale..., current...], so anything committed beyond
+    // the stale run consumed current-criteria companies. Guarded so a partial
+    // commit can never report a larger queue than we started with.
+    const currentRetired = Math.max(0, committed - stale.length);
+    return { retired: committed, pendingCount: current.length - currentRetired };
+
   } catch (error) {
-    console.error('❌ Error clearing pending companies for ICP:', error);
-    return 0;
+    console.error('❌ Error reconciling pending queue:', error);
+    return { retired: 0, pendingCount: null };
   }
 }
 
@@ -1033,7 +1097,7 @@ function buildBarryIntel(company, companyProfile) {
   return summary;
 }
 
-async function saveCompaniesToFirestore(userId, authToken, companies, companyProfile, icpId) {
+async function saveCompaniesToFirestore(userId, authToken, companies, companyProfile, icpId, criteriaFingerprint) {
   try {
     const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
 
@@ -1131,7 +1195,10 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
           found_at: { timestampValue: company.found_at },
           source: { stringValue: 'apollo_api' },
           barry_intel: { stringValue: String(company.barry_intel || '') },
-          icpId: { stringValue: String(company.icpId) }
+          icpId: { stringValue: String(company.icpId) },
+          // Stamps WHICH criteria discovered this company, so a later run can
+          // tell a still-valid queue entry from one the user has since edited away.
+          icpCriteriaFingerprint: { stringValue: String(criteriaFingerprint || '') }
         }
       };
 

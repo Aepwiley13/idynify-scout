@@ -3,6 +3,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { setActiveIcpProfile } from '../../utils/setActiveIcpProfile';
+import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import './Section9MessagingFlow.css';
 
 const QUESTIONS = [
@@ -62,6 +63,10 @@ export default function Section9MessagingFlow({ icpId, icpName, icpList = [], on
   const [saving, setSaving] = useState(false);
   const [showCompletion, setShowCompletion] = useState(false);
   const [activating, setActivating] = useState(false);
+  // True when completion auto-activated this profile because nothing else was
+  // active. onComplete must report that, or the parent's local list would
+  // diverge from Firestore.
+  const [autoActivated, setAutoActivated] = useState(false);
 
   const question = QUESTIONS[step];
   const isLast = step === QUESTIONS.length - 1;
@@ -82,8 +87,46 @@ export default function Section9MessagingFlow({ icpId, icpName, icpList = [], on
         status: progressPct >= 100 ? 'inactive' : 'pending',
         updatedAt: new Date().toISOString(),
       });
+      if (progressPct >= 100) {
+        await ensureWorkspaceHasActiveIcp(user, updatedAnswers);
+      }
     } catch (err) {
       console.warn('[Section9MessagingFlow] saveProgress failed:', err.message);
+    }
+  }
+
+  /**
+   * Completing a profile must never leave the workspace with nothing active.
+   *
+   * The write above demotes a finished profile to 'inactive' so the user can
+   * choose whether to switch to it. That is correct only while some OTHER
+   * profile is active. When this is the user's only profile, that demotion
+   * strands them in 'none-active': a fully completed ICP that resolveActiveIcp
+   * refuses to return, so Discovery, Barry refinement and ICP-dependent
+   * surfaces all decline with "none of your target profiles is active" — a
+   * state the user cannot have intended and did not ask for.
+   *
+   * So: activate iff nothing else is active. When the user already has an
+   * active profile, their existing selection is left alone and the completion
+   * screen's "Activate Now" remains an explicit choice.
+   */
+  async function ensureWorkspaceHasActiveIcp(user, finalAnswers) {
+    try {
+      const resolution = await resolveActiveIcp(user.uid);
+      // 'read-failed' is not evidence of an absent selection — never activate on it.
+      if (isResolved(resolution) || resolution.reason === 'read-failed') return false;
+
+      await setActiveIcpProfile(
+        user.uid,
+        icpId,
+        { messaging: finalAnswers, messagingProgress: 100 },
+        icpList.length ? icpList : null
+      );
+      setAutoActivated(true);
+      return true;
+    } catch (err) {
+      console.warn('[Section9MessagingFlow] ensureWorkspaceHasActiveIcp failed:', err.message);
+      return false;
     }
   }
 
@@ -122,7 +165,7 @@ export default function Section9MessagingFlow({ icpId, icpName, icpList = [], on
   }
 
   async function handleSaveForLater() {
-    onComplete?.({ activated: false, icpId, answers });
+    onComplete?.({ activated: autoActivated, icpId, answers });
   }
 
   async function handleDismiss() {

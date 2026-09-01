@@ -29,7 +29,11 @@ function getCategory(company) {
     company.status !== 'rejected' &&
     company.status !== 'deprioritized' &&
     company.status !== 'archived' &&
-    company.status !== 'people_mode_archived'
+    company.status !== 'people_mode_archived' &&
+    // Retired by an ICP criteria change — it was never reviewed and no longer
+    // matches. Every other company surface filters for status == 'pending', so
+    // this negative filter is the only place it could otherwise leak through.
+    company.status !== 'replaced'
   ) {
     return 'sam';
   }
@@ -342,7 +346,8 @@ export default function MissionControl() {
       c.status !== 'rejected' &&
       c.status !== 'deprioritized' &&
       c.status !== 'archived' &&
-      c.status !== 'people_mode_archived'
+      c.status !== 'people_mode_archived' &&
+      c.status !== 'replaced'
   );
   // SOM: accepted status OR confirmed fit_score >= threshold (use != null to handle missing field)
   const som = companies.filter(

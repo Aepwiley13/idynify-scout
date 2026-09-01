@@ -33,19 +33,33 @@ function bodyOf(name) {
   return source.slice(at, next === -1 ? at + 4000 : next);
 }
 
-/** Evaluate the real resolution order from the source against fixtures. */
-function makeResolver({ activeICPId, icpList, resolverResult }) {
+/**
+ * Evaluate the real resolution order from the source against fixtures.
+ *
+ * `stored` is what Firestore currently holds, keyed by ICP id. A selected tab
+ * is re-read from there, so passing a `stored` entry that differs from the
+ * `icpList` copy is how the stale-copy case is exercised. Omit `stored` (or
+ * pass `getDocThrows`) to simulate a failed re-read.
+ */
+function makeResolver({ activeICPId, icpList, resolverResult, stored = {}, getDocThrows = false }) {
   const body = bodyOf('resolveSearchIcp');
   const inner = body.slice(body.indexOf('async (user) => {') + 'async (user) => {'.length);
   const fnBody = inner.slice(0, inner.lastIndexOf('}, ['));
   return new Function(
-    'activeICPId', 'icpList', 'resolveActiveIcp', 'isResolved',
+    'activeICPId', 'icpList', 'resolveActiveIcp', 'isResolved', 'db', 'doc', 'getDoc',
     `return (async (user) => {${fnBody}});`
   )(
     activeICPId,
     icpList,
     async () => resolverResult,
     r => r.status === 'resolved',
+    {},
+    (_db, _users, _uid, _col, id) => ({ id }),
+    async (ref) => {
+      if (getDocThrows) throw new Error('permission-denied');
+      const data = stored[ref.id];
+      return { exists: () => !!data, data: () => data };
+    },
   );
 }
 
@@ -63,12 +77,13 @@ describe('V-1 — explicit tab selection decides where a search lands', () => {
       activeICPId: 'icp_B',
       icpList: [ICP_A, ICP_B],
       resolverResult: ACTIVE_A,
+      stored: { icp_B: ICP_B },
     });
 
     const result = await resolveSearchIcp(USER);
 
     expect(result.icpId).toBe('icp_B');
-    expect(result.profile).toBe(ICP_B);
+    expect(result.profile).toMatchObject({ id: 'icp_B', industries: ['Legal'] });
     expect(result.source).toBe('explicit-tab');
   });
 
@@ -77,11 +92,42 @@ describe('V-1 — explicit tab selection decides where a search lands', () => {
       activeICPId: 'icp_B',
       icpList: [ICP_A, ICP_B],
       resolverResult: ACTIVE_A,
+      stored: { icp_B: ICP_B },
     });
 
     const result = await resolveSearchIcp(USER);
 
     expect(result.profile.industries).toEqual(['Legal']);
+  });
+
+  it('re-reads the selected ICP, so an edit made since mount is what gets searched', async () => {
+    // icpList is loaded once on mount. Firestore has since been edited.
+    const resolveSearchIcp = makeResolver({
+      activeICPId: 'icp_B',
+      icpList: [ICP_A, ICP_B],
+      resolverResult: ACTIVE_A,
+      stored: { icp_B: { ...ICP_B, industries: ['Publishing'] } },
+    });
+
+    const result = await resolveSearchIcp(USER);
+
+    expect(result.icpId).toBe('icp_B');
+    expect(result.profile.industries).toEqual(['Publishing']);
+  });
+
+  it('falls back to the loaded copy when the re-read fails — a failed read is not an identity change', async () => {
+    const resolveSearchIcp = makeResolver({
+      activeICPId: 'icp_B',
+      icpList: [ICP_A, ICP_B],
+      resolverResult: ACTIVE_A,
+      getDocThrows: true,
+    });
+
+    const result = await resolveSearchIcp(USER);
+
+    expect(result.icpId).toBe('icp_B');
+    expect(result.profile).toBe(ICP_B);
+    expect(result.source).toBe('explicit-tab');
   });
 
   it('no tab selected → falls back to the canonical resolver, not to a candidate', async () => {

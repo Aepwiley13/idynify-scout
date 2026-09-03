@@ -1005,8 +1005,15 @@ async function reconcilePendingQueue(userId, authToken, icpId, fingerprint, forc
   }
 }
 
+export const DEDUP_BLOCKING_STATUSES = ['accepted', 'rejected', 'pending'];
+
 /**
- * Get all existing company IDs to prevent duplicates
+ * Get existing company IDs that should block re-discovery.
+ *
+ * Only companies the user has actively acted on (accepted, rejected) or that
+ * are still queued (pending) suppress an Apollo org from a new search. Retired
+ * records (replaced, archived) and legacy documents with no status field are
+ * eligible for rediscovery.
  */
 async function getExistingCompanyIds(userId, authToken) {
   try {
@@ -1023,6 +1030,15 @@ async function getExistingCompanyIds(userId, authToken) {
         from: [{
           collectionId: 'companies'
         }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'status' },
+            op: 'IN',
+            value: { arrayValue: { values:
+              DEDUP_BLOCKING_STATUSES.map(s => ({ stringValue: s }))
+            } }
+          }
+        },
         select: {
           fields: [{ fieldPath: 'apollo_organization_id' }]
         }

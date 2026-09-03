@@ -1287,7 +1287,6 @@ export default function DailyLeads({ onNavigate }) {
   const [showUndo, setShowUndo] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState('');
-  const [barrySearching, setBarrySearching] = useState(false);
   const [actionToast, setActionToast] = useState(null); // { message, type: 'success'|'info' }
 
   // ── ICP profile (for score breakdown) ───────────────────────────────────────
@@ -1401,9 +1400,6 @@ export default function DailyLeads({ onNavigate }) {
     try {
       const user = getEffectiveUser();
       if (!user) { navigate('/login'); return; }
-
-      const userSnap = await getDoc(doc(db, 'users', user.uid));
-      setBarrySearching(userSnap.exists() && userSnap.data().barryState === 'SEARCHING');
 
       // Load RECON confidence to scale search queue size
       const dashSnap = await getDoc(doc(db, 'dashboards', user.uid));
@@ -2400,23 +2396,13 @@ export default function DailyLeads({ onNavigate }) {
                   </div>
                 ) : (
                   <div style={{ textAlign: 'center', padding: 50, color: T.textMuted }}>
-                    <div style={{ fontSize: 44, marginBottom: 12 }}>{barrySearching ? '🔍' : '🎯'}</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.pink, marginBottom: 8 }}>
-                      {barrySearching ? 'BARRY IS SEARCHING' : 'QUEUE EMPTY'}
-                    </div>
-                    <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 16 }}>
-                      {barrySearching
-                        ? 'Barry is finding companies that match your targeting. This usually takes a moment.'
-                        : 'No pending companies. Barry will find new targets.'}
-                    </p>
-                    {barrySearching ? (
-                      <Loader size={20} style={{ animation: 'spin 1s linear infinite', color: BRAND.pink, margin: '0 auto' }} />
-                    ) : (
-                      <button onClick={handleManualRefresh} disabled={isRefreshing} style={{ padding: '10px 22px', borderRadius: 10, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, margin: '0 auto' }}>
-                        {isRefreshing ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={14} />}
-                        Find More Targets
-                      </button>
-                    )}
+                    <div style={{ fontSize: 44, marginBottom: 12 }}>🎯</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.pink, marginBottom: 8 }}>QUEUE EMPTY</div>
+                    <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 16 }}>No pending companies. Barry will find new targets.</p>
+                    <button onClick={handleManualRefresh} disabled={isRefreshing} style={{ padding: '10px 22px', borderRadius: 10, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, margin: '0 auto' }}>
+                      {isRefreshing ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={14} />}
+                      Find More Targets
+                    </button>
                   </div>
                 )
               ) : showSessionSummary || currentIndex >= companies.length ? (

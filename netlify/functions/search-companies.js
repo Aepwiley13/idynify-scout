@@ -1023,16 +1023,6 @@ async function getExistingCompanyIds(userId, authToken) {
         from: [{
           collectionId: 'companies'
         }],
-        where: {
-          fieldFilter: {
-            field: { fieldPath: 'status' },
-            op: 'NOT_IN',
-            value: { arrayValue: { values: [
-              { stringValue: 'replaced' },
-              { stringValue: 'retired' },
-            ] } }
-          }
-        },
         select: {
           fields: [{ fieldPath: 'apollo_organization_id' }]
         }

@@ -185,6 +185,33 @@ describe('ICPSettings — save triggers discovery', () => {
   });
 });
 
+// ── ICPSettings Refresh message uses currentQueueSize ──────────────────────
+
+describe('ICPSettings — Refresh message distinguishes queue-full from no-results', () => {
+  it('captures currentQueueSize from server response', () => {
+    expect(icpSettings).toMatch(/currentQueueSize:\s*data\.currentQueueSize/);
+  });
+
+  it('shows queue-full message only when currentQueueSize > 0', () => {
+    expect(icpSettings).toMatch(/currentQueueSize\s*>\s*0/);
+    expect(icpSettings).toMatch(/Queue is already full/);
+  });
+
+  it('shows no-matches message when currentQueueSize is 0', () => {
+    expect(icpSettings).toMatch(/No new matches found/);
+  });
+
+  it('has three branches: added, queue-full, no-matches', () => {
+    const refreshBlock = icpSettings.slice(
+      icpSettings.indexOf('header-refresh-success'),
+      icpSettings.indexOf('header-refresh-error')
+    );
+    expect(refreshBlock).toMatch(/refreshResult\.count\s*>\s*0/);
+    expect(refreshBlock).toMatch(/refreshResult\.currentQueueSize\s*>\s*0/);
+    expect(refreshBlock).toMatch(/No new matches found/);
+  });
+});
+
 // ── normalizeIcpCriteria mirrors server fingerprint normalization ─────────
 
 describe('normalizeIcpCriteria mirrors server', () => {

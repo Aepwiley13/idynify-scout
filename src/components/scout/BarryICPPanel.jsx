@@ -11,6 +11,7 @@ import { BRAND, ASSETS } from '../../theme/tokens';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
 import { appendTurn, loadOrSeedRecentTurns } from '../../utils/barryCanonical';
+import { normalizeIcpParams } from '../../utils/normalizeIcpParams';
 
 // ─── BarryAvatar ──────────────────────────────────────────────────────────────
 export function BarryAvatar({ size = 20, style = {} }) {
@@ -187,12 +188,13 @@ export default function BarryICPPanel({ userId, icpProfile, onClose, onSearchCom
         return;
       }
       const authToken = await user.getIdToken();
+      const normalized = normalizeIcpParams(icpParams);
       const mergedProfile = {
         ...resolution.profile,
-        ...(icpParams.industries?.length > 0 && { industries: icpParams.industries }),
-        ...(icpParams.companySizes?.length > 0 && { companySizes: icpParams.companySizes }),
-        ...(icpParams.targetTitles?.length > 0 && { targetTitles: icpParams.targetTitles }),
-        ...(icpParams.companyKeywords?.length > 0 && { companyKeywords: icpParams.companyKeywords }),
+        ...(normalized.industries?.length > 0 && { industries: normalized.industries }),
+        ...(normalized.companySizes?.length > 0 && { companySizes: normalized.companySizes }),
+        ...(normalized.targetTitles?.length > 0 && { targetTitles: normalized.targetTitles }),
+        ...(normalized.companyKeywords?.length > 0 && { companyKeywords: normalized.companyKeywords }),
         updatedAt: new Date().toISOString(),
         managedByBarry: true,
       };

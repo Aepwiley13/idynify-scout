@@ -112,6 +112,10 @@ const INDUSTRY_ALIASES = {
   'janitorial': 'Facilities Services',
   'architects': 'Architecture and Planning',
   'engineering firms': 'Civil Engineering',
+  'non-profit': 'Non-Profit Organization Management',
+  'nonprofit': 'Non-Profit Organization Management',
+  'non-profits': 'Non-Profit Organization Management',
+  'nonprofits': 'Non-Profit Organization Management',
 };
 
 /** Canonical names that merely *contain* the phrase, as whole words. */

@@ -23,6 +23,7 @@ import { RECORD_STATUS } from '../../constants/statusModel';
 import { calculateReconConfidence } from '../../utils/reconConfidence';
 import { ARRIVAL_REVIEW_ICP } from '../../utils/firstExperienceMode';
 import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
+import { normalizeIcpParams } from '../../utils/normalizeIcpParams';
 
 // ─── Initials avatar ─────────────────────────────────────────────────────────
 function Av({ initials, color = BRAND.pink, size = 70 }) {
@@ -1110,12 +1111,13 @@ function IcpReclarificationModal({ userId, icpId, onClose, onSearchComplete, rec
         console.warn(`[IcpReclarificationModal] active ICP changed ${icpId} → ${resolution.icpId}`);
       }
       const authToken = await user.getIdToken();
+      const normalized = normalizeIcpParams(icpParams);
       const mergedProfile = {
         ...resolution.profile,
-        ...(icpParams.industries?.length > 0 && { industries: icpParams.industries }),
-        ...(icpParams.companySizes?.length > 0 && { companySizes: icpParams.companySizes }),
-        ...(icpParams.targetTitles?.length > 0 && { targetTitles: icpParams.targetTitles }),
-        ...(icpParams.companyKeywords?.length > 0 && { companyKeywords: icpParams.companyKeywords }),
+        ...(normalized.industries?.length > 0 && { industries: normalized.industries }),
+        ...(normalized.companySizes?.length > 0 && { companySizes: normalized.companySizes }),
+        ...(normalized.targetTitles?.length > 0 && { targetTitles: normalized.targetTitles }),
+        ...(normalized.companyKeywords?.length > 0 && { companyKeywords: normalized.companyKeywords }),
         updatedAt: new Date().toISOString(),
         managedByBarry: true,
       };

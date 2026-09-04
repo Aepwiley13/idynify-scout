@@ -28,6 +28,7 @@ import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { getStaleContacts } from './utils/contactUtils.js';
 import { buildCapabilityBlock, computeReconState } from './utils/reconCapability.js';
 import { LEGACY_HAIKU_4_5 } from './utils/models.js';
+import { APOLLO_INDUSTRIES, COMPANY_SIZE_OPTIONS, US_STATES } from '../../src/constants/targetingCanon.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -393,8 +394,8 @@ When you have enough context (immediately if existing ICP is confirmed, or after
 }
 
 icp_params format:
-- industries: array of lowercase strings (e.g. ["technology", "healthcare", "saas"])
-- companySizes: match these ranges exactly: ["1-10", "11-50", "51-200", "201-500", "501-1000", "1001-5000", "5001+"]
+- industries: array of EXACT industry names from this list: ${APOLLO_INDUSTRIES.map(i => i.name).join(', ')}
+- companySizes: array of EXACT values from this list: ${JSON.stringify(COMPANY_SIZE_OPTIONS)}
 - targetTitles: array of specific job titles they sell to
 - companyKeywords: descriptive terms (e.g. ["startup", "b2b", "agency", "saas", "enterprise"])
 
@@ -1174,6 +1175,24 @@ Return valid JSON only:
         };
       } finally {
         clearTimeout(icpTimeout);
+      }
+
+      // Validate icp_params against canonical targeting vocabulary.
+      // barryICPConversation already does this; barryMissionChat did not,
+      // so free-form values like "saas" or "501-1000" reached Firestore.
+      if (icpParsed.icp_params) {
+        const p = icpParsed.icp_params;
+        if (p.industries) {
+          p.industries = p.industries
+            .filter(ind => APOLLO_INDUSTRIES.some(ai => ai.name.toLowerCase() === ind.toLowerCase()))
+            .map(ind => {
+              const match = APOLLO_INDUSTRIES.find(ai => ai.name.toLowerCase() === ind.toLowerCase());
+              return match ? match.name : ind;
+            });
+        }
+        if (p.companySizes) {
+          p.companySizes = p.companySizes.filter(size => COMPANY_SIZE_OPTIONS.includes(size));
+        }
       }
 
       // Build updated conversation history to return to the client

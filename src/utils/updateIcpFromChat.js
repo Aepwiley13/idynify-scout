@@ -15,6 +15,7 @@
 import { doc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { resolveActiveIcp, isResolved } from './resolveActiveIcp';
+import { normalizeIcpParams } from './normalizeIcpParams';
 
 /**
  * Apply a confirmed ICP delta from Barry chat.
@@ -40,12 +41,13 @@ export async function updateIcpFromChat(userId, icpDelta, action, existingProfil
 
   const { icpId } = resolution;
   const authoritative = resolution.profile || {};
+  const normalized = normalizeIcpParams(icpDelta);
 
   let updatedIcpProfile;
   if (action === 'replace') {
     updatedIcpProfile = {
       ...authoritative,
-      ...icpDelta,
+      ...normalized,
       managedByBarry: true,
       updatedAt: new Date().toISOString(),
     };
@@ -56,11 +58,11 @@ export async function updateIcpFromChat(userId, icpDelta, action, existingProfil
     const current = { ...(existingProfile || {}), ...authoritative };
     updatedIcpProfile = {
       ...current,
-      industries: dedupe([...(current.industries || []), ...(icpDelta.industries || [])]),
-      companySizes: dedupe([...(current.companySizes || []), ...(icpDelta.companySizes || [])]),
-      locations: dedupe([...(current.locations || []), ...(icpDelta.locations || [])]),
-      targetTitles: dedupe([...(current.targetTitles || []), ...(icpDelta.targetTitles || [])]),
-      companyKeywords: dedupe([...(current.companyKeywords || []), ...(icpDelta.companyKeywords || [])]),
+      industries: dedupe([...(current.industries || []), ...(normalized.industries || [])]),
+      companySizes: dedupe([...(current.companySizes || []), ...(normalized.companySizes || [])]),
+      locations: dedupe([...(current.locations || []), ...(normalized.locations || [])]),
+      targetTitles: dedupe([...(current.targetTitles || []), ...(normalized.targetTitles || [])]),
+      companyKeywords: dedupe([...(current.companyKeywords || []), ...(normalized.companyKeywords || [])]),
       managedByBarry: true,
       updatedAt: new Date().toISOString(),
     };

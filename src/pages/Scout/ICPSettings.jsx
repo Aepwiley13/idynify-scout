@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { doc, getDoc, setDoc, collection, getDocs, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 
@@ -14,6 +14,7 @@ import BarryICPPanel from '../../components/scout/BarryICPPanel';
 import Section9MessagingFlow from '../../components/icp/Section9MessagingFlow';
 import { setActiveIcpProfile } from '../../utils/setActiveIcpProfile';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
+import { criteriaChanged } from '../../utils/normalizeIcpCriteria';
 
 export default function ICPSettings() {
   const navigate = useNavigate();
@@ -38,6 +39,9 @@ export default function ICPSettings() {
   const [industrySearch, setIndustrySearch] = useState('');
   const [locationSearch, setLocationSearch] = useState('');
   const [newTitleInput, setNewTitleInput] = useState('');
+
+  const savedCriteriaRef = useRef(null);
+  const discoveryInFlightRef = useRef(false);
 
   const companySizeOptions = [
     "1-10", "11-20", "21-50", "51-100", "101-200", "201-500",
@@ -103,6 +107,7 @@ export default function ICPSettings() {
       scoringWeights: icp.scoringWeights || DEFAULT_WEIGHTS,
       targetTitles: icp.targetTitles || [],
     });
+    savedCriteriaRef.current = icp;
   }
 
   function selectICP(icp) {
@@ -239,6 +244,31 @@ export default function ICPSettings() {
       // demand against the ICP it is actually showing, so saving one ICP can no
       // longer overwrite another ICP's stored scores.
 
+      if (isActiveProfile && !discoveryInFlightRef.current && criteriaChanged(savedCriteriaRef.current, updatedProfile)) {
+        discoveryInFlightRef.current = true;
+        await setDoc(doc(db, 'users', user.uid), {
+          barryState: 'SEARCHING',
+          companiesFoundCount: 0,
+        }, { merge: true });
+        const authToken = await user.getIdToken();
+        fetch('/.netlify/functions/search-companies', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.uid,
+            authToken,
+            companyProfile: updatedProfile,
+            icpId: selectedICPId,
+            forceRefresh: true,
+          }),
+        }).then(() => {
+          discoveryInFlightRef.current = false;
+        }).catch(() => {
+          discoveryInFlightRef.current = false;
+        });
+      }
+
+      savedCriteriaRef.current = updatedProfile;
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
       setSaving(false);

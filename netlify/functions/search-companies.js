@@ -437,6 +437,10 @@ export const handler = async (event) => {
       console.log('\n');
     }
 
+    // TODO: remove diag_* after P0-zero-result closes
+    const diag_apolloRawCount = foundedAgeRange ? totalFetched : companies.length;
+    const diag_afterAgeCount = companies.length;
+
     // VALIDATION: Filter companies to ensure they match requested industries
     // External API sometimes returns companies that don't match the filter
     const requestedIndustries = companyProfile.industries || [];
@@ -451,7 +455,9 @@ export const handler = async (event) => {
 
     // Industry validation: use keyword matching since Apollo's industry field is unreliable.
     // Check company name + industry + keywords against ICP keywords to filter obvious mismatches.
+    let diag_industrySoftFilterApplied = false; // TODO: remove after P0-zero-result closes
     if (requestedIndustries.length > 0 && companyProfile.companyKeywords?.length > 0) {
+      diag_industrySoftFilterApplied = true;
       const keywords = companyProfile.companyKeywords.map(k => k.toLowerCase());
       const industryTerms = requestedIndustries.map(i => i.toLowerCase());
       const beforeCount = companies.length;
@@ -479,6 +485,7 @@ export const handler = async (event) => {
       console.log(`🔍 Industry soft-filter: ${companies.length}/${beforeCount} companies passed (removed ${beforeCount - companies.length} mismatches)`);
       debugInfo.afterValidation = companies.length;
     }
+    const diag_afterIndustryCount = companies.length; // TODO: remove after P0-zero-result closes
 
     // ---------------------------------------------------------------------
     // Queue reconciliation, keyed on ICP CRITERIA (not ICP identity).
@@ -494,7 +501,7 @@ export const handler = async (event) => {
     // it no longer depends on which refresh button the user happened to press.
     // ---------------------------------------------------------------------
     const criteriaFingerprint = computeIcpCriteriaFingerprint(companyProfile);
-    const { retired, pendingCount } = await reconcilePendingQueue(
+    const { retired, pendingCount, totalPendingBefore } = await reconcilePendingQueue(
       userId, authToken, icpId, criteriaFingerprint, forceRefresh
     );
 
@@ -539,6 +546,7 @@ export const handler = async (event) => {
         }
       }
 
+      // TODO: remove diagnostics after P0-zero-result closes
       return {
         statusCode: 200,
         headers: {
@@ -552,7 +560,32 @@ export const handler = async (event) => {
           companiesAdded: 0,
           currentQueueSize: pendingCount,
           message: `Queue is full with ${pendingCount} pending companies. No new companies added.`,
-          generationTime: (Date.now() - startTime) / 1000
+          generationTime: (Date.now() - startTime) / 1000,
+          diagnostics: {
+            activeIcpId: icpId,
+            criteriaFingerprint,
+            pendingBeforeReconciliation: totalPendingBefore,
+            replacedByReconciliation: retired,
+            pendingAfterReconciliation: pendingCount,
+            queueTarget: TARGET_QUEUE_SIZE,
+            queueFullDecision: true,
+            apolloQuery: null,
+            apolloHttpStatus: null,
+            apolloRawCount: null,
+            ageFilterApplied: !!foundedAgeRange,
+            afterAgeCount: null,
+            industrySoftFilterApplied: false,
+            companyKeywordsCount: companyProfile.companyKeywords?.length || 0,
+            afterIndustryCount: null,
+            afterOtherQualificationCount: null,
+            dedupBlockingCount: null,
+            dedupSuppressedCount: null,
+            dedupSuppressedByStatus: null,
+            dedupSuppressedByIcpScope: null,
+            companiesAttempted: 0,
+            companiesWritten: 0,
+            currentQueueSize: pendingCount,
+          },
         })
       };
     }
@@ -562,6 +595,23 @@ export const handler = async (event) => {
 
     // Filter out companies that already exist
     const newCompanies = companies.filter(c => !existingCompanyIds.has(String(c.id)));
+
+    // TODO: remove dedup diagnostics after P0-zero-result closes
+    const dedupMeta = existingCompanyIds._dedupMeta || new Map();
+    const suppressed = companies.filter(c => existingCompanyIds.has(String(c.id)));
+    const diag_dedupByStatus = { pending: 0, accepted: 0, rejected: 0 };
+    const diag_dedupByScope = { sameIcp: 0, differentIcp: 0, legacyOrNoIcp: 0 };
+    for (const c of suppressed) {
+      const meta = dedupMeta.get(String(c.id));
+      if (meta) {
+        diag_dedupByStatus[meta.status] = (diag_dedupByStatus[meta.status] || 0) + 1;
+        if (!meta.icpId) diag_dedupByScope.legacyOrNoIcp++;
+        else if (meta.icpId === icpId) diag_dedupByScope.sameIcp++;
+        else diag_dedupByScope.differentIcp++;
+      } else {
+        diag_dedupByScope.legacyOrNoIcp++;
+      }
+    }
 
     console.log(`📊 Filtered ${companies.length} companies → ${newCompanies.length} new (removed ${companies.length - newCompanies.length} duplicates)`);
 
@@ -633,7 +683,33 @@ export const handler = async (event) => {
           apolloReturnedCount: debugInfo?.apolloReturned || 0,
           requestedIndustries: debugInfo?.requestedIndustries || [],
           sampleIndustriesFromApollo: debugInfo?.sampleIndustriesReturned || []
-        } : undefined
+        } : undefined,
+        // TODO: remove diagnostics after P0-zero-result closes
+        diagnostics: {
+          activeIcpId: icpId,
+          criteriaFingerprint,
+          pendingBeforeReconciliation: totalPendingBefore,
+          replacedByReconciliation: retired,
+          pendingAfterReconciliation: pendingCount,
+          queueTarget: TARGET_QUEUE_SIZE,
+          queueFullDecision: false,
+          apolloQuery,
+          apolloHttpStatus: 200,
+          apolloRawCount: diag_apolloRawCount,
+          ageFilterApplied: !!foundedAgeRange,
+          afterAgeCount: diag_afterAgeCount,
+          industrySoftFilterApplied: diag_industrySoftFilterApplied,
+          companyKeywordsCount: companyProfile.companyKeywords?.length || 0,
+          afterIndustryCount: diag_afterIndustryCount,
+          afterOtherQualificationCount: diag_afterIndustryCount,
+          dedupBlockingCount: dedupMeta.size,
+          dedupSuppressedCount: suppressed.length,
+          dedupSuppressedByStatus: diag_dedupByStatus,
+          dedupSuppressedByIcpScope: diag_dedupByScope,
+          companiesAttempted: toAdd.length,
+          companiesWritten: toAdd.length,
+          currentQueueSize: pendingCount + toAdd.length,
+        },
       })
     };
 
@@ -948,14 +1024,16 @@ async function fetchPendingCompanyDocs(userId, authToken) {
 async function reconcilePendingQueue(userId, authToken, icpId, fingerprint, forceRefresh = false) {
   try {
     const fetched = await fetchPendingCompanyDocs(userId, authToken);
-    if (!fetched) return { retired: 0, pendingCount: null };
+    if (!fetched) return { retired: 0, pendingCount: null, totalPendingBefore: null };
 
     const { firestoreUrl, docs } = fetched;
+    // TODO: remove after P0-zero-result closes — totalPendingBefore diagnostic
+    const totalPendingBefore = docs.length;
     const { current, stale } = partitionPendingQueue(docs, icpId, fingerprint);
 
     const toRetire = forceRefresh ? [...stale, ...current] : stale;
     if (toRetire.length === 0) {
-      return { retired: 0, pendingCount: current.length };
+      return { retired: 0, pendingCount: current.length, totalPendingBefore };
     }
 
     const retiredAt = new Date().toISOString();
@@ -997,11 +1075,11 @@ async function reconcilePendingQueue(userId, authToken, icpId, fingerprint, forc
     // the stale run consumed current-criteria companies. Guarded so a partial
     // commit can never report a larger queue than we started with.
     const currentRetired = Math.max(0, committed - stale.length);
-    return { retired: committed, pendingCount: current.length - currentRetired };
+    return { retired: committed, pendingCount: current.length - currentRetired, totalPendingBefore };
 
   } catch (error) {
     console.error('❌ Error reconciling pending queue:', error);
-    return { retired: 0, pendingCount: null };
+    return { retired: 0, pendingCount: null, totalPendingBefore: null };
   }
 }
 
@@ -1025,6 +1103,7 @@ async function getExistingCompanyIds(userId, authToken) {
 
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
 
+    // TODO: remove status+icpId projection after P0-zero-result closes
     const queryBody = {
       structuredQuery: {
         from: [{
@@ -1040,7 +1119,11 @@ async function getExistingCompanyIds(userId, authToken) {
           }
         },
         select: {
-          fields: [{ fieldPath: 'apollo_organization_id' }]
+          fields: [
+            { fieldPath: 'apollo_organization_id' },
+            { fieldPath: 'status' },
+            { fieldPath: 'icpId' },
+          ]
         }
       }
     };
@@ -1061,16 +1144,33 @@ async function getExistingCompanyIds(userId, authToken) {
 
     const queryResults = await queryResponse.json();
 
-    const ids = queryResults
-      .filter(result => result.document)
+    const docs = queryResults.filter(result => result.document);
+
+    const ids = docs
       .map(result => result.document.fields?.apollo_organization_id?.stringValue)
       .filter(id => id);
 
-    return new Set(ids);
+    // TODO: remove dedupMeta after P0-zero-result closes
+    const dedupMeta = new Map();
+    for (const result of docs) {
+      const apolloId = result.document.fields?.apollo_organization_id?.stringValue;
+      if (apolloId) {
+        dedupMeta.set(apolloId, {
+          status: result.document.fields?.status?.stringValue || 'unknown',
+          icpId: result.document.fields?.icpId?.stringValue || null,
+        });
+      }
+    }
+
+    const idSet = new Set(ids);
+    idSet._dedupMeta = dedupMeta;
+    return idSet;
 
   } catch (error) {
     console.error('❌ Error getting existing company IDs:', error);
-    return new Set();
+    const empty = new Set();
+    empty._dedupMeta = new Map();
+    return empty;
   }
 }
 

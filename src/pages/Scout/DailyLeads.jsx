@@ -1287,6 +1287,7 @@ export default function DailyLeads({ onNavigate }) {
   const [showUndo, setShowUndo] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState('');
+  const [barrySearching, setBarrySearching] = useState(false);
   const [actionToast, setActionToast] = useState(null); // { message, type: 'success'|'info' }
 
   // ── ICP profile (for score breakdown) ───────────────────────────────────────
@@ -1400,6 +1401,10 @@ export default function DailyLeads({ onNavigate }) {
     try {
       const user = getEffectiveUser();
       if (!user) { navigate('/login'); return; }
+
+      const userSnap = await getDoc(doc(db, 'users', user.uid));
+      const barryState = userSnap.exists() ? userSnap.data().barryState : null;
+      setBarrySearching(barryState === 'SEARCHING');
 
       // Load RECON confidence to scale search queue size
       const dashSnap = await getDoc(doc(db, 'dashboards', user.uid));
@@ -2393,6 +2398,13 @@ export default function DailyLeads({ onNavigate }) {
                       <Settings size={14} />
                       {icpUnresolvedReason === 'none-active' ? 'Choose Profile' : 'Set Up Targeting'}
                     </button>
+                  </div>
+                ) : barrySearching ? (
+                  <div style={{ textAlign: 'center', padding: 50, color: T.textMuted }}>
+                    <div style={{ fontSize: 44, marginBottom: 12 }}>🔍</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.pink, marginBottom: 8 }}>BARRY IS SEARCHING</div>
+                    <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 16 }}>Barry is finding companies that match your targeting. This usually takes a moment.</p>
+                    <Loader size={20} style={{ animation: 'spin 1s linear infinite', color: BRAND.pink, margin: '0 auto' }} />
                   </div>
                 ) : (
                   <div style={{ textAlign: 'center', padding: 50, color: T.textMuted }}>

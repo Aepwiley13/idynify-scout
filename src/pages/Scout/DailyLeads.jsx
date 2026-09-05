@@ -316,10 +316,10 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
       style={{
         position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
         height: wide ? undefined : '100%',
-        transform: `translateX(calc(-50% + ${tx}px)) translateY(${dy * 0.1}px) rotate(${dx * 0.04}deg)`,
+        transform: `translateX(${tx}px) translateY(${dy * 0.1}px) rotate(${dx * 0.04}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
-        touchAction: 'pan-y', top: 0, left: '50%',
+        touchAction: 'pan-y', top: 0, left: 0, right: 0, margin: '0 auto',
       }}
     >
       {/* Swipe overlay labels */}
@@ -637,11 +637,11 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
       style={{
         position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
         height: wide ? undefined : '100%',
-        transform: `translateX(calc(-50% + ${tx}px)) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
+        transform: `translateX(${tx}px) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
         touchAction: 'pan-y',
-        top: 0, left: '50%',
+        top: 0, left: 0, right: 0, margin: '0 auto',
       }}
     >
       {dx > 30 && (
@@ -2364,10 +2364,10 @@ export default function DailyLeads({ onNavigate }) {
       </div>
 
       {/* Content area — two-column on desktop */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minWidth: 0 }}>
 
         {/* ── Card column ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isDesktop ? '20px 16px 8px' : '18px 12px 8px', overflowY: 'auto', overflowX: 'hidden', position: 'relative', WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isDesktop ? '20px 16px 8px' : '18px 12px 8px', overflowY: 'auto', overflowX: 'hidden', position: 'relative', WebkitOverflowScrolling: 'touch' }}>
 
           {/* ── Companies Tab ── */}
           {tab === 'companies' && (

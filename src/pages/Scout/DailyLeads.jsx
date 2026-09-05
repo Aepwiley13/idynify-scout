@@ -1274,16 +1274,28 @@ function LayoutDebugOverlay({ isDesktop }) {
         const el = document.querySelector(sel);
         if (!el) return null;
         const b = el.getBoundingClientRect();
-        return `L${Math.round(b.left)} R${Math.round(b.right)} W${Math.round(b.width)}`;
+        return { l: Math.round(b.left), r: Math.round(b.right), w: Math.round(b.width) };
+      };
+      const ml = (sel) => {
+        const el = document.querySelector(sel);
+        if (!el) return null;
+        return getComputedStyle(el).marginLeft;
       };
       setInfo({
         vw: window.innerWidth,
         vh: window.innerHeight,
         dpr: window.devicePixelRatio,
         docW: document.documentElement.scrollWidth,
+        scrollX: Math.round(window.scrollX),
         isDesktop,
         mql768: window.matchMedia('(max-width: 768px)').matches,
-        overflow: document.documentElement.scrollWidth > window.innerWidth,
+        root: r('#root'),
+        layout: r('.main-layout'),
+        content: r('.main-content'),
+        contentML: ml('.main-content'),
+        page: r('.page-content-full'),
+        scoutM: r('.scout-mobile'),
+        scoutMC: r('.scout-mobile-content'),
       });
     };
     measure();
@@ -1293,18 +1305,26 @@ function LayoutDebugOverlay({ isDesktop }) {
   }, [isDesktop]);
 
   if (!info) return null;
+  const f = (o) => o ? `L${o.l} R${o.r} W${o.w}` : '—';
   const lines = [
     `vw:${info.vw} vh:${info.vh} dpr:${info.dpr}`,
-    `docW:${info.docW} overflow:${info.overflow}`,
+    `docW:${info.docW} scrollX:${info.scrollX}`,
     `isDesktop:${info.isDesktop} mql768:${info.mql768}`,
+    `#root: ${f(info.root)}`,
+    `.main-layout: ${f(info.layout)}`,
+    `.main-content: ${f(info.content)}`,
+    `  margin-left: ${info.contentML}`,
+    `.page-full: ${f(info.page)}`,
+    `.scout-mobile: ${f(info.scoutM)}`,
+    `.scout-mc: ${f(info.scoutMC)}`,
   ];
   return (
     <div style={{
-      position: 'fixed', top: 4, right: 4, zIndex: 9999,
-      background: 'rgba(0,0,0,0.85)', color: '#0f0',
-      fontFamily: 'monospace', fontSize: 9, lineHeight: 1.4,
+      position: 'fixed', top: 4, left: 4, zIndex: 9999,
+      background: 'rgba(0,0,0,0.88)', color: '#0f0',
+      fontFamily: 'monospace', fontSize: 8, lineHeight: 1.35,
       padding: '6px 8px', borderRadius: 6,
-      pointerEvents: 'none', maxWidth: 220,
+      pointerEvents: 'none', maxWidth: 240,
       whiteSpace: 'pre',
     }}>
       {lines.join('\n')}

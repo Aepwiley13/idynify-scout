@@ -315,10 +315,11 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
         position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
-        transform: `translateX(calc(-50% + ${tx}px)) translateY(${dy * 0.1}px) rotate(${dx * 0.04}deg)`,
+        height: wide ? undefined : '100%',
+        transform: `translateX(${tx}px) translateY(${dy * 0.1}px) rotate(${dx * 0.04}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
-        touchAction: 'pan-y', top: 0, left: '50%',
+        touchAction: 'pan-y', top: 0, left: 0, right: 0, margin: '0 auto',
       }}
     >
       {/* Swipe overlay labels */}
@@ -341,14 +342,16 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
         }}>✗ NOT A MATCH</div>
       )}
 
-      {/* Card — no overflow scroll, content sized to fit */}
+      {/* Card — scrollable on mobile when content exceeds card height */}
       <div style={{
         position: 'relative',
+        height: wide ? undefined : '100%',
         background: T.cardBg, border: `1px solid ${T.border2}`,
-        borderRadius: 22, overflow: 'hidden',
+        borderRadius: 22, overflow: wide ? 'hidden' : 'auto',
         boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`,
         transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)',
         transition: 'transform 0.14s ease',
+        WebkitOverflowScrolling: wide ? undefined : 'touch',
       }}>
         {/* Feedback overlay — appears after "This is a Match" click */}
         {showFeedback && (
@@ -633,11 +636,12 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
         position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
-        transform: `translateX(calc(-50% + ${tx}px)) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
+        height: wide ? undefined : '100%',
+        transform: `translateX(${tx}px) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
         touchAction: 'pan-y',
-        top: 0, left: '50%',
+        top: 0, left: 0, right: 0, margin: '0 auto',
       }}
     >
       {dx > 30 && (
@@ -646,7 +650,7 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
       {dx < -30 && (
         <div style={{ position: 'absolute', top: 22, right: 16, zIndex: 10, padding: '5px 13px', borderRadius: 8, border: `3px solid ${STATUS.red}`, color: STATUS.red, fontSize: 13, fontWeight: 700, transform: 'rotate(11deg)', background: `${STATUS.red}10` }}>✗ NOT A MATCH</div>
       )}
-      <div style={{ position: 'relative', background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: 'hidden', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)', transition: 'transform 0.14s ease' }}>
+      <div style={{ position: 'relative', height: wide ? undefined : '100%', background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: wide ? 'hidden' : 'auto', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)', transition: 'transform 0.14s ease', WebkitOverflowScrolling: wide ? undefined : 'touch' }}>
         {showFeedback && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 30, background: T.cardBg, borderRadius: 22, overflowY: 'auto' }}>
             <FeedbackFace
@@ -2360,10 +2364,10 @@ export default function DailyLeads({ onNavigate }) {
       </div>
 
       {/* Content area — two-column on desktop */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minWidth: 0 }}>
 
         {/* ── Card column ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isDesktop ? '20px 16px 8px' : '18px 12px 8px', overflowY: 'hidden', overflowX: 'hidden', position: 'relative' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isDesktop ? '20px 16px 8px' : '18px 12px 8px', overflowY: 'auto', overflowX: 'hidden', position: 'relative', WebkitOverflowScrolling: 'touch' }}>
 
           {/* ── Companies Tab ── */}
           {tab === 'companies' && (

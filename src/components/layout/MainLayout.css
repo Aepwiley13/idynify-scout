@@ -279,7 +279,7 @@
   /* Mobile: No margin - sidebar doesn't push content */
   .main-content {
     margin-left: 0 !important;
-    max-width: 100vw;
+    max-width: 100%;
     overflow-x: hidden;
   }
 

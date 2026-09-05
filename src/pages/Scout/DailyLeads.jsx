@@ -315,10 +315,11 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
         position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
-        transform: `translateX(calc(-50% + ${tx}px)) translateY(${dy * 0.1}px) rotate(${dx * 0.04}deg)`,
+        height: wide ? undefined : '100%',
+        transform: `translateX(${tx}px) translateY(${dy * 0.1}px) rotate(${dx * 0.04}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
-        touchAction: 'pan-y', top: 0, left: '50%',
+        touchAction: 'pan-y', top: 0, left: 0, right: 0, margin: '0 auto',
       }}
     >
       {/* Swipe overlay labels */}
@@ -341,14 +342,16 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
         }}>✗ NOT A MATCH</div>
       )}
 
-      {/* Card — no overflow scroll, content sized to fit */}
+      {/* Card — scrollable on mobile when content exceeds card height */}
       <div style={{
         position: 'relative',
+        height: wide ? undefined : '100%',
         background: T.cardBg, border: `1px solid ${T.border2}`,
-        borderRadius: 22, overflow: 'hidden',
+        borderRadius: 22, overflow: wide ? 'hidden' : 'auto',
         boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`,
         transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)',
         transition: 'transform 0.14s ease',
+        WebkitOverflowScrolling: wide ? undefined : 'touch',
       }}>
         {/* Feedback overlay — appears after "This is a Match" click */}
         {showFeedback && (
@@ -633,11 +636,12 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
         position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
-        transform: `translateX(calc(-50% + ${tx}px)) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
+        height: wide ? undefined : '100%',
+        transform: `translateX(${tx}px) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
         touchAction: 'pan-y',
-        top: 0, left: '50%',
+        top: 0, left: 0, right: 0, margin: '0 auto',
       }}
     >
       {dx > 30 && (
@@ -646,7 +650,7 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
       {dx < -30 && (
         <div style={{ position: 'absolute', top: 22, right: 16, zIndex: 10, padding: '5px 13px', borderRadius: 8, border: `3px solid ${STATUS.red}`, color: STATUS.red, fontSize: 13, fontWeight: 700, transform: 'rotate(11deg)', background: `${STATUS.red}10` }}>✗ NOT A MATCH</div>
       )}
-      <div style={{ position: 'relative', background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: 'hidden', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)', transition: 'transform 0.14s ease' }}>
+      <div style={{ position: 'relative', height: wide ? undefined : '100%', background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: wide ? 'hidden' : 'auto', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)', transition: 'transform 0.14s ease', WebkitOverflowScrolling: wide ? undefined : 'touch' }}>
         {showFeedback && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 30, background: T.cardBg, borderRadius: 22, overflowY: 'auto' }}>
             <FeedbackFace
@@ -1258,6 +1262,52 @@ function IcpReclarificationModal({ userId, icpId, onClose, onSearchComplete, rec
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+function LayoutDebugOverlay({ isDesktop }) {
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    const measure = () => {
+      const r = (sel) => {
+        const el = document.querySelector(sel);
+        if (!el) return null;
+        const b = el.getBoundingClientRect();
+        return `L${Math.round(b.left)} R${Math.round(b.right)} W${Math.round(b.width)}`;
+      };
+      setInfo({
+        vw: window.innerWidth,
+        vh: window.innerHeight,
+        dpr: window.devicePixelRatio,
+        docW: document.documentElement.scrollWidth,
+        isDesktop,
+        mql768: window.matchMedia('(max-width: 768px)').matches,
+        overflow: document.documentElement.scrollWidth > window.innerWidth,
+      });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    const id = setInterval(measure, 2000);
+    return () => { window.removeEventListener('resize', measure); clearInterval(id); };
+  }, [isDesktop]);
+
+  if (!info) return null;
+  const lines = [
+    `vw:${info.vw} vh:${info.vh} dpr:${info.dpr}`,
+    `docW:${info.docW} overflow:${info.overflow}`,
+    `isDesktop:${info.isDesktop} mql768:${info.mql768}`,
+  ];
+  return (
+    <div style={{
+      position: 'fixed', top: 4, right: 4, zIndex: 9999,
+      background: 'rgba(0,0,0,0.85)', color: '#0f0',
+      fontFamily: 'monospace', fontSize: 9, lineHeight: 1.4,
+      padding: '6px 8px', borderRadius: 6,
+      pointerEvents: 'none', maxWidth: 220,
+      whiteSpace: 'pre',
+    }}>
+      {lines.join('\n')}
     </div>
   );
 }
@@ -2360,10 +2410,10 @@ export default function DailyLeads({ onNavigate }) {
       </div>
 
       {/* Content area — two-column on desktop */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minWidth: 0 }}>
 
         {/* ── Card column ── */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isDesktop ? '20px 16px 8px' : '18px 12px 8px', overflowY: 'hidden', overflowX: 'hidden', position: 'relative' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isDesktop ? '20px 16px 8px' : '18px 12px 8px', overflowY: 'auto', overflowX: 'hidden', position: 'relative', WebkitOverflowScrolling: 'touch' }}>
 
           {/* ── Companies Tab ── */}
           {tab === 'companies' && (
@@ -2863,6 +2913,12 @@ export default function DailyLeads({ onNavigate }) {
             </span>
           )}
         </button>
+      )}
+
+      {/* Debug layout overlay — activated by ?debug=layout */}
+      {typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug') &&
+        new URLSearchParams(window.location.search).get('debug') === 'layout' && (
+        <LayoutDebugOverlay isDesktop={isDesktop} />
       )}
 
       {/* Keyframe animations */}

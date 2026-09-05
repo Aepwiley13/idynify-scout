@@ -1266,6 +1266,52 @@ function IcpReclarificationModal({ userId, icpId, onClose, onSearchComplete, rec
   );
 }
 
+function LayoutDebugOverlay({ isDesktop }) {
+  const [info, setInfo] = useState(null);
+  useEffect(() => {
+    const measure = () => {
+      const r = (sel) => {
+        const el = document.querySelector(sel);
+        if (!el) return null;
+        const b = el.getBoundingClientRect();
+        return `L${Math.round(b.left)} R${Math.round(b.right)} W${Math.round(b.width)}`;
+      };
+      setInfo({
+        vw: window.innerWidth,
+        vh: window.innerHeight,
+        dpr: window.devicePixelRatio,
+        docW: document.documentElement.scrollWidth,
+        isDesktop,
+        mql768: window.matchMedia('(max-width: 768px)').matches,
+        overflow: document.documentElement.scrollWidth > window.innerWidth,
+      });
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    const id = setInterval(measure, 2000);
+    return () => { window.removeEventListener('resize', measure); clearInterval(id); };
+  }, [isDesktop]);
+
+  if (!info) return null;
+  const lines = [
+    `vw:${info.vw} vh:${info.vh} dpr:${info.dpr}`,
+    `docW:${info.docW} overflow:${info.overflow}`,
+    `isDesktop:${info.isDesktop} mql768:${info.mql768}`,
+  ];
+  return (
+    <div style={{
+      position: 'fixed', top: 4, right: 4, zIndex: 9999,
+      background: 'rgba(0,0,0,0.85)', color: '#0f0',
+      fontFamily: 'monospace', fontSize: 9, lineHeight: 1.4,
+      padding: '6px 8px', borderRadius: 6,
+      pointerEvents: 'none', maxWidth: 220,
+      whiteSpace: 'pre',
+    }}>
+      {lines.join('\n')}
+    </div>
+  );
+}
+
 export default function DailyLeads({ onNavigate }) {
   const T = useT();
   const navigate = useNavigate();
@@ -2867,6 +2913,12 @@ export default function DailyLeads({ onNavigate }) {
             </span>
           )}
         </button>
+      )}
+
+      {/* Debug layout overlay — activated by ?debug=layout */}
+      {typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug') &&
+        new URLSearchParams(window.location.search).get('debug') === 'layout' && (
+        <LayoutDebugOverlay isDesktop={isDesktop} />
       )}
 
       {/* Keyframe animations */}

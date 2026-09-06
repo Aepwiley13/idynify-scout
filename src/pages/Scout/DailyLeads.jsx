@@ -1296,6 +1296,8 @@ function LayoutDebugOverlay({ isDesktop }) {
         page: r('.page-content-full'),
         scoutM: r('.scout-mobile'),
         scoutMC: r('.scout-mobile-content'),
+        cArea: r('[data-debug="content-area"]'),
+        cCol: r('[data-debug="card-col"]'),
       });
     };
     measure();
@@ -1317,6 +1319,8 @@ function LayoutDebugOverlay({ isDesktop }) {
     `.page-full: ${f(info.page)}`,
     `.scout-mobile: ${f(info.scoutM)}`,
     `.scout-mc: ${f(info.scoutMC)}`,
+    `content-area: ${f(info.cArea)}`,
+    `card-col: ${f(info.cCol)}`,
   ];
   return (
     <div style={{
@@ -2430,10 +2434,10 @@ export default function DailyLeads({ onNavigate }) {
       </div>
 
       {/* Content area — two-column on desktop */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minWidth: 0 }}>
+      <div data-debug="content-area" style={{ flex: 1, display: 'flex', overflow: 'hidden', minWidth: 0 }}>
 
         {/* ── Card column ── */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isDesktop ? '20px 16px 8px' : '18px 12px 8px', overflowY: 'auto', overflowX: 'hidden', position: 'relative', WebkitOverflowScrolling: 'touch' }}>
+        <div data-debug="card-col" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isDesktop ? '20px 16px 8px' : '18px 12px 8px', overflowY: 'auto', overflowX: 'hidden', position: 'relative', WebkitOverflowScrolling: 'touch' }}>
 
           {/* ── Companies Tab ── */}
           {tab === 'companies' && (

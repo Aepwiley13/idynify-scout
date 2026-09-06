@@ -1,5 +1,5 @@
 // Idynify Scout Service Worker
-const CACHE_NAME = 'idynify-scout-v3';
+const CACHE_NAME = 'idynify-scout-v4';
 
 // On install, take control immediately
 self.addEventListener('install', (event) => {
@@ -7,7 +7,13 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(clients.claim());
+  event.waitUntil(
+    caches.keys().then((names) =>
+      Promise.all(
+        names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n))
+      )
+    ).then(() => clients.claim())
+  );
 });
 
 // Network-first strategy: always try the network, fall back to cache for navigation requests

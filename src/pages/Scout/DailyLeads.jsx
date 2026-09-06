@@ -223,21 +223,40 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
   const [rejectionNote, setRejectionNote] = useState('');
   const [isFlipping, setIsFlipping] = useState(false);
   const s = useRef(null);
+  const gestureRef = useRef(null);
+  const outerRef = useRef(null);
 
   const xy = e => e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.clientX, e.clientY];
-  const down = e => { s.current = xy(e); };
+  const down = e => { s.current = xy(e); gestureRef.current = null; };
   const move = e => {
     if (!s.current) return;
     const [cx, cy] = xy(e);
+    if (!gestureRef.current) {
+      const adx = Math.abs(cx - s.current[0]);
+      const ady = Math.abs(cy - s.current[1]);
+      if (adx < 8 && ady < 8) return;
+      gestureRef.current = adx >= ady ? 'swipe' : 'scroll';
+    }
+    if (gestureRef.current === 'scroll') return;
     setDx(cx - s.current[0]);
-    setDy(cy - s.current[1]);
   };
   const up = () => {
-    if (dx > 100) { setGone('r'); setTimeout(() => onAccept(null), 280); }
-    else if (dx < -100) { setGone('l'); setTimeout(onReject, 280); }
-    else { setDx(0); setDy(0); }
+    if (gestureRef.current !== 'scroll') {
+      if (dx > 100) { setGone('r'); setTimeout(() => onAccept(null), 280); }
+      else if (dx < -100) { setGone('l'); setTimeout(onReject, 280); }
+      else { setDx(0); }
+    }
     s.current = null;
+    gestureRef.current = null;
   };
+
+  useEffect(() => {
+    const el = outerRef.current;
+    if (!el) return;
+    const h = (e) => { if (gestureRef.current === 'swipe' && e.cancelable) e.preventDefault(); };
+    el.addEventListener('touchmove', h, { passive: false });
+    return () => el.removeEventListener('touchmove', h);
+  }, []);
 
   const handleMatchClick = (e) => {
     e.stopPropagation();
@@ -311,12 +330,13 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
 
   return (
     <div
+      ref={outerRef}
       onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
         position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
         height: wide ? undefined : '100%',
-        transform: `translateX(${tx}px) translateY(${dy * 0.1}px) rotate(${dx * 0.04}deg)`,
+        transform: `translateX(${tx}px) rotate(${dx * 0.04}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
         touchAction: 'pan-y', top: 0, left: 0, right: 0, margin: '0 auto',
@@ -348,6 +368,7 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
         height: wide ? undefined : '100%',
         background: T.cardBg, border: `1px solid ${T.border2}`,
         borderRadius: 22, overflow: wide ? 'hidden' : 'auto',
+        overscrollBehavior: 'contain',
         boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`,
         transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)',
         transition: 'transform 0.14s ease',
@@ -397,18 +418,18 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
 
         {/* Header */}
         <div style={{
-          padding: wide ? '22px 28px 16px' : '18px 22px 12px', display: 'flex', flexDirection: 'column',
+          padding: wide ? '22px 28px 16px' : '12px 18px 8px', display: 'flex', flexDirection: 'column',
           alignItems: 'center', background: T.cardBg2, borderBottom: `1px solid ${T.border}`,
         }}>
           <div style={{
-            width: wide ? 72 : 60, height: wide ? 72 : 60, borderRadius: 16, background: T.surface,
+            width: wide ? 72 : 44, height: wide ? 72 : 44, borderRadius: wide ? 16 : 12, background: T.surface,
             border: `1px solid ${T.border2}`, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontSize: wide ? 32 : 26, marginBottom: 12,
+            justifyContent: 'center', fontSize: wide ? 32 : 22, marginBottom: wide ? 12 : 6,
           }}>
             {company.emoji || company.logo || '🏢'}
           </div>
-          <div style={{ fontSize: wide ? 20 : 18, fontWeight: 700, color: T.text, textAlign: 'center' }}>{company.name}</div>
-          <div style={{ fontSize: 10, color: T.textFaint, marginTop: 3, letterSpacing: 1.5 }}>
+          <div style={{ fontSize: wide ? 20 : 16, fontWeight: 700, color: T.text, textAlign: 'center' }}>{company.name}</div>
+          <div style={{ fontSize: 10, color: T.textFaint, marginTop: 2, letterSpacing: 1.5 }}>
             {(company.industry || '').toUpperCase()}
           </div>
         </div>
@@ -423,8 +444,8 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
             ['HQ',        hqLocation || '—'],
             ['CEO',       ceoName || '—'],
           ].map(([l, v]) => (
-            <div key={l} style={{ padding: wide ? '10px 18px' : '8px 14px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
-              <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>{l}</div>
+            <div key={l} style={{ padding: wide ? '10px 18px' : '5px 12px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
+              <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 1 }}>{l}</div>
               <div style={{ fontSize: wide ? 12 : 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
             </div>
           ))}
@@ -434,7 +455,7 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
         <div
           onClick={() => breakdown && setShowBreakdown(p => !p)}
           style={{
-            padding: wide ? '10px 18px' : '8px 14px', borderBottom: `1px solid ${T.border}`,
+            padding: wide ? '10px 18px' : '5px 12px', borderBottom: `1px solid ${T.border}`,
             display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             cursor: breakdown ? 'pointer' : 'default',
             background: showBreakdown ? T.surface : 'transparent',
@@ -535,36 +556,36 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
         )}
 
         {/* Barry Intel */}
-        <div style={{ padding: wide ? '12px 18px' : '10px 14px', borderBottom: `1px solid ${T.border}`, background: T.accentBg }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
-            <BarryAvatar size={18} />
+        <div style={{ padding: wide ? '12px 18px' : '6px 12px', borderBottom: `1px solid ${T.border}`, background: T.accentBg }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
+            <BarryAvatar size={wide ? 18 : 14} />
             <span style={{ fontSize: 9, letterSpacing: 2, color: BRAND.pink, fontWeight: 700 }}>BARRY INTEL</span>
           </div>
-          <p style={{ margin: 0, fontSize: wide ? 12 : 11, color: T.isDark ? '#d0a0c0' : T.textMuted, lineHeight: 1.6 }}>
+          <p style={{ margin: 0, fontSize: wide ? 12 : 10, color: T.isDark ? '#d0a0c0' : T.textMuted, lineHeight: 1.5 }}>
             {barryText}
           </p>
         </div>
 
         {/* Action links */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: wide ? '11px 14px' : '9px 12px', borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, padding: wide ? '11px 14px' : '6px 10px', borderBottom: `1px solid ${T.border}` }}>
           <a
             href={company.website_url || undefined}
             target="_blank"
             rel="noopener noreferrer"
             onClick={e => { e.stopPropagation(); if (!company.website_url) e.preventDefault(); }}
-            style={{ padding: wide ? '9px 10px' : 7, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#7c5ce4,#6c4fd6)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: company.website_url ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none', opacity: company.website_url ? 1 : 0.5 }}
+            style={{ padding: wide ? '9px 10px' : 5, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#7c5ce4,#6c4fd6)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: company.website_url ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none', opacity: company.website_url ? 1 : 0.5 }}
           ><Globe size={12} />Website</a>
           <a
             href={company.linkedin_url || undefined}
             target="_blank"
             rel="noopener noreferrer"
             onClick={e => { e.stopPropagation(); if (!company.linkedin_url) e.preventDefault(); }}
-            style={{ padding: wide ? '9px 10px' : 7, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#0077b5,#005e94)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: company.linkedin_url ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none', opacity: company.linkedin_url ? 1 : 0.5 }}
+            style={{ padding: wide ? '9px 10px' : 5, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#0077b5,#005e94)', color: '#fff', fontSize: 11, fontWeight: 600, cursor: company.linkedin_url ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none', opacity: company.linkedin_url ? 1 : 0.5 }}
           ><Linkedin size={12} />LinkedIn</a>
         </div>
 
         {/* Decision buttons */}
-        <div style={{ display: 'flex', gap: 8, padding: wide ? '12px 14px 14px' : '10px 12px 12px' }}>
+        <div style={{ display: 'flex', gap: 8, padding: wide ? '12px 14px 14px' : '8px 10px 8px' }}>
           <button
             onClick={handleRejectClick}
             style={{ flex: 1, padding: wide ? 12 : 10, borderRadius: 11, border: `1.5px solid ${STATUS.red}40`, background: `${STATUS.red}0c`, color: STATUS.red, fontSize: wide ? 13 : 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
@@ -593,21 +614,40 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
   const [rejectionNote, setRejectionNote] = useState('');
   const [isFlipping, setIsFlipping] = useState(false);
   const s = useRef(null);
+  const gestureRef = useRef(null);
+  const outerRef = useRef(null);
 
   const xy = e => e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.clientX, e.clientY];
-  const down = e => { s.current = xy(e); };
+  const down = e => { s.current = xy(e); gestureRef.current = null; };
   const move = e => {
     if (!s.current) return;
     const [cx, cy] = xy(e);
+    if (!gestureRef.current) {
+      const adx = Math.abs(cx - s.current[0]);
+      const ady = Math.abs(cy - s.current[1]);
+      if (adx < 8 && ady < 8) return;
+      gestureRef.current = adx >= ady ? 'swipe' : 'scroll';
+    }
+    if (gestureRef.current === 'scroll') return;
     setDx(cx - s.current[0]);
-    setDy(cy - s.current[1]);
   };
   const up = () => {
-    if (dx > 100) { setGone('r'); setTimeout(() => onAccept(null), 280); }
-    else if (dx < -100) { setGone('l'); setTimeout(onReject, 280); }
-    else { setDx(0); setDy(0); }
+    if (gestureRef.current !== 'scroll') {
+      if (dx > 100) { setGone('r'); setTimeout(() => onAccept(null), 280); }
+      else if (dx < -100) { setGone('l'); setTimeout(onReject, 280); }
+      else { setDx(0); }
+    }
     s.current = null;
+    gestureRef.current = null;
   };
+
+  useEffect(() => {
+    const el = outerRef.current;
+    if (!el) return;
+    const h = (e) => { if (gestureRef.current === 'swipe' && e.cancelable) e.preventDefault(); };
+    el.addEventListener('touchmove', h, { passive: false });
+    return () => el.removeEventListener('touchmove', h);
+  }, []);
 
   const handleMatchClick = (e) => {
     e.stopPropagation();
@@ -631,12 +671,13 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
 
   return (
     <div
+      ref={outerRef}
       onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
         position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
         height: wide ? undefined : '100%',
-        transform: `translateX(${tx}px) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
+        transform: `translateX(${tx}px) rotate(${dx * 0.055}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
         touchAction: 'pan-y',
@@ -649,7 +690,7 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
       {dx < -30 && (
         <div style={{ position: 'absolute', top: 22, right: 16, zIndex: 10, padding: '5px 13px', borderRadius: 8, border: `3px solid ${STATUS.red}`, color: STATUS.red, fontSize: 13, fontWeight: 700, transform: 'rotate(11deg)', background: `${STATUS.red}10` }}>✗ NOT A MATCH</div>
       )}
-      <div style={{ position: 'relative', height: wide ? undefined : '100%', background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: wide ? 'hidden' : 'auto', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)', transition: 'transform 0.14s ease' }}>
+      <div style={{ position: 'relative', height: wide ? undefined : '100%', background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: wide ? 'hidden' : 'auto', overscrollBehavior: 'contain', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)', transition: 'transform 0.14s ease' }}>
         {showFeedback && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 30, background: T.cardBg, borderRadius: 22, overflowY: 'auto' }}>
             <FeedbackFace
@@ -673,8 +714,8 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
             />
           </div>
         )}
-        <div style={{ padding: wide ? '22px 28px 16px' : '18px 22px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', background: T.cardBg2, borderBottom: `1px solid ${T.border}` }}>
-          <Av initials={initials} color={color} size={wide ? 80 : 70} />
+        <div style={{ padding: wide ? '22px 28px 16px' : '12px 18px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', background: T.cardBg2, borderBottom: `1px solid ${T.border}` }}>
+          <Av initials={initials} color={color} size={wide ? 80 : 48} />
           {matchText && (
             <div style={{ marginTop: 12, background: `${STATUS.green}15`, border: `1px solid ${STATUS.green}40`, borderRadius: 8, padding: '4px 16px', color: STATUS.green, fontSize: wide ? 12 : 11, fontWeight: 600, marginBottom: 12, width: '88%', textAlign: 'center' }}>
               {matchText}
@@ -690,29 +731,29 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
             ['EMPLOYEES', company?.employee_count || company?.company_size || 'N/A'],
             ['LOCATION',  person.city ? `${person.city}${person.state ? ', ' + person.state : ''}` : 'N/A'],
           ].map(([l, v]) => (
-            <div key={l} style={{ padding: wide ? '13px 20px' : '10px 15px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
-              <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>{l}</div>
+            <div key={l} style={{ padding: wide ? '13px 20px' : '5px 12px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
+              <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 1 }}>{l}</div>
               <div style={{ fontSize: wide ? 13 : 11, color: T.textMuted }}>{v}</div>
             </div>
           ))}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: wide ? '13px 16px' : '11px 12px', borderBottom: `1px solid ${T.border}` }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, padding: wide ? '13px 16px' : '6px 10px', borderBottom: `1px solid ${T.border}` }}>
           <a
             href={company?.website_url || person.organization?.website_url || undefined}
             target="_blank"
             rel="noopener noreferrer"
             onClick={e => { e.stopPropagation(); if (!(company?.website_url || person.organization?.website_url)) e.preventDefault(); }}
-            style={{ padding: wide ? '10px 12px' : 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#7c5ce4,#6c4fd6)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 600, cursor: (company?.website_url || person.organization?.website_url) ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none', opacity: (company?.website_url || person.organization?.website_url) ? 1 : 0.5 }}
+            style={{ padding: wide ? '10px 12px' : 5, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#7c5ce4,#6c4fd6)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 600, cursor: (company?.website_url || person.organization?.website_url) ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none', opacity: (company?.website_url || person.organization?.website_url) ? 1 : 0.5 }}
           ><Globe size={13} />Visit Website</a>
           <a
             href={person.linkedin_url || undefined}
             target="_blank"
             rel="noopener noreferrer"
             onClick={e => { e.stopPropagation(); if (!person.linkedin_url) e.preventDefault(); }}
-            style={{ padding: wide ? '10px 12px' : 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#0077b5,#005e94)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 600, cursor: person.linkedin_url ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none', opacity: person.linkedin_url ? 1 : 0.5 }}
+            style={{ padding: wide ? '10px 12px' : 5, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#0077b5,#005e94)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 600, cursor: person.linkedin_url ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none', opacity: person.linkedin_url ? 1 : 0.5 }}
           ><Linkedin size={13} />LinkedIn</a>
         </div>
-        <div style={{ display: 'flex', gap: 8, padding: wide ? '13px 16px 6px' : '11px 12px 6px' }}>
+        <div style={{ display: 'flex', gap: 8, padding: wide ? '13px 16px 6px' : '8px 10px 4px' }}>
           <button
             onClick={handleRejectClick}
             style={{ flex: 1, padding: wide ? 13 : 11, borderRadius: 11, border: `1.5px solid ${STATUS.red}40`, background: `${STATUS.red}0c`, color: STATUS.red, fontSize: wide ? 14 : 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}

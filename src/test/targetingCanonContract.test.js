@@ -160,6 +160,13 @@ describe('client writers normalize before persisting', () => {
     expect(src).toMatch(/normalizeIcpParams\(icpDelta\)/);
   });
 
+  it('ICPSettings imports and calls normalizeIcpParams', () => {
+    const src = read('../pages/Scout/ICPSettings.jsx');
+    expect(src).toMatch(/import\s*\{[^}]*normalizeIcpParams[^}]*\}/);
+    expect(src).toMatch(/normalizeIcpParams\(profile\)/);
+    expect(src).toMatch(/normalizeIcpParams\(icp\)/);
+  });
+
   it('BarryICPPanel merges normalized.industries, not raw icpParams.industries', () => {
     const src = read('../components/scout/BarryICPPanel.jsx');
     const mergeBlock = src.slice(
@@ -180,7 +187,7 @@ describe('client writers normalize before persisting', () => {
   });
 });
 
-// ── ICPSettings already uses canonical vocabulary ────────────────────────────
+// ── ICPSettings uses canonical vocabulary and normalizes on save ─────────────
 
 describe('ICPSettings writes canonical vocabulary', () => {
   const src = read('../pages/Scout/ICPSettings.jsx');
@@ -191,6 +198,18 @@ describe('ICPSettings writes canonical vocabulary', () => {
 
   it('does not import INDUSTRIES from icpOptions.js', () => {
     expect(src).not.toMatch(/import\s*\{[^}]*\bINDUSTRIES\b[^}]*\}\s*from\s*['"].*icpOptions/);
+  });
+
+  it('imports normalizeIcpParams', () => {
+    expect(src).toMatch(/import\s*\{[^}]*normalizeIcpParams[^}]*\}\s*from/);
+  });
+
+  it('normalizes on save (handleSaveChanges)', () => {
+    expect(src).toMatch(/normalizeIcpParams\(profile\)/);
+  });
+
+  it('normalizes on load (applyICPToState)', () => {
+    expect(src).toMatch(/normalizeIcpParams\(icp\)/);
   });
 });
 

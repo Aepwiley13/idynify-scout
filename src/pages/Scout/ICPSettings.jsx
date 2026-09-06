@@ -15,6 +15,7 @@ import Section9MessagingFlow from '../../components/icp/Section9MessagingFlow';
 import { setActiveIcpProfile } from '../../utils/setActiveIcpProfile';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { criteriaChanged } from '../../utils/normalizeIcpCriteria';
+import { normalizeIcpParams } from '../../utils/normalizeIcpParams';
 
 export default function ICPSettings() {
   const navigate = useNavigate();
@@ -102,12 +103,13 @@ export default function ICPSettings() {
   }
 
   function applyICPToState(icp) {
+    const normalized = normalizeIcpParams(icp);
     setProfile({
-      ...icp,
-      scoringWeights: icp.scoringWeights || DEFAULT_WEIGHTS,
-      targetTitles: icp.targetTitles || [],
+      ...normalized,
+      scoringWeights: normalized.scoringWeights || DEFAULT_WEIGHTS,
+      targetTitles: normalized.targetTitles || [],
     });
-    savedCriteriaRef.current = icp;
+    savedCriteriaRef.current = normalized;
   }
 
   function selectICP(icp) {
@@ -215,7 +217,7 @@ export default function ICPSettings() {
       }
 
       const updatedProfile = {
-        ...profile,
+        ...normalizeIcpParams(profile),
         name: nameInput.trim() || profile.name || 'My ICP',
         updatedAt: new Date().toISOString(),
       };

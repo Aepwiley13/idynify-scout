@@ -155,6 +155,13 @@ describe('SLC nonprofit — client-side normalization at write boundary', () => 
     expect(src).toMatch(/import\s*\{[^}]*normalizeIcpParams[^}]*\}/);
     expect(src).toMatch(/normalizeIcpParams\(icpDelta\)/);
   });
+
+  it('ICPSettings normalizes on load and save', () => {
+    const src = read('../pages/Scout/ICPSettings.jsx');
+    expect(src).toMatch(/import\s*\{[^}]*normalizeIcpParams[^}]*\}/);
+    expect(src).toMatch(/normalizeIcpParams\(profile\)/);
+    expect(src).toMatch(/normalizeIcpParams\(icp\)/);
+  });
 });
 
 // ── Identity guard: candidate PII never reaches canonical turn metadata ──────

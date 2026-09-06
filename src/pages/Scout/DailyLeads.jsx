@@ -337,7 +337,7 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
         position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
         height: wide ? undefined : '100%',
         transform: `translateX(${tx}px) rotate(${dx * 0.04}deg)`,
-        transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
+        transition: gone ? 'transform 0.25s ease, opacity 0.25s ease' : dx === 0 ? 'transform 0.12s ease-out' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
         touchAction: 'pan-y', top: 0, left: 0, right: 0, margin: '0 auto',
       }}
@@ -678,7 +678,7 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
         position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
         height: wide ? undefined : '100%',
         transform: `translateX(${tx}px) rotate(${dx * 0.055}deg)`,
-        transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
+        transition: gone ? 'transform 0.25s ease, opacity 0.25s ease' : dx === 0 ? 'transform 0.12s ease-out' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
         touchAction: 'pan-y',
         top: 0, left: 0, right: 0, margin: '0 auto',
@@ -2235,7 +2235,7 @@ export default function DailyLeads({ onNavigate }) {
   // so the outer column never overflows and shows no scrollbar
   const CARD_H = isDesktop
     ? 'clamp(440px, calc(100vh - 280px), 660px)'
-    : 'clamp(400px, calc(100vh - 300px), 560px)';
+    : 'clamp(360px, calc(100vh - 260px), 560px)';
   const renderGhostCards = (count) =>
     Array.from({ length: Math.min(count, 2) }).map((_, i) => (
       <div key={i} style={{
@@ -2483,7 +2483,7 @@ export default function DailyLeads({ onNavigate }) {
       <div data-debug="content-area" style={{ flex: 1, display: 'flex', overflow: 'hidden', minWidth: 0, width: '100%', maxWidth: '100%' }}>
 
         {/* ── Card column ── */}
-        <div ref={cardColRef} data-debug="card-col" style={{ flex: 1, minWidth: 0, width: '100%', maxWidth: '100%', display: 'flex', flexDirection: 'column', alignItems: isDesktop ? 'center' : 'stretch', padding: isDesktop ? '20px 16px 8px' : '18px 12px 8px', overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>
+        <div ref={cardColRef} data-debug="card-col" style={{ flex: 1, minWidth: 0, width: '100%', maxWidth: '100%', display: 'flex', flexDirection: 'column', alignItems: isDesktop ? 'center' : 'stretch', padding: isDesktop ? '20px 16px 8px' : '12px 12px 4px', overflowY: isDesktop ? 'auto' : 'hidden', overflowX: 'hidden', position: 'relative' }}>
 
           {/* ── Companies Tab ── */}
           {tab === 'companies' && (

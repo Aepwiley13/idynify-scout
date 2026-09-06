@@ -33,6 +33,7 @@
   flex-direction: column;
   height: 100%;
   width: 100%;
+  max-width: 100%;
   overflow: hidden;
 }
 
@@ -42,6 +43,8 @@
   flex-direction: column;
   overflow: hidden;
   position: relative;
+  width: 100%;
+  max-width: 100%;
 }
 
 

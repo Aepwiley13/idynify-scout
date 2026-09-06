@@ -351,7 +351,6 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
         boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`,
         transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)',
         transition: 'transform 0.14s ease',
-        WebkitOverflowScrolling: wide ? undefined : 'touch',
       }}>
         {/* Feedback overlay — appears after "This is a Match" click */}
         {showFeedback && (
@@ -650,7 +649,7 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
       {dx < -30 && (
         <div style={{ position: 'absolute', top: 22, right: 16, zIndex: 10, padding: '5px 13px', borderRadius: 8, border: `3px solid ${STATUS.red}`, color: STATUS.red, fontSize: 13, fontWeight: 700, transform: 'rotate(11deg)', background: `${STATUS.red}10` }}>✗ NOT A MATCH</div>
       )}
-      <div style={{ position: 'relative', height: wide ? undefined : '100%', background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: wide ? 'hidden' : 'auto', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)', transition: 'transform 0.14s ease', WebkitOverflowScrolling: wide ? undefined : 'touch' }}>
+      <div style={{ position: 'relative', height: wide ? undefined : '100%', background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: wide ? 'hidden' : 'auto', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)', transition: 'transform 0.14s ease' }}>
         {showFeedback && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 30, background: T.cardBg, borderRadius: 22, overflowY: 'auto' }}>
             <FeedbackFace
@@ -1348,6 +1347,11 @@ export default function DailyLeads({ onNavigate }) {
     return () => window.removeEventListener('resize', handler);
   }, []);
 
+  useEffect(() => {
+    const el = cardColRef.current;
+    if (el && el.scrollLeft !== 0) el.scrollLeft = 0;
+  });
+
   // ── Company Mode state ──────────────────────────────────────────────────────
   const [companies, setCompanies] = useState([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -1373,6 +1377,7 @@ export default function DailyLeads({ onNavigate }) {
   const [activeICPId, setActiveICPId] = useState(null);
   const [icpUnresolvedReason, setIcpUnresolvedReason] = useState(null);
   // Store the full company list (unfiltered by ICP) for re-scoring
+  const cardColRef = useRef(null);
   const allCompaniesRef = useRef([]);
 
   // ── Session stats ────────────────────────────────────────────────────────────
@@ -2434,10 +2439,10 @@ export default function DailyLeads({ onNavigate }) {
       </div>
 
       {/* Content area — two-column on desktop */}
-      <div data-debug="content-area" style={{ flex: 1, display: 'flex', overflow: 'hidden', minWidth: 0 }}>
+      <div data-debug="content-area" style={{ flex: 1, display: 'flex', overflow: 'hidden', minWidth: 0, width: '100%', maxWidth: '100%' }}>
 
         {/* ── Card column ── */}
-        <div data-debug="card-col" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isDesktop ? '20px 16px 8px' : '18px 12px 8px', overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>
+        <div ref={cardColRef} data-debug="card-col" style={{ flex: 1, minWidth: 0, width: '100%', maxWidth: '100%', display: 'flex', flexDirection: 'column', alignItems: isDesktop ? 'center' : 'stretch', padding: isDesktop ? '20px 16px 8px' : '18px 12px 8px', overflowY: 'auto', overflowX: 'hidden', position: 'relative' }}>
 
           {/* ── Companies Tab ── */}
           {tab === 'companies' && (
@@ -2505,7 +2510,7 @@ export default function DailyLeads({ onNavigate }) {
                 />
               ) : showBatchEnd ? (
                 /* ── Batch end screen ───────────────────────────────────── */
-                <div style={{ textAlign: 'center', padding: '32px 24px', maxWidth: 400, width: '100%' }}>
+                <div style={{ textAlign: 'center', padding: '32px 24px', maxWidth: 400, width: '100%', margin: '0 auto' }}>
                   {feedbackImpactMsg && (
                     <div style={{
                       marginBottom: 16, padding: '10px 14px', borderRadius: 10,
@@ -2612,7 +2617,7 @@ export default function DailyLeads({ onNavigate }) {
               ) : (
                 <>
                   {renderBatchDots()}
-                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, height: CARD_H, overflowX: 'hidden' }}>
+                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, margin: '0 auto', height: CARD_H, overflowX: 'hidden' }}>
                     {visibleCompanies.length > 1 && renderGhostCards(visibleCompanies.length - 1)}
                     {currentCompany && (
                       <CompanySwipeCard
@@ -2641,12 +2646,12 @@ export default function DailyLeads({ onNavigate }) {
                   {showUndo && swipeHistory.length > 0 && (
                     <button
                       onClick={handleUndo}
-                      style={{ marginTop: 10, padding: '7px 16px', borderRadius: 10, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, animation: 'slideUp 0.2s ease' }}
+                      style={{ marginTop: 10, padding: '7px 16px', borderRadius: 10, background: T.surface, border: `1px solid ${T.border2}`, color: T.textMuted, fontSize: 12, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, animation: 'slideUp 0.2s ease', alignSelf: 'center' }}
                     >
                       <RotateCcw size={13} />Undo last skip
                     </button>
                   )}
-                  <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? 560 : 440, fontSize: 10, color: T.textGhost }}>
+                  <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? 560 : 440, margin: '10px auto 0', fontSize: 10, color: T.textGhost }}>
                     <span>← Sharpens targeting</span>
                     <span>Add to hunt list →</span>
                   </div>
@@ -2693,7 +2698,7 @@ export default function DailyLeads({ onNavigate }) {
               ) : (
                 <>
                   {renderDots(peopleQueue.length, currentPersonIdx)}
-                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, height: CARD_H, overflowX: 'hidden' }}>
+                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, margin: '0 auto', height: CARD_H, overflowX: 'hidden' }}>
                     {peopleQueue.slice(currentPersonIdx + 1, currentPersonIdx + 3).map((_, i) => (
                       <div key={i} style={{ position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, height: CARD_H, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none' }} />
                     ))}
@@ -2708,7 +2713,7 @@ export default function DailyLeads({ onNavigate }) {
                       wide={isDesktop}
                     />
                   </div>
-                  <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? 560 : 440, fontSize: 10, color: T.textGhost }}>
+                  <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? 560 : 440, margin: '14px auto 0', fontSize: 10, color: T.textGhost }}>
                     <span>← Not this person</span>
                     <span>Save to engage →</span>
                   </div>

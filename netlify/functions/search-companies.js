@@ -1180,7 +1180,11 @@ async function getExistingCompanyIds(userId, authToken) {
  */
 function buildBarryIntel(company, companyProfile) {
   const name = company.name || 'This company';
-  const industry = company.industry || company.primary_industry || companyProfile.industries?.[0] || 'this sector';
+  // No ICP echo here either. barry_intel is a PERSISTED string, so falling back
+  // to the user's own target industry baked a fabricated claim into stored prose
+  // ("Acme is a Credit Unions company") that no provider data supported.
+  // 'this sector' is generic phrasing, not an industry value.
+  const industry = company.industry || company.primary_industry || 'this sector';
   const currentYear = new Date().getFullYear();
 
   let summary = `${name} is a ${industry} company`;
@@ -1250,8 +1254,17 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
         console.log(`  ⚠️  NOTE: Apollo search endpoint does NOT return employee_count or location`);
       }
 
-      // Use Apollo's actual industry data; fall back to ICP's first industry only if Apollo doesn't provide one
-      const industry = company.industry || company.primary_industry || companyProfile.industries?.[0] || 'Unknown';
+      // Only the provider's own industry is canonical. Absent data is null.
+      //
+      // This previously fell back to `companyProfile.industries?.[0]` and then
+      // to the literal 'Unknown'. Both fabricated a value the provider never
+      // returned and persisted it as canonical company data: the ICP echo
+      // stamped the user's own target industry onto the company, which then
+      // exact-matched that same ICP and scored 100 at full confidence, and the
+      // 'Unknown' literal is a truthy string, so scoring counted it as observed
+      // evidence and scored 0 on the heaviest dimension instead of recording
+      // that the dimension was never measured.
+      const industry = company.industry || company.primary_industry || null;
 
       const companyObj = {
         // IDs
@@ -1300,7 +1313,12 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
         fields: {
           apollo_organization_id: { stringValue: String(company.apollo_organization_id) },
           name: { stringValue: String(company.name) },
-          industry: { stringValue: String(company.industry) },
+          // nullValue, not String(null) — the latter would persist the literal
+          // string "null", trading one fabricated value for another. A null
+          // here is what lets scoring record industry as unmeasured.
+          industry: company.industry
+            ? { stringValue: String(company.industry) }
+            : { nullValue: null },
           revenue: { stringValue: String(company.revenue || '') },
           founded_year: { integerValue: String(company.founded_year || 0) },
           phone: { stringValue: String(company.phone || '') },

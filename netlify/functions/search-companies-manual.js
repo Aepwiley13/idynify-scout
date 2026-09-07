@@ -161,7 +161,11 @@ export async function handler(event, context) {
       return {
         apollo_organization_id: company.id,
         name: company.name,
-        industry: company.industry || company.primary_industry || 'Unknown',
+        // Only the provider's own industry is canonical. Absent data is null —
+        // the literal 'Unknown' is a truthy string that scoring counts as
+        // observed evidence. (`location` below still carries the same pattern;
+        // it is out of scope for this containment patch.)
+        industry: company.industry || company.primary_industry || null,
         employee_count: company.estimated_num_employees || 0,
         revenue: revenue,
         founded_year: company.founded_year || null,

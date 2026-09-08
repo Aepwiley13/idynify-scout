@@ -828,8 +828,8 @@
   display: inline;
 }
 
-/* Collapse to icon-only when the top bar is tight but still desktop */
-@media (max-width: 1080px) and (min-width: 769px) {
+/* Collapse to icon-only on tablet and phone widths */
+@media (max-width: 1080px) {
   .scout-linkedin-action .scout-linkedin-label {
     display: none;
   }
@@ -837,6 +837,14 @@
     padding: 0;
     width: 34px;
     justify-content: center;
+  }
+}
+
+/* Match the smaller icon-button size the shell uses on phone */
+@media (max-width: 768px) {
+  .scout-linkedin-action {
+    width: 32px;
+    height: 32px;
   }
 }
 

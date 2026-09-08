@@ -27,9 +27,9 @@
  *                                        retained for rollback layer 1)
  */
 
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useLocation, useNavigate, Outlet } from 'react-router-dom';
-import { Menu, History, Search, ChevronRight, LifeBuoy } from 'lucide-react';
+import { Menu, History, Search, ChevronRight, LifeBuoy, Linkedin } from 'lucide-react';
 import Sidebar from './Sidebar';
 import UserMenu from './UserMenu';
 import BottomNav from './BottomNav';
@@ -47,6 +47,8 @@ import { useActiveUserId } from '../../context/ImpersonationContext';
 import { ShellProvider, useShell } from '../../context/ShellContext';
 import { resolveModule, resolveDestination, MISSION_CONTROL } from '../../constants/navigationModel';
 import { supportMailto } from '../../constants/support';
+
+const LinkedInQuickAdd = lazy(() => import('../scout/LinkedInQuickAdd'));
 import { bottomNavFor } from '../../constants/mobileNavigation';
 import { useT } from '../../theme/ThemeContext';
 import './MainLayout.css';
@@ -108,6 +110,7 @@ function ShellChrome({ children, user }) {
   const [moreSheetOpen, setMoreSheetOpen] = React.useState(false);
   const [historyOpen, setHistoryOpen] = React.useState(false);
   const [commandBarOpen, setCommandBarOpen] = React.useState(false);
+  const [linkedInQuickAddOpen, setLinkedInQuickAddOpen] = React.useState(false);
 
   const {
     shellUser,
@@ -230,6 +233,21 @@ function ShellChrome({ children, user }) {
           </div>
 
           <div className="top-bar-right">
+            {/* Scout-only: LinkedIn quick-add shortcut. Desktop only — mobile
+                uses BottomNav → Scout+ → LinkedIn Link. */}
+            {module.id === 'scout' && (
+              <button
+                className="scout-linkedin-action topbar-desktop-only"
+                onClick={() => setLinkedInQuickAddOpen(true)}
+                aria-haspopup="dialog"
+                aria-expanded={linkedInQuickAddOpen}
+                title="Add from LinkedIn"
+              >
+                <Linkedin size={15} />
+                <span className="scout-linkedin-label">Add from LinkedIn</span>
+              </button>
+            )}
+
             {/* Global search. The affordance sat here disabled through Phase 0
                 because no global search existed — an honest placeholder rather
                 than a dead input. It exists now: CommandBar, mounted once at
@@ -339,6 +357,17 @@ function ShellChrome({ children, user }) {
       {/* Stage-transition announcements. Only explicit announce() calls
           surface here — routine navigation never produces one. */}
       <ShellAnnouncements />
+
+      {/* LinkedIn Quick Add — Scout-only overlay. Lazy-loaded so the Scout+
+          component tree does not inflate the shell bundle for non-Scout users. */}
+      {linkedInQuickAddOpen && (
+        <Suspense fallback={null}>
+          <LinkedInQuickAdd
+            isOpen={linkedInQuickAddOpen}
+            onClose={() => setLinkedInQuickAddOpen(false)}
+          />
+        </Suspense>
+      )}
 
       {/* Quick Engage — shell-hosted so it overlays whatever is underneath
           without unmounting it. Closing restores exact prior context. */}

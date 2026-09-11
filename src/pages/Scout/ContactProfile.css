@@ -1313,16 +1313,30 @@
     font-size: 1.125rem;
   }
 
-  .profile-nav {
-    flex-direction: column;
-    gap: 1rem;
-    align-items: stretch;
+  .profile-nav-inner {
+    padding: 8px;
   }
 
-  .btn-back-nav,
-  .btn-export {
-    width: 100%;
-    justify-content: center;
+  .profile-nav-actions {
+    gap: 6px !important;
+  }
+
+  .profile-nav-actions > button {
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center !important;
+  }
+
+  .profile-nav-actions > button > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
 }
 

@@ -688,5 +688,19 @@
 
   .peb-primary {
     gap: 10px;
+    padding: 12px;
+  }
+
+  .peb-status {
+    flex-shrink: 1;
+  }
+
+  .peb-status-label {
+    white-space: normal;
+  }
+
+  .peb-cta-btn {
+    white-space: normal;
+    text-align: left;
   }
 }

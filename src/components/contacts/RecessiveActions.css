@@ -48,8 +48,13 @@
 /* Mobile responsive */
 @media (max-width: 768px) {
   .recessive-actions {
+    flex-wrap: wrap;
     gap: 1rem;
     margin-bottom: 32px;
+  }
+
+  .recessive-action {
+    min-height: 44px;
   }
 
   .action-icon {

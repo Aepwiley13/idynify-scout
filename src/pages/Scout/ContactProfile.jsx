@@ -746,19 +746,23 @@ export default function ContactProfile({
             >
               <ArrowLeft size={13} />{returnLabel}
             </button>
-            <div style={{ display: 'flex', gap: 9 }}>
+            <div className="profile-nav-actions" style={{ display: 'flex', gap: 9 }}>
               <button
                 onClick={handleEnrichContact}
                 disabled={enriching}
+                aria-label={enriching ? 'Enriching contact' : 'Enrich contact'}
+                title={enriching ? 'Enriching contact' : 'Enrich contact'}
                 style={{ background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', border: 'none', borderRadius: 9, padding: '8px 18px', fontSize: 13, fontWeight: 700, cursor: enriching ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', gap: 6, opacity: enriching ? 0.7 : 1 }}
               >
-                {enriching ? <><Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />Enriching...</> : <><Star size={13} />Enrich Contact</>}
+                {enriching ? <><Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /><span>Enriching...</span></> : <><Star size={13} /><span>Enrich Contact</span></>}
               </button>
               <button
                 onClick={() => setShowArchiveModal(true)}
+                aria-label="Archive contact"
+                title="Archive contact"
                 style={{ background: T.surface, border: `1px solid ${T.border2}`, borderRadius: 9, padding: '8px 14px', fontSize: 13, color: T.textMuted, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6 }}
               >
-                <Archive size={13} />Archive
+                <Archive size={13} /><span>Archive</span>
               </button>
               <BarryKnowledgeButton variant="compact" />
             </div>

@@ -1172,10 +1172,11 @@ export default function MissionControlDashboardV2() {
                       <button
                         onClick={(e) => { e.stopPropagation(); setSelectedCompany(company); }}
                         style={{
-                          padding: '6px 14px', borderRadius: 8,
+                          padding: '6px 14px', minHeight: 44, borderRadius: 8,
                           background: `${T.accent}15`, border: `1px solid ${T.accent}30`,
                           color: T.accent, fontSize: 11, fontWeight: 700,
                           cursor: 'pointer', whiteSpace: 'nowrap',
+                          display: 'flex', alignItems: 'center',
                         }}
                       >
                         View & Approve

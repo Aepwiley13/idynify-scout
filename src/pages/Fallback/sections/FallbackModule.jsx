@@ -119,7 +119,7 @@ function ContactRow({ person, T, onRestore }) {
         onClick={(e) => { e.stopPropagation(); onRestore(person); }}
         title="Restore to pipeline"
         style={{
-          width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+          width: 44, height: 44, borderRadius: 7, flexShrink: 0,
           background: ACCENT_BG(0.12), border: `1px solid ${ACCENT}30`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: 'pointer', transition: 'all 0.15s',

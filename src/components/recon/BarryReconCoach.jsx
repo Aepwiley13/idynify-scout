@@ -192,7 +192,7 @@ export default function BarryReconCoach({ sectionId, sectionLabel, existingAnswe
 
       {/* Panel */}
       <div style={{
-        position: 'fixed', top: 0, right: 0, bottom: 0, width: 400,
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: 400, maxWidth: '100vw',
         zIndex: 499,
         background: T.cardBg,
         borderLeft: `1px solid ${BRAND.pink}30`,

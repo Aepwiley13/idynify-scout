@@ -230,7 +230,7 @@ export default function BarryICPPanel({ userId, icpProfile, onClose, onSearchCom
 
       {/* Side panel */}
       <div style={{
-        position: 'fixed', top: 0, right: 0, bottom: 0, width: 380, zIndex: 499,
+        position: 'fixed', top: 0, right: 0, bottom: 0, width: 380, maxWidth: '100vw', zIndex: 499,
         background: T.cardBg, borderLeft: `1px solid ${T.border}`,
         display: 'flex', flexDirection: 'column',
         boxShadow: `-8px 0 40px rgba(0,0,0,0.3)`,

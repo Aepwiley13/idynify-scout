@@ -1825,7 +1825,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
               <button
                 key={m}
                 onClick={() => { setViewMode(m); if (m === 'cards') { setPanelContactId(null); setListSelected(null); } }}
-                style={{ padding: '5px 13px', borderRadius: 6, border: 'none', background: viewMode === m ? BRAND.pink : 'transparent', color: viewMode === m ? '#fff' : T.textMuted, fontSize: 11, fontWeight: viewMode === m ? 700 : 400, cursor: 'pointer', transition: 'all 0.15s' }}
+                style={{ padding: '5px 13px', minHeight: 44, borderRadius: 6, border: 'none', background: viewMode === m ? BRAND.pink : 'transparent', color: viewMode === m ? '#fff' : T.textMuted, fontSize: 11, fontWeight: viewMode === m ? 700 : 400, cursor: 'pointer', transition: 'all 0.15s' }}
               >{l}</button>
             ))}
           </div>
@@ -1949,7 +1949,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
           <div style={{ position: 'relative', flexShrink: 0 }} ref={industryPickerRef}>
             <button
               onClick={() => setIndustryPickerOpen(o => !o)}
-              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 20, border: `1px solid ${industryFilter ? T.accentBdr : T.border}`, background: industryFilter ? T.accentBg : 'transparent', color: industryFilter ? BRAND.pink : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', minHeight: 44, borderRadius: 20, border: `1px solid ${industryFilter ? T.accentBdr : T.border}`, background: industryFilter ? T.accentBg : 'transparent', color: industryFilter ? BRAND.pink : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
             >
               <Factory size={10} />
               {industryFilter || 'Industry'}
@@ -1989,33 +1989,33 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
           <button
             key={id}
             onClick={() => setWarmthFilter(w => w === id ? null : id)}
-            style={{ padding: '5px 11px', borderRadius: 20, border: `1px solid ${warmthFilter === id ? `${color}60` : T.border}`, background: warmthFilter === id ? `${color}15` : 'transparent', color: warmthFilter === id ? color : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            style={{ padding: '5px 11px', minHeight: 44, borderRadius: 20, border: `1px solid ${warmthFilter === id ? `${color}60` : T.border}`, background: warmthFilter === id ? `${color}15` : 'transparent', color: warmthFilter === id ? color : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >{label}</button>
         ))}
 
         {/* ── Smart engagement filters ── */}
         <button
           onClick={() => setSmartFilter(s => s === 'has_replied' ? null : 'has_replied')}
-          style={{ padding: '5px 11px', borderRadius: 20, border: `1px solid ${smartFilter === 'has_replied' ? '#0ea5e960' : T.border}`, background: smartFilter === 'has_replied' ? '#0ea5e915' : 'transparent', color: smartFilter === 'has_replied' ? '#0ea5e9' : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
+          style={{ padding: '5px 11px', minHeight: 44, borderRadius: 20, border: `1px solid ${smartFilter === 'has_replied' ? '#0ea5e960' : T.border}`, background: smartFilter === 'has_replied' ? '#0ea5e915' : 'transparent', color: smartFilter === 'has_replied' ? '#0ea5e9' : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
         ><MessageSquare size={9} />Has Replied</button>
 
         <button
           onClick={() => setSmartFilter(s => s === 'going_cold' ? null : 'going_cold')}
-          style={{ padding: '5px 11px', borderRadius: 20, border: `1px solid ${smartFilter === 'going_cold' ? '#dc262660' : T.border}`, background: smartFilter === 'going_cold' ? '#dc262615' : 'transparent', color: smartFilter === 'going_cold' ? '#dc2626' : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
+          style={{ padding: '5px 11px', minHeight: 44, borderRadius: 20, border: `1px solid ${smartFilter === 'going_cold' ? '#dc262660' : T.border}`, background: smartFilter === 'going_cold' ? '#dc262615' : 'transparent', color: smartFilter === 'going_cold' ? '#dc2626' : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
         ><Flame size={9} />Going Cold</button>
 
         {/* ── Warm signals filter (opened/replied in last 30 days) ── */}
         <button
           onClick={() => setWarmSignalFilter(v => !v)}
           title="Contacts who opened or replied to a cadence in the last 30 days"
-          style={{ padding: '5px 11px', borderRadius: 20, border: `1px solid ${warmSignalFilter ? '#10b98160' : T.border}`, background: warmSignalFilter ? '#10b98115' : 'transparent', color: warmSignalFilter ? '#10b981' : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
+          style={{ padding: '5px 11px', minHeight: 44, borderRadius: 20, border: `1px solid ${warmSignalFilter ? '#10b98160' : T.border}`, background: warmSignalFilter ? '#10b98115' : 'transparent', color: warmSignalFilter ? '#10b981' : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
         ><Flame size={9} />Warm Signals</button>
 
         {/* ── Tag filter picker ── */}
         <div style={{ position: 'relative', flexShrink: 0 }} ref={tagPickerRef}>
           <button
             onClick={() => setTagPickerOpen(o => !o)}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 20, border: `1px solid ${tagFilter ? T.accentBdr : T.border}`, background: tagFilter ? T.accentBg : 'transparent', color: tagFilter ? BRAND.pink : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', minHeight: 44, borderRadius: 20, border: `1px solid ${tagFilter ? T.accentBdr : T.border}`, background: tagFilter ? T.accentBg : 'transparent', color: tagFilter ? BRAND.pink : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             <Tag size={10} />
             {tagFilter ? tagFilter : 'Tag'}
@@ -2053,7 +2053,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <button
             onClick={() => setMoreFiltersOpen(o => !o)}
-            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 11px', borderRadius: 20, border: `1px solid ${dataFilter ? T.accentBdr : T.border}`, background: dataFilter ? T.accentBg : 'transparent', color: dataFilter ? BRAND.pink : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 11px', minHeight: 44, borderRadius: 20, border: `1px solid ${dataFilter ? T.accentBdr : T.border}`, background: dataFilter ? T.accentBg : 'transparent', color: dataFilter ? BRAND.pink : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             <MoreHorizontal size={10} />
             {dataFilter ? (dataFilter === 'has-email' ? 'Has Email' : dataFilter === 'needs-email' ? 'Needs Email' : 'Needs Phone') : 'More'}
@@ -2093,7 +2093,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
         {activeFilterCount > 0 && (
           <button
             onClick={() => { setIndustryFilter(null); setWarmthFilter(null); setSourceFilter(null); setSmartFilter(null); setDataFilter(null); setTagFilter(null); setWarmSignalFilter(false); }}
-            style={{ padding: '4px 10px', borderRadius: 20, border: `1px solid ${BRAND.pink}40`, background: `${BRAND.pink}12`, color: BRAND.pink, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
+            style={{ padding: '4px 10px', minHeight: 44, borderRadius: 20, border: `1px solid ${BRAND.pink}40`, background: `${BRAND.pink}12`, color: BRAND.pink, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
           >
             <X size={9} />{activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} — Clear
           </button>
@@ -2205,7 +2205,8 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
             </div>
           ) : (
             <div style={{ background: T.navBg, borderRadius: 11, overflow: 'hidden', border: `1px solid ${T.border}` }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '7px 15px', borderBottom: `1px solid ${T.border}`, fontSize: 9, color: T.textFaint, letterSpacing: 1 }}>
+             <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '7px 15px', borderBottom: `1px solid ${T.border}`, fontSize: 9, color: T.textFaint, letterSpacing: 1, minWidth: 480 }}>
                 <div style={{ width: 30 }} />
                 <div style={{ width: 128 }}>NAME</div>
                 <div style={{ flex: 1 }}>TITLE</div>
@@ -2242,6 +2243,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
                   onArchive={handleContactArchived}
                 />
               ))}
+             </div>
             </div>
           )}
         </div>

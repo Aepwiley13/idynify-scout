@@ -6,17 +6,11 @@
 
 /* ── Main Container — Finding 22: 1400px for overview pages ── */
 .recon-overview {
-  max-width: 1400px;
+  max-width: min(1400px, 100%);
   margin: 0 auto;
   padding: 2rem 1.5rem;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  /* Never wider than what contains it. Without this the page could grow past
-     the viewport, and because the header is text-align:center it then centres
-     inside the OVERSIZED box — which is what "the title bleeds off-screen"
-     actually was. The title itself is the word "RECON"; it was never too wide. */
-  max-width: min(1400px, 100%);
   box-sizing: border-box;
-  overflow-x: hidden;
 }
 
 /* ── Header — Finding 10: Scout's centered enterprise-header ── */
@@ -90,6 +84,7 @@
   display: flex;
   align-items: center;
   gap: 1.5rem;
+  flex-wrap: wrap;
 }
 
 .recon-training-stat {
@@ -207,6 +202,7 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
+  flex-wrap: wrap;
   font-size: 0.625rem;
   font-weight: 500;
   color: var(--text-secondary);
@@ -1243,9 +1239,7 @@
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  white-space: nowrap;
   transition: background 0.15s;
-  flex-shrink: 0;
 }
 
 .train-next-btn:hover { background: #6d28d9; }
@@ -1273,8 +1267,6 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
-  white-space: nowrap;
-  flex-shrink: 0;
 }
 
 .recon-messaging-manage-btn:hover {

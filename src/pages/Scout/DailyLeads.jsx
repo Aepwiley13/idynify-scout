@@ -842,7 +842,7 @@ function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose
 
   return (
     <div style={{
-      position: 'fixed', top: 0, right: 0, bottom: 0, width: 320, zIndex: 500,
+      position: 'fixed', top: 0, right: 0, bottom: 0, width: 320, maxWidth: '100vw', zIndex: 500,
       background: T.cardBg, borderLeft: `1px solid ${T.border}`,
       display: 'flex', flexDirection: 'column',
       boxShadow: `-8px 0 32px ${T.isDark ? '#00000060' : '#00000018'}`,
@@ -2374,7 +2374,7 @@ export default function DailyLeads({ onNavigate }) {
                 key={icp.id}
                 onClick={() => handleICPSwitch(icp.id)}
                 style={{
-                  padding: '5px 14px', borderRadius: 20,
+                  padding: '5px 14px', minHeight: 44, borderRadius: 20,
                   fontSize: 11, fontWeight: 600, cursor: 'pointer',
                   border: `1.5px solid ${activeICPId === icp.id ? BRAND.pink : T.border2}`,
                   background: activeICPId === icp.id ? T.accentBg : T.surface,
@@ -2396,11 +2396,12 @@ export default function DailyLeads({ onNavigate }) {
               key={id}
               onClick={() => handleTabSwitch(id)}
               style={{
-                padding: '7px 22px', fontSize: 13, cursor: 'pointer',
+                padding: '7px 22px', minHeight: 44, fontSize: 13, cursor: 'pointer',
                 borderBottom: `2px solid ${tab === id ? BRAND.pink : 'transparent'}`,
                 color: tab === id ? BRAND.pink : T.textMuted,
                 background: tab === id ? T.accentBg : 'transparent',
                 marginBottom: -1, transition: 'all 0.15s',
+                display: 'flex', alignItems: 'center',
               }}
             >
               {label}

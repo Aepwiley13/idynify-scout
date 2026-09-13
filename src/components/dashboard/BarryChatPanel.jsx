@@ -37,12 +37,12 @@ const DEFAULT_TOKENS = {
   cardBg2:   '#0b0818',
   surface:   '#ffffff08',
   surface2:  '#ffffff0d',
-  border:    '#ffffff0d',
-  border2:   '#ffffff18',
+  border:    '#ffffff1a',
+  border2:   '#ffffff28',
   text:      '#f0eaff',
-  textMuted: '#9080b0',
-  textFaint: '#4a3870',
-  textGhost: '#2a1a50',
+  textMuted: '#a898c8',
+  textFaint: '#7a6a9a',
+  textGhost: '#5a4a7a',
   input:     '#ffffff08',
   accent:    BRAND.pink,
   accentBg:  `${BRAND.pink}15`,
@@ -298,11 +298,11 @@ function PipelineMoveRow({ move, onExecute }) {
     <div className="flex items-start gap-2 px-3 py-2 rounded-xl" style={{ background: `${BRAND.navy}66`, border: `1px solid ${BRAND.navy}66` }}>
       <div className="flex-1 min-w-0">
         <div className="text-sm font-medium truncate" style={{ color: '#f0eaff' }}>{move.contact_name}</div>
-        <div className="text-xs mt-0.5" style={{ color: '#9080b0' }}>
-          <span style={{ color: '#4a3870' }}>{stageLabels[move.current_stage] || move.current_stage}</span>
-          <span className="mx-1" style={{ color: '#4a3870' }}>→</span>
+        <div className="text-xs mt-0.5" style={{ color: T.textMuted }}>
+          <span style={{ color: T.textFaint }}>{stageLabels[move.current_stage] || move.current_stage}</span>
+          <span className="mx-1" style={{ color: T.textFaint }}>→</span>
           <span style={{ color: BRAND.cyan }}>{stageLabels[move.recommended_stage] || move.recommended_stage}</span>
-          {move.reason && <span className="ml-2" style={{ color: '#4a3870' }}>· {move.reason}</span>}
+          {move.reason && <span className="ml-2" style={{ color: T.textFaint }}>· {move.reason}</span>}
         </div>
       </div>
       <div className="flex-shrink-0">
@@ -316,7 +316,7 @@ function PipelineMoveRow({ move, onExecute }) {
           </button>
         )}
         {status === 'loading' && (
-          <span className="text-xs font-mono" style={{ color: '#4a3870' }}>Moving...</span>
+          <span className="text-xs font-mono" style={{ color: T.textFaint }}>Moving...</span>
         )}
         {status === 'done' && (
           <span className="text-xs font-mono" style={{ color: STATUS.green }}>✓ Done</span>

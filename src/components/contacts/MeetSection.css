@@ -268,7 +268,7 @@ body.theme-dark .conversation-starters {
 }
 
 body.theme-dark .meet-section h3 {
-  color: #9080b0;
+  color: var(--text-secondary);
 }
 
 body.theme-dark .role-priorities li {
@@ -298,7 +298,7 @@ body.theme-dark .email-type-picker {
 }
 
 body.theme-dark .email-type-label {
-  color: #9080b0;
+  color: var(--text-secondary);
 }
 
 body.theme-dark .email-type-btn {

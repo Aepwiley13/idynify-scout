@@ -463,7 +463,8 @@ export default function AlignmentBrief() {
                 key={i}
                 style={{
                   display: 'flex',
-                  gap: 16,
+                  flexWrap: 'wrap',
+                  gap: '4px 16px',
                   padding: '0.75rem 1.1rem',
                   borderBottom: i < facts.length - 1 ? `1px solid ${T.border2}` : 'none',
                   alignItems: 'flex-start',

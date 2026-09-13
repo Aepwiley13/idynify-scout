@@ -6,8 +6,10 @@ import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { recordReferralReceived } from '../../services/referralIntelligenceService';
 import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
+import { useT } from '../../theme/ThemeContext';
 
 export default function ManualContactForm({ onContactAdded, onCancel }) {
+  const T = useT();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -159,62 +161,61 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-        <p className="text-sm text-gray-700">
+      <div className="rounded-xl p-4 border" style={{ background: T.isDark ? `${T.accent}10` : '#eff6ff', borderColor: T.isDark ? `${T.accent}30` : '#bfdbfe' }}>
+        <p className="text-sm" style={{ color: T.textMuted }}>
           <strong>Quick add:</strong> Only name is required. Add more details now or enrich later.
         </p>
       </div>
 
       {/* Name (Required) */}
       <div>
-        <label className="block text-sm font-semibold text-gray-900 mb-2">
-          Full Name <span className="text-red-600">*</span>
+        <label className="block text-sm font-semibold mb-2" style={{ color: T.accent }}>
+          Full Name <span style={{ color: '#dc2626' }}>*</span>
         </label>
         <input
           type="text"
           value={formData.name}
           onChange={(e) => handleChange('name', e.target.value)}
-          className={`w-full px-4 py-3 rounded-lg border ${
-            errors.name ? 'border-red-500' : 'border-gray-300'
-          } focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all`}
+          className="w-full px-4 py-3 rounded-lg border focus:outline-none transition-all"
+          style={{ background: T.input || T.surface, borderColor: errors.name ? '#dc2626' : T.border, color: T.text }}
           placeholder="John Doe"
           disabled={saving}
         />
         {errors.name && (
-          <p className="text-red-600 text-xs mt-1">⚠️ {errors.name}</p>
+          <p className="text-xs mt-1" style={{ color: '#dc2626' }}>⚠️ {errors.name}</p>
         )}
       </div>
 
       {/* Email (Optional) */}
       <div>
-        <label className="block text-sm font-semibold text-gray-900 mb-2">
+        <label className="block text-sm font-semibold mb-2" style={{ color: T.accent }}>
           Email
         </label>
         <input
           type="email"
           value={formData.email}
           onChange={(e) => handleChange('email', e.target.value)}
-          className={`w-full px-4 py-3 rounded-lg border ${
-            errors.email ? 'border-red-500' : 'border-gray-300'
-          } focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all`}
+          className="w-full px-4 py-3 rounded-lg border focus:outline-none transition-all"
+          style={{ background: T.input || T.surface, borderColor: errors.email ? '#dc2626' : T.border, color: T.text }}
           placeholder="john.doe@company.com"
           disabled={saving}
         />
         {errors.email && (
-          <p className="text-red-600 text-xs mt-1">⚠️ {errors.email}</p>
+          <p className="text-xs mt-1" style={{ color: '#dc2626' }}>⚠️ {errors.email}</p>
         )}
       </div>
 
       {/* Phone (Optional) */}
       <div>
-        <label className="block text-sm font-semibold text-gray-900 mb-2">
+        <label className="block text-sm font-semibold mb-2" style={{ color: T.accent }}>
           Phone
         </label>
         <input
           type="tel"
           value={formData.phone}
           onChange={(e) => handleChange('phone', e.target.value)}
-          className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all"
+          className="w-full px-4 py-3 rounded-lg border focus:outline-none transition-all"
+          style={{ background: T.input || T.surface, borderColor: T.border, color: T.text }}
           placeholder="+1 (555) 123-4567"
           disabled={saving}
         />
@@ -222,14 +223,15 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
 
       {/* Company (Optional) */}
       <div>
-        <label className="block text-sm font-semibold text-gray-900 mb-2">
+        <label className="block text-sm font-semibold mb-2" style={{ color: T.accent }}>
           Company
         </label>
         <input
           type="text"
           value={formData.company}
           onChange={(e) => handleChange('company', e.target.value)}
-          className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all"
+          className="w-full px-4 py-3 rounded-lg border focus:outline-none transition-all"
+          style={{ background: T.input || T.surface, borderColor: T.border, color: T.text }}
           placeholder="Acme Corporation"
           disabled={saving}
         />
@@ -237,14 +239,15 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
 
       {/* Title (Optional) */}
       <div>
-        <label className="block text-sm font-semibold text-gray-900 mb-2">
+        <label className="block text-sm font-semibold mb-2" style={{ color: T.accent }}>
           Title
         </label>
         <input
           type="text"
           value={formData.title}
           onChange={(e) => handleChange('title', e.target.value)}
-          className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all"
+          className="w-full px-4 py-3 rounded-lg border focus:outline-none transition-all"
+          style={{ background: T.input || T.surface, borderColor: T.border, color: T.text }}
           placeholder="VP of Sales"
           disabled={saving}
         />
@@ -252,34 +255,34 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
 
       {/* LinkedIn URL (Optional) */}
       <div>
-        <label className="block text-sm font-semibold text-gray-900 mb-2">
+        <label className="block text-sm font-semibold mb-2" style={{ color: T.accent }}>
           LinkedIn URL
         </label>
         <input
           type="url"
           value={formData.linkedin_url}
           onChange={(e) => handleChange('linkedin_url', e.target.value)}
-          className={`w-full px-4 py-3 rounded-lg border ${
-            errors.linkedin_url ? 'border-red-500' : 'border-gray-300'
-          } focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all`}
+          className="w-full px-4 py-3 rounded-lg border focus:outline-none transition-all"
+          style={{ background: T.input || T.surface, borderColor: errors.linkedin_url ? '#dc2626' : T.border, color: T.text }}
           placeholder="https://linkedin.com/in/johndoe"
           disabled={saving}
         />
         {errors.linkedin_url && (
-          <p className="text-red-600 text-xs mt-1">⚠️ {errors.linkedin_url}</p>
+          <p className="text-xs mt-1" style={{ color: '#dc2626' }}>⚠️ {errors.linkedin_url}</p>
         )}
       </div>
 
       {/* Address (Optional) */}
       <div>
-        <label className="block text-sm font-semibold text-gray-900 mb-2">
+        <label className="block text-sm font-semibold mb-2" style={{ color: T.accent }}>
           Address
         </label>
         <input
           type="text"
           value={formData.address}
           onChange={(e) => handleChange('address', e.target.value)}
-          className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all"
+          className="w-full px-4 py-3 rounded-lg border focus:outline-none transition-all"
+          style={{ background: T.input || T.surface, borderColor: T.border, color: T.text }}
           placeholder="123 Main St, City, State"
           disabled={saving}
         />
@@ -287,14 +290,15 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
 
       {/* Website (Optional) */}
       <div>
-        <label className="block text-sm font-semibold text-gray-900 mb-2">
+        <label className="block text-sm font-semibold mb-2" style={{ color: T.accent }}>
           Website
         </label>
         <input
           type="url"
           value={formData.website}
           onChange={(e) => handleChange('website', e.target.value)}
-          className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 focus:outline-none transition-all"
+          className="w-full px-4 py-3 rounded-lg border focus:outline-none transition-all"
+          style={{ background: T.input || T.surface, borderColor: T.border, color: T.text }}
           placeholder="https://example.com"
           disabled={saving}
         />
@@ -302,11 +306,11 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
 
       {/* Referred By (Optional) */}
       <div>
-        <label className="block text-sm font-semibold text-gray-900 mb-2">
+        <label className="block text-sm font-semibold mb-2" style={{ color: T.accent }}>
           Referred By
         </label>
-        <ReferredByPicker value={referredBy} onChange={setReferredBy} />
-        <p className="text-xs text-gray-400 mt-1">
+        <ReferredByPicker value={referredBy} onChange={setReferredBy} T={T} />
+        <p className="text-xs mt-1" style={{ color: T.textFaint }}>
           Optional — tag who referred this person to track referral attribution.
         </p>
       </div>
@@ -317,14 +321,16 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
           type="button"
           onClick={onCancel}
           disabled={saving}
-          className="flex-1 px-6 py-3 rounded-xl bg-white border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="flex-1 px-6 py-3 rounded-xl border font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ background: T.cardBg, borderColor: T.border, color: T.textMuted }}
         >
           Cancel
         </button>
         <button
           type="submit"
           disabled={saving}
-          className="flex-1 px-6 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center justify-center gap-2"
+          className="flex-1 px-6 py-3 rounded-xl font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center justify-center gap-2"
+          style={{ background: T.accent, color: '#fff', border: 'none' }}
         >
           {saving ? (
             <>
@@ -344,7 +350,7 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
 }
 
 // ─── ReferredByPicker ─────────────────────────────────────────────────────
-function ReferredByPicker({ value, onChange }) {
+function ReferredByPicker({ value, onChange, T }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
@@ -389,9 +395,9 @@ function ReferredByPicker({ value, onChange }) {
 
   if (value) {
     return (
-      <div className="flex items-center gap-2 px-4 py-3 rounded-lg border border-purple-300 bg-purple-50">
-        <span className="text-sm text-purple-800 font-medium flex-1">{value.name}</span>
-        <button type="button" onClick={() => onChange(null)} className="text-purple-400 hover:text-purple-600">
+      <div className="flex items-center gap-2 px-4 py-3 rounded-lg border" style={{ background: `${T.accent}10`, borderColor: `${T.accent}40` }}>
+        <span className="text-sm font-medium flex-1" style={{ color: T.accent }}>{value.name}</span>
+        <button type="button" onClick={() => onChange(null)} style={{ color: T.textFaint }}>
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -400,8 +406,8 @@ function ReferredByPicker({ value, onChange }) {
 
   return (
     <div className="relative">
-      <div className="flex items-center gap-2 px-4 py-3 rounded-lg border border-gray-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100">
-        <Search className="w-4 h-4 text-gray-400 flex-shrink-0" />
+      <div className="flex items-center gap-2 px-4 py-3 rounded-lg border" style={{ borderColor: T.border, background: T.input || T.surface }}>
+        <Search className="w-4 h-4 flex-shrink-0" style={{ color: T.textFaint }} />
         <input
           type="text"
           value={searchTerm}
@@ -409,12 +415,13 @@ function ReferredByPicker({ value, onChange }) {
           onFocus={() => { if (results.length > 0) setOpen(true); }}
           onBlur={() => setTimeout(() => setOpen(false), 200)}
           placeholder="Search existing contacts..."
-          className="flex-1 bg-transparent border-none outline-none text-sm text-gray-900"
+          className="flex-1 bg-transparent border-none outline-none text-sm"
+          style={{ color: T.text }}
         />
-        {searching && <Loader className="w-4 h-4 text-gray-400 animate-spin" />}
+        {searching && <Loader className="w-4 h-4 animate-spin" style={{ color: T.textFaint }} />}
       </div>
       {open && results.length > 0 && (
-        <div className="absolute z-20 top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+        <div className="absolute z-20 top-full left-0 right-0 mt-1 rounded-lg shadow-lg max-h-48 overflow-y-auto border" style={{ background: T.cardBg, borderColor: T.border }}>
           {results.map(c => (
             <button
               key={c.id}
@@ -424,13 +431,16 @@ function ReferredByPicker({ value, onChange }) {
                 setSearchTerm('');
                 setOpen(false);
               }}
-              className="w-full text-left px-4 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-b-0"
+              className="w-full text-left px-4 py-2 border-b last:border-b-0"
+              style={{ borderColor: T.border, color: T.text }}
+              onMouseEnter={e => e.currentTarget.style.background = T.surface}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
             >
-              <div className="text-sm font-medium text-gray-900">
+              <div className="text-sm font-medium" style={{ color: T.text }}>
                 {c.name || `${c.first_name || ''} ${c.last_name || ''}`.trim()}
               </div>
               {(c.company || c.company_name) && (
-                <div className="text-xs text-gray-400">{c.company || c.company_name}</div>
+                <div className="text-xs" style={{ color: T.textFaint }}>{c.company || c.company_name}</div>
               )}
             </button>
           ))}

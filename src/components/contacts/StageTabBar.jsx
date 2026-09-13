@@ -52,6 +52,7 @@ export default function StageTabBar({ contact, previewStage, onPreviewChange }) 
             style={{
               flex: 1,
               padding: '8px 6px',
+              minHeight: 44,
               borderRadius: 9,
               border: 'none',
               background: isSelected ? `${stage.color}18` : 'transparent',

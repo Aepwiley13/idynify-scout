@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { Search, Building2, Globe, Check, X } from 'lucide-react';
+import { Search, Building2, Globe, Check, X, MapPin, Users, Briefcase, Calendar, ExternalLink, Linkedin } from 'lucide-react';
 import './CompanySearch.css';
 import { createCompanyRecord } from '../../schemas/companySchema';
 import { resolveCompany, apolloIdFields, readApolloOrgId } from '../../services/companyIdentityService';
@@ -232,6 +232,16 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
         website_url: websiteCompany.websiteUrl,
         domain: websiteCompany.domain,
         email: websiteCompany.email || null,
+        industry: websiteCompany.industry || null,
+        employee_count: websiteCompany.employee_count || null,
+        revenue: websiteCompany.revenue || null,
+        founded_year: websiteCompany.founded_year || null,
+        phone: websiteCompany.phone || null,
+        linkedin_url: websiteCompany.linkedin_url || null,
+        location: websiteCompany.location || null,
+        description: websiteCompany.description || null,
+        barry_intel: websiteCompany.barry_intel || null,
+        logo_url: websiteCompany.logo_url || null,
         source: 'website',
         status: 'accepted',
         found_at: new Date(),
@@ -338,23 +348,64 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
           <div className="website-contact-preview">
             <div className="preview-header">
               <div className="preview-avatar">
-                {websiteCompany.companyName.charAt(0).toUpperCase()}
+                {websiteCompany.logo_url ? (
+                  <img src={websiteCompany.logo_url} alt="" onError={(e) => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex'; }} />
+                ) : null}
+                <span style={websiteCompany.logo_url ? { display: 'none' } : {}}>
+                  {websiteCompany.companyName.charAt(0).toUpperCase()}
+                </span>
               </div>
               <div className="preview-info">
                 <h3>{websiteCompany.companyName}</h3>
-                <span>{websiteCompany.domain}</span>
+                <span>{websiteCompany.industry || websiteCompany.domain}</span>
               </div>
             </div>
-            <div className="preview-email">
-              {websiteCompany.email ? (
-                <>
-                  <span className="email-label">Email found:</span>
-                  <span className="email-value">{websiteCompany.email}</span>
-                </>
-              ) : (
-                <span className="no-email">No email found on website</span>
+
+            {websiteCompany.description && (
+              <p className="preview-description">{websiteCompany.description}</p>
+            )}
+
+            <div className="preview-details">
+              {websiteCompany.location && (
+                <div className="preview-detail"><MapPin className="w-4 h-4" /><span>{websiteCompany.location}</span></div>
+              )}
+              {websiteCompany.employee_count && (
+                <div className="preview-detail"><Users className="w-4 h-4" /><span>{websiteCompany.employee_count} employees</span></div>
+              )}
+              {websiteCompany.industry && (
+                <div className="preview-detail"><Briefcase className="w-4 h-4" /><span>{websiteCompany.industry}</span></div>
+              )}
+              {websiteCompany.founded_year && (
+                <div className="preview-detail"><Calendar className="w-4 h-4" /><span>Founded {websiteCompany.founded_year}</span></div>
+              )}
+              {websiteCompany.revenue && (
+                <div className="preview-detail"><Building2 className="w-4 h-4" /><span>{websiteCompany.revenue} revenue</span></div>
+              )}
+              {websiteCompany.email && (
+                <div className="preview-detail"><Globe className="w-4 h-4" /><span>{websiteCompany.email}</span></div>
               )}
             </div>
+
+            {(websiteCompany.linkedin_url || websiteCompany.websiteUrl) && (
+              <div className="preview-links">
+                {websiteCompany.linkedin_url && (
+                  <a href={websiteCompany.linkedin_url} target="_blank" rel="noopener noreferrer" className="preview-link">
+                    <Linkedin className="w-4 h-4" /> LinkedIn
+                  </a>
+                )}
+                <a href={websiteCompany.websiteUrl} target="_blank" rel="noopener noreferrer" className="preview-link">
+                  <ExternalLink className="w-4 h-4" /> Website
+                </a>
+              </div>
+            )}
+
+            {websiteCompany.barry_intel && (
+              <div className="preview-barry-intel">
+                <span className="barry-label">Barry's Intel</span>
+                <p>{websiteCompany.barry_intel}</p>
+              </div>
+            )}
+
             <div className="preview-actions">
               <button
                 className="action-btn reject"

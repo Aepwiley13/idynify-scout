@@ -6,7 +6,6 @@ import { Search, Building2, Globe, Check, X } from 'lucide-react';
 import './CompanySearch.css';
 import { createCompanyRecord } from '../../schemas/companySchema';
 import { resolveCompany, apolloIdFields, readApolloOrgId } from '../../services/companyIdentityService';
-import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 
 /**
  * Company Search Component
@@ -33,7 +32,7 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
   // Website URL search state
   const [websiteUrl, setWebsiteUrl] = useState('');
   const [websiteSearching, setWebsiteSearching] = useState(false);
-  const [websiteContact, setWebsiteContact] = useState(null);
+  const [websiteCompany, setWebsiteCompany] = useState(null);
   const [websiteError, setWebsiteError] = useState(null);
   const [websiteSaving, setWebsiteSaving] = useState(false);
   const [websiteSaveSuccess, setWebsiteSaveSuccess] = useState(false);
@@ -184,7 +183,7 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
 
     setWebsiteSearching(true);
     setWebsiteError(null);
-    setWebsiteContact(null);
+    setWebsiteCompany(null);
     setWebsiteSaveSuccess(false);
 
     try {
@@ -202,16 +201,16 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
       const data = await response.json();
       if (!data.success) throw new Error(data.error || 'Failed to scan website');
 
-      setWebsiteContact(data.contact);
+      setWebsiteCompany(data.contact);
     } catch (err) {
-      setWebsiteError(err.message || "Couldn't find a contact email. Try adding manually.");
+      setWebsiteError(err.message || "Couldn't find company info. Try adding manually.");
     } finally {
       setWebsiteSearching(false);
     }
   }
 
-  async function handleSaveWebsiteContact() {
-    if (!websiteContact) return;
+  async function handleSaveWebsiteCompany() {
+    if (!websiteCompany) return;
 
     setWebsiteSaving(true);
     setWebsiteError(null);
@@ -220,42 +219,35 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
       const user = auth.currentUser;
       if (!user) throw new Error('You must be logged in');
 
-      const resolution = await prepareContactWrite(user.uid, {
-        email: websiteContact.email,
-        name: websiteContact.companyName,
-        company: websiteContact.companyName,
-        source: 'website',
-      }, { source: 'CompanySearch.websiteContact' });
+      const match = await resolveCompany(user.uid, { name: websiteCompany.companyName }, { source: 'CompanySearch.website' });
 
-      if (resolution.action === 'merge') {
-        await applyContactMerge(user.uid, resolution);
-        setWebsiteSaveSuccess(true);
-        setWebsiteContact(null);
-        setWebsiteUrl('');
+      if (match.companyId) {
+        setWebsiteError(`${websiteCompany.companyName} is already in your Saved Companies`);
         return;
       }
 
-      await addDoc(collection(db, 'users', user.uid, 'contacts'), {
-        ...resolution.fields,
-        name: websiteContact.companyName,
-        email: websiteContact.email || null,
-        emailSource: 'website',
-        company_name: websiteContact.companyName,
-        company_website: websiteContact.websiteUrl,
-        domain: websiteContact.domain,
-        sourceType: 'website',
+      const companiesRef = collection(db, 'users', user.uid, 'companies');
+      const docRef = await addDoc(companiesRef, createCompanyRecord({
+        name: websiteCompany.companyName,
+        website_url: websiteCompany.websiteUrl,
+        domain: websiteCompany.domain,
+        email: websiteCompany.email || null,
         source: 'website',
-        status: 'saved',
-        saved_at: new Date(),
+        status: 'accepted',
         found_at: new Date(),
-        last_enriched_at: null
-      });
+        saved_at: new Date(),
+      }));
+
+      if (onCompanyAdded) {
+        onCompanyAdded([{ name: websiteCompany.companyName, id: docRef.id, _uploadType: 'companies' }]);
+        return;
+      }
 
       setWebsiteSaveSuccess(true);
-      setWebsiteContact(null);
+      setWebsiteCompany(null);
       setWebsiteUrl('');
     } catch (err) {
-      setWebsiteError(err.message || 'Failed to save contact');
+      setWebsiteError(err.message || 'Failed to save company');
     } finally {
       setWebsiteSaving(false);
     }
@@ -304,7 +296,7 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
       {/* Website URL Search Section */}
       <div className="website-search-section">
         <div className="website-search-divider"><span>or</span></div>
-        <p className="website-search-label">Know their website? Add them directly.</p>
+        <p className="website-search-label">Know their website? Add the company directly.</p>
         <form onSubmit={handleWebsiteSearch} className="search-form">
           <div className="search-input-container">
             <Globe className="search-icon" />
@@ -322,7 +314,7 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
             className="search-button"
             disabled={websiteSearching || !websiteUrl.trim()}
           >
-            {websiteSearching ? 'Scanning website...' : 'Find Contact'}
+            {websiteSearching ? 'Scanning website...' : 'Find Company'}
           </button>
         </form>
 
@@ -337,27 +329,27 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
         {websiteSaveSuccess && (
           <div className="success-message">
             <Check className="w-5 h-5" />
-            <span>Contact saved to People!</span>
+            <span>Company added to Saved Companies!</span>
             <button onClick={() => setWebsiteSaveSuccess(false)}>×</button>
           </div>
         )}
 
-        {websiteContact && (
+        {websiteCompany && (
           <div className="website-contact-preview">
             <div className="preview-header">
               <div className="preview-avatar">
-                {websiteContact.companyName.charAt(0).toUpperCase()}
+                {websiteCompany.companyName.charAt(0).toUpperCase()}
               </div>
               <div className="preview-info">
-                <h3>{websiteContact.companyName}</h3>
-                <span>{websiteContact.domain}</span>
+                <h3>{websiteCompany.companyName}</h3>
+                <span>{websiteCompany.domain}</span>
               </div>
             </div>
             <div className="preview-email">
-              {websiteContact.email ? (
+              {websiteCompany.email ? (
                 <>
                   <span className="email-label">Email found:</span>
-                  <span className="email-value">{websiteContact.email}</span>
+                  <span className="email-value">{websiteCompany.email}</span>
                 </>
               ) : (
                 <span className="no-email">No email found on website</span>
@@ -366,18 +358,18 @@ export default function CompanySearch({ onCompanyAdded } = {}) {
             <div className="preview-actions">
               <button
                 className="action-btn reject"
-                onClick={() => setWebsiteContact(null)}
+                onClick={() => setWebsiteCompany(null)}
               >
                 <X className="w-5 h-5" />
                 Dismiss
               </button>
               <button
                 className="action-btn accept"
-                onClick={handleSaveWebsiteContact}
+                onClick={handleSaveWebsiteCompany}
                 disabled={websiteSaving}
               >
                 <Check className="w-5 h-5" />
-                {websiteSaving ? 'Saving...' : 'Save to People'}
+                {websiteSaving ? 'Saving...' : 'Save Company'}
               </button>
             </div>
           </div>

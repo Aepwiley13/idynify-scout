@@ -4,7 +4,7 @@ import { db, auth } from '../../firebase/config';
 
 import { APOLLO_INDUSTRIES } from '../../constants/apolloIndustries';
 import { US_STATES } from '../../constants/usStates';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Building2, Users, MapPin, Search, X, Save, RefreshCw, CheckCircle, Globe, Filter, Sliders, TrendingUp, Brain, MessageSquare, Calendar, FileText, Zap } from 'lucide-react';
 import NumericRangeFilter from '../../components/scout/NumericRangeFilter';
 import { DEFAULT_WEIGHTS } from '../../utils/icpScoring';
@@ -18,6 +18,7 @@ import { criteriaChanged } from '../../utils/normalizeIcpCriteria';
 
 export default function ICPSettings() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [showBarryPanel, setShowBarryPanel] = useState(false);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -83,14 +84,22 @@ export default function ICPSettings() {
         return;
       }
 
-      // Resolve through the canonical contract. When ICPs exist but none is
-      // active, the first is shown for continuity only — it is not treated as
-      // active, not persisted, and not searched against.
-      const resolution = await resolveActiveIcp(user.uid);
-      const selected = isResolved(resolution)
-        ? icps.find(i => i.id === resolution.icpId) || icps[0]
-        : icps[0];
-      setIcpUnresolvedReason(isResolved(resolution) ? null : resolution.reason);
+      // If a specific ICP was requested via URL (e.g. double-click from
+      // Daily Discoveries), select it directly; otherwise resolve through
+      // the canonical contract.
+      const deepLinkId = searchParams.get('icpId');
+      const deepLinked = deepLinkId ? icps.find(i => i.id === deepLinkId) : null;
+
+      let selected;
+      if (deepLinked) {
+        selected = deepLinked;
+      } else {
+        const resolution = await resolveActiveIcp(user.uid);
+        selected = isResolved(resolution)
+          ? icps.find(i => i.id === resolution.icpId) || icps[0]
+          : icps[0];
+        setIcpUnresolvedReason(isResolved(resolution) ? null : resolution.reason);
+      }
       setSelectedICPId(selected.id);
       setNameInput(selected.name || 'My ICP');
       applyICPToState(selected);

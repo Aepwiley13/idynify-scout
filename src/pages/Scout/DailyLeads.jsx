@@ -2373,6 +2373,8 @@ export default function DailyLeads({ onNavigate }) {
               <button
                 key={icp.id}
                 onClick={() => handleICPSwitch(icp.id)}
+                onDoubleClick={() => navigate(`/scout?tab=icp-settings&icpId=${icp.id}`)}
+                title="Double-click to edit ICP"
                 style={{
                   padding: '5px 14px', minHeight: 44, borderRadius: 20,
                   fontSize: 11, fontWeight: 600, cursor: 'pointer',

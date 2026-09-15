@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Building2 } from 'lucide-react';
+import { BRAND } from '../../theme/tokens';
 
 // Session-level cache to remember Clearbit failures
 // Prevents repeated network requests for known failures
@@ -24,13 +25,15 @@ export default function CompanyLogo({ company, size = 'default', className = '' 
   const sizeClasses = {
     small: 'w-10 h-10 text-sm',
     default: 'w-16 h-16 text-base',
-    large: 'w-20 h-20 text-xl'
+    large: 'w-20 h-20 text-xl',
+    card: 'w-[88px] h-[88px] text-2xl flex-shrink-0',
   };
 
   const iconSizes = {
     small: 'w-5 h-5',
     default: 'w-8 h-8',
-    large: 'w-10 h-10'
+    large: 'w-10 h-10',
+    card: 'w-10 h-10',
   };
 
   // Extract company initial for fallback (single letter - matches Manual Search)
@@ -138,7 +141,10 @@ export default function CompanyLogo({ company, size = 'default', className = '' 
 
   // Fallback: Company initial (single letter - matches Manual Search)
   return (
-    <div className={`${sizeClasses[size]} ${className} bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-bold shadow-sm`}>
+    <div
+      className={`${sizeClasses[size]} ${className} rounded-xl flex items-center justify-center text-white font-bold shadow-sm`}
+      style={{ background: `linear-gradient(135deg, ${BRAND.pink}, ${BRAND.purple})` }}
+    >
       {initial}
     </div>
   );

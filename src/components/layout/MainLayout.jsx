@@ -237,7 +237,7 @@ function ShellChrome({ children, user }) {
                 uses BottomNav → Scout+ → LinkedIn Link. */}
             {module.id === 'scout' && (
               <button
-                className="scout-linkedin-action topbar-desktop-only"
+                className="scout-linkedin-action"
                 onClick={() => setLinkedInQuickAddOpen(true)}
                 aria-haspopup="dialog"
                 aria-expanded={linkedInQuickAddOpen}

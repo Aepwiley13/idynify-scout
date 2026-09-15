@@ -57,7 +57,7 @@ export const handler = async (event) => {
     // Build company context
     const companyLines = [
       `Company: ${company.name || 'Unknown'}`,
-      `Industry: ${company.industry || 'Unknown'}`,
+      `Industry: ${company.industry || 'Not specified'}`,
       `Revenue: ${company.revenue || 'Unknown'}`,
       `Size: ${company.employee_count || company.company_size || 'Unknown'}`,
       `Location: ${company.state || company.location || 'Unknown'}`,

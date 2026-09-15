@@ -101,7 +101,7 @@ exports.handler = async (event, context) => {
     const validationSample = companies.slice(0, sampleSize).map(company => ({
       id: company.id,
       name: company.name,
-      industry: company.industry || 'Unknown',
+      industry: company.industry || null,
       employees: company.estimated_num_employees || 0,
       location: buildCompanyLocation(company),
       website: company.website_url || null,
@@ -178,7 +178,7 @@ function calculateDistribution(companies, scoutData) {
   // Industry distribution
   const industries = {};
   companies.forEach(c => {
-    const industry = c.industry || 'Unknown';
+    const industry = c.industry || 'Unspecified';
     industries[industry] = (industries[industry] || 0) + 1;
   });
 

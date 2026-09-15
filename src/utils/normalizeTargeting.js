@@ -112,6 +112,21 @@ const INDUSTRY_ALIASES = {
   'janitorial': 'Facilities Services',
   'architects': 'Architecture and Planning',
   'engineering firms': 'Civil Engineering',
+  'e-commerce': 'Internet',
+  'ecommerce': 'Internet',
+  'technology': 'Information Technology and Services',
+  'tech': 'Information Technology and Services',
+  'professional services': 'Management Consulting',
+  'transportation & logistics': 'Logistics and Supply Chain',
+  'transportation and logistics': 'Logistics and Supply Chain',
+  'energy & utilities': 'Oil & Energy',
+  'energy and utilities': 'Oil & Energy',
+  'media & entertainment': 'Entertainment',
+  'media and entertainment': 'Entertainment',
+  'agriculture': 'Farming',
+  'non-profit': 'Non-Profit Organization Management',
+  'nonprofit': 'Non-Profit Organization Management',
+  'government': 'Government Administration',
 };
 
 /** Canonical names that merely *contain* the phrase, as whole words. */

@@ -8,10 +8,12 @@
  *   - getFitTier(score)      → { label, color }  (fit-score → tier)
  *   - getCompanyName(company)→ display name       (fallback chain)
  *   - getMatchReasons(company) → reasons array     (fallback chain)
+ *   - getDisplayIndustry(company) → canonical industry name for display
  *
  * Presentation only — no data fetching, no scoring, no side effects.
  */
 import { STATUS } from '../theme/tokens';
+import { normalizeIndustry } from './normalizeTargeting.js';
 
 // Fit-tier thresholds — carried over verbatim from the desktop table's FitBadge
 // (≥75 green, ≥50 amber, else grey). The grey '#888' is preserved exactly so
@@ -32,4 +34,18 @@ export function getCompanyName(company) {
 export function getMatchReasons(company) {
   if (!company) return [];
   return company.fit_reasons || company.matchReasons || company.match_reasons || [];
+}
+
+// Industry display name — resolves non-canonical values (e.g. "saas") to
+// Apollo canonical names (e.g. "Computer Software") via the alias map.
+// Falls through to the raw value when no mapping exists.
+export function getDisplayIndustry(company, fallback = 'N/A') {
+  if (!company) return fallback;
+  const raw = company.apolloEnrichment?.snapshot?.industry
+    || company.industry
+    || company.primary_industry
+    || company.company_industry;
+  if (!raw || typeof raw !== 'string' || !raw.trim()) return fallback;
+  const result = normalizeIndustry(raw);
+  return result.status === 'matched' ? result.value : raw;
 }

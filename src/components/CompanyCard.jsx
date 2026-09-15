@@ -1,6 +1,7 @@
 // Module 6: Company Matching - CompanyCard Component
 
 import React from 'react';
+import { getDisplayIndustry } from '../utils/companyDisplay';
 
 export default function CompanyCard({ company, isSelected, onToggle }) {
   return (
@@ -49,7 +50,7 @@ export default function CompanyCard({ company, isSelected, onToggle }) {
           <div className="space-y-2">
             <div className="flex items-center gap-2 text-sm">
               <span className="text-gray-500">Industry:</span>
-              <span className="text-gray-300">{company.industry}</span>
+              <span className="text-gray-300">{getDisplayIndustry(company, '')}</span>
             </div>
 
             <div className="flex items-center gap-2 text-sm">

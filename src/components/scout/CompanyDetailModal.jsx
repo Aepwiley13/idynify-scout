@@ -10,6 +10,7 @@ import CompanyLogo from './CompanyLogo';
 import { searchPeople, updatePerson } from '../../services/peopleService';
 import './CompanyDetailModal.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { getDisplayIndustry } from '../../utils/companyDisplay';
 
 export default function CompanyDetailModal({ company, onClose, onFindMoreContacts, sourceModule = 'scout' }) {
   const navigate = useNavigate();
@@ -436,7 +437,7 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
             <CompanyLogo company={company} size="large" className="company-detail-logo-wrapper" />
             <div className="header-text">
               <h2 className="company-detail-name">{company.name || 'Unknown Company'}</h2>
-              <p className="company-detail-industry">{enrichedData?.snapshot?.industry || company.industry || 'Industry not specified'}</p>
+              <p className="company-detail-industry">{getDisplayIndustry(company, 'Industry not specified')}</p>
             </div>
           </div>
           <div className="header-actions">
@@ -478,7 +479,7 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
                 <Briefcase className="snapshot-icon" />
                 <div>
                   <p className="snapshot-label">Industry</p>
-                  <p className="snapshot-value">{enrichedData?.snapshot?.industry || company.industry || 'Not available'}</p>
+                  <p className="snapshot-value">{getDisplayIndustry(company, 'Not available')}</p>
                 </div>
               </div>
 

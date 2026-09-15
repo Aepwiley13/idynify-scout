@@ -17,6 +17,7 @@ import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
 import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
 import BarryICPPanel, { BarryAvatar } from '../../components/scout/BarryICPPanel';
 import { getScoreBreakdown, DEFAULT_WEIGHTS, calculateICPScore, generateMatchReasons, computeCoverage } from '../../utils/icpScoring';
+import { getDisplayIndustry } from '../../utils/companyDisplay';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 import { RECORD_STATUS } from '../../constants/statusModel';
@@ -266,7 +267,7 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
   const scoreLabel = !isScored ? 'Not enough data'
     : score >= 75 ? 'Strong Fit' : score >= 50 ? 'Good Match' : 'Low Fit';
   const barryText = company.barry_intel || company.barry_context || company.barryIntel
-    || `${company.name} is a ${company.industry || 'company'} — review their profile to assess fit.`;
+    || `${company.name} is a ${getDisplayIndustry(company, 'company')} — review their profile to assess fit.`;
 
   // ICP factor breakdown (calculated live from stored profile)
   const breakdown = (icpProfile && company) ? getScoreBreakdown(company, icpProfile, icpWeights || DEFAULT_WEIGHTS) : null;
@@ -410,14 +411,14 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
           </div>
           <div style={{ fontSize: wide ? 20 : 18, fontWeight: 700, color: T.text, textAlign: 'center' }}>{company.name}</div>
           <div style={{ fontSize: 10, color: T.textFaint, marginTop: 3, letterSpacing: 1.5 }}>
-            {(company.industry || '').toUpperCase()}
+            {getDisplayIndustry(company, '').toUpperCase()}
           </div>
         </div>
 
         {/* Stats grid — 3 rows: Industry/Employees, Revenue/Founded, HQ/CEO */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: `1px solid ${T.border}` }}>
           {[
-            ['INDUSTRY',  company.industry || 'N/A'],
+            ['INDUSTRY',  getDisplayIndustry(company)],
             ['EMPLOYEES', company.employee_count || company.company_size || 'N/A'],
             ['REVENUE',   company.revenue || 'N/A'],
             ['FOUNDED',   company.founded_year || 'N/A'],
@@ -687,7 +688,7 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: `1px solid ${T.border}` }}>
           {[
             ['COMPANY',   company?.name || person.company_name || 'N/A'],
-            ['INDUSTRY',  company?.industry || person.industry || 'N/A'],
+            ['INDUSTRY',  getDisplayIndustry(company) !== 'N/A' ? getDisplayIndustry(company) : (person.industry || 'N/A')],
             ['EMPLOYEES', company?.employee_count || company?.company_size || 'N/A'],
             ['LOCATION',  person.city ? `${person.city}${person.state ? ', ' + person.state : ''}` : 'N/A'],
           ].map(([l, v]) => (
@@ -804,7 +805,7 @@ function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose
                     <div style={{ fontSize: 12, fontWeight: i === 0 ? 700 : 500, color: i === 0 ? BRAND.pink : T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {i === 0 && '▶ '}{co.name}
                     </div>
-                    <div style={{ fontSize: 10, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.industry || '—'}</div>
+                    <div style={{ fontSize: 10, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getDisplayIndustry(co, '—')}</div>
                   </div>
                   <ScorePip score={co.fit_score || co.score || 0} />
                 </div>
@@ -877,7 +878,7 @@ function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose
                 <div style={{ fontSize: 12, fontWeight: i === 0 ? 700 : 500, color: i === 0 ? BRAND.pink : T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {i === 0 && '▶ '}{co.name}
                 </div>
-                <div style={{ fontSize: 10, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.industry || '—'}</div>
+                <div style={{ fontSize: 10, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getDisplayIndustry(co, '—')}</div>
               </div>
               <ScorePip score={co.fit_score || co.score || 0} />
             </div>

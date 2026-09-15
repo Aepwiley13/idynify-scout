@@ -1180,7 +1180,7 @@ async function getExistingCompanyIds(userId, authToken) {
  */
 function buildBarryIntel(company, companyProfile) {
   const name = company.name || 'This company';
-  const industry = company.industry || company.primary_industry || companyProfile.industries?.[0] || 'this sector';
+  const industry = company.industry || company.primary_industry || 'this sector';
   const currentYear = new Date().getFullYear();
 
   let summary = `${name} is a ${industry} company`;

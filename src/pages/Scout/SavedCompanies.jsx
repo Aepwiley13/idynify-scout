@@ -18,6 +18,7 @@ import CompanyDetailModal from '../../components/scout/CompanyDetailModal';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { calculateICPScore, DEFAULT_WEIGHTS } from '../../utils/icpScoring';
+import { getDisplayIndustry } from '../../utils/companyDisplay';
 
 // ─── SavedCompanies ───────────────────────────────────────────────────────────
 export default function SavedCompanies({ onSelectCompany }) {
@@ -321,7 +322,7 @@ export default function SavedCompanies({ onSelectCompany }) {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{company.name}</div>
-                    <div style={{ fontSize: 10, color: T.textFaint }}>{company.apolloEnrichment?.snapshot?.industry || company.industry} · {(company.apolloEnrichment?.snapshot?.founded_year || company.founded_year) ? `Founded ${company.apolloEnrichment?.snapshot?.founded_year || company.founded_year}` : ''}</div>
+                    <div style={{ fontSize: 10, color: T.textFaint }}>{getDisplayIndustry(company)} · {(company.apolloEnrichment?.snapshot?.founded_year || company.founded_year) ? `Founded ${company.apolloEnrichment?.snapshot?.founded_year || company.founded_year}` : ''}</div>
                   </div>
                   {company.contact_count > 0 && (
                     <span style={{ fontSize: 9, background: `${STATUS.green}15`, color: STATUS.green, borderRadius: 7, padding: '2px 7px' }}>
@@ -665,7 +666,7 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
                 </div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: T.text, textAlign: 'center' }}>{current.name}</div>
                 <div style={{ fontSize: 10, color: T.textFaint, marginTop: 3, letterSpacing: 1.5 }}>
-                  {(current.industry || current.apolloEnrichment?.snapshot?.industry || '').toUpperCase()}
+                  {getDisplayIndustry(current, '').toUpperCase()}
                 </div>
               </div>
 
@@ -788,7 +789,7 @@ function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts, onArch
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.name}</div>
-            <div style={{ fontSize: 10, color: T.textMuted }}>{company.apolloEnrichment?.snapshot?.industry || company.industry}</div>
+            <div style={{ fontSize: 10, color: T.textMuted }}>{getDisplayIndustry(company)}</div>
           </div>
           {company.contact_count > 0 && (
             <div style={{ fontSize: 9, background: `${STATUS.green}18`, color: STATUS.green, borderRadius: 7, padding: '2px 7px', border: `1px solid ${STATUS.green}30`, flexShrink: 0 }}>
@@ -805,7 +806,7 @@ function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts, onArch
           {[
             ['EMPLOYEES', company.apolloEnrichment?.snapshot?.estimated_num_employees || company.employee_count || company.company_size || 'N/A'],
             ['FOUNDED', company.apolloEnrichment?.snapshot?.founded_year || company.founded_year || 'N/A'],
-            ['INDUSTRY', company.apolloEnrichment?.snapshot?.industry || company.industry || 'N/A'],
+            ['INDUSTRY', getDisplayIndustry(company)],
             ['LOCATION', company.apolloEnrichment?.snapshot?.location?.full || company.location || company.city || 'N/A'],
           ].map(([l, v]) => (
             <div key={l}>

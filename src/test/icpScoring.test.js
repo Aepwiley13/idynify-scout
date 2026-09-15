@@ -272,3 +272,61 @@ describe('DEFAULT_WEIGHTS', () => {
     expect(industry + location + employeeSize + revenue).toBe(100);
   });
 });
+
+describe('industry normalization — alias matching across vocabularies', () => {
+  it('matches ICP "SaaS" against company industry "Computer Software" (Apollo canonical)', () => {
+    const icp = { industries: ['SaaS'] };
+    const company = { industry: 'Computer Software' };
+    expect(calculateICPScore(company, icp)).toBe(100);
+    expect(getScoreBreakdown(company, icp).industry.state).toBe('matched');
+  });
+
+  it('matches ICP "Computer Software" against company industry "saas"', () => {
+    const icp = { industries: ['Computer Software'] };
+    const company = { industry: 'saas' };
+    expect(calculateICPScore(company, icp)).toBe(100);
+    expect(getScoreBreakdown(company, icp).industry.state).toBe('matched');
+  });
+
+  it('matches ICP "Healthcare" against company industry "Hospital and Health Care"', () => {
+    const icp = { industries: ['Healthcare'] };
+    const company = { industry: 'Hospital and Health Care' };
+    expect(calculateICPScore(company, icp)).toBe(100);
+  });
+
+  it('matches ICP "Hospital and Health Care" against company industry "healthcare"', () => {
+    const icp = { industries: ['Hospital and Health Care'] };
+    const company = { industry: 'healthcare' };
+    expect(calculateICPScore(company, icp)).toBe(100);
+  });
+
+  it('matches ICP "Legal Services" against company "law firms" and vice versa', () => {
+    const icp = { industries: ['Legal Services'] };
+    expect(calculateICPScore({ industry: 'law firms' }, icp)).toBe(100);
+
+    const icp2 = { industries: ['law firms'] };
+    expect(calculateICPScore({ industry: 'Legal Services' }, icp2)).toBe(100);
+  });
+
+  it('does not false-match unrelated industries through normalization', () => {
+    const icp = { industries: ['SaaS'] };
+    const company = { industry: 'Restaurants' };
+    expect(calculateICPScore(company, icp)).toBe(0);
+    expect(getScoreBreakdown(company, icp).industry.state).toBe('missed');
+  });
+
+  it('generates correct match reasons when alias resolves', () => {
+    const icp = { industries: ['SaaS'] };
+    const company = { industry: 'Computer Software' };
+    const reasons = generateMatchReasons(company, icp);
+    expect(reasons[0]).toMatch(/matches your target industry/i);
+  });
+
+  it('handles multiple ICP industries with mixed vocabularies', () => {
+    const icp = { industries: ['SaaS', 'Healthcare', 'Banking'] };
+    expect(calculateICPScore({ industry: 'Computer Software' }, icp)).toBe(100);
+    expect(calculateICPScore({ industry: 'Hospital and Health Care' }, icp)).toBe(100);
+    expect(calculateICPScore({ industry: 'Banking' }, icp)).toBe(100);
+    expect(calculateICPScore({ industry: 'Restaurants' }, icp)).toBe(0);
+  });
+});

@@ -1250,8 +1250,10 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
         console.log(`  ⚠️  NOTE: Apollo search endpoint does NOT return employee_count or location`);
       }
 
-      // Use Apollo's actual industry data; fall back to ICP's first industry only if Apollo doesn't provide one
-      const industry = company.industry || company.primary_industry || companyProfile.industries?.[0] || 'Unknown';
+      // Use Apollo's actual industry data; never fall back to the ICP's own industry
+      // label — that creates a circular match where the company trivially matches
+      // the ICP on a value the ICP itself supplied.
+      const industry = company.industry || company.primary_industry || 'Unknown';
 
       const companyObj = {
         // IDs

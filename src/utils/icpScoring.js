@@ -17,6 +17,8 @@
  * existing score-breakdown tooltips (MissionControl, DailyLeads) keep working.
  */
 
+import { normalizeIndustry } from './normalizeTargeting.js';
+
 /**
  * Default ICP scoring weights (must total 100%)
  */
@@ -164,6 +166,17 @@ function parseRevenueToNumber(value) {
 //   value   = the company's value, for display in reasons
 //   matchedCriterion = the ICP label that matched, for nicely-cased reasons
 
+/**
+ * Resolve a free-text industry string to its Apollo canonical name via the
+ * alias map in normalizeTargeting. Returns the canonical name or the
+ * original string if no mapping exists.
+ */
+function toCanonical(text) {
+  if (!text) return null;
+  const result = normalizeIndustry(text);
+  return result.status === 'matched' ? result.value : text;
+}
+
 function evalIndustry(company, icp) {
   const icpIndustries = icp.industries || [];
   if (icpIndustries.length === 0) return { active: false, match: 0 };
@@ -171,18 +184,36 @@ function evalIndustry(company, icp) {
   const industry = resolveIndustry(company);
   if (!industry) return { active: true, match: UNKNOWN, unknown: true };
 
-  const norm = industry.toLowerCase().trim();
+  // Normalize both sides through the alias map so "SaaS" (ICP) matches
+  // "Computer Software" (Apollo) and vice versa.
+  const companyCanonical = (toCanonical(industry) || industry).toLowerCase().trim();
+  const icpCanonicals = icpIndustries.map((i) => ({
+    original: i,
+    canonical: (toCanonical(i) || i).toLowerCase().trim(),
+  }));
 
-  // Exact (case-insensitive) match.
-  const exact = icpIndustries.find((i) => i.toLowerCase().trim() === norm);
-  if (exact) return { active: true, match: 100, value: industry, matchedCriterion: exact };
+  // Exact match on canonical names.
+  const exact = icpCanonicals.find((i) => i.canonical === companyCanonical);
+  if (exact) return { active: true, match: 100, value: industry, matchedCriterion: exact.original };
+
+  // Also check raw case-insensitive match (handles values already in canonical form).
+  const norm = industry.toLowerCase().trim();
+  const rawExact = icpIndustries.find((i) => i.toLowerCase().trim() === norm);
+  if (rawExact) return { active: true, match: 100, value: industry, matchedCriterion: rawExact };
 
   // Partial: token overlap in either direction ("Credit Unions" vs "Banking & Credit Unions").
-  const related = icpIndustries.find((i) => {
+  const related = icpCanonicals.find((i) => {
+    return i.canonical.includes(companyCanonical) || companyCanonical.includes(i.canonical) ||
+      shareSignificantToken(companyCanonical, i.canonical);
+  });
+  if (related) return { active: true, match: 50, value: industry, matchedCriterion: related.original };
+
+  // Also check raw strings for partial match.
+  const rawRelated = icpIndustries.find((i) => {
     const other = i.toLowerCase().trim();
     return other.includes(norm) || norm.includes(other) || shareSignificantToken(norm, other);
   });
-  if (related) return { active: true, match: 50, value: industry, matchedCriterion: related };
+  if (rawRelated) return { active: true, match: 50, value: industry, matchedCriterion: rawRelated };
 
   return { active: true, match: 0, value: industry };
 }

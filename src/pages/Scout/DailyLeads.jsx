@@ -14,6 +14,7 @@ import {
 import { Globe, Linkedin, Check, X, RefreshCw, Loader, Settings, RotateCcw, MessageCircle, ArrowRight, MapPin, User, List, ChevronDown, Flame, Trophy } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
+import CompanyLogo from '../../components/scout/CompanyLogo';
 import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
 import BarryICPPanel, { BarryAvatar } from '../../components/scout/BarryICPPanel';
 import { getScoreBreakdown, DEFAULT_WEIGHTS, calculateICPScore, generateMatchReasons, computeCoverage } from '../../utils/icpScoring';
@@ -387,31 +388,32 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
           <div style={{ position: 'absolute', inset: 0, zIndex: 5, borderRadius: 22, background: `${STATUS.red}${Math.round(overlayOpacity * 20).toString(16).padStart(2,'0')}`, pointerEvents: 'none' }} />
         )}
 
-        {/* Confidence badge — top right */}
+        {/* Header — horizontal: logo left, info right, confidence pill top-right */}
         <div style={{
-          position: 'absolute', top: 12, right: 12, zIndex: 6,
-          fontSize: 9, color: confColor, fontWeight: 700, letterSpacing: 1,
-          padding: '3px 8px', background: `${confColor}18`, borderRadius: 5,
-          border: `1px solid ${confColor}40`,
+          padding: wide ? '18px 24px' : '14px 18px', display: 'flex', alignItems: 'center', gap: wide ? 16 : 12,
+          background: T.cardBg2, borderBottom: `1px solid ${T.border}`, position: 'relative',
         }}>
-          {confidence} confidence
-        </div>
-
-        {/* Header */}
-        <div style={{
-          padding: wide ? '22px 28px 16px' : '18px 22px 12px', display: 'flex', flexDirection: 'column',
-          alignItems: 'center', background: T.cardBg2, borderBottom: `1px solid ${T.border}`,
-        }}>
-          <div style={{
-            width: wide ? 72 : 60, height: wide ? 72 : 60, borderRadius: 16, background: T.surface,
-            border: `1px solid ${T.border2}`, display: 'flex', alignItems: 'center',
-            justifyContent: 'center', fontSize: wide ? 32 : 26, marginBottom: 12,
-          }}>
-            {company.emoji || company.logo || '🏢'}
+          <CompanyLogo company={company} size="card" />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: wide ? 20 : 18, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 90 }}>{company.name}</div>
+            {getDisplayIndustry(company, '') && getDisplayIndustry(company, '').toLowerCase() !== 'unknown' && (
+              <div style={{ fontSize: 11, color: T.textMuted, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {getDisplayIndustry(company, '')}
+              </div>
+            )}
+            {hqLocation && hqLocation.toLowerCase() !== 'unknown' && (
+              <div style={{ fontSize: 10, color: T.textFaint, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <MapPin size={10} style={{ flexShrink: 0 }} />{hqLocation}
+              </div>
+            )}
           </div>
-          <div style={{ fontSize: wide ? 20 : 18, fontWeight: 700, color: T.text, textAlign: 'center' }}>{company.name}</div>
-          <div style={{ fontSize: 10, color: T.textFaint, marginTop: 3, letterSpacing: 1.5 }}>
-            {getDisplayIndustry(company, '').toUpperCase()}
+          <div style={{
+            position: 'absolute', top: 12, right: 14, zIndex: 6,
+            fontSize: 9, color: confColor, fontWeight: 700, letterSpacing: 1,
+            padding: '3px 8px', background: `${confColor}18`, borderRadius: 5,
+            border: `1px solid ${confColor}40`,
+          }}>
+            {confidence} confidence
           </div>
         </div>
 
@@ -800,7 +802,7 @@ function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose
                     background: i === 0 ? T.accentBg : 'transparent',
                   }}
                 >
-                  <div style={{ fontSize: 18, flexShrink: 0 }}>{co.emoji || co.logo || '🏢'}</div>
+                  <CompanyLogo company={co} size="small" />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 12, fontWeight: i === 0 ? 700 : 500, color: i === 0 ? BRAND.pink : T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {i === 0 && '▶ '}{co.name}
@@ -825,7 +827,7 @@ function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose
                     onClick={() => { const idx = companies.findIndex(c => c.id === co.id); if (idx >= 0) { onJumpTo(idx); onClose(); } }}
                     style={{ padding: '9px 18px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10, borderBottom: `1px solid ${T.border}`, opacity: 0.7 }}
                   >
-                    <div style={{ fontSize: 16, flexShrink: 0 }}>{co.emoji || co.logo || '🏢'}</div>
+                    <CompanyLogo company={co} size="small" />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
                       <div style={{ fontSize: 10, color: T.textFaint }}>Re-review</div>
@@ -873,7 +875,7 @@ function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose
               onMouseEnter={e => { if (i !== 0) e.currentTarget.style.background = T.surface; }}
               onMouseLeave={e => { if (i !== 0) e.currentTarget.style.background = 'transparent'; }}
             >
-              <div style={{ fontSize: 18, flexShrink: 0 }}>{co.emoji || co.logo || '🏢'}</div>
+              <CompanyLogo company={co} size="small" />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 12, fontWeight: i === 0 ? 700 : 500, color: i === 0 ? BRAND.pink : T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {i === 0 && '▶ '}{co.name}
@@ -905,7 +907,7 @@ function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose
                 onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.background = T.surface; }}
                 onMouseLeave={e => { e.currentTarget.style.opacity = '0.7'; e.currentTarget.style.background = 'transparent'; }}
               >
-                <div style={{ fontSize: 16, flexShrink: 0 }}>{co.emoji || co.logo || '🏢'}</div>
+                <CompanyLogo company={co} size="small" />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
                   <div style={{ fontSize: 10, color: T.textFaint }}>Re-review</div>
@@ -952,7 +954,7 @@ function SessionSummaryScreen({ reviewed, saved, skipped, streak, savedCompanies
       {/* Top match */}
       {topMatch && (
         <div style={{ width: '100%', padding: '12px 14px', background: T.surface, borderRadius: 12, border: `1px solid ${T.border2}`, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ fontSize: 28, flexShrink: 0 }}>{topMatch.emoji || topMatch.logo || '🏢'}</div>
+          <CompanyLogo company={topMatch} size="default" />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 9, letterSpacing: 1.5, color: T.textFaint, marginBottom: 2 }}>TOP MATCH</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topMatch.name}</div>
@@ -2161,6 +2163,7 @@ export default function DailyLeads({ onNavigate }) {
 
   const currentCompany = companies[currentIndex];
   const visibleCompanies = companies.slice(currentIndex);
+  const nextCompany = companies[currentIndex + 1] || null;
 
   // Ghost cards for depth effect — CARD_H accounts for header + batch dots + hints
   // so the outer column never overflows and shows no scrollbar
@@ -2606,6 +2609,13 @@ export default function DailyLeads({ onNavigate }) {
                       />
                     )}
 
+                    {/* Preload next card's logo so it's ready instantly */}
+                    {nextCompany && (
+                      <div style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', pointerEvents: 'none' }} aria-hidden>
+                        <CompanyLogo company={nextCompany} size="small" />
+                      </div>
+                    )}
+
                     {/* Barry nudge card (overlaid at bottom of card) */}
                     {showNudge && nudgeData && (
                       <BarryNudgeCard
@@ -2779,7 +2789,7 @@ export default function DailyLeads({ onNavigate }) {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     {sessionSavedCompanies.slice(-4).reverse().map(co => (
                       <div key={co.id} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', background: T.surface, borderRadius: 8, border: `1px solid ${T.border2}` }}>
-                        <div style={{ fontSize: 16, flexShrink: 0 }}>{co.emoji || co.logo || '🏢'}</div>
+                        <CompanyLogo company={co} size="small" />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 11, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
                           <div style={{ fontSize: 10, color: T.textFaint }}>{co.fit_score || 0}/100</div>

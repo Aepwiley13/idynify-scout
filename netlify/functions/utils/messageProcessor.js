@@ -24,7 +24,11 @@ import {
   RESOLUTION,
   IdentityConflictError,
 } from '../../../src/utils/identityResolution.js';
-import { recordInboundEvent } from './relationshipEventWriter.js';
+import {
+  recordInboundEvent,
+  resolveIdentityMode,
+  IDENTITY_MODES,
+} from './relationshipEventWriter.js';
 import { getConversationState } from '../../../src/utils/relationshipRead.js';
 import { upsertRelationshipContext } from './relationshipContext.js';
 
@@ -171,6 +175,59 @@ export async function processNormalizedMessage(db, message) {
       contactMatch.requiresReview &&
       (contactMatch.matchConfidence === MATCH_CONFIDENCE.LOW ||
        contactMatch.matchConfidence === MATCH_CONFIDENCE.NONE);
+
+    // ── THE DRY-RUN BOUNDARY ───────────────────────────────────────────────
+    //
+    // Everything above this line is a READ. Everything below it mutates. In
+    // dry_run we record what resolution decided, into the diagnostic probe, and
+    // stop — so the only collection this function writes outside `live` is
+    // `identity_resolution_probe`.
+    //
+    // ─── WHY THE BOUNDARY IS HERE AND NOT INSIDE THE WRITER ────────────────
+    //
+    // The writer's own gate sits at Step 5, and four write paths run before it:
+    // the communication record, the contact timeline, the relationship context
+    // and the unmatched-message row. A dry run against production therefore
+    // used to leave user-visible timeline entries on real contacts. Moving the
+    // boundary above Step 3 is what makes "dry_run writes nothing" true rather
+    // than approximately true.
+    //
+    // ─── THE PART THAT IS NOT MERELY TIDINESS ──────────────────────────────
+    //
+    // Step 1 de-duplicates on `communication_records` by gmailMessageId. If a
+    // dry run persisted those records for the backlog, the eventual switch to
+    // `live` would early-return on every one of them and the backlog would be
+    // permanently unprocessable. Observing must not consume what it observes.
+    //
+    // Automated mail is skipped here exactly as it is in the live path below:
+    // a bounce or an out-of-office is not the person answering, and probing it
+    // would put rows in the denominator that `live` would never have evented.
+    const identityMode = resolveIdentityMode();
+    if (identityMode !== IDENTITY_MODES.LIVE) {
+      if (message.category !== 'automated') {
+        // contactId may be null. The probe key is idynifyUserId + gmailMessageId,
+        // so a miss is recorded as faithfully as a match — which is what makes
+        // the probe a match RATE rather than just a match count.
+        await recordInboundEvent({
+          db,
+          message: { ...message, communicationRecordId: null },
+          contactId: contactMatch.contactId,
+          identity: contactMatch.identity,
+          source: message.ingestionSource || 'gmail_sync',
+          threadHasPriorOutbound: message.isFirstMessageInThread !== true,
+        });
+      }
+
+      return createProcessingResult({
+        success: true,
+        mode: identityMode,
+        observedOnly: true,
+        contactMatchResult: contactMatch,
+        requiresReview: contactMatch.requiresReview,
+        reviewReason: contactMatch.requiresReview ? contactMatch.reviewReason : null,
+        processingMs: Date.now() - startMs,
+      });
+    }
 
     // ── Step 3: Persist communication record ───────────────────────────────
     const commRecord = {

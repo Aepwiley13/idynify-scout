@@ -152,6 +152,18 @@ The canonical Gmail timestamp is authoritative; this is a data correction, not a
 regression. Known instance: one contact whose displayed last reply moves 2026-08-27 →
 2026-08-19.
 
+**Scope note for the Sign-Off B backfill.** The dry-run observation window
+enlarges what the backfill must cover. `ingestMessage` treats a dry-run result as
+`processed`, so `lastHistoryId` advances past mail that was only observed — the
+probe records the resolution decision, but no `communication_record` is written.
+Moving the dry-run boundary above Step 3 deliberately avoids the *dedup* stranding
+path (a persisted record would make the eventual `live` flip early-return on every
+one), but it does not rewind the *cursor*. So mail seen during the observation
+window sits behind the cursor exactly as the original ~1,207 unmatched messages do.
+
+Whoever runs the backfill must therefore treat its scope as **the historical
+backlog plus everything observed during dry_run**, not the backlog alone.
+
 `matchContact.js` is deleted, not deprecated. Two composite indexes currently live in
 production but absent from `firestore.indexes.json` should be declared before anything
 depends on them further.

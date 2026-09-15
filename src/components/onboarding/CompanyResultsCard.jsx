@@ -3,6 +3,7 @@ import { auth, db } from '../../firebase/config';
 import { doc, updateDoc } from 'firebase/firestore';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { useT } from '../../theme/ThemeContext';
+import { getDisplayIndustry } from '../../utils/companyDisplay';
 import './CompanyResultsCard.css';
 
 export default function CompanyResultsCard({ companies, totalCount, onAccept }) {
@@ -42,8 +43,7 @@ export default function CompanyResultsCard({ companies, totalCount, onAccept }) 
     return null;
   };
 
-  const industryLabel = (company) =>
-    company.industry || company.primary_industry || company.company_industry || null;
+  const industryLabel = (company) => getDisplayIndustry(company, null);
 
   return (
     <div className="crc" style={{ borderColor: T.border, background: T.surface }}>

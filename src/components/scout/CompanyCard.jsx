@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Building2, TrendingUp, Calendar, DollarSign, Globe, Linkedin, Phone, Award, CheckCircle, XCircle, Users, ChevronLeft, ChevronRight } from 'lucide-react';
 import WebsitePreviewModal from './WebsitePreviewModal';
 import CompanyLogo from './CompanyLogo';
+import { getDisplayIndustry } from '../../utils/companyDisplay';
 
 export default function CompanyCard({ company, onSwipe }) {
   const [dragStart, setDragStart] = useState(null);
@@ -184,7 +185,7 @@ export default function CompanyCard({ company, onSwipe }) {
           <div className="company-meta-grid">
             <div className="meta-cell">
               <div className="meta-label">INDUSTRY</div>
-              <div className="meta-value">{company.industry || 'Not available'}</div>
+              <div className="meta-value">{getDisplayIndustry(company, 'Not available')}</div>
             </div>
             <div className="meta-cell">
               <div className="meta-label">EMPLOYEES</div>

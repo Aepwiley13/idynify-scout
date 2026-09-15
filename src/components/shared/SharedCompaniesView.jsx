@@ -22,6 +22,7 @@ import { Building2, Users, Globe, Search, RotateCcw } from 'lucide-react';
 import { Archive, Linkedin } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS } from '../../theme/tokens';
+import { getDisplayIndustry } from '../../utils/companyDisplay';
 import CompanyLogo from '../scout/CompanyLogo';
 import CompanyDetailModal from '../scout/CompanyDetailModal';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
@@ -55,8 +56,7 @@ function SharedCompanyCard({
   const employees = rawEmployees ? (fmtEmployees(rawEmployees) || String(rawEmployees)) : 'N/A';
   const founded = company.apolloEnrichment?.snapshot?.founded_year
     || company.founded_year || 'N/A';
-  const industry = company.apolloEnrichment?.snapshot?.industry
-    || company.industry || 'N/A';
+  const industry = getDisplayIndustry(company);
   const location = company.apolloEnrichment?.snapshot?.location?.full
     || company.location || company.city
     || (company.headquarters_city ? `${company.headquarters_city}${company.headquarters_state ? ', ' + company.headquarters_state : ''}` : null)
@@ -88,7 +88,7 @@ function SharedCompanyCard({
               {company.name || 'Unnamed Company'}
             </div>
             <div style={{ fontSize: 10, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {company.apolloEnrichment?.snapshot?.industry || company.industry || 'Unknown'}
+              {getDisplayIndustry(company, 'Unknown')}
             </div>
           </div>
           {/* Contact count badge — tappable: navigates to company contacts */}

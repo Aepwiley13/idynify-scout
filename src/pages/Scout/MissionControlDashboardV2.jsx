@@ -13,7 +13,7 @@ import { calculateICPScore, DEFAULT_WEIGHTS, generateMatchReasons } from '../../
 import { ARRIVAL_REVIEW_ICP } from '../../utils/firstExperienceMode';
 import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
 import { retrievalConstraints } from '../../utils/targetingProposal';
-import { getFitTier } from '../../utils/companyDisplay';
+import { getFitTier, getDisplayIndustry } from '../../utils/companyDisplay';
 import useOnboardingState from '../../hooks/useOnboardingState';
 import AnimatedCounter from '../../components/AnimatedCounter';
 import TodaysPriorities from '../../components/mission-control/TodaysPriorities';
@@ -95,7 +95,7 @@ function CompanyDetailPanel({ company, onClose, onApprove, T }) {
   const [approved, setApproved] = useState(false);
 
   const name = company.name || company.company_name || 'Unknown';
-  const industry = company.industry || '';
+  const industry = getDisplayIndustry(company, '');
   const size = company.employee_count || company.employeeCount || '';
   const location = company.location || company.city || '';
   const website = company.website || company.url || '';
@@ -701,7 +701,7 @@ function FirstRunView({ barryState, companiesFoundCount, companies, activeIcpPro
 
 function FirstRunCompanyCard({ company, T }) {
   const name = company.name || company.company_name || 'Unknown';
-  const industry = company.industry || '';
+  const industry = getDisplayIndustry(company, '');
   const score = company.fit_score == null ? null : Math.round(company.fit_score);
   const reasons = company.fit_reasons || company.matchReasons || company.match_reasons || [];
   const topReason = reasons[0] || (score === null ? 'No active ICP to match against' : 'Matches your ICP profile');
@@ -898,10 +898,10 @@ export default function MissionControlDashboardV2() {
   };
 
   // ── Filtering ──────────────────────────────────────────────────────────────
-  const industries = [...new Set(companies.map(c => c.industry).filter(Boolean))].sort();
+  const industries = [...new Set(companies.map(c => getDisplayIndustry(c, null)).filter(Boolean))].sort();
 
   const filtered = companies.filter(c => {
-    if (industryFilter && c.industry !== industryFilter) return false;
+    if (industryFilter && getDisplayIndustry(c, null) !== industryFilter) return false;
     // A company with no attributed Match belongs in no Match band — it is not a
     // zero, and putting it in "<70" would be a judgment we cannot support.
     if (scoreFilter !== 'all' && c.fit_score == null) return false;
@@ -1085,7 +1085,7 @@ export default function MissionControlDashboardV2() {
             ) : (
               pageCompanies.map((company, i) => {
                 const name = company.name || company.company_name || 'Unknown';
-                const industry = company.industry || '';
+                const industry = getDisplayIndustry(company, '');
                 const size = company.employee_count || company.employeeCount || '';
                 // "Why it's a match" — first 2-3 specific reasons from the shared
                 // scorer, never a generic template.

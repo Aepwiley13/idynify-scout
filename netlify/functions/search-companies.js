@@ -198,15 +198,117 @@ const APOLLO_INDUSTRIES = {
   "Writing and Editing": "5567cd4773696439b10b0092"
 };
 
+// ICP → Apollo canonical name aliases (mirrors normalizeTargeting.js INDUSTRY_ALIASES).
+// Serverless functions cannot import client modules, so the map is duplicated here.
+const INDUSTRY_ALIASES_SERVER = {
+  'healthcare': 'Hospital & Health Care',
+  'health care': 'Hospital & Health Care',
+  'hospitals': 'Hospital & Health Care',
+  'software': 'Computer Software',
+  'saas': 'Computer Software',
+  'software as a service': 'Computer Software',
+  'it services': 'Information Technology and Services',
+  'managed services': 'Information Technology and Services',
+  'msp': 'Information Technology and Services',
+  'marketing': 'Marketing and Advertising',
+  'advertising': 'Marketing and Advertising',
+  'ad agency': 'Marketing and Advertising',
+  'marketing agency': 'Marketing and Advertising',
+  'digital agency': 'Marketing and Advertising',
+  'finance': 'Financial Services',
+  'financial services': 'Financial Services',
+  'logistics': 'Logistics and Supply Chain',
+  'supply chain': 'Logistics and Supply Chain',
+  'freight': 'Logistics and Supply Chain',
+  'contractor': 'Construction',
+  'contractors': 'Construction',
+  'general contractors': 'Construction',
+  'general contractor': 'Construction',
+  'construction': 'Construction',
+  'law firms': 'Legal Services',
+  'law firm': 'Legal Services',
+  'legal': 'Legal Services',
+  'attorney': 'Legal Services',
+  'attorneys': 'Legal Services',
+  'staffing': 'Staffing and Recruiting',
+  'recruiting': 'Staffing and Recruiting',
+  'recruitment': 'Staffing and Recruiting',
+  'consulting': 'Management Consulting',
+  'consultancies': 'Management Consulting',
+  'professional services': 'Management Consulting',
+  'accountant': 'Accounting',
+  'accountants': 'Accounting',
+  'accounting firms': 'Accounting',
+  'accounting firm': 'Accounting',
+  'cpa firms': 'Accounting',
+  'cpa firm': 'Accounting',
+  'restaurants': 'Restaurants',
+  'restaurant': 'Restaurants',
+  'hotels': 'Hospitality',
+  'hotel': 'Hospitality',
+  'property management': 'Real Estate',
+  'dental practice': 'Medical Practice',
+  'dental practices': 'Medical Practice',
+  'medical practice': 'Medical Practice',
+  'medical practices': 'Medical Practice',
+  'clinic': 'Medical Practice',
+  'clinics': 'Medical Practice',
+  'trucking': 'Transportation/Trucking/Railroad',
+  'car dealership': 'Automotive',
+  'car dealerships': 'Automotive',
+  'auto dealer': 'Automotive',
+  'auto dealers': 'Automotive',
+  'bank': 'Banking',
+  'banks': 'Banking',
+  'credit union': 'Banking',
+  'credit unions': 'Banking',
+  'hr': 'Human Resources',
+  'facilities management': 'Facilities Services',
+  'janitorial': 'Facilities Services',
+  'architects': 'Architecture & Planning',
+  'engineering firm': 'Civil Engineering',
+  'engineering firms': 'Civil Engineering',
+  'e-commerce': 'Internet',
+  'ecommerce': 'Internet',
+  'technology': 'Information Technology and Services',
+  'tech': 'Information Technology and Services',
+  'transportation & logistics': 'Logistics and Supply Chain',
+  'transportation and logistics': 'Logistics and Supply Chain',
+  'energy & utilities': 'Oil & Energy',
+  'energy and utilities': 'Oil & Energy',
+  'media & entertainment': 'Entertainment',
+  'media and entertainment': 'Entertainment',
+  'agriculture': 'Farming',
+  'non-profit': 'Non-Profit Organization Management',
+  'nonprofit': 'Non-Profit Organization Management',
+  'non profits': 'Non-Profit Organization Management',
+  'non-profits': 'Non-Profit Organization Management',
+  'nonprofits': 'Non-Profit Organization Management',
+  'government': 'Government Administration',
+  'food': 'Food & Beverages',
+  'food & beverage': 'Food & Beverages',
+  'food and beverage': 'Food & Beverages',
+};
+
+function resolveToCanonical(name) {
+  if (!name) return null;
+  if (APOLLO_INDUSTRIES[name]) return name;
+  const alias = INDUSTRY_ALIASES_SERVER[name.toLowerCase().trim()];
+  if (alias && APOLLO_INDUSTRIES[alias]) return alias;
+  return null;
+}
+
 function getIndustryIds(industryNames) {
   console.log('\n🔍 Industry ID Mapping:');
   const ids = industryNames.map(name => {
-    const id = APOLLO_INDUSTRIES[name];
-    console.log(`  "${name}" -> ${id || 'NOT FOUND'}`);
-    if (!id) {
-      console.error(`  ❌ WARNING: Industry "${name}" not found in APOLLO_INDUSTRIES mapping!`);
+    const canonical = resolveToCanonical(name);
+    if (canonical) {
+      const id = APOLLO_INDUSTRIES[canonical];
+      console.log(`  "${name}" -> "${canonical}" -> ${id}`);
+      return id;
     }
-    return id;
+    console.error(`  ❌ WARNING: Industry "${name}" not found in APOLLO_INDUSTRIES mapping or aliases!`);
+    return undefined;
   }).filter(id => id !== undefined);
 
   if (ids.length === 0 && industryNames.length > 0) {
@@ -476,10 +578,7 @@ export const handler = async (event) => {
         const matchesIndustry = industryTerms.some(term => searchText.includes(term.split(' ')[0]));
         const matchesKeyword = keywords.some(kw => searchText.includes(kw));
 
-        // Also pass companies without enough data (don't silently exclude unknowns)
-        const hasNoData = !company.industry && !company.short_description;
-
-        return matchesIndustry || matchesKeyword || hasNoData;
+        return matchesIndustry || matchesKeyword;
       });
 
       console.log(`🔍 Industry soft-filter: ${companies.length}/${beforeCount} companies passed (removed ${beforeCount - companies.length} mismatches)`);
@@ -787,10 +886,15 @@ export function buildApolloQuery(companyProfile, adaptiveSignals) {
   // Build keyword tags combining industries and company keywords
   const keywordTags = [];
 
-  // Add industries as keywords
+  // Map ICP industries to Apollo industry tag IDs for proper filtering
   if (companyProfile.industries && companyProfile.industries.length > 0) {
+    const industryIds = getIndustryIds(companyProfile.industries);
+    if (industryIds.length > 0) {
+      query.organization_industry_tag_ids = industryIds;
+    }
     keywordTags.push(...companyProfile.industries.map(i => i.toLowerCase()));
     console.log(`🏭 Industries selected: ${companyProfile.industries.join(', ')}`);
+    console.log(`🏭 Apollo industry tag IDs: ${industryIds.length} mapped`);
   } else {
     console.log('⚠️  No industries selected!');
   }
@@ -920,6 +1024,10 @@ export function computeIcpCriteriaFingerprint(companyProfile) {
   ).sort();
 
   const canonical = {
+    // v2: bump to invalidate queues built without Apollo industry tag ID filtering.
+    // Cards saved by the old pipeline may carry the ICP's own industry label
+    // instead of Apollo's actual data, so they must be retired and re-fetched.
+    _v: 2,
     industries: norm(p.industries),
     companyKeywords: norm(p.companyKeywords),
     companySizes: norm(p.companySizes),
@@ -1180,7 +1288,7 @@ async function getExistingCompanyIds(userId, authToken) {
  */
 function buildBarryIntel(company, companyProfile) {
   const name = company.name || 'This company';
-  const industry = company.industry || company.primary_industry || companyProfile.industries?.[0] || 'this sector';
+  const industry = company.industry || company.primary_industry || 'this sector';
   const currentYear = new Date().getFullYear();
 
   let summary = `${name} is a ${industry} company`;

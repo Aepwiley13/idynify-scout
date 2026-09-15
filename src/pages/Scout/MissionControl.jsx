@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { collection, getDocs, doc, getDoc, query, where } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { getScoreBreakdown } from '../../utils/icpScoring';
+import { getDisplayIndustry } from '../../utils/companyDisplay';
 import { getActiveMissions, assignCompanyToMission } from '../../services/missionService';
 import { generateOpeningMessage, copyToClipboard } from '../../services/outreachService';
 import { deprioritizeCompany } from '../../services/statusService';
@@ -743,7 +744,7 @@ export default function MissionControl() {
             <span className={`mc-dossier-status-badge ${statusClass}`}>{statusLabel}</span>
             <div className="mc-dossier-name">{(t.name || 'UNKNOWN').toUpperCase()}</div>
             {(t.industry || t.revenue) && (
-              <div className="mc-dossier-subtitle">{[t.industry, t.revenue].filter(Boolean).join(' · ')}</div>
+              <div className="mc-dossier-subtitle">{[getDisplayIndustry(t, null), t.revenue].filter(Boolean).join(' · ')}</div>
             )}
           </div>
 
@@ -776,7 +777,7 @@ export default function MissionControl() {
             </button>
             {!collapsedSections.firmographic && (
               <div className="mc-dossier-section-body">
-                {t.industry && <div className="mc-dossier-row"><span className="mc-dossier-key">INDUSTRY</span><span className="mc-dossier-val">{t.industry}</span></div>}
+                {t.industry && <div className="mc-dossier-row"><span className="mc-dossier-key">INDUSTRY</span><span className="mc-dossier-val">{getDisplayIndustry(t)}</span></div>}
                 {t.revenue && <div className="mc-dossier-row"><span className="mc-dossier-key">REVENUE</span><span className="mc-dossier-val">{t.revenue}</span></div>}
                 {(t.employee_count || t.company_size) && <div className="mc-dossier-row"><span className="mc-dossier-key">SIZE</span><span className="mc-dossier-val">{t.employee_count || t.company_size}</span></div>}
                 {t.founded_year && <div className="mc-dossier-row"><span className="mc-dossier-key">FOUNDED</span><span className="mc-dossier-val">{t.founded_year}</span></div>}
@@ -908,7 +909,7 @@ export default function MissionControl() {
           <div className="mc-mission-card-left">
             <div className="mc-mission-card-name">{company.name || 'Unknown'}</div>
             <div className="mc-mission-card-meta">
-              {[company.industry, company.revenue].filter(Boolean).join(' · ') || 'No data'}
+              {[getDisplayIndustry(company, null), company.revenue].filter(Boolean).join(' · ') || 'No data'}
             </div>
           </div>
 
@@ -1083,7 +1084,7 @@ export default function MissionControl() {
         {hoveredCompany && (
           <div className="mc-tooltip" style={{ left: tooltipPos.x + 14, top: tooltipPos.y - 10 }}>
             <div className="mc-tooltip-name">{hoveredCompany.name || 'Unknown'}</div>
-            {hoveredCompany.industry && <div className="mc-tooltip-row">{hoveredCompany.industry}</div>}
+            {hoveredCompany.industry && <div className="mc-tooltip-row">{getDisplayIndustry(hoveredCompany)}</div>}
             <div className="mc-tooltip-score">ICP FIT: <span style={{ color: hoveredCompany.color }}>{hoveredCompany.fit_score ?? '—'}</span></div>
             <div className="mc-tooltip-cat">{hoveredCompany.category.toUpperCase()}</div>
           </div>

@@ -1024,6 +1024,10 @@ export function computeIcpCriteriaFingerprint(companyProfile) {
   ).sort();
 
   const canonical = {
+    // v2: bump to invalidate queues built without Apollo industry tag ID filtering.
+    // Cards saved by the old pipeline may carry the ICP's own industry label
+    // instead of Apollo's actual data, so they must be retired and re-fetched.
+    _v: 2,
     industries: norm(p.industries),
     companyKeywords: norm(p.companyKeywords),
     companySizes: norm(p.companySizes),

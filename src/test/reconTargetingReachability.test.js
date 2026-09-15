@@ -71,11 +71,18 @@ describe('Which ICP fields become real Apollo constraints', () => {
     expect(withRevenue).toEqual(buildApolloQuery({}, null));
   });
 
-  it('structured industry IDs are not sent — the free-text path is the live one', () => {
+  it('industries resolve to Apollo industry tag IDs alongside keyword tags', () => {
     const query = buildApolloQuery({ industries: ['Accounting'] }, null);
 
-    expect(query.organization_industry_tag_ids).toBeUndefined();
+    expect(query.organization_industry_tag_ids).toEqual(['5567cd4773696439b10b0000']);
     expect(query.q_organization_keyword_tags).toEqual(['accounting']);
+  });
+
+  it('ICP aliases resolve to canonical Apollo industry tag IDs', () => {
+    const query = buildApolloQuery({ industries: ['Credit Unions'] }, null);
+
+    expect(query.organization_industry_tag_ids).toEqual(['5567cd4773696439b10b000a']);
+    expect(query.q_organization_keyword_tags).toEqual(['credit unions']);
   });
 
   it('avoidIndustries reaches nothing — it is not even read here', () => {

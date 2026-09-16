@@ -43,9 +43,16 @@ describe('no score-display site coerces null to zero', () => {
     expect(dailyLeads).not.toMatch(/\{co\.fit_score\s*\|\|\s*0\}\/100/);
   });
 
-  it('both direct-render sites branch on null explicitly', () => {
-    expect(dailyLeads).toMatch(/topMatch\.fit_score == null/);
+  it('the saved-today site branches on null explicitly', () => {
     expect(dailyLeads).toMatch(/co\.fit_score == null/);
+  });
+
+  it('TOP MATCH has no unscored branch, because pickTopMatch cannot return one', () => {
+    // Not an omission: a null branch here would be unreachable code asserting a
+    // case the selector rules out. The guarantee is tested in fitRanking.test.js
+    // ("is never awarded to an unscored company").
+    expect(dailyLeads).not.toMatch(/topMatch\.fit_score == null/);
+    expect(dailyLeads).toContain('{topMatch.fit_score}');
   });
 
   it('the unscored copy comes from the shared vocabulary, not a local string', () => {
@@ -62,19 +69,24 @@ describe('no score-display site coerces null to zero', () => {
   });
 });
 
-describe('ranking is deliberately left alone in this change', () => {
-  // The topMatch reduce still reads `(c.fit_score || 0)`. That is RANKING, not
-  // display, and it is correct for its own purpose — a null can never win the
-  // comparison, which is what we want. The ordering question (where null should
-  // sit in a sorted queue) is proposed in the PR and not implemented here, so
-  // this asserts the status quo rather than a fix, and will fail loudly if
-  // someone changes ordering without the decision being made.
-  it('the topMatch reduce is unchanged', () => {
-    expect(dailyLeads).toMatch(/reduce\(\(best, c\) => \(\(c\.fit_score \|\| 0\) > \(best\.fit_score \|\| 0\)/);
+describe('ranking goes through the shared comparator', () => {
+  it('both queue sorts use compareByFit rather than an inline comparator', () => {
+    const sorts = dailyLeads.match(/\.sort\(compareByFit\)/g) || [];
+    expect(sorts.length).toBe(2);
   });
 
-  it('the queue sorts still place null at the bottom via `?? 0`', () => {
-    const sorts = dailyLeads.match(/\(\(b\.fit_score \?\? 0\) - \(a\.fit_score \?\? 0\)\)/g) || [];
-    expect(sorts.length).toBe(2);
+  it('no inline `?? 0` score comparator survives', () => {
+    expect(dailyLeads).not.toMatch(/\(b\.fit_score \?\? 0\) - \(a\.fit_score \?\? 0\)/);
+  });
+
+  it('TOP MATCH is chosen by pickTopMatch, not by a reduce over coerced scores', () => {
+    expect(dailyLeads).toContain('pickTopMatch(savedCompanies)');
+    expect(dailyLeads).not.toMatch(/reduce\(\(best, c\) => \(\(c\.fit_score \|\| 0\)/);
+  });
+
+  it('imports the ranking helpers from the shared module', () => {
+    expect(dailyLeads).toMatch(
+      /import \{ compareByFit, pickTopMatch \} from '\.\.\/\.\.\/utils\/fitRanking'/,
+    );
   });
 });

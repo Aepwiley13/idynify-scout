@@ -171,9 +171,24 @@ async function commit({ projectId, authToken, writes }) {
   if (res.ok) return { ok: true, committed: true };
 
   const text = await res.text();
-  if (/FAILED_PRECONDITION|already exists|entity already exists/i.test(text) || res.status === 409) {
+
+  // A retry of an already-recorded write. MEASURED against a real Firestore
+  // emulator rather than assumed — the precondition failure comes back as:
+  //
+  //   409 {"error":{"code":409,"status":"ALREADY_EXISTS",
+  //        "message":"entity already exists: EntityRef[... /lineageEvents/e1]"}}
+  //
+  // and the stored document is left untouched. Matched three independent ways
+  // (status, status string, message) because this branch is the difference
+  // between "idempotent" and "every retry surfaces a spurious error".
+  if (
+    res.status === 409
+    || /ALREADY_EXISTS|FAILED_PRECONDITION/i.test(text)
+    || /entity already exists|already exists/i.test(text)
+  ) {
     return { ok: true, alreadyRecorded: true };
   }
+
   throw new Error(`commit → ${res.status} ${text.slice(0, 180)}`);
 }
 

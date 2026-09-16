@@ -43,7 +43,20 @@ function mockFetch(url, init = {}) {
     const body = JSON.parse(init.body);
     COMMITS.push(body);
     if (FAIL_COMMIT === 'precondition') {
-      return Promise.resolve({ ok: false, status: 400, text: async () => 'FAILED_PRECONDITION: entity already exists' });
+      // The EXACT payload a real Firestore emulator returns for a failed
+      // `currentDocument: {exists:false}` — measured, not invented, so this
+      // test cannot drift from what production actually sends.
+      return Promise.resolve({
+        ok: false,
+        status: 409,
+        text: async () => JSON.stringify({
+          error: {
+            code: 409,
+            message: 'entity already exists: EntityRef[partitionRef=dev~p, path=/users/U/lineageEvents/e1]',
+            status: 'ALREADY_EXISTS',
+          },
+        }),
+      });
     }
     if (FAIL_COMMIT === 'network') {
       return Promise.resolve({ ok: false, status: 500, text: async () => 'boom' });
@@ -166,8 +179,28 @@ describe('when the ICP has already met this company', () => {
 // ── failure behaviour ───────────────────────────────────────────────────────
 
 describe('failure never reaches discovery', () => {
-  it('a precondition failure is "already recorded", not an error', async () => {
+  it('a genuine retry is a silent no-op, not an error', async () => {
+    // §9 requires shadow writes to log and retry, never block, never surface.
+    // A retried discovery run re-derives the same causeId and therefore the
+    // same event id, so the create precondition fails — and that MUST read as
+    // "already recorded", not as a failure the caller has to reason about.
     FAIL_COMMIT = 'precondition';
+    const r = await recordDiscoveryEncounter(args());
+    expect(r.ok).toBe(true);
+    expect(r.alreadyRecorded).toBe(true);
+    expect(r.error).toBeUndefined();
+  });
+
+  it.each([
+    ['409 with ALREADY_EXISTS', 409, { error: { code: 409, status: 'ALREADY_EXISTS', message: 'entity already exists' } }],
+    ['400 with FAILED_PRECONDITION', 400, { error: { code: 400, status: 'FAILED_PRECONDITION', message: 'precondition failed' } }],
+  ])('%s is treated as already-recorded', async (_label, status, body) => {
+    vi.stubGlobal('fetch', vi.fn((url, init) => {
+      if (String(url).endsWith(':commit')) {
+        return Promise.resolve({ ok: false, status, text: async () => JSON.stringify(body) });
+      }
+      return mockFetch(url, init);
+    }));
     const r = await recordDiscoveryEncounter(args());
     expect(r.ok).toBe(true);
     expect(r.alreadyRecorded).toBe(true);

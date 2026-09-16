@@ -51,5 +51,9 @@ jobs:
         run: npm install
       # Run from the repo ROOT: the CLI refuses a rules path outside the
       # project directory, so it must use the root firebase.json.
+      # Both suites share one emulator start. `rules` covers who may write;
+      # `write-semantics` covers what a write does to the fields it was not
+      # told about — the class of bug a mock cannot catch, because the thing
+      # under test is Firestore's own PATCH behaviour.
       - name: Run the rules suite
-        run: npx --yes firebase-tools@15 emulators:exec --only firestore --project demo-icp-rules "node scripts/rules-check/cases.mjs"
+        run: npx --yes firebase-tools@15 emulators:exec --only firestore --project demo-icp-rules "node scripts/rules-check/cases.mjs && node scripts/rules-check/write-semantics.mjs"

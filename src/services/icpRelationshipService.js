@@ -342,6 +342,54 @@ export async function recordResurface({ userId, subjectId, icpId, profile, cause
   });
 }
 
+// ── People (Sprint 2) ───────────────────────────────────────────────────────
+
+/**
+ * A person, surfaced by an ICP-driven search.
+ *
+ * Only two write paths genuinely carry ICP context — post-accept auto-discovery
+ * and the People tab. LinkedIn Link, Find Contacts, CSV and manual adds have no
+ * ICP in scope and deliberately create NO association rather than a guessed one:
+ * an absent association is the honest record that nobody evaluated this person
+ * against an ICP.
+ *
+ * `subjectId` is the contact's Firestore document id, which ADR-002 makes
+ * canonical and which is stable across the composite `{companyId}_{personId}`
+ * ids the Apollo paths produce.
+ */
+export async function recordPersonEncounter({ userId, contactId, icpId, causeId, source }) {
+  return recordEncounter({
+    userId, icpId, causeId, source,
+    subjectId: contactId,
+    subjectType: SUBJECT_TYPE.PERSON,
+  });
+}
+
+/** The user saved this person to engage (accepted) or archived them (rejected). */
+export async function recordPersonDecision({ userId, contactId, icpId, accepted, causeId, source }) {
+  return recordDecision({
+    userId, icpId, accepted, causeId, source,
+    subjectId: contactId,
+    subjectType: SUBJECT_TYPE.PERSON,
+  });
+}
+
+/**
+ * The user passed on this person for now.
+ *
+ * People-mode skip already has legacy semantics keyed on a DATE
+ * (`people_mode_skipped` + `skipped_date`), so the cycle recorded here is that
+ * same day marker rather than a discovery run. The two sides then agree about
+ * what "comes back later" means instead of inventing a second notion of it.
+ */
+export async function recordPersonSkip({ userId, contactId, icpId, causeId, cycleId, source }) {
+  return recordSkip({
+    userId, icpId, causeId, cycleId, source,
+    subjectId: contactId,
+    subjectType: SUBJECT_TYPE.PERSON,
+  });
+}
+
 // ── Reads (for tests, reconciliation and Sprint 3 — not wired to any screen) ─
 
 export async function getRelationship(userId, icpId, subjectId, subjectType = SUBJECT_TYPE.COMPANY) {
@@ -396,6 +444,9 @@ export async function getRelationshipEvents(userId, icpId, subjectId, subjectTyp
 }
 
 export default {
+  recordPersonEncounter,
+  recordPersonDecision,
+  recordPersonSkip,
   setShadowWritesEnabled,
   areShadowWritesEnabled,
   ensureCriteriaVersion,

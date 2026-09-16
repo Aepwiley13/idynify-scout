@@ -25,7 +25,10 @@ import { RECORD_STATUS } from '../../constants/statusModel';
 import { calculateReconConfidence } from '../../utils/reconConfidence';
 import { ARRIVAL_REVIEW_ICP } from '../../utils/firstExperienceMode';
 import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
-import { recordDecision, recordSkip } from '../../services/icpRelationshipService';
+import {
+  recordDecision, recordSkip,
+  recordPersonEncounter, recordPersonDecision, recordPersonSkip,
+} from '../../services/icpRelationshipService';
 
 // ─── Initials avatar ─────────────────────────────────────────────────────────
 function Av({ initials, color = BRAND.pink, size = 70 }) {
@@ -1879,6 +1882,20 @@ export default function DailyLeads({ onNavigate }) {
                   lead_owner: user.uid, status: 'suggested', source: 'icp_auto_discovery',
                   discovered_at: new Date().toISOString(),
                 });
+
+                // Shadow (Sprint 2), after the legacy write. This search ran
+                // because of an ICP, so the person was genuinely encountered
+                // under it — a DIRECT association, not an inherited one.
+                // activeICPId is the same ICP the company was just swiped for.
+                if (activeICPId) {
+                  await recordPersonEncounter({
+                    userId: user.uid,
+                    contactId,
+                    icpId: activeICPId,
+                    causeId: swipedAt,
+                    source: 'icp_auto_discovery',
+                  });
+                }
               }
               await updateDoc(companyRef, { auto_contact_status: 'completed', auto_contact_count: result.people.length, auto_contact_searched_at: new Date().toISOString() });
             }
@@ -2254,6 +2271,10 @@ export default function DailyLeads({ onNavigate }) {
     const { person, company } = personItem;
     const contactId = `${company.id}_${person.id}`;
     const contactRef = doc(db, 'users', user.uid, 'contacts', contactId);
+    // One timestamp for this decision, shared by the legacy write and the
+    // shadow event — and it doubles as the event's causeId, so a retry lands on
+    // the same event id and is recognised as already recorded.
+    const personDecidedAt = new Date().toISOString();
     try {
       if (direction === 'right') {
         // Identity resolution before the write. The composite id already
@@ -2278,6 +2299,14 @@ export default function DailyLeads({ onNavigate }) {
           // state, no normalized identifiers and no status dimensions.
           await setDoc(contactRef, { ...person, ...decision.fields, apollo_person_id: person.id, company_id: company.id, company_name: company.name, lead_owner: user.uid, status: 'suggested', source: 'people_mode', saved_at: new Date().toISOString(), ...(feedback ? { barryFeedback: feedback, feedbackAt: new Date().toISOString() } : {}) }, { merge: true });
         }
+        // Shadow: the People tab runs against the active ICP, so saving someone
+        // here is a decision made under it.
+        if (activeICPId) {
+          await recordPersonDecision({
+            userId: user.uid, contactId, icpId: activeICPId,
+            accepted: true, causeId: personDecidedAt, source: 'people_mode',
+          });
+        }
         if (company.status === 'pending') {
           const companyRef = doc(db, 'users', user.uid, 'companies', company.id);
           await updateDoc(companyRef, { status: 'accepted', swipedAt: new Date().toISOString(), swipeDirection: 'right', swipe_source: 'people_mode' });
@@ -2291,8 +2320,23 @@ export default function DailyLeads({ onNavigate }) {
         // not is_archived, so readers that key off the boolean — quick search
         // among them — kept treating rejected people as live contacts.
         await setDoc(contactRef, { apollo_person_id: person.id, company_id: company.id, status: 'people_mode_archived', source: 'people_mode', is_archived: true, archived_at: new Date().toISOString(), ...(feedback ? { barryRejectionFeedback: feedback, rejectionFeedbackAt: new Date().toISOString() } : {}) }, { merge: true });
+        if (activeICPId) {
+          await recordPersonDecision({
+            userId: user.uid, contactId, icpId: activeICPId,
+            accepted: false, causeId: personDecidedAt, source: 'people_mode',
+          });
+        }
       } else if (direction === 'skip') {
         await setDoc(contactRef, { apollo_person_id: person.id, company_id: company.id, status: 'people_mode_skipped', source: 'people_mode', skipped_date: today }, { merge: true });
+        // The cycle recorded is the DAY, matching people-mode's existing
+        // skipped_date semantics rather than inventing a second notion of
+        // "comes back later" for the same control.
+        if (activeICPId) {
+          await recordPersonSkip({
+            userId: user.uid, contactId, icpId: activeICPId,
+            causeId: personDecidedAt, cycleId: today, source: 'people_mode',
+          });
+        }
       }
       const nextIdx = currentPersonIdx + 1;
       const remaining = peopleQueue.length - nextIdx;

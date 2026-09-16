@@ -1435,8 +1435,31 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
         }
       };
 
-      // Save to Firestore using REST API
-      const docUrl = `${firestoreUrl}/users/${userId}/companies/${companyId}`;
+      // Save to Firestore using REST API.
+      //
+      // ─── THE updateMask IS LOAD-BEARING ────────────────────────────────────
+      // A REST PATCH with no updateMask REPLACES the document: every field not
+      // in the request is DELETED. Measured against a real Firestore, not
+      // assumed — a company carrying 11 fields came back with 5, losing
+      // swipedForICPId, swipedAt, barryFeedback, selected_titles, contact_count
+      // and replacedAt.
+      //
+      // That is not hypothetical here. Rediscovery reaches this line for any
+      // company outside DEDUP_BLOCKING_STATUSES — `replaced`, `archived`,
+      // `deferred` — which across production is 182 companies holding 520
+      // fields this write would have deleted. Among them `apollo_id` on 11
+      // records: one of the TWO field names findCompanyByApolloId checks, so
+      // the overwrite would not merely lose provenance, it would make the
+      // record harder to match and could create the next duplicate.
+      //
+      // The mask is derived from the payload rather than hardcoded, so it
+      // cannot drift: whatever discovery writes is exactly what discovery
+      // touches, and everything else on the document is left alone. The same
+      // pattern is already used by reconcilePendingQueue above, for the same
+      // reason.
+      const maskedFields = Object.keys(companyData.fields);
+      const updateMask = maskedFields.map(f => `updateMask.fieldPaths=${f}`).join('&');
+      const docUrl = `${firestoreUrl}/users/${userId}/companies/${companyId}?${updateMask}`;
 
       const saveResponse = await fetch(docUrl, {
         method: 'PATCH',

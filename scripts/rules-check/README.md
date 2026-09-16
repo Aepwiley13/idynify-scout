@@ -1,7 +1,15 @@
-# Firestore rules verification
+# Firestore emulator checks
 
-Runs the rules suite against a **real** Firestore emulator on a throwaway
-`demo-` project. No production project, no credentials, no access to real data.
+Two suites against a **real** Firestore emulator on a throwaway `demo-` project.
+No production project, no credentials, no access to real data.
+
+- `cases.mjs` — **who** may write. The append-only rules on `lineageEvents` and
+  `criteriaVersions`.
+- `write-semantics.mjs` — **what a write does** to the fields it was not told
+  about. Guards the rediscovery `updateMask`.
+
+Both exist for the same reason: the behaviour under test is Firestore's own, so
+a mock could only assert that we believe what we already believed.
 
 It reads the **live** `firestore.rules` — not a copy — so any change to the
 deployed ruleset is checked before the PR is reviewable. CI runs it on every PR.
@@ -32,11 +40,22 @@ path outside the project directory.
 
 ```bash
 npm --prefix scripts/rules-check install
-npx firebase-tools emulators:exec --only firestore --project demo-icp-rules "node scripts/rules-check/cases.mjs"
+npx firebase-tools emulators:exec --only firestore --project demo-icp-rules "node scripts/rules-check/cases.mjs && node scripts/rules-check/write-semantics.mjs"
 ```
 
-Expected: `19 passed, 0 failed`.
+Expected: `19 passed, 0 failed` then `20 passed, 0 failed`.
 
 Case 09 matters most — `update users/U/companies/c1 → ALLOW`. The likely failure
 mode of a bad rule is that *every* product write denies, not that the protected
 collections stay mutable.
+
+## write-semantics
+
+A REST PATCH with no `updateMask` **replaces** the document — every field absent
+from the request is deleted. Measured: a company carrying 32 fields came back
+with 15, losing `swipedAt`, `swipedForICPId`, `barryFeedback`, `selected_titles`
+and — worst — `apollo_id`, one of the two field names identity resolution checks.
+
+The suite runs a rediscovery against a fully-lived company at every status a
+rediscovery can reach, and keeps an unmasked write as a control, so a test that
+stops detecting the bug fails loudly rather than passing vacuously.

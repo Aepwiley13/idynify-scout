@@ -45,18 +45,15 @@ service cloud.firestore {
     //   - nothing in Sprint 1 READS these collections, so a mutation would be
     //     invisible to the product rather than corrupting a live read path.
     //
-    // The intended shape, for review:
+    // The intended ruleset is in firestore.rules.proposed, alongside the
+    // simulator cases that must pass before it is deployed. It is NOT
+    // referenced by firebase.json and has NOT been run against an emulator —
+    // this machine has no Java runtime, so the Firestore emulator cannot start
+    // here. Deploy is a deliberate, separately reviewed action.
     //
-    //   function owns(userId) {
-    //     return request.auth != null && request.auth.uid == userId;
-    //   }
-    //   match /users/{userId}/{document=**} {
-    //     allow read: if owns(userId);
-    //     allow create: if owns(userId);
-    //     allow update, delete: if owns(userId)
-    //       && !(document.size() == 2 && document[0] == 'lineageEvents')
-    //       && !(document.size() == 4 && document[2] == 'criteriaVersions');
-    //   }
+    // ACCEPTANCE STATUS, T-21: append-only is enforced by APPLICATION CODE
+    // ONLY. The database does not yet refuse update or delete on these
+    // collections. Do not record T-21 as met.
     // ─────────────────────────────────────────────────────────────────────────
 
     // Notifications subcollection — explicit rule for clarity.

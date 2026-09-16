@@ -402,15 +402,40 @@ describe('T-15 — the reconciler flags real divergence and nothing else', () =>
     expect(r.status).toBe(RECONCILE.AGREED);
   });
 
-  it('flags a genuine disagreement — the un-followed undo case', () => {
-    // Legacy was undone back to pending; shadow still reads accepted, because
-    // undo is not modelled in Sprint 1.
+  it.each([[ACCEPTED], [REJECTED]])(
+    'classifies an un-followed undo (legacy pending, shadow %s) as UNDO_GAP, not divergence',
+    (shadowState) => {
+      // Undo sets the company back to pending and writes no event, so shadow
+      // keeps the decision. Counting this as a divergence would fail the
+      // "zero divergences" criterion every time a user presses U, which would
+      // say nothing about whether the model works.
+      const r = classifyCompany({
+        company: { status: 'pending', swipedForICPId: 'icp_A', swipedAt: after },
+        relationships: [rel('icp_A', shadowState)], cutoverAt: CUTOVER,
+      });
+      expect(r.status).toBe(RECONCILE.UNDO_GAP);
+      expect(r.reason).toMatch(/undo-not-modelled/);
+    });
+
+  it('a FORWARD disagreement is still a real divergence', () => {
+    // Legacy accepted, shadow still pending — shadow genuinely failed to follow.
     const r = classifyCompany({
-      company: { status: 'pending', swipedForICPId: 'icp_A', swipedAt: after },
-      relationships: [rel('icp_A', ACCEPTED)], cutoverAt: CUTOVER,
+      company: { status: 'accepted', swipedForICPId: 'icp_A', swipedAt: after },
+      relationships: [rel('icp_A', PENDING)], cutoverAt: CUTOVER,
     });
     expect(r.status).toBe(RECONCILE.DIVERGENCE);
-    expect(r.reason).toBe('legacy=pending shadow=accepted');
+    expect(r.reason).toBe('legacy=accepted shadow=pending');
+  });
+
+  it('undo gaps are reported in full but do not break the acceptance signal', () => {
+    const s = summarize([
+      { status: RECONCILE.AGREED },
+      { status: RECONCILE.UNDO_GAP, reason: 'undo-not-modelled: legacy=pending shadow=accepted' },
+      { status: RECONCILE.UNDO_GAP, reason: 'undo-not-modelled: legacy=pending shadow=rejected' },
+    ]);
+    expect(s.clean).toBe(true);                    // no real divergence
+    expect(s.counts[RECONCILE.UNDO_GAP]).toBe(2);  // and nothing is hidden
+    expect(s.undoGaps).toHaveLength(2);
   });
 
   it('does not treat extra memberships as divergence — legacy cannot express them', () => {

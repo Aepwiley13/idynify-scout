@@ -19,9 +19,26 @@
  *   expected-gap  a legacy record last written BEFORE the cutover, with no
  *                 shadow counterpart — the Unattributed / legacy-unverified
  *                 population, exactly as designed
- *   divergence    a legacy record written AFTER the cutover with no shadow
- *                 counterpart, or the two disagree. The only thing that should
- *                 ever be non-zero.
+ *   undo-gap      legacy moved BACKWARD to pending while shadow still holds the
+ *                 decision. Undo is not modelled in Sprint 1, so this is a known
+ *                 consequence rather than a failure — see below
+ *   divergence    anything else that disagrees, or a legacy record written AFTER
+ *                 the cutover with no shadow counterpart. The only category that
+ *                 should ever be non-zero.
+ *
+ * ─── WHY UNDO GETS ITS OWN CATEGORY ────────────────────────────────────────
+ * The legacy undo path sets a company back to `pending` and writes no event, so
+ * shadow keeps reading `accepted` or `rejected`. Counting that as a divergence
+ * would mean the acceptance criterion "zero divergences over a week of normal
+ * use" fails every time a user presses U — which would say nothing about
+ * whether the shadow model is working, and would train everyone to ignore the
+ * number.
+ *
+ * It is named rather than hidden: an undo gap is still reported, still listed,
+ * and still counted. What it is not is evidence of a fault. It closes when undo
+ * gets a vocabulary of its own, which is a product decision — does undo emit an
+ * event, or retract the prior one? — that belongs with the vocabulary review
+ * before the Sprint 3 cutover, not invented mid-build.
  *
  * Divergence is single-directional by construction: the write order is legacy
  * first, shadow second (invariant I-11), so shadow may only ever lag. That is
@@ -33,6 +50,7 @@ import { RELATIONSHIP_STATE } from './icpLineage';
 export const RECONCILE = Object.freeze({
   AGREED: 'agreed',
   EXPECTED_GAP: 'expected-gap',
+  UNDO_GAP: 'undo-gap',
   DIVERGENCE: 'divergence',
 });
 
@@ -107,9 +125,17 @@ export function classifyCompany({ company = {}, relationships = [], cutoverAt } 
   }
 
   if (match.state !== expected) {
+    // Legacy moved backward to pending while shadow still holds the decision:
+    // the signature of an undo that shadow could not follow.
+    const isUndoGap =
+      company.status === 'pending'
+      && (match.state === RELATIONSHIP_STATE.ACCEPTED || match.state === RELATIONSHIP_STATE.REJECTED);
+
     return {
-      status: RECONCILE.DIVERGENCE,
-      reason: `legacy=${company.status} shadow=${match.state}`,
+      status: isUndoGap ? RECONCILE.UNDO_GAP : RECONCILE.DIVERGENCE,
+      reason: isUndoGap
+        ? `undo-not-modelled: legacy=pending shadow=${match.state}`
+        : `legacy=${company.status} shadow=${match.state}`,
       icpId,
     };
   }
@@ -119,13 +145,22 @@ export function classifyCompany({ company = {}, relationships = [], cutoverAt } 
 
 /** Roll a set of classifications into a report. Divergences are listed, not counted away. */
 export function summarize(results = []) {
-  const counts = { [RECONCILE.AGREED]: 0, [RECONCILE.EXPECTED_GAP]: 0, [RECONCILE.DIVERGENCE]: 0 };
+  const counts = {
+    [RECONCILE.AGREED]: 0,
+    [RECONCILE.EXPECTED_GAP]: 0,
+    [RECONCILE.UNDO_GAP]: 0,
+    [RECONCILE.DIVERGENCE]: 0,
+  };
   const divergences = [];
+  const undoGaps = [];
   for (const r of results) {
     counts[r.status] = (counts[r.status] ?? 0) + 1;
     if (r.status === RECONCILE.DIVERGENCE) divergences.push(r);
+    if (r.status === RECONCILE.UNDO_GAP) undoGaps.push(r);
   }
-  return { counts, divergences, clean: counts[RECONCILE.DIVERGENCE] === 0 };
+  // `clean` is the acceptance signal and counts DIVERGENCE only. Undo gaps are
+  // reported in full alongside it so they stay visible rather than swept up.
+  return { counts, divergences, undoGaps, clean: counts[RECONCILE.DIVERGENCE] === 0 };
 }
 
 export default { RECONCILE, classifyCompany, summarize, legacyWrittenAt, legacyIcpId };

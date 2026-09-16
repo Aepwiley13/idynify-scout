@@ -9,6 +9,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+const here = dirname(fileURLToPath(import.meta.url));
 import {
   SUBJECT_TYPE, RELATIONSHIP_STATE, EVENT_TYPE, EVENT_TYPES, TRANSITIONS,
   relationshipId, eventId, eventScopeKey, nextState, isLegalTransition,
@@ -19,7 +24,7 @@ import {
   materialCriteria, isMaterialField,
 } from '../utils/icpCriteria';
 import { admitCandidate, ADMISSION } from '../utils/icpAdmission';
-import { classifyCompany, summarize, RECONCILE } from '../utils/icpReconcile';
+import { classifyCompany, summarize, summarizeActivity, stageOneGate, RECONCILE } from '../utils/icpReconcile';
 
 const { PENDING, ACCEPTED, REJECTED, SKIPPED } = RELATIONSHIP_STATE;
 const CO = SUBJECT_TYPE.COMPANY;
@@ -464,5 +469,118 @@ describe('T-15 — the reconciler flags real divergence and nothing else', () =>
     expect(s.counts[RECONCILE.DIVERGENCE]).toBe(1);
     expect(s.divergences).toHaveLength(1);
     expect(s.clean).toBe(false);
+  });
+});
+
+// ─── Stage 1: writes seen, and the gate ─────────────────────────────────────
+
+describe('Stage 1 — the reconciler reports writes seen, not only divergences', () => {
+  const ev = (eventType, day) => ({ eventType, occurredAt: `2026-10-0${day}T12:00:00.000Z` });
+
+  it('an empty log is reported as empty, not as clean', () => {
+    // The whole reason this exists: production held 0 shadow documents, so a
+    // divergence-only report would have said "0 divergences" and proven nothing.
+    const a = summarizeActivity([]);
+    expect(a.events).toBe(0);
+    expect(a.varied).toBe(false);
+    expect(a.days).toEqual([]);
+  });
+
+  it('counts volume, composition and spread', () => {
+    const a = summarizeActivity([
+      ev('encountered', 1), ev('encountered', 1), ev('accepted', 2), ev('rejected', 3),
+    ]);
+    expect(a.events).toBe(4);
+    expect(a.byType).toEqual({ encountered: 2, accepted: 1, rejected: 1 });
+    expect(a.eventTypes).toBe(3);
+    expect(a.daysWithActivity).toBe(3);
+    expect(a.varied).toBe(true);
+  });
+
+  it('one big burst on a single day is NOT varied traffic', () => {
+    const a = summarizeActivity(Array.from({ length: 200 }, () => ev('encountered', 1)));
+    expect(a.events).toBe(200);
+    expect(a.varied).toBe(false);   // volume alone proves nothing
+  });
+
+  it('reports the window it saw', () => {
+    const a = summarizeActivity([ev('accepted', 2), ev('encountered', 1)]);
+    expect(a.earliest).toBe('2026-10-01T12:00:00.000Z');
+    expect(a.latest).toBe('2026-10-02T12:00:00.000Z');
+  });
+});
+
+describe('Stage 1 — the gate cannot be reported more generously than the numbers', () => {
+  const varied = summarizeActivity([
+    { eventType: 'encountered', occurredAt: '2026-10-01T00:00:00Z' },
+    { eventType: 'accepted', occurredAt: '2026-10-02T00:00:00Z' },
+    { eventType: 'rejected', occurredAt: '2026-10-03T00:00:00Z' },
+  ]);
+  const clean = summarize([{ status: RECONCILE.AGREED }]);
+
+  it('passes on varied traffic with no divergence', () => {
+    expect(stageOneGate({ activity: varied, reconciliation: clean }).pass).toBe(true);
+  });
+
+  it('FAILS on zero writes, however clean the reconciliation looks', () => {
+    const g = stageOneGate({ activity: summarizeActivity([]), reconciliation: clean });
+    expect(g.pass).toBe(false);
+    expect(g.reasons[0]).toMatch(/no shadow writes seen/);
+  });
+
+  it('fails on a quiet week that would pass a calendar test', () => {
+    const quiet = summarizeActivity([{ eventType: 'encountered', occurredAt: '2026-10-01T00:00:00Z' }]);
+    const g = stageOneGate({ activity: quiet, reconciliation: clean });
+    expect(g.pass).toBe(false);
+    expect(g.reasons[0]).toMatch(/not varied enough/);
+  });
+
+  it('fails on any divergence', () => {
+    const dirty = summarize([{ status: RECONCILE.DIVERGENCE, reason: 'x' }]);
+    const g = stageOneGate({ activity: varied, reconciliation: dirty });
+    expect(g.pass).toBe(false);
+    expect(g.reasons.join(' ')).toMatch(/1 divergence/);
+  });
+
+  it('undo gaps are reported but never block — undo is unmodelled by design', () => {
+    const withUndo = summarize([{ status: RECONCILE.AGREED }, { status: RECONCILE.UNDO_GAP, reason: 'u' }]);
+    expect(stageOneGate({ activity: varied, reconciliation: withUndo }).pass).toBe(true);
+  });
+});
+
+describe('Stage 1 — the runner reports, never repairs', () => {
+  const runner = readFileSync(resolve(here, '../../scripts/reconcile/run.mjs'), 'utf8')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+
+  // Checked against the WRITE APIs specifically, not the substring "set(" —
+  // the runner legitimately uses Map.set to index relationships by subject, and
+  // a test that cannot tell those apart teaches people to weaken it.
+  it.each([
+    ['a write on a document ref', /\b(ref|doc|docRef)\w*\.(set|update|delete|create)\s*\(/],
+    ['a chained doc write', /\.doc\([^)]*\)\s*\.(set|update|delete|create)\s*\(/],
+    ['a batch', /\bdb\.batch\s*\(|\bbatch\(\)\.(set|update|delete)/],
+    ['a transaction', /runTransaction\s*\(/],
+    ['the web-SDK write verbs', /\b(addDoc|setDoc|updateDoc|deleteDoc)\s*\(/],
+    ['a server timestamp or field-value helper', /FieldValue\./],
+  ])('never issues %s', (_label, pattern) => {
+    expect(runner).not.toMatch(pattern);
+  });
+
+  it('only ever reads', () => {
+    // Every Firestore call in the runner resolves through .get().
+    const calls = [...runner.matchAll(/\.(get|collection|doc)\s*\(/g)].map(m => m[1]);
+    expect(calls.length).toBeGreaterThan(0);
+    expect([...new Set(calls)].sort()).toEqual(['collection', 'doc', 'get']);
+  });
+
+  it('refuses to run without a cutover, rather than defaulting to one', () => {
+    // Without it every pre-cutover company reads as a divergence.
+    expect(runner).toMatch(/if \(!args\.cutover\)/);
+    expect(runner).toMatch(/process\.exit\(2\)/);
+  });
+
+  it('derives its verdict from stageOneGate rather than narrating one', () => {
+    expect(runner).toMatch(/stageOneGate\(\{ activity, reconciliation \}\)/);
+    expect(runner).toMatch(/process\.exit\(gate\.pass \? 0 : 1\)/);
   });
 });

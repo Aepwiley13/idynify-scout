@@ -26,8 +26,8 @@
  * destroy its own provenance.
  */
 
-import { RELATIONSHIP_STATE, EVENT_TYPE } from './icpLineage';
-import { isReEligible } from './icpCriteria';
+import { RELATIONSHIP_STATE, EVENT_TYPE } from './icpLineage.js';
+import { isReEligible } from './icpCriteria.js';
 
 /** What discovery should do with a candidate. */
 export const ADMISSION = Object.freeze({

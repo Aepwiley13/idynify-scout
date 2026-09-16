@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
 import { logApolloError } from './utils/apolloErrorLogger.js';
+import { ensureCriteriaVersion, recordDiscoveryEncounter } from './utils/icpRelationshipWriter.js';
 
 // ---------------------------------------------------------------------------
 // Post-fetch age filter helpers
@@ -721,7 +722,12 @@ export const handler = async (event) => {
     console.log(`📊 Adding ${toAdd.length} companies to reach target of ${TARGET_QUEUE_SIZE}`);
 
     // Save companies to Firestore
-    await saveCompaniesToFirestore(userId, authToken, toAdd, companyProfile, icpId, criteriaFingerprint);
+    // One id for this discovery run. It is the shadow event's causeId, so a
+    // company surfaced twice in one run produces one event and a retried run
+    // converges instead of duplicating. It is also the value the skip cycle
+    // guard will compare against once Skip ships.
+    const cycleId = `search_${startTime}`;
+    await saveCompaniesToFirestore(userId, authToken, toAdd, companyProfile, icpId, criteriaFingerprint, cycleId);
 
     // Barry state contract: companies are saved and available → READY.
     // Same REST pattern as the company writes (authToken Bearer + updateMask
@@ -1321,7 +1327,7 @@ function buildBarryIntel(company, companyProfile) {
   return summary;
 }
 
-async function saveCompaniesToFirestore(userId, authToken, companies, companyProfile, icpId, criteriaFingerprint) {
+async function saveCompaniesToFirestore(userId, authToken, companies, companyProfile, icpId, criteriaFingerprint, cycleId = null) {
   try {
     const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
 
@@ -1409,6 +1415,15 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
     console.log(`✅ Accepting ALL ${simplifiedCompanies.length} companies (no filtering)`);
     console.log(`📊 Scout shows total market size, user decides fit via swipes`);
 
+    // ── Shadow (Sprint 1A) ────────────────────────────────────────────────
+    // Resolved once per batch rather than per company: the version is the same
+    // for every company in one run, and minting is idempotent anyway. Fail-soft
+    // — a null version means the per-company shadow writes below skip
+    // themselves, and discovery carries on exactly as before.
+    const shadowVersion = cycleId
+      ? await ensureCriteriaVersion({ projectId, userId, authToken, icpId })
+      : null;
+
     // Save to Firestore - ALL companies, no sorting needed
     for (const company of simplifiedCompanies) {
       const companyId = company.apollo_organization_id || `company_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -1473,6 +1488,22 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
       if (!saveResponse.ok) {
         const errorText = await saveResponse.text();
         console.error(`❌ Failed to save company ${company.name}:`, errorText);
+        // Legacy write failed, so nothing happened. The shadow must never
+        // describe an event that did not occur (invariant I-11: shadow is never
+        // ahead of legacy), so skip it rather than recording an arrival.
+        continue;
+      }
+
+      // Shadow write, strictly after the legacy write has committed. The
+      // service swallows its own errors; nothing here can fail discovery.
+      if (cycleId && shadowVersion?.ok) {
+        await recordDiscoveryEncounter({
+          projectId, userId, authToken, icpId,
+          subjectId: companyId,
+          cycleId,
+          source: 'apollo_api',
+          version: shadowVersion,
+        });
       }
     }
 

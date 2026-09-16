@@ -14,6 +14,8 @@ import {
 import { Globe, Linkedin, Check, X, RefreshCw, Loader, Settings, RotateCcw, MessageCircle, ArrowRight, MapPin, User, List, ChevronDown, Flame, Trophy } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
+import ScorePip from '../../components/scout/ScorePip';
+import { UNSCORED_TITLE, UNSCORED_SHORT, UNSCORED_LABEL } from '../../utils/scoreDisplay';
 import CompanyLogo from '../../components/scout/CompanyLogo';
 import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
 import BarryICPPanel, { BarryAvatar } from '../../components/scout/BarryICPPanel';
@@ -746,15 +748,6 @@ function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose
   const upcoming = companies.slice(currentIndex);
   const skipped = companies.filter(c => skippedIds.includes(c.id));
 
-  const ScorePip = ({ score }) => {
-    const c = score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : STATUS.red;
-    return (
-      <span style={{ fontSize: 10, fontWeight: 700, color: c, padding: '2px 6px', background: `${c}18`, borderRadius: 4, border: `1px solid ${c}40` }}>
-        {score}
-      </span>
-    );
-  };
-
   if (mobile) {
     // Bottom-sheet overlay for mobile
     return (
@@ -809,7 +802,7 @@ function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose
                     </div>
                     <div style={{ fontSize: 10, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getDisplayIndustry(co, '—')}</div>
                   </div>
-                  <ScorePip score={co.fit_score || co.score || 0} />
+                  <ScorePip score={co.fit_score ?? co.score ?? null} />
                 </div>
               ))}
               {upcoming.length === 0 && (
@@ -832,7 +825,7 @@ function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose
                       <div style={{ fontSize: 12, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
                       <div style={{ fontSize: 10, color: T.textFaint }}>Re-review</div>
                     </div>
-                    <ScorePip score={co.fit_score || co.score || 0} />
+                    <ScorePip score={co.fit_score ?? co.score ?? null} />
                   </div>
                 ))}
               </>
@@ -882,7 +875,7 @@ function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose
                 </div>
                 <div style={{ fontSize: 10, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getDisplayIndustry(co, '—')}</div>
               </div>
-              <ScorePip score={co.fit_score || co.score || 0} />
+              <ScorePip score={co.fit_score ?? co.score ?? null} />
             </div>
           ))}
           {upcoming.length === 0 && (
@@ -912,7 +905,7 @@ function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose
                   <div style={{ fontSize: 12, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
                   <div style={{ fontSize: 10, color: T.textFaint }}>Re-review</div>
                 </div>
-                <ScorePip score={co.fit_score || co.score || 0} />
+                <ScorePip score={co.fit_score ?? co.score ?? null} />
               </div>
             ))}
           </>
@@ -960,7 +953,13 @@ function SessionSummaryScreen({ reviewed, saved, skipped, streak, savedCompanies
             <div style={{ fontSize: 13, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topMatch.name}</div>
             <div style={{ fontSize: 10, color: T.textFaint }}>{topMatch.industry || '—'}</div>
           </div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: STATUS.green, flexShrink: 0 }}>{topMatch.fit_score || 0}</div>
+          {/* G1-06: an unscored top match shows a muted dash, not a green 0 —
+              which would read as a confident "worst possible fit". */}
+          {topMatch.fit_score == null ? (
+            <div title={UNSCORED_TITLE} style={{ fontSize: 18, fontWeight: 800, color: T.textFaint, flexShrink: 0 }}>{UNSCORED_SHORT}</div>
+          ) : (
+            <div style={{ fontSize: 18, fontWeight: 800, color: STATUS.green, flexShrink: 0 }}>{topMatch.fit_score}</div>
+          )}
         </div>
       )}
 
@@ -2792,7 +2791,11 @@ export default function DailyLeads({ onNavigate }) {
                         <CompanyLogo company={co} size="small" />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 11, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
-                          <div style={{ fontSize: 10, color: T.textFaint }}>{co.fit_score || 0}/100</div>
+                          {/* G1-06: "0/100" is a measured verdict; an unscored
+                              company has not earned one. */}
+                          <div style={{ fontSize: 10, color: T.textFaint }}>
+                            {co.fit_score == null ? UNSCORED_LABEL : `${co.fit_score}/100`}
+                          </div>
                         </div>
                         <button
                           onClick={() => navigate('/recon', { state: { companyId: co.id } })}

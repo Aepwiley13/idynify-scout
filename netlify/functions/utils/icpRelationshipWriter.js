@@ -289,9 +289,27 @@ export async function recordDiscoveryEncounter({
       projectId, authToken, path: `users/${userId}/icpRelationships/${relId}`,
     });
     if (existing) {
-      // Already known to this ICP. Resurfacing is an admission decision, and
-      // admission is dark until Sprint 3 — so record nothing rather than guess.
-      return { ok: true, skipped: true, reason: 'relationship-already-exists' };
+      // Already known to this ICP — so this is a RE-ENCOUNTER, and decision 6
+      // says a confident match accumulates provenance rather than overwriting
+      // it. The relationship itself is left alone: whether it should resurface
+      // is an admission decision, and admission is dark until Sprint 3. What is
+      // recorded is the fact that discovery met it again.
+      const occurredAtRe = new Date().toISOString();
+      const re = buildEvent({
+        subjectType, subjectId, icpId,
+        eventType: EVENT_TYPE.PROVENANCE_ADDED,
+        causeId: cycleId,
+        criteriaVersionId: v.versionId ?? null,
+        criteriaFingerprint: v.fingerprint ?? null,
+        source, actor: ACTOR.SYSTEM,
+        fromState: existing.state ?? null,   // state-neutral: to === from
+        occurredAt: occurredAtRe,
+      });
+      const res = await commit({
+        projectId, authToken,
+        writes: [{ path: `users/${userId}/lineageEvents/${re.id}`, data: re.body, createOnly: true }],
+      });
+      return { ...res, reEncounter: true };
     }
 
     const occurredAt = new Date().toISOString();

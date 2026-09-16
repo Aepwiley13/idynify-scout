@@ -1741,9 +1741,17 @@ export default function DailyLeads({ onNavigate }) {
       }
       setLastSwipe({ company, direction, index: currentIndex, previousSwipeCount: dailySwipeCount });
       setShowUndo(true);
-      const icpProfileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
-      const icpProfileDoc = await getDoc(icpProfileRef);
-      const icpTitles = icpProfileDoc.exists() ? icpProfileDoc.data().targetTitles || [] : [];
+      // Persona comes from the ICP this company was found under — the same ICP
+      // the search was launched from — never from the companyProfile/current
+      // bridge. The bridge is a projection of whichever ICP was last made
+      // active globally, so reading it here meant a swipe under ICP B searched
+      // for ICP A's titles. resolveActiveIcp's own contract already says the
+      // bridge "is a projection; it is not an identity source".
+      //
+      // Fail closed: with no ICP resolved there are no titles, and the block
+      // below is skipped rather than falling back to someone else's persona.
+      const swipeIcp = await resolveSearchIcp(user);
+      const icpTitles = swipeIcp.profile?.targetTitles || [];
       if (direction === 'right' && icpTitles.length > 0) {
         const formattedTitles = icpTitles.map((title, index) => ({ title, rank: index + 1, score: 100 - (index * 10) }));
         await updateDoc(companyRef, { selected_titles: formattedTitles, titles_updated_at: new Date().toISOString(), titles_source: 'icp_auto' });
@@ -2026,9 +2034,12 @@ export default function DailyLeads({ onNavigate }) {
     const today = new Date().toISOString().split('T')[0];
     todayRef.current = today;
     try {
-      const profileRef = doc(db, 'users', user.uid, 'companyProfile', 'current');
-      const profileDoc = await getDoc(profileRef);
-      const titles = profileDoc.exists() ? (profileDoc.data().targetTitles ?? []) : [];
+      // Same rule as the swipe handler: the People tab searches the titles of
+      // the ICP on screen, not whichever ICP the bridge happens to project.
+      // No resolved ICP means no titles, which the existing 'no_titles' state
+      // already handles.
+      const peopleIcp = await resolveSearchIcp(user);
+      const titles = peopleIcp.profile?.targetTitles ?? [];
       if (titles.length === 0) { setPeopleModeEmpty('no_titles'); setPeopleLoading(false); return; }
       setTargetTitles(titles);
       targetTitlesRef.current = titles;

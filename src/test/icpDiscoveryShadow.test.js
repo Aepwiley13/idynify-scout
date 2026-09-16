@@ -199,6 +199,22 @@ describe('when the ICP has already met this company', () => {
     await recordDiscoveryEncounter(args());
     expect(eventWrites()[0].currentDocument).toEqual({ exists: false });
   });
+
+  // The deleted test only ever exercised a `rejected` relationship. A
+  // re-encounter can land on any state, and none of them may be disturbed.
+  it.each([['pending'], ['accepted'], ['rejected'], ['skipped']])(
+    'from %s: records provenance and disturbs nothing', async (state) => {
+      DOCS[`users/${UID}/icpRelationships/icp_A__company__co_1`] = enc({ state, icpId: ICP });
+      await recordDiscoveryEncounter(args());
+
+      expect(relWrites(), 'the relationship must not be written').toHaveLength(0);
+      expect(eventWrites(), 'exactly one event, never a burst').toHaveLength(1);
+
+      const f = eventWrites()[0].update.fields;
+      expect(f.eventType).toEqual({ stringValue: 'provenance_added' });
+      expect(f.fromState).toEqual({ stringValue: state });
+      expect(f.toState).toEqual({ stringValue: state });
+    });
 });
 
 // ── failure behaviour ───────────────────────────────────────────────────────

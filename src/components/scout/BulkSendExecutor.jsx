@@ -24,6 +24,8 @@ import { collection, addDoc, doc, updateDoc, getDoc, serverTimestamp } from 'fir
 import { executeSendAction, CHANNELS, SEND_RESULT } from '../../utils/sendActionResolver';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { db } from '../../firebase/config';
+import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
+import { ensureCriteriaVersion } from '../../services/icpRelationshipService';
 import { useT } from '../../theme/ThemeContext';
 
 export const SEND_DELAY_MS = 1500; // mandatory inter-send delay — do not remove
@@ -61,6 +63,9 @@ export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts,
   const [complete, setComplete] = useState(false);
   const startedRef = useRef(false); // guards StrictMode double-mount
   const cadenceIdRef = useRef(null); // pre-minted cadence doc id, threaded into each send for open tracking
+  // The ICP this send run is being made under. Resolved once, before the first
+  // enrollment row is built, and frozen for the run.
+  const icpContextRef = useRef(null);
 
   const items = payload || [];
   const total = items.length;
@@ -136,6 +141,13 @@ export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts,
       reason: null,
       gmailMessageId: null,
       gmailThreadId: null,
+      // The ICP this outreach was sent under, frozen at send. Together with
+      // gmailThreadId — already captured from the send result — this row is the
+      // outbound half of reply attribution; the inbound half is ADR-006's
+      // relationship_events, and the two are joined on the thread.
+      //
+      // Absent when no ICP resolved. Absence is Unattributed, never a guess.
+      ...(icpContextRef.current ?? {}),
     };
   }
 
@@ -144,6 +156,34 @@ export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts,
     startedRef.current = true;
 
     (async () => {
+      // ── ICP context for this engagement (Sprint 2) ───────────────────────
+      // Decision 3: persona ownership is decided when engagement BEGINS, from
+      // the ICP the user is acting from, and is then frozen for the life of the
+      // engagement. Resolved once here, stamped on every enrollment row below,
+      // and never re-read — editing the ICP afterwards cannot change what was
+      // already sent, because the row points at an immutable criteria version.
+      //
+      // Fail-closed: if no ICP resolves, nothing is stamped and those replies
+      // report Unattributed. A bulk send from a neutral surface has no ICP to
+      // infer, and inferring one is the fabrication this programme exists to
+      // end. The explicit-choice UI for that case is Sprint 3's.
+      try {
+        const uid = getEffectiveUser()?.uid;
+        if (uid) {
+          const resolution = await resolveActiveIcp(uid);
+          if (isResolved(resolution)) {
+            const version = await ensureCriteriaVersion(uid, resolution.icpId);
+            icpContextRef.current = {
+              icpId: resolution.icpId,
+              icpCriteriaVersionId: version?.versionId ?? null,
+              icpCriteriaFingerprint: version?.fingerprint ?? null,
+            };
+          }
+        }
+      } catch (err) {
+        console.warn('[cadence] ICP context unresolved — enrollments will be unattributed:', err?.message);
+      }
+
       // Pre-mint the cadence doc so its ID exists during the send loop — the
       // open-tracking pixel needs a real cadenceId at send time (the doc is no
       // longer created only at completion). Non-blocking: if this fails, the

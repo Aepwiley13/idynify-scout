@@ -293,8 +293,23 @@ describe('T-12 — nothing reads what the shadow writes', () => {
   const files = walk(SRC).filter(f => !f.endsWith('icpRelationshipService.js'));
   const importers = files.filter(f => /from ['"][^'"]*icpRelationshipService['"]/.test(stripComments(readFileSync(f, 'utf8'))));
 
-  it('only the wired write path imports the relationship service', () => {
-    expect(importers.map(f => f.replace(SRC + '/', ''))).toEqual(['pages/Scout/DailyLeads.jsx']);
+  /**
+   * The authorised WRITERS. This list only ever grows by review — adding a path
+   * here is a conversation about where its ICP came from, which is the whole
+   * point of the guarantee. It is not a list of readers; see the next two tests.
+   *
+   *   DailyLeads      company decisions, and the two person paths that carry
+   *                   ICP context (auto-discovery, People tab)
+   *   BulkSendExecutor  stamps the ICP an engagement was sent under, and mints
+   *                   the criteria version that stamp points at
+   */
+  const AUTHORISED_WRITERS = [
+    'components/scout/BulkSendExecutor.jsx',
+    'pages/Scout/DailyLeads.jsx',
+  ];
+
+  it('only authorised write paths import the relationship service', () => {
+    expect(importers.map(f => f.replace(SRC + '/', '')).sort()).toEqual(AUTHORISED_WRITERS);
   });
 
   it('and it imports only write functions, never a read', () => {

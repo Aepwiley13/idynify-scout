@@ -13,7 +13,8 @@ import { calculateICPScore, DEFAULT_WEIGHTS, generateMatchReasons } from '../../
 import { ARRIVAL_REVIEW_ICP } from '../../utils/firstExperienceMode';
 import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
 import { retrievalConstraints } from '../../utils/targetingProposal';
-import { getFitTier, getDisplayIndustry } from '../../utils/companyDisplay';
+import { getDisplayIndustry } from '../../utils/companyDisplay';
+import FitBadge from '../../components/mission-control/FitBadge';
 import useOnboardingState from '../../hooks/useOnboardingState';
 import AnimatedCounter from '../../components/AnimatedCounter';
 import TodaysPriorities from '../../components/mission-control/TodaysPriorities';
@@ -64,29 +65,6 @@ function KpiCard({ icon: Icon, label, value, color, subtitle, T }) {
   );
 }
 
-// ─── Fit Score Badge ─────────────────────────────────────────────────────────
-function FitBadge({ score }) {
-  // Threshold/color logic lives in the shared getFitTier util so the desktop
-  // table and the mobile card can never diverge. Output is byte-identical to
-  // the previous inline logic (green ≥75, amber ≥50, grey below).
-  // null = no ICP resolved, so there is no Company × ICP judgment to show. It
-  // is not a low score, and getFitTier would round it to a grey "Low Fit".
-  const unattributed = score === null || score === undefined;
-  const { color } = unattributed ? { color: '#888' } : getFitTier(score);
-  return (
-    <span
-      title={unattributed ? 'No active ICP — Match not scored' : undefined}
-      style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        padding: '4px 12px', borderRadius: 20, minWidth: 42,
-        background: `${color}18`, border: `1px solid ${color}40`,
-        fontSize: unattributed ? 11 : 13, fontWeight: 700, color,
-        fontVariantNumeric: 'tabular-nums',
-      }}>
-      {unattributed ? '—' : Math.round(score)}
-    </span>
-  );
-}
 
 // ─── Company Detail Panel ────────────────────────────────────────────────────
 function CompanyDetailPanel({ company, onClose, onApprove, T }) {
@@ -187,7 +165,7 @@ function CompanyDetailPanel({ company, onClose, onApprove, T }) {
             <div style={{ fontSize: 11, color: T.textMuted }}>
               {[industry, size && `${size} employees`, location].filter(Boolean).join(' · ')}
             </div>
-            <div style={{ marginTop: 4 }}><FitBadge score={Math.round(score)} /></div>
+            <div style={{ marginTop: 4 }}><FitBadge score={score} /></div>
           </div>
         </div>
 
@@ -1135,7 +1113,7 @@ export default function MissionControlDashboardV2() {
 
                     {/* Fit Score */}
                     <div style={{ textAlign: 'center' }}>
-                      <FitBadge score={company.fit_score == null ? null : Math.round(company.fit_score)} />
+                      <FitBadge score={company.fit_score} />
                     </div>
 
                     {/* Recommended Contact */}

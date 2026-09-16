@@ -1,69 +1,58 @@
 // ════════════════════════════════════════════════════════════════════════════
-//  PROPOSED — NOT DEPLOYED, NOT REFERENCED BY firebase.json.
+//  PROPOSED — VERIFIED, NOT YET DEPLOYED.
 //
-//  firebase.json points at firestore.rules, which is unchanged. This file
-//  exists so the intended change is reviewable as a real diff rather than as a
-//  comment, and so it can be pasted into the Firebase console Rules Playground.
+//  firebase.json still points at firestore.rules, which is unchanged. Deploy is
+//  a separate, explicitly approved action.
 //
-//  ⚠️  NOT VERIFIED AGAINST AN EMULATOR OR SIMULATOR.
-//      The Firestore emulator needs a Java runtime, and this machine has none
-//      ("Unable to locate a Java Runtime"). @firebase/rules-unit-testing is not
-//      installed and would need the emulator anyway, and the Firebase CLI
-//      session on this machine is expired. So the expression below is reasoned,
-//      not tested. The unverified part is specifically Path INDEXING on a
-//      recursive wildcard — `document[0]`, `document.size()` — which is
-//      documented behaviour but must be confirmed before deploy, because a rule
-//      that errors at evaluation time DENIES, and this one sits on the path
-//      that protects all user data.
+//  ✅ VERIFIED against a real Firestore emulator — 19/19 cases pass.
+//     Temurin JRE 21 fetched into a scratch dir, firebase-tools emulator run on
+//     throwaway project `demo-icp-rules`. No production project, no credentials,
+//     no network access to any real data. Reproduce with scripts/rules-check
+//     (see its README).
 //
-//  WHY THE CHANGE IS NEEDED
-//  ────────────────────────
-//  Sprint 1A's contract calls for the database itself to refuse update and
-//  delete on the two append-only collections, so "append-only" is structural
-//  rather than a convention a future call site can break:
+//  ─── WHAT VERIFICATION CAUGHT ───────────────────────────────────────────────
+//  The first draft of this file was wrong in two ways, and both denied silently
+//  rather than erroring at deploy time:
 //
+//   1. `document.size()` DOES NOT EXIST for a recursive-wildcard binding.
+//      The emulator reported "Function not found error: Name: [size]". A rule
+//      whose expression errors evaluates to DENY, so the guard did not merely
+//      fail to protect the append-only collections — it denied a legitimate
+//      update to users/{uid}/icpProfiles/{icpId}, the criteria-version pointer
+//      this sprint writes. That is the failure mode worth fearing: total write
+//      denial on ordinary paths, not a quiet data issue.
+//
+//   2. A RECURSIVE WILDCARD MATCHES ZERO OR MORE SEGMENTS.
+//      With size() removed, `match /{coll}/{docId}/{rest=**}` still matched the
+//      2-deep documents that the narrower rule above had just withheld, and
+//      because Firestore grants access if ANY matching rule allows it, the deep
+//      rule re-granted the update on lineageEvents. Every guard therefore has
+//      to be repeated on the deep rule.
+//
+//  Both are the kind of thing that reads as correct and behaves as neither.
+//
+//  ─── THE APPROACH THAT WORKS ────────────────────────────────────────────────
+//  No path introspection at all. `coll` and `sub` are SINGLE-segment wildcards,
+//  which bind plain strings and compare directly.
+//
+//  Append-only collections:
 //      users/{uid}/lineageEvents/{eventId}
 //      users/{uid}/icpProfiles/{icpId}/criteriaVersions/{versionId}
 //
-//  The deployed rules cannot express that today. `match /users/{userId}/
-//  {document=**}` grants `write` — create, update AND delete — to every
-//  subcollection, and Firestore evaluates ALL matching rules and grants access
-//  if ANY of them allows it. A more specific `allow update, delete: if false`
-//  is therefore ignored, not honoured. The only way to tighten is to narrow the
-//  catch-all, which is why this is a deliberate deploy rather than a ride-along.
+//  ─── RESULTS ────────────────────────────────────────────────────────────────
+//   01 create lineageEvents              ALLOW ✓   11 update exclusions        ALLOW ✓
+//   02 update lineageEvents              DENY  ✓   12 OTHER reads companies    DENY  ✓
+//   03 delete lineageEvents              DENY  ✓   13 update 3-deep timeline   ALLOW ✓
+//   04 get    lineageEvents              ALLOW ✓   14 update other icp subcoll ALLOW ✓
+//   05 create criteriaVersions           ALLOW ✓   15 delete own company       ALLOW ✓
+//   06 update criteriaVersions           DENY  ✓   16 update notifications     ALLOW ✓
+//   07 update icpProfiles (pointer)      ALLOW ✓   17 update own user doc      ALLOW ✓
+//   08 update icpRelationships           ALLOW ✓   18 OTHER creates event      DENY  ✓
+//   09 update companies  ← REGRESSION    ALLOW ✓   19 create then update ver.  DENY  ✓
+//   10 update contacts                   ALLOW ✓
 //
-//  UNTIL IT IS DEPLOYED
-//  ────────────────────
-//  Append-only is enforced by APPLICATION CODE ONLY, in
-//  icpRelationshipService.applyEvent, which reads the event id inside the
-//  transaction and no-ops when it already exists rather than overwriting it.
-//  Nothing in Sprint 1 reads these collections, so a mutation would be invisible
-//  to the product rather than corrupting a live read path.
-//
-//  SIMULATOR CASES TO RUN BEFORE APPROVING
-//  ───────────────────────────────────────
-//  Authenticated as uid "U", against this ruleset:
-//
-//   1. create users/U/lineageEvents/e1                          → ALLOW
-//   2. update users/U/lineageEvents/e1                          → DENY
-//   3. delete users/U/lineageEvents/e1                          → DENY
-//   4. get    users/U/lineageEvents/e1                          → ALLOW
-//   5. create users/U/icpProfiles/i1/criteriaVersions/v1        → ALLOW
-//   6. update users/U/icpProfiles/i1/criteriaVersions/v1        → DENY
-//   7. update users/U/icpProfiles/i1                            → ALLOW  (the
-//        currentCriteriaVersionId pointer — must NOT be caught by the guard)
-//   8. update users/U/icpRelationships/r1                       → ALLOW  (state
-//        moves; only events and versions are append-only)
-//   9. update users/U/companies/c1                              → ALLOW  (the
-//        regression that matters most — normal product writes must be untouched)
-//  10. update users/U/contacts/k1                               → ALLOW
-//  11. update users/U/exclusions/company__c1                    → ALLOW
-//  12. any operation as uid "OTHER" on users/U/...              → DENY
-//
-//  Case 9 is the one to watch. If Path indexing does not behave as expected,
-//  the likely failure is that isAppendOnly() errors and the whole
-//  `allow update, delete` denies — which would break ordinary product writes,
-//  not just the two protected collections.
+//  Until this is deployed, append-only is enforced by APPLICATION CODE ONLY, in
+//  icpRelationshipService.applyEvent. T-21 stays PARTIAL.
 // ════════════════════════════════════════════════════════════════════════════
 
 rules_version = '2';
@@ -74,54 +63,57 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
 
-    // The append-only collections, addressed by their path SHAPE relative to
-    // users/{userId}. `document` is the recursive wildcard's captured Path.
-    //
-    //   lineageEvents/{eventId}                          → size 2
-    //   icpProfiles/{icpId}/criteriaVersions/{versionId} → size 4
-    function isAppendOnly(document) {
-      return (document.size() == 2 && document[0] == 'lineageEvents')
-          || (document.size() == 4
-              && document[0] == 'icpProfiles'
-              && document[2] == 'criteriaVersions');
-    }
-
-    // The user's own document.
     match /users/{userId} {
       allow read: if owns(userId);
       allow write: if owns(userId);
+
+      // Every 2-deep document under the user. `coll` is a SINGLE-segment
+      // wildcard, so it is a plain string and can be compared directly — no
+      // path indexing and no size(), neither of which exists for the recursive
+      // wildcard binding.
+      match /{coll}/{docId} {
+        allow read:   if owns(userId);
+        allow create: if owns(userId);
+        allow update, delete: if owns(userId) && coll != 'lineageEvents';
+      }
+
+      // One level inside an ICP profile: criteriaVersions is append-only,
+      // any other subcollection of a profile behaves normally.
+      match /icpProfiles/{icpId}/{sub}/{subId} {
+        allow read:   if owns(userId);
+        allow create: if owns(userId);
+        allow update, delete: if owns(userId) && sub != 'criteriaVersions';
+      }
+
+      // Anything deeper, outside the subtrees handled above.
+      //
+      // NOTE: a recursive wildcard matches ZERO OR MORE segments, so this block
+      // ALSO matches the 2-deep documents above. Firestore grants access if ANY
+      // matching rule allows it, so every guard applied above has to be
+      // repeated here — omitting `lineageEvents` here silently re-granted the
+      // update the rule above had just withheld.
+      match /{coll}/{docId}/{rest=**} {
+        allow read:  if owns(userId);
+        allow write: if owns(userId)
+                     && coll != 'icpProfiles'
+                     && coll != 'lineageEvents';
+      }
     }
 
-    // User subcollections. Split from a single `allow write` so that update and
-    // delete can be withheld from the append-only collections while create,
-    // read and all ordinary product writes behave exactly as they do today.
-    match /users/{userId}/{document=**} {
-      allow read:   if owns(userId);
-      allow create: if owns(userId);
-      allow update, delete: if owns(userId) && !isAppendOnly(document);
-    }
-
-    // Notifications — explicit rule kept for clarity.
-    // process-barry-queue.js writes via Admin SDK (bypasses rules).
-    // HunterDashboard onSnapshot reads via web SDK (hits this rule).
     match /users/{userId}/notifications/{notificationId} {
       allow read, write: if owns(userId);
     }
 
-    // API Logs — write allowed for all authenticated users (for logging).
-    // Read access handled by admin backend (not exposed to frontend).
     match /apiLogs/{logId} {
       allow write: if request.auth != null;
       allow read: if false;
     }
 
-    // Dashboards — users can read and write their own.
     match /dashboards/{userId} {
       allow read: if owns(userId);
       allow write: if owns(userId);
     }
 
-    // Impersonation sessions — admin backend only (service account).
     match /impersonationSessions/{sessionId} {
       allow read, write: if false;
     }

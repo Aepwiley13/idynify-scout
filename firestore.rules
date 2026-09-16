@@ -45,15 +45,21 @@ service cloud.firestore {
     //   - nothing in Sprint 1 READS these collections, so a mutation would be
     //     invisible to the product rather than corrupting a live read path.
     //
-    // The intended ruleset is in firestore.rules.proposed, alongside the
-    // simulator cases that must pass before it is deployed. It is NOT
-    // referenced by firebase.json and has NOT been run against an emulator —
-    // this machine has no Java runtime, so the Firestore emulator cannot start
-    // here. Deploy is a deliberate, separately reviewed action.
+    // The intended ruleset is in firestore.rules.proposed. It is NOT referenced
+    // by firebase.json and is NOT deployed — deploy is a separate, explicitly
+    // approved action.
     //
-    // ACCEPTANCE STATUS, T-21: append-only is enforced by APPLICATION CODE
-    // ONLY. The database does not yet refuse update or delete on these
-    // collections. Do not record T-21 as met.
+    // It IS now verified: 19/19 cases pass against a real Firestore emulator on
+    // a throwaway `demo-` project (scripts/rules-check). Verification was worth
+    // doing — the reasoned first draft was wrong twice, and both faults denied
+    // silently rather than failing at deploy: `document.size()` does not exist
+    // for a recursive-wildcard binding (an erroring rule DENIES, which broke an
+    // ordinary write path), and a recursive wildcard matches zero or more
+    // segments, so the deep rule re-granted what the narrow rule withheld.
+    //
+    // ACCEPTANCE STATUS, T-21: still PARTIAL. Verified is not deployed —
+    // append-only is enforced by APPLICATION CODE ONLY until the proposed rules
+    // ship, and the database does not yet refuse update or delete here.
     // ─────────────────────────────────────────────────────────────────────────
 
     // Notifications subcollection — explicit rule for clarity.

@@ -1,0 +1,12 @@
+{
+  "name": "rules-check",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Runs the Firestore rules suite against a real emulator on a throwaway demo project. Invoke from the REPO ROOT so the CLI uses the root firebase.json.",
+  "dependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "firebase": "^12.6.0",
+    "firebase-tools": "^15.1.0"
+  }
+}

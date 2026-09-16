@@ -1,6 +1,11 @@
 /**
- * The 12 simulator cases from firestore.rules.proposed, run against a REAL
- * Firestore emulator on a throwaway `demo-` project.
+ * The rules suite, run against a REAL Firestore emulator on a throwaway
+ * `demo-` project.
+ *
+ * It reads ../../firestore.rules — THE LIVE FILE, not a copy — so any future
+ * change to the deployed ruleset is checked by this suite before it is
+ * reviewable. That is the point: the two faults this caught the first time
+ * both read as correct and behaved as neither.
  *
  * Case 9 is the one that matters: if Path indexing on the recursive wildcard
  * does not behave as reasoned, the likely failure is that isAppendOnly() errors
@@ -15,7 +20,7 @@ import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 
 const env = await initializeTestEnvironment({
   projectId: 'demo-icp-rules',
-  firestore: { rules: readFileSync('firestore.rules', 'utf8'), host: '127.0.0.1', port: 8080 },
+  firestore: { rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8'), host: '127.0.0.1', port: 8080 },
 });
 
 const U = 'U';

@@ -15,6 +15,50 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.uid == userId;
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // DEFERRED, ON PURPOSE: append-only enforcement for the Sprint 1A lineage
+    // records (users/{uid}/lineageEvents and
+    // users/{uid}/icpProfiles/{icpId}/criteriaVersions).
+    //
+    // The contract calls for the database itself to deny update and delete on
+    // those two collections, so "append-only" is structural rather than a
+    // convention a future call site can break. That is NOT expressed below,
+    // and adding it naively would not work:
+    //
+    //   Firestore evaluates EVERY matching rule and grants access if ANY of
+    //   them allows it. The `match /users/{userId}/{document=**}` block above
+    //   already grants `write` — which covers create, update AND delete — to
+    //   every subcollection. A more specific `allow update, delete: if false`
+    //   is therefore ignored, not honoured.
+    //
+    // Tightening it means narrowing that catch-all, which currently protects
+    // every user document in the product. The correct expression inspects the
+    // request path, and if it is wrong at evaluation time the rule denies —
+    // which would break every write for every user. There is no fail-open way
+    // to tighten a rule, so this cannot ride along unverified with a sprint
+    // whose whole posture is "safe to switch off".
+    //
+    // Until it is deployed deliberately, with a rules-simulator check:
+    //   - append-only is enforced in code, in icpRelationshipService.applyEvent,
+    //     which reads the event id inside the transaction and no-ops when it
+    //     already exists rather than overwriting it;
+    //   - nothing in Sprint 1 READS these collections, so a mutation would be
+    //     invisible to the product rather than corrupting a live read path.
+    //
+    // The intended shape, for review:
+    //
+    //   function owns(userId) {
+    //     return request.auth != null && request.auth.uid == userId;
+    //   }
+    //   match /users/{userId}/{document=**} {
+    //     allow read: if owns(userId);
+    //     allow create: if owns(userId);
+    //     allow update, delete: if owns(userId)
+    //       && !(document.size() == 2 && document[0] == 'lineageEvents')
+    //       && !(document.size() == 4 && document[2] == 'criteriaVersions');
+    //   }
+    // ─────────────────────────────────────────────────────────────────────────
+
     // Notifications subcollection — explicit rule for clarity.
     // process-barry-queue.js writes via Admin SDK (bypasses rules).
     // HunterDashboard onSnapshot reads via web SDK (hits this rule).

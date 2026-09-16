@@ -235,8 +235,8 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
     setDy(cy - s.current[1]);
   };
   const up = () => {
-    if (dx > 100) { setGone('r'); setTimeout(() => onAccept(null), 280); }
-    else if (dx < -100) { setGone('l'); setTimeout(onReject, 280); }
+    if (dx > 100) { setGone('r'); setTimeout(() => onAccept(null, 'drag'), 280); }
+    else if (dx < -100) { setGone('l'); setTimeout(() => onReject(null, 'drag'), 280); }
     else { setDx(0); setDy(0); }
     s.current = null;
   };
@@ -246,16 +246,16 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
     setIsFlipping(true);
     setTimeout(() => { setShowFeedback(true); setIsFlipping(false); }, 140);
   };
-  const handleSkipFeedback = () => { setGone('r'); setTimeout(() => onAccept(null), 280); };
-  const handleSendFeedback = () => { setGone('r'); setTimeout(() => onAccept({ reasons: feedbackReasons, note: feedbackNote, score: feedbackScore }), 280); };
+  const handleSkipFeedback = () => { setGone('r'); setTimeout(() => onAccept(null, 'button'), 280); };
+  const handleSendFeedback = () => { setGone('r'); setTimeout(() => onAccept({ reasons: feedbackReasons, note: feedbackNote, score: feedbackScore }, 'button'), 280); };
 
   const handleRejectClick = (e) => {
     e.stopPropagation();
     setIsFlipping(true);
     setTimeout(() => { setShowRejectionFeedback(true); setIsFlipping(false); }, 140);
   };
-  const handleSkipRejectionFeedback = () => { setGone('l'); setTimeout(() => onReject(null), 280); };
-  const handleSendRejectionFeedback = () => { setGone('l'); setTimeout(() => onReject({ reasons: rejectionReasons, note: rejectionNote }), 280); };
+  const handleSkipRejectionFeedback = () => { setGone('l'); setTimeout(() => onReject(null, 'button'), 280); };
+  const handleSendRejectionFeedback = () => { setGone('l'); setTimeout(() => onReject({ reasons: rejectionReasons, note: rejectionNote }, 'button'), 280); };
 
   const tx = gone === 'r' ? 700 : gone === 'l' ? -700 : dx;
   // G1-06: a null score means "configured criteria, but nothing measurable on
@@ -741,10 +741,10 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
 }
 
 // ─── QueueListPanel ───────────────────────────────────────────────────────────
-function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose, mobile = false }) {
+function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo, onClose, mobile = false }) {
   const T = useT();
   const upcoming = companies.slice(currentIndex);
-  const skipped = companies.filter(c => skippedIds.includes(c.id));
+  const rejected = companies.filter(c => rejectedIds.includes(c.id));
 
   const ScorePip = ({ score }) => {
     const c = score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : STATUS.red;
@@ -816,12 +816,12 @@ function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose
                 <div style={{ padding: '24px 18px', textAlign: 'center', color: T.textFaint, fontSize: 12 }}>Queue is empty</div>
               )}
             </div>
-            {skipped.length > 0 && (
+            {rejected.length > 0 && (
               <>
                 <div style={{ padding: '8px 18px 4px', fontSize: 9, letterSpacing: 2, color: T.textFaint, fontWeight: 700, borderTop: `1px solid ${T.border}` }}>
-                  SKIPPED THIS SESSION
+                  NOT A MATCH THIS SESSION
                 </div>
-                {skipped.map(co => (
+                {rejected.map(co => (
                   <div
                     key={co.id}
                     onClick={() => { const idx = companies.findIndex(c => c.id === co.id); if (idx >= 0) { onJumpTo(idx); onClose(); } }}
@@ -890,13 +890,13 @@ function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose
           )}
         </div>
 
-        {/* Skipped */}
-        {skipped.length > 0 && (
+        {/* Rejected */}
+        {rejected.length > 0 && (
           <>
             <div style={{ padding: '8px 18px 4px', fontSize: 9, letterSpacing: 2, color: T.textFaint, fontWeight: 700, borderTop: `1px solid ${T.border}` }}>
-              SKIPPED THIS SESSION
+              NOT A MATCH THIS SESSION
             </div>
-            {skipped.map(co => (
+            {rejected.map(co => (
               <div
                 key={co.id}
                 onClick={() => { const idx = companies.findIndex(c => c.id === co.id); if (idx >= 0) { onJumpTo(idx); onClose(); } }}
@@ -923,7 +923,7 @@ function QueueListPanel({ companies, currentIndex, skippedIds, onJumpTo, onClose
 }
 
 // ─── SessionSummaryScreen ─────────────────────────────────────────────────────
-function SessionSummaryScreen({ reviewed, saved, skipped, streak, savedCompanies, onViewSaved, onDismiss, onRefresh, isRefreshing }) {
+function SessionSummaryScreen({ reviewed, saved, rejected, streak, savedCompanies, onViewSaved, onDismiss, onRefresh, isRefreshing }) {
   const T = useT();
   const matchRate = reviewed > 0 ? Math.round((saved / reviewed) * 100) : 0;
   const topMatch = savedCompanies.length > 0
@@ -941,7 +941,7 @@ function SessionSummaryScreen({ reviewed, saved, skipped, streak, savedCompanies
         {[
           ['Reviewed', reviewed, T.text, T.surface],
           ['Saved', saved, BRAND.pink, T.accentBg],
-          ['Skipped', skipped, T.textMuted, T.surface],
+          ['Not a match', rejected, T.textMuted, T.surface],
           ['Match Rate', `${matchRate}%`, STATUS.green, `${STATUS.green}10`],
         ].map(([label, value, color, bg]) => (
           <div key={label} style={{ padding: '12px 14px', background: bg, borderRadius: 12, border: `1px solid ${T.border2}`, textAlign: 'center' }}>
@@ -1357,12 +1357,12 @@ export default function DailyLeads({ onNavigate }) {
   // ── Session stats ────────────────────────────────────────────────────────────
   const [sessionReviewed, setSessionReviewed] = useState(0);
   const [sessionSaved, setSessionSaved] = useState(0);
-  const [sessionSkipped, setSessionSkipped] = useState(0);
+  const [sessionRejected, setSessionRejected] = useState(0);
   const [sessionSavedCompanies, setSessionSavedCompanies] = useState([]);
 
   // ── Extended undo history (up to 5) ──────────────────────────────────────────
   const [swipeHistory, setSwipeHistory] = useState([]);
-  const [skippedInSession, setSkippedInSession] = useState([]); // company ids
+  const [rejectedInSession, setRejectedInSession] = useState([]); // company ids rejected this session
   const undoTimerRef = useRef(null);
 
   // ── Queue list view ──────────────────────────────────────────────────────────
@@ -1438,8 +1438,8 @@ export default function DailyLeads({ onNavigate }) {
       if (showTitleSetup || showICPChat || barryPanelOpen || queueListOpen) return;
 
       if (tab === 'companies' && !showBatchEnd) {
-        if (e.key === 'ArrowRight' || e.key === 'l' || e.key === 'L') { e.preventDefault(); handleSwipeRef.current?.('right'); }
-        if (e.key === 'ArrowLeft' || e.key === 'j' || e.key === 'J') { e.preventDefault(); handleSwipeRef.current?.('left'); }
+        if (e.key === 'ArrowRight' || e.key === 'l' || e.key === 'L') { e.preventDefault(); handleSwipeRef.current?.('right', null, 'keyboard'); }
+        if (e.key === 'ArrowLeft' || e.key === 'j' || e.key === 'J') { e.preventDefault(); handleSwipeRef.current?.('left', null, 'keyboard'); }
         if ((e.key === 'u' || e.key === 'U') && swipeHistory.length > 0) { e.preventDefault(); handleUndoRef.current?.(); }
       }
       if (e.key === 'b' || e.key === 'B') { e.preventDefault(); setBarryPanelOpen(true); }
@@ -1704,7 +1704,7 @@ export default function DailyLeads({ onNavigate }) {
     setCurrentIndex(0);
   }, [activeICPId, icpList, companies]);
 
-  const handleSwipe = async (direction, feedback = null) => {
+  const handleSwipe = async (direction, feedback = null, gesture = 'unknown') => {
     const user = getEffectiveUser();
     if (!user) return;
     const today = new Date().toISOString().split('T')[0];
@@ -1722,6 +1722,14 @@ export default function DailyLeads({ onNavigate }) {
         status: direction === 'right' ? 'accepted' : 'rejected',
         swipedAt: new Date().toISOString(),
         swipeDirection: direction,
+        // WHICH gesture produced this decision — keyboard | drag | button.
+        // Distinct from `swipe_source`, which names the SURFACE (people_mode,
+        // barry_first_value). Recorded because all three reject gestures wrote
+        // byte-identical documents, so a rejection's origin was unrecoverable:
+        // a keyboard press and a deliberate "Not a Match" were indistinguishable
+        // forever. Written, never read — it exists so the question stays
+        // answerable later. 'unknown' means a call site forgot to say.
+        swipe_gesture: gesture,
         ...(activeICPId ? { swipedForICPId: activeICPId } : {}),
         ...(direction === 'right' && feedback ? { barryFeedback: feedback, feedbackAt: new Date().toISOString() } : {}),
         ...(direction === 'left' && feedback ? { barryRejectionFeedback: feedback, rejectionFeedbackAt: new Date().toISOString() } : {}),
@@ -1810,10 +1818,10 @@ export default function DailyLeads({ onNavigate }) {
       // ── Session stats ─────────────────────────────────────────────────────
       const newReviewed = sessionReviewed + 1;
       const newSaved = isInterested ? sessionSaved + 1 : sessionSaved;
-      const newSkipped = !isInterested ? sessionSkipped + 1 : sessionSkipped;
+      const newRejected = !isInterested ? sessionRejected + 1 : sessionRejected;
       setSessionReviewed(newReviewed);
       setSessionSaved(newSaved);
-      setSessionSkipped(newSkipped);
+      setSessionRejected(newRejected);
       if (isInterested) {
         setSessionSavedCompanies(prev => [...prev, company]);
       }
@@ -1827,12 +1835,12 @@ export default function DailyLeads({ onNavigate }) {
       if (!isInterested) {
         if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
         setShowUndo(true);
-        setSkippedInSession(prev => [...prev, company.id]);
+        setRejectedInSession(prev => [...prev, company.id]);
         undoTimerRef.current = setTimeout(() => setShowUndo(false), 5000);
       } else {
         setShowUndo(false);
-        // Remove from skipped list if re-swiped right
-        setSkippedInSession(prev => prev.filter(id => id !== company.id));
+        // Remove from the rejected list if re-swiped right
+        setRejectedInSession(prev => prev.filter(id => id !== company.id));
       }
 
       // ── Streak update (first swipe of today) ─────────────────────────────
@@ -1897,7 +1905,7 @@ export default function DailyLeads({ onNavigate }) {
     const today = new Date().toISOString().split('T')[0];
     try {
       const companyRef = doc(db, 'users', user.uid, 'companies', entry.company.id);
-      await updateDoc(companyRef, { status: 'pending', swipedAt: null, swipeDirection: null });
+      await updateDoc(companyRef, { status: 'pending', swipedAt: null, swipeDirection: null, swipe_gesture: null });
       if (entry.direction === 'right') {
         const swipeProgressRef = doc(db, 'users', user.uid, 'scoutProgress', 'swipes');
         await setDoc(swipeProgressRef, { dailySwipeCount: entry.previousSwipeCount, lastSwipeDate: today, hasSeenTitleSetup });
@@ -1910,8 +1918,8 @@ export default function DailyLeads({ onNavigate }) {
         setSessionSaved(prev => Math.max(0, prev - 1));
         setSessionSavedCompanies(prev => prev.filter(c => c.id !== entry.company.id));
       } else {
-        setSessionSkipped(prev => Math.max(0, prev - 1));
-        setSkippedInSession(prev => prev.filter(id => id !== entry.company.id));
+        setSessionRejected(prev => Math.max(0, prev - 1));
+        setRejectedInSession(prev => prev.filter(id => id !== entry.company.id));
       }
       setSessionReviewed(prev => Math.max(0, prev - 1));
       // Pop from history
@@ -2431,7 +2439,7 @@ export default function DailyLeads({ onNavigate }) {
                   <SessionSummaryScreen
                     reviewed={sessionReviewed}
                     saved={sessionSaved}
-                    skipped={sessionSkipped}
+                    rejected={sessionRejected}
                     streak={streakDays}
                     savedCompanies={sessionSavedCompanies}
                     onViewSaved={() => onNavigate ? onNavigate('saved') : navigate('/scout', { state: { activeTab: 'saved-companies' } })}
@@ -2478,7 +2486,7 @@ export default function DailyLeads({ onNavigate }) {
                 <SessionSummaryScreen
                   reviewed={sessionReviewed}
                   saved={sessionSaved}
-                  skipped={sessionSkipped}
+                  rejected={sessionRejected}
                   streak={streakDays}
                   savedCompanies={sessionSavedCompanies}
                   onViewSaved={() => onNavigate ? onNavigate('saved') : navigate('/scout', { state: { activeTab: 'saved-companies' } })}
@@ -2601,8 +2609,8 @@ export default function DailyLeads({ onNavigate }) {
                       <CompanySwipeCard
                         key={currentCompany.id}
                         company={currentCompany}
-                        onAccept={(feedback) => handleSwipe('right', feedback)}
-                        onReject={(feedback) => handleSwipe('left', feedback)}
+                        onAccept={(feedback, gesture) => handleSwipe('right', feedback, gesture)}
+                        onReject={(feedback, gesture) => handleSwipe('left', feedback, gesture)}
                         wide={isDesktop}
                         icpProfile={icpProfile}
                         icpWeights={icpWeights}
@@ -2750,7 +2758,7 @@ export default function DailyLeads({ onNavigate }) {
                 {[
                   ['REVIEWED', sessionReviewed, T.text, T.surface],
                   ['SAVED', sessionSaved, BRAND.pink, T.accentBg],
-                  ['SKIPPED', sessionSkipped, T.textMuted, T.surface],
+                  ['NOT A MATCH', sessionRejected, T.textMuted, T.surface],
                   ['MATCH %', sessionReviewed > 0 ? `${Math.round((sessionSaved / sessionReviewed) * 100)}%` : '—', STATUS.green, `${STATUS.green}10`],
                 ].map(([label, value, color, bg]) => (
                   <div key={label} style={{ padding: '8px 10px', background: bg, borderRadius: 9, border: `1px solid ${T.border2}` }}>
@@ -2892,7 +2900,7 @@ export default function DailyLeads({ onNavigate }) {
         <QueueListPanel
           companies={companies}
           currentIndex={currentIndex}
-          skippedIds={skippedInSession}
+          rejectedIds={rejectedInSession}
           onJumpTo={(idx) => setCurrentIndex(idx)}
           onClose={() => setQueueListOpen(false)}
           mobile={!isDesktop}

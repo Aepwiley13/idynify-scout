@@ -25,7 +25,7 @@ import { RECORD_STATUS } from '../../constants/statusModel';
 import { calculateReconConfidence } from '../../utils/reconConfidence';
 import { ARRIVAL_REVIEW_ICP } from '../../utils/firstExperienceMode';
 import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
-import { recordDecision } from '../../services/icpRelationshipService';
+import { recordDecision, recordSkip } from '../../services/icpRelationshipService';
 
 // ─── Initials avatar ─────────────────────────────────────────────────────────
 function Av({ initials, color = BRAND.pink, size = 70 }) {
@@ -211,7 +211,7 @@ function FeedbackFace({ entityName, reasons, setReasons, note, setNote, score, s
 }
 
 // ─── CompanySwipeCard ─────────────────────────────────────────────────────────
-function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfile, icpWeights }) {
+function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = false, icpProfile, icpWeights }) {
   const T = useT();
   const [dx, setDx] = useState(0);
   const [dy, setDy] = useState(0);
@@ -257,6 +257,11 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
   };
   const handleSkipRejectionFeedback = () => { setGone('l'); setTimeout(() => onReject(null, 'button'), 280); };
   const handleSendRejectionFeedback = () => { setGone('l'); setTimeout(() => onReject({ reasons: rejectionReasons, note: rejectionNote }, 'button'), 280); };
+  // Not a decision, so it does not animate off to either side — a skip is
+  // "not now", and the card simply steps aside. Placement and styling are
+  // Sprint 3's to settle; this is parity with the affordance PersonSwipeCard
+  // has had all along, so Skip is reachable at all.
+  const handleSkipClick = (e) => { e.stopPropagation(); onSkip?.(); };
 
   const tx = gone === 'r' ? 700 : gone === 'l' ? -700 : dx;
   // G1-06: a null score means "configured criteria, but nothing measurable on
@@ -578,6 +583,12 @@ function CompanySwipeCard({ company, onAccept, onReject, wide = false, icpProfil
             onClick={handleMatchClick}
             style={{ flex: 1, padding: wide ? 12 : 10, borderRadius: 11, border: `1.5px solid ${STATUS.green}40`, background: `${STATUS.green}0c`, color: STATUS.green, fontSize: wide ? 13 : 12, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}
           ><Check size={14} />This is a Match</button>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: wide ? '6px 16px 8px' : '4px 12px 6px' }}>
+          <button
+            onClick={handleSkipClick}
+            style={{ padding: '6px 14px', borderRadius: 10, border: 'none', background: 'transparent', color: T.textFaint, fontSize: 11, cursor: 'pointer' }}
+          >⊙ Skip for now</button>
         </div>
       </div>
     </div>
@@ -1364,6 +1375,11 @@ export default function DailyLeads({ onNavigate }) {
   // ── Extended undo history (up to 5) ──────────────────────────────────────────
   const [swipeHistory, setSwipeHistory] = useState([]);
   const [rejectedInSession, setRejectedInSession] = useState([]); // company ids rejected this session
+  // The discovery run the queue is being served from. A company skipped in THIS
+  // cycle stays hidden; a later run reveals it. Null means "unknown", and the
+  // filter then hides nothing — failing toward showing a card is recoverable,
+  // hiding one forever is not.
+  const [currentCycleId, setCurrentCycleId] = useState(null);
   const undoTimerRef = useRef(null);
 
   // ── Queue list view ──────────────────────────────────────────────────────────
@@ -1495,6 +1511,13 @@ export default function DailyLeads({ onNavigate }) {
         return;
       }
 
+      // Which discovery run this queue belongs to. Read before the queue query
+      // because the skip filter below needs it.
+      const progressSnap = await getDoc(doc(db, 'users', user.uid, 'scoutProgress', 'swipes'))
+        .catch(() => null);
+      const cycleNow = progressSnap?.exists?.() ? (progressSnap.data().currentCycleId ?? null) : null;
+      setCurrentCycleId(cycleNow);
+
       const companiesRef = collection(db, 'users', user.uid, 'companies');
       const q = query(companiesRef, where('status', '==', 'pending'));
       const snapshot = await getDocs(q);
@@ -1502,9 +1525,19 @@ export default function DailyLeads({ onNavigate }) {
 
       // Filter to companies for the active ICP. Companies with no icpId are legacy (show for all ICPs).
       const activeId = isResolved(resolution) ? resolution.icpId : null;
-      const companiesData = activeId
+      const forActiveIcp = activeId
         ? allPendingData.filter(c => !c.icpId || c.icpId === activeId)
         : allPendingData;
+
+      // ── The skip cycle guard ──────────────────────────────────────────────
+      // A skipped company keeps `status: 'pending'` on purpose: `pending`
+      // already blocks rediscovery, so skip needs no change to
+      // DEDUP_BLOCKING_STATUSES and adds nothing to the overwrite exposure.
+      // What makes it disappear is this filter, and what makes it come back is
+      // the cycle id moving on.
+      const companiesData = cycleNow
+        ? forActiveIcp.filter(c => c.skippedInCycle !== cycleNow)
+        : forActiveIcp;
 
       // Score companies against active ICP (reasons from the same shared fn)
       const scoredData = companiesData.map(c => ({
@@ -1651,6 +1684,20 @@ export default function DailyLeads({ onNavigate }) {
       });
       clearTimeout(timeout);
       clearTimeout(slowTimer);
+
+      // Remember which run served this queue. The skip filter compares a
+      // company's `skippedInCycle` to it, so a skip lasts exactly one run.
+      try {
+        const searched = await response.clone().json();
+        if (searched?.cycleId) {
+          setCurrentCycleId(searched.cycleId);
+          await setDoc(
+            doc(db, 'users', user.uid, 'scoutProgress', 'swipes'),
+            { currentCycleId: searched.cycleId },
+            { merge: true },
+          );
+        }
+      } catch { /* the search itself already succeeded; this is bookkeeping */ }
 
       const data = await response.json();
       if (data.success) {
@@ -1929,6 +1976,58 @@ export default function DailyLeads({ onNavigate }) {
     } catch (error) {
       console.error('Error handling swipe:', error);
       alert('Failed to save swipe. Please try again.');
+    }
+  };
+
+  /**
+   * Skip — "not now", and explicitly not a decision.
+   *
+   * The legacy document keeps `status: 'pending'`. That is the whole point of
+   * the approved shape: `pending` already blocks rediscovery, so skip needs no
+   * change to DEDUP_BLOCKING_STATUSES and adds nothing to the overwrite
+   * exposure. What hides the card is `skippedInCycle` plus the queue filter in
+   * loadTodayLeads; what brings it back is the cycle id moving on, which
+   * happens on the next discovery run.
+   *
+   * Nothing here writes a decision: no swipedAt, no swipeDirection, no
+   * swipedForICPId, no swipe_gesture. A skip that left decision fields behind
+   * would read as a rejection to every consumer of those fields.
+   */
+  const handleSkipCompany = async () => {
+    const user = getEffectiveUser();
+    if (!user) return;
+    const company = companies[currentIndex];
+    if (!company) return;
+
+    try {
+      const skippedAt = new Date().toISOString();
+
+      // Legacy first, and field-scoped: this document carries a lifetime of
+      // provenance that an unmasked write would delete.
+      await updateDoc(doc(db, 'users', user.uid, 'companies', company.id), {
+        skippedInCycle: currentCycleId ?? null,
+        skippedAt,
+      });
+
+      // Shadow second, fail-soft. The relationship moves to `skipped` and
+      // records the cycle, so the guard agrees on both sides at cutover.
+      if (activeICPId) {
+        await recordSkip({
+          userId: user.uid,
+          subjectId: company.id,
+          icpId: activeICPId,
+          causeId: skippedAt,
+          cycleId: currentCycleId ?? null,
+          source: company.source ?? null,
+        });
+      }
+
+      setActionToast({ message: `${company.name} — back next run`, type: 'info' });
+      setTimeout(() => setActionToast(null), 2200);
+      setCompanies(prev => prev.filter(c => c.id !== company.id));
+      setCurrentIndex(i => Math.min(i, Math.max(0, companies.length - 2)));
+    } catch (err) {
+      console.error('Skip failed:', err);
     }
   };
 
@@ -2650,6 +2749,7 @@ export default function DailyLeads({ onNavigate }) {
                         company={currentCompany}
                         onAccept={(feedback, gesture) => handleSwipe('right', feedback, gesture)}
                         onReject={(feedback, gesture) => handleSwipe('left', feedback, gesture)}
+                        onSkip={handleSkipCompany}
                         wide={isDesktop}
                         icpProfile={icpProfile}
                         icpWeights={icpWeights}

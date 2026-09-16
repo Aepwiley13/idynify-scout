@@ -776,6 +776,11 @@ export const handler = async (event) => {
       },
       body: JSON.stringify({
         success: true,
+        // The client persists this and compares it to a company's
+        // `skippedInCycle`: a skip hides the card for THIS run, and a later run
+        // reveals it again. Returned rather than derived so both sides use the
+        // same value.
+        cycleId,
         companiesFound: companies.length,
         companiesAdded: toAdd.length,
         currentQueueSize: pendingCount + toAdd.length,

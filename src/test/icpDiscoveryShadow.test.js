@@ -167,13 +167,54 @@ describe('a fresh discovery hit', () => {
 });
 
 describe('when the ICP has already met this company', () => {
-  it('records nothing — resurfacing is an admission decision, and admission is dark', async () => {
+  // Superseded by Option C: a re-encounter now ACCUMULATES provenance rather
+  // than recording nothing. Decision 6, arriving on the one path that had only
+  // ever overwritten.
+  beforeEach(() => {
     DOCS[`users/${UID}/icpRelationships/icp_A__company__co_1`] = enc({ state: 'rejected', icpId: ICP });
-    const r = await recordDiscoveryEncounter(args());
-    expect(r.skipped).toBe(true);
-    expect(r.reason).toBe('relationship-already-exists');
-    expect(eventWrites()).toHaveLength(0);
   });
+
+  it('records a provenance_added event instead of nothing', async () => {
+    const r = await recordDiscoveryEncounter(args());
+    expect(r.reEncounter).toBe(true);
+    const ev = eventWrites();
+    expect(ev).toHaveLength(1);
+    expect(ev[0].update.fields.eventType).toEqual({ stringValue: 'provenance_added' });
+    expect(ev[0].update.fields.source).toEqual({ stringValue: 'apollo_api' });
+  });
+
+  it('leaves the relationship untouched — resurfacing is an admission decision', async () => {
+    await recordDiscoveryEncounter(args());
+    expect(relWrites()).toHaveLength(0);
+  });
+
+  it('is state-neutral: the event records the same state on both sides', async () => {
+    await recordDiscoveryEncounter(args());
+    const f = eventWrites()[0].update.fields;
+    expect(f.fromState).toEqual({ stringValue: 'rejected' });
+    expect(f.toState).toEqual({ stringValue: 'rejected' });
+  });
+
+  it('is create-only, so a retried run does not duplicate the provenance', async () => {
+    await recordDiscoveryEncounter(args());
+    expect(eventWrites()[0].currentDocument).toEqual({ exists: false });
+  });
+
+  // The deleted test only ever exercised a `rejected` relationship. A
+  // re-encounter can land on any state, and none of them may be disturbed.
+  it.each([['pending'], ['accepted'], ['rejected'], ['skipped']])(
+    'from %s: records provenance and disturbs nothing', async (state) => {
+      DOCS[`users/${UID}/icpRelationships/icp_A__company__co_1`] = enc({ state, icpId: ICP });
+      await recordDiscoveryEncounter(args());
+
+      expect(relWrites(), 'the relationship must not be written').toHaveLength(0);
+      expect(eventWrites(), 'exactly one event, never a burst').toHaveLength(1);
+
+      const f = eventWrites()[0].update.fields;
+      expect(f.eventType).toEqual({ stringValue: 'provenance_added' });
+      expect(f.fromState).toEqual({ stringValue: state });
+      expect(f.toState).toEqual({ stringValue: state });
+    });
 });
 
 // ── failure behaviour ───────────────────────────────────────────────────────

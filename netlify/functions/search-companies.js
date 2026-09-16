@@ -1361,7 +1361,14 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
       // Use Apollo's actual industry data; never fall back to the ICP's own industry
       // label — that creates a circular match where the company trivially matches
       // the ICP on a value the ICP itself supplied.
-      const industry = company.industry || company.primary_industry || 'Unknown';
+      //
+      // And never fall back to 'Unknown' either. That string is truthy, so the
+      // scorer read it as a real industry that simply matched nothing, scored a
+      // hard 0, and validateCompanyData then dropped the company below the fit
+      // gate — meaning an industry-poor Apollo batch filtered itself down to an
+      // empty queue. Absent stays absent: the scorer reports it as unmeasured
+      // (G1-06) rather than as a miss.
+      const industry = company.industry || company.primary_industry || null;
 
       const companyObj = {
         // IDs
@@ -1538,16 +1545,26 @@ function enrichCompanyData(company, companyProfile) {
 /**
  * Validate company data before saving
  */
-function validateCompanyData(company) {
-  // Require minimum fit score of 50%
-  if (company.fit_score < 50) {
+export function validateCompanyData(company) {
+  // Require minimum fit score of 50% — but only where a score was actually
+  // computed. calculateICPScore returns null for "configured, but nothing
+  // measurable" (G1-06), and `null < 50` is TRUE in JavaScript because null
+  // coerces to 0. So the gate was rejecting "we could not evaluate this" as
+  // though it were "we evaluated this and it scored zero" — collapsing exactly
+  // the distinction G1-06 exists to preserve.
+  const scored = company.fit_score !== null && company.fit_score !== undefined;
+  if (scored && company.fit_score < 50) {
     console.log(`⚠️  Filtering out ${company.name}: Low fit score (${company.fit_score}%)`);
     return false;
   }
 
   // Require at least name and one other key field
   const hasName = company.name && company.name !== 'Unknown Company';
-  const hasIndustry = company.industry && company.industry !== 'Unknown Industry';
+  // One sentinel, one meaning. This previously guarded 'Unknown Industry' while
+  // the write path stamped 'Unknown' — two different strings, so the check never
+  // fired on the value that was actually being written. Industry is now either a
+  // real value or absent, so a plain presence test is the whole rule.
+  const hasIndustry = Boolean(company.industry && String(company.industry).trim());
   const hasLocation = company.headquarters_location && company.headquarters_location !== 'Unknown';
 
   if (!hasName) {

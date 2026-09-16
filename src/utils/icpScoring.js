@@ -54,10 +54,33 @@ const REVENUE_RANGES = [
 // LinkedIn import) with inconsistent field names. Resolve each dimension from
 // whatever is present rather than assuming one canonical name.
 
-/** Company's industry, across the known field names. */
+/**
+ * Placeholder strings discovery has historically stamped onto a company when
+ * the source had no industry. They are the ABSENCE of data wearing the costume
+ * of a value, and treating them as one is what made a company with no industry
+ * score WORSE than a company with no industry field at all: the sentinel is
+ * truthy, so it skipped the `unknown` branch in evalIndustry and fell through
+ * to a hard 0 — a real miss — instead of being reported as unmeasured.
+ */
+const INDUSTRY_PLACEHOLDERS = new Set(['unknown', 'unknown industry', 'n/a', 'none', 'null']);
+
+/**
+ * Company's industry, across the known field names.
+ *
+ * Legacy rows still carry `primary_industry` / `company_industry`, so both are
+ * still read. A placeholder resolves to null — "we do not know" — which is the
+ * honest answer and the one G1-06 already knows how to score.
+ */
 function resolveIndustry(company) {
   const v = company.industry || company.primary_industry || company.company_industry;
-  return typeof v === 'string' && v.trim() ? v.trim() : null;
+  if (typeof v !== 'string') return null;
+  const trimmed = v.trim();
+  if (!trimmed) return null;
+  if (INDUSTRY_PLACEHOLDERS.has(trimmed.toLowerCase())) return null;
+  // `empty` also covers punctuation-only strings that survive the trim above
+  // but carry no industry signal.
+  if (normalizeIndustry(trimmed).status === 'empty') return null;
+  return trimmed;
 }
 
 /** Company's state/location, across the known field names. */
@@ -168,13 +191,18 @@ function parseRevenueToNumber(value) {
 
 /**
  * Resolve a free-text industry string to its Apollo canonical name via the
- * alias map in normalizeTargeting. Returns the canonical name or the
- * original string if no mapping exists.
+ * alias map in normalizeTargeting.
+ *
+ * Returns null when no canonical name exists. It deliberately does NOT fall
+ * back to the input: a raw string is not a canonical name, and returning one
+ * from a function named `toCanonical` let unsupported values enter the
+ * canonical comparison disguised as canonical ones. Raw strings still get their
+ * own comparison pass in evalIndustry — that path is explicit and stays.
  */
 function toCanonical(text) {
   if (!text) return null;
   const result = normalizeIndustry(text);
-  return result.status === 'matched' ? result.value : text;
+  return result.status === 'matched' ? result.value : null;
 }
 
 function evalIndustry(company, icp) {

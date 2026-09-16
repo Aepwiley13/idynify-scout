@@ -12,6 +12,7 @@ import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getGmailSignatureHtml, appendSignatureHtml } from './utils/gmailSignature.js';
+import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {
@@ -421,10 +422,16 @@ export const handler = async (event) => {
           // Fresh send — record the new thread so replies can be tracked
           contactUpdate.gmail_thread_id = gmailThreadId;
         }
-        await db
+        const contactRef = db
           .collection('users').doc(userId)
-          .collection('contacts').doc(contactId)
-          .update(contactUpdate);
+          .collection('contacts').doc(contactId);
+        // Engaging a contact means the user kept it, so it can no longer be a
+        // discovery suggestion. Merged into the send's own write.
+        Object.assign(
+          contactUpdate,
+          await engagementPromotionPatch(contactRef, 'gmail_send_quick'),
+        );
+        await contactRef.update(contactUpdate);
         const threadLabel = existingThreadId ? `existing thread ${existingThreadId}` : `new thread ${gmailThreadId}`;
         console.log(`✅ Contact updated — ${threadLabel}, hunter_status → awaiting_reply`);
       } catch (updateErr) {

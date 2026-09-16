@@ -22,6 +22,7 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
 import { writeTimelineEvent, ACTORS } from './utils/timelineWrite.js';
+import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 
 // Initialize Firebase Admin (singleton guard)
 if (getApps().length === 0) {
@@ -221,9 +222,15 @@ async function sendScheduledEmail(userId, docRef, eng, results) {
     if (!existingThreadId && gmailThreadId) {
       contactUpdate.gmail_thread_id = gmailThreadId;
     }
-    await db.collection('users').doc(userId)
-      .collection('contacts').doc(contactId)
-      .update(contactUpdate).catch(() => {});
+    const contactRef = db.collection('users').doc(userId)
+      .collection('contacts').doc(contactId);
+    // Engaging a contact means the user kept it, so it can no longer be a
+    // discovery suggestion. Merged into the send's own write.
+    Object.assign(
+      contactUpdate,
+      await engagementPromotionPatch(contactRef, 'scheduled_engagement'),
+    );
+    await contactRef.update(contactUpdate).catch(() => {});
   }
 
   // Log timeline event
@@ -460,6 +467,10 @@ async function sendScheduledWave(userId, waveRef, wave, results) {
       if (!existingThreadId && gmailThreadId) {
         contactUpdate.gmail_thread_id = gmailThreadId;
       }
+      Object.assign(
+        contactUpdate,
+        await engagementPromotionPatch(contactDoc.ref, 'scheduled_wave'),
+      );
       await contactDoc.ref.update(contactUpdate).catch(() => {});
 
       // Log to email_logs

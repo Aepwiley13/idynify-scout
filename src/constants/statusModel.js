@@ -220,6 +220,123 @@ export function isActiveRecord(contact) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// ENGAGEMENT PROMOTION
+//
+// `suggested` means "surfaced by discovery, not yet kept by the user". Sending
+// a contact an email, enrolling them in a cadence or assigning them a mission
+// is the strongest possible statement that the user kept them — so a record
+// cannot still be `suggested` once it is engaged.
+//
+// Leaving it there is not a harmless inconsistency, because the two Scout
+// people surfaces filter on DIFFERENT dimensions and a row can fall out of
+// both at once:
+//
+//   Saved Companies "Total Contacts"  excludes status === 'suggested'
+//   People "Total Leads"              excludes engaged contacts
+//
+// A contact that is BOTH suggested and engaged is excluded by each of them,
+// for opposite reasons, and appears in neither. It is invisible while still
+// being actively emailed. Promoting on engagement closes that gap at the
+// source; `isActiveRecord` and the readers below close it for rows already
+// written.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * relationship_status values that mean the user has actually reached out.
+ *
+ * `dormant` belongs here: a contact only goes dormant after engagement went
+ * quiet, so the record was kept. `new` is the only non-engaged state.
+ */
+export const ENGAGED_RELATIONSHIP_STATUSES = Object.freeze([
+  RELATIONSHIP_STATUS.ENGAGED,
+  RELATIONSHIP_STATUS.AWAITING_REPLY,
+  RELATIONSHIP_STATUS.IN_CONVERSATION,
+  RELATIONSHIP_STATUS.CUSTOMER,
+  RELATIONSHIP_STATUS.DORMANT,
+]);
+
+/**
+ * hunter_status values that mean outreach is under way.
+ *
+ * `readRelationshipStatus` does not consult hunter_status at all, but it is
+ * the field the Hunter module actually maintains, so for a contact that has
+ * only ever been through Hunter it is the only engagement evidence there is.
+ */
+export const ENGAGED_HUNTER_STATUSES = Object.freeze([
+  'active_mission', 'awaiting_reply', 'engaged_pending', 'in_conversation', 'converted',
+]);
+
+/**
+ * Has the user engaged this contact? Works on old and new records alike.
+ *
+ * This deliberately asks EVERY field that could know, rather than trusting
+ * `readRelationshipStatus` alone, because the new-model field goes stale:
+ * `createStatusFields` stamps `relationship_status: 'new'` at creation and no
+ * engagement write path has ever updated it — they update `contact_status`
+ * and `hunter_status`. `readRelationshipStatus` checks the new field first,
+ * so for those records the stale 'new' beats the fresher legacy value.
+ *
+ * That is not hypothetical either: in the audited workspace 80 contacts say
+ * `relationship_status: 'new'` while carrying 'Awaiting Reply', an active
+ * mission and a `last_sent_at`. Thirteen of them were exactly the contacts
+ * this whole fix exists to rescue, and asking only the new field would have
+ * left them behind.
+ *
+ * Any single field saying "engaged" is therefore enough. Over-detecting
+ * engagement means a contact gets counted as real, which is the safe
+ * direction — the same reasoning that makes `readRecordStatus` default to
+ * 'active' rather than hiding records it cannot classify.
+ */
+export function isEngagedRecord(contact) {
+  if (!contact) return false;
+
+  if (ENGAGED_RELATIONSHIP_STATUSES.includes(readRelationshipStatus(contact))) return true;
+
+  // The legacy behavioural field, consulted directly rather than through the
+  // reader, so a stale `relationship_status` cannot mask it.
+  const legacy = LEGACY_RELATIONSHIP_STATUS[contact.contact_status];
+  if (legacy && ENGAGED_RELATIONSHIP_STATUSES.includes(legacy)) return true;
+
+  if (ENGAGED_HUNTER_STATUSES.includes(contact.hunter_status)) return true;
+
+  return false;
+}
+
+/**
+ * The fields that promote a discovery suggestion to a kept record, for a
+ * contact that is being engaged right now.
+ *
+ * Returns `{}` — an empty patch, safe to spread into any update — when the
+ * record is not `suggested`. Archived and rejected records are deliberately
+ * NOT resurrected: engaging someone the user archived should not silently
+ * undo the archive, and `record_status` is not the field that decides it.
+ *
+ * @param {object} contact  The contact document as it exists BEFORE the write.
+ * @param {object} [opts]
+ * @param {string} [opts.now]     ISO timestamp, injectable for tests.
+ * @param {string} [opts.reason]  What engaged it — appears on the record.
+ */
+export function engagementPromotionFields(contact, { now, reason = 'engagement' } = {}) {
+  if (readRecordStatus(contact) !== RECORD_STATUS.SUGGESTED) return {};
+
+  const out = {
+    record_status: RECORD_STATUS.ACTIVE,
+    record_status_promoted_at: now || new Date().toISOString(),
+    record_status_promoted_by: reason,
+  };
+
+  // Only rewrite the legacy field when the legacy field is the thing saying
+  // 'suggested'. `status` also carries Apollo enrichment markers
+  // ('pending_enrichment', 'enrichment_failed', …) that say nothing about
+  // whether the record counts, and clobbering one would lose real state.
+  if (contact?.status === RECORD_STATUS.SUGGESTED) {
+    out.status = RECORD_STATUS.ACTIVE;
+  }
+
+  return out;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // WRITE HELPER
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -292,5 +409,8 @@ export default {
   readStage,
   readStatusTriple,
   isActiveRecord,
+  isEngagedRecord,
+  ENGAGED_HUNTER_STATUSES,
+  engagementPromotionFields,
   createStatusFields,
 };

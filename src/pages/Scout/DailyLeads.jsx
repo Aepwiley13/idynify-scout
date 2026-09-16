@@ -25,6 +25,7 @@ import { RECORD_STATUS } from '../../constants/statusModel';
 import { calculateReconConfidence } from '../../utils/reconConfidence';
 import { ARRIVAL_REVIEW_ICP } from '../../utils/firstExperienceMode';
 import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
+import { recordDecision } from '../../services/icpRelationshipService';
 
 // ─── Initials avatar ─────────────────────────────────────────────────────────
 function Av({ initials, color = BRAND.pink, size = 70 }) {
@@ -1718,9 +1719,14 @@ export default function DailyLeads({ onNavigate }) {
     if (!company) return;
     try {
       const companyRef = doc(db, 'users', user.uid, 'companies', company.id);
+      // Hoisted so the decision has ONE timestamp: the legacy write and the
+      // shadow event must describe the same moment, and it doubles as the
+      // shadow write's causeId — a retry of this decision lands on the same
+      // event id and is recognised as already recorded rather than duplicated.
+      const swipedAt = new Date().toISOString();
       await updateDoc(companyRef, {
         status: direction === 'right' ? 'accepted' : 'rejected',
-        swipedAt: new Date().toISOString(),
+        swipedAt,
         swipeDirection: direction,
         // WHICH gesture produced this decision — keyboard | drag | button.
         // Distinct from `swipe_source`, which names the SURFACE (people_mode,
@@ -1734,6 +1740,28 @@ export default function DailyLeads({ onNavigate }) {
         ...(direction === 'right' && feedback ? { barryFeedback: feedback, feedbackAt: new Date().toISOString() } : {}),
         ...(direction === 'left' && feedback ? { barryRejectionFeedback: feedback, rejectionFeedbackAt: new Date().toISOString() } : {}),
       });
+
+      // ── Shadow write (Sprint 1A) ────────────────────────────────────────
+      // Strictly AFTER the legacy write has committed, and strictly fail-soft:
+      // the service swallows its own errors, so a shadow failure can never undo
+      // or block a decision the user already made. Nothing reads what this
+      // writes until the Sprint 3 cutover.
+      //
+      // The ICP recorded is `activeICPId` — the one the legacy write stamps as
+      // swipedForICPId — so the two can never disagree about which ICP the user
+      // was deciding under. With no ICP resolved there is nothing to attribute
+      // and the shadow write is skipped rather than guessed.
+      if (activeICPId) {
+        await recordDecision({
+          userId: user.uid,
+          subjectId: company.id,
+          icpId: activeICPId,
+          accepted: direction === 'right',
+          causeId: swipedAt,
+          source: company.source ?? null,
+        });
+      }
+
       const isInterested = direction === 'right';
       const newSwipeCount = isInterested
         ? (lastSwipeDate === today ? dailySwipeCount + 1 : 1)

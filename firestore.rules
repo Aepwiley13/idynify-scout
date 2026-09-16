@@ -1,41 +1,97 @@
+// Firestore security rules.
+//
+// ─── APPEND-ONLY COLLECTIONS ────────────────────────────────────────────────
+//   users/{uid}/lineageEvents/{eventId}
+//   users/{uid}/icpProfiles/{icpId}/criteriaVersions/{versionId}
+//
+// These are Sprint 1A's history records. Create is allowed; update and delete
+// are not, so "append-only" is enforced by the database rather than by every
+// call site remembering. icpRelationshipService also checks existence inside
+// its transaction, but that is defence in depth, not the guarantee.
+//
+// ─── TWO THINGS THAT LOOK CORRECT AND ARE NOT ───────────────────────────────
+// Both were caught by running the suite in scripts/rules-check against a real
+// emulator. Neither would have failed at deploy time; the first would have
+// denied writes for every user.
+//
+//   1. `document.size()` DOES NOT EXIST for a recursive-wildcard binding.
+//      The emulator reports "Function not found error: Name: [size]", and a
+//      rule whose expression errors evaluates to DENY — so a size()-based guard
+//      does not merely fail to protect, it denies ordinary writes. That is why
+//      there is no path introspection anywhere below: `coll` and `sub` are
+//      SINGLE-segment wildcards, which bind plain strings and compare directly.
+//
+//   2. A RECURSIVE WILDCARD MATCHES ZERO OR MORE SEGMENTS, so the deep
+//      `/{coll}/{docId}/{rest=**}` block also matches 2-deep documents. Firestore
+//      grants access if ANY matching rule allows it, so every guard above has to
+//      be repeated there. Omitting one silently re-grants what was withheld.
+//
+// ─── BEFORE CHANGING THIS FILE ──────────────────────────────────────────────
+// CI runs the 19-case suite in scripts/rules-check on every PR. Run it locally
+// too — it needs a JDK 21+ and takes under a minute. Case 09 is the one that
+// matters most: `update users/U/companies/c1 → ALLOW`. The likely failure mode
+// of a bad rule is that EVERY product write denies, not that the protected
+// collections stay mutable.
+
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can only read/write their own document
-    // Admin reads are handled server-side via Firebase Admin SDK (bypasses rules)
+
+    function owns(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
     match /users/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read: if owns(userId);
+      allow write: if owns(userId);
+
+      // Every 2-deep document under the user. `coll` is a SINGLE-segment
+      // wildcard, so it is a plain string and can be compared directly — no
+      // path indexing and no size(), neither of which exists for the recursive
+      // wildcard binding.
+      match /{coll}/{docId} {
+        allow read:   if owns(userId);
+        allow create: if owns(userId);
+        allow update, delete: if owns(userId) && coll != 'lineageEvents';
+      }
+
+      // One level inside an ICP profile: criteriaVersions is append-only,
+      // any other subcollection of a profile behaves normally.
+      match /icpProfiles/{icpId}/{sub}/{subId} {
+        allow read:   if owns(userId);
+        allow create: if owns(userId);
+        allow update, delete: if owns(userId) && sub != 'criteriaVersions';
+      }
+
+      // Anything deeper, outside the subtrees handled above.
+      //
+      // NOTE: a recursive wildcard matches ZERO OR MORE segments, so this block
+      // ALSO matches the 2-deep documents above. Firestore grants access if ANY
+      // matching rule allows it, so every guard applied above has to be
+      // repeated here — omitting `lineageEvents` here silently re-granted the
+      // update the rule above had just withheld.
+      match /{coll}/{docId}/{rest=**} {
+        allow read:  if owns(userId);
+        allow write: if owns(userId)
+                     && coll != 'icpProfiles'
+                     && coll != 'lineageEvents';
+      }
     }
 
-    // User subcollections are only accessible by the owning user
-    // Admin reads are handled server-side via Firebase Admin SDK (bypasses rules)
-    match /users/{userId}/{document=**} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Notifications subcollection — explicit rule for clarity.
-    // process-barry-queue.js writes via Admin SDK (bypasses rules).
-    // HunterDashboard onSnapshot reads via web SDK (hits this rule).
     match /users/{userId}/notifications/{notificationId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read, write: if owns(userId);
     }
 
-    // API Logs collection - write allowed for all authenticated users (for logging)
-    // Read access handled by admin backend (not exposed to frontend)
     match /apiLogs/{logId} {
       allow write: if request.auth != null;
-      allow read: if false; // Admin backend uses service account, not user tokens
+      allow read: if false;
     }
 
-    // Dashboards collection - users can read and write their own dashboards
     match /dashboards/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-      allow write: if request.auth != null && request.auth.uid == userId;
+      allow read: if owns(userId);
+      allow write: if owns(userId);
     }
 
-    // Impersonation sessions - admin backend only (service account)
     match /impersonationSessions/{sessionId} {
       allow read, write: if false;
     }

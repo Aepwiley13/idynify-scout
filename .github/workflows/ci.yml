@@ -22,3 +22,34 @@ jobs:
       # outlived its cause by five weeks, hiding a real failure from CI.
       - name: Run tests
         run: npx vitest run
+
+  # Firestore security rules, against a real emulator on a throwaway project.
+  #
+  # This exists because reasoning about rules is not enough. The append-only
+  # ruleset was wrong twice before it was ever run: `document.size()` does not
+  # exist for a recursive-wildcard binding (and an erroring rule DENIES, so it
+  # broke ordinary writes), and a recursive wildcard matches zero or more
+  # segments, so the deep rule re-granted what the narrow rule withheld. Both
+  # read as correct. Neither would have failed at deploy time.
+  #
+  # The suite reads the LIVE firestore.rules, so any change to it is checked
+  # here before the PR is reviewable.
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # firebase-tools refuses any JDK below 21.
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install rules-check dependencies
+        working-directory: scripts/rules-check
+        run: npm install
+      # Run from the repo ROOT: the CLI refuses a rules path outside the
+      # project directory, so it must use the root firebase.json.
+      - name: Run the rules suite
+        run: npx --yes firebase-tools@15 emulators:exec --only firestore --project demo-icp-rules "node scripts/rules-check/cases.mjs"

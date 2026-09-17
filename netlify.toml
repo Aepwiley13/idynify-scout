@@ -7,6 +7,45 @@
   # Netlify's default Node 20 is pre-20.19, so pin explicitly.
   NODE_VERSION = "22"
 
+# ─── Non-production contexts ─────────────────────────────────────────────────
+#
+# DEFENCE IN DEPTH ONLY. Read the limits before trusting this.
+#
+# There is one Firebase project, `idynify-scout-dev`, and it serves production.
+# Branch deploys and deploy previews resolve to it as well, so a non-production
+# deploy reads and writes real customer data (ADR-006, "What dry_run actually
+# guarantees"). These two blocks narrow that exposure. They do not remove it.
+#
+# What this does NOT do:
+#
+#   · It probably changes nothing for the scheduled functions. Netlify runs
+#     those on the production deploy, so DISCOVERY_CRON_ENABLED never reaches
+#     a branch-deploy cron because no branch-deploy cron exists. The setting is
+#     here so that if that assumption is ever wrong — or changes — the answer
+#     is already "off" rather than "nobody checked".
+#   · It does not stop the ~76 HTTP functions that write Firestore. Every one
+#     of them is mounted and callable on a branch-deploy URL, and none consults
+#     the deploy context.
+#   · It does not stop the browser. src/firebase/config.js hardcodes
+#     projectId: "idynify-scout-dev" with no environment variable involved, so
+#     a signed-in user on a preview URL writes production directly from the
+#     web SDK, server-side settings notwithstanding.
+#   · dry_run is not write-free. Per ADR-006 it still persists
+#     communication_records, unmatched_messages, the contact timeline,
+#     relationship_context and identity_resolution_probe.
+#
+# The access restrictions configured in the Netlify UI are the control that
+# actually limits who can reach a preview. This file makes the two automated
+# writers fail safe if someone gets past that.
+
+[context.branch-deploy.environment]
+  DISCOVERY_CRON_ENABLED = "false"
+  GMAIL_IDENTITY_MODE = "dry_run"
+
+[context.deploy-preview.environment]
+  DISCOVERY_CRON_ENABLED = "false"
+  GMAIL_IDENTITY_MODE = "dry_run"
+
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"

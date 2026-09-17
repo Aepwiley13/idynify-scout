@@ -131,6 +131,7 @@ import {
   RECORD_STATUS,
   readRecordStatus,
   isEngagedRecord,
+  hasArchiveSignal,
   engagementPromotionFields,
 } from '../src/constants/statusModel.js';
 
@@ -141,21 +142,13 @@ import {
 // that disagrees with the runtime is worse than no migration at all.
 
 /**
- * Does any field say this record was archived?
- *
- * Asked of the raw fields rather than through `readRecordStatus`, which
- * checks `record_status` first and therefore reads a stale 'suggested' on an
- * archived row as 'suggested', stepping straight past the archive signal.
- * See the precedence note in the header.
- *
- * @param   {Object}  data  The contact document.
- * @returns {boolean}
+ * Re-exported so this script's predicates can be imported and tested as one
+ * unit. The definition lives in the status model with every other status
+ * question, per the rule above — a migration that disagrees with the runtime
+ * is worse than no migration at all, and the runtime now enforces the same
+ * archive guarantee at the write path (`engagementPromotionFields`).
  */
-export function hasArchiveSignal(data = {}) {
-  return data.is_archived === true
-    || data.status === 'archived'
-    || data.status === 'people_mode_archived';
-}
+export { hasArchiveSignal };
 
 /**
  * Is this contact in the contradictory state the audit found?

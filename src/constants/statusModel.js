@@ -138,6 +138,31 @@ export function readRecordStatus(contact) {
   return RECORD_STATUS.ACTIVE;
 }
 
+/**
+ * Does any field say the user archived this record?
+ *
+ * MIND THE PRECEDENCE — it is the opposite of what it looks like.
+ * `readRecordStatus` checks `record_status` BEFORE `is_archived`, so
+ * `is_archived: true` does NOT win: an archived row whose `record_status` is
+ * still the stale 'suggested' it was stamped with at creation reads back as
+ * 'suggested' and walks straight past the archive signal. `createStatusFields`
+ * writes that stamp and the archive paths never update it, so the combination
+ * is ordinary, not exotic — the audited workspace holds 7 such rows.
+ *
+ * That precedence is deliberate and stays: the new field is authoritative when
+ * it is present. So anything that must not act on an archived record asks THIS
+ * of the raw fields instead, and asks it FIRST.
+ *
+ * @param   {object}  contact  The contact document.
+ * @returns {boolean}
+ */
+export function hasArchiveSignal(contact) {
+  if (!contact) return false;
+  return contact.is_archived === true
+    || contact.status === 'archived'
+    || contact.status === 'people_mode_archived';
+}
+
 /** Legacy `contact_status` (title case, space separated) → relationship_status. */
 const LEGACY_RELATIONSHIP_STATUS = Object.freeze({
   'New': RELATIONSHIP_STATUS.NEW,
@@ -307,9 +332,17 @@ export function isEngagedRecord(contact) {
  * contact that is being engaged right now.
  *
  * Returns `{}` — an empty patch, safe to spread into any update — when the
- * record is not `suggested`. Archived and rejected records are deliberately
- * NOT resurrected: engaging someone the user archived should not silently
- * undo the archive, and `record_status` is not the field that decides it.
+ * record is not `suggested`, and when any field says it was archived.
+ *
+ * Archived and rejected records are deliberately NOT resurrected: engaging
+ * someone the user archived must not silently undo the archive. That is
+ * enforced by `hasArchiveSignal`, checked FIRST and deliberately not folded
+ * into the `readRecordStatus` test below — because `readRecordStatus` reads
+ * `record_status` before `is_archived`, so an archived row carrying a stale
+ * 'suggested' resolves to 'suggested' and would otherwise be promoted to
+ * 'active'. The guarantee has to be enforced, not left resting on such rows
+ * also happening to be unengaged today. An archive is a decision the user
+ * made, and no amount of engagement evidence may overturn it here.
  *
  * @param {object} contact  The contact document as it exists BEFORE the write.
  * @param {object} [opts]
@@ -317,6 +350,7 @@ export function isEngagedRecord(contact) {
  * @param {string} [opts.reason]  What engaged it — appears on the record.
  */
 export function engagementPromotionFields(contact, { now, reason = 'engagement' } = {}) {
+  if (hasArchiveSignal(contact)) return {};
   if (readRecordStatus(contact) !== RECORD_STATUS.SUGGESTED) return {};
 
   const out = {
@@ -409,6 +443,7 @@ export default {
   readStage,
   readStatusTriple,
   isActiveRecord,
+  hasArchiveSignal,
   isEngagedRecord,
   ENGAGED_HUNTER_STATUSES,
   engagementPromotionFields,

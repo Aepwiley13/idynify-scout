@@ -100,7 +100,10 @@ describe('one gesture, one decision', () => {
     settle();
 
     expect(onAccept, 'one drag produced more than one accept').toHaveBeenCalledTimes(1);
-    expect(onAccept).toHaveBeenCalledWith(null, 'drag');
+    // The third argument is the subject the gesture was made on — added so a
+    // callback deferred behind the exit animation cannot be applied to whatever
+    // card is current when it finally runs. See swipeSubjectIdentity.test.jsx.
+    expect(onAccept).toHaveBeenCalledWith(null, 'drag', COMPANY.id);
     expect(onReject).not.toHaveBeenCalled();
   });
 
@@ -115,7 +118,7 @@ describe('one gesture, one decision', () => {
     settle();
 
     expect(onReject, 'one drag produced more than one reject').toHaveBeenCalledTimes(1);
-    expect(onReject).toHaveBeenCalledWith(null, 'drag');
+    expect(onReject).toHaveBeenCalledWith(null, 'drag', COMPANY.id);
     expect(onAccept).not.toHaveBeenCalled();
   });
 

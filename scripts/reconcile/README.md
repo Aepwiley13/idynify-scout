@@ -6,7 +6,7 @@ exists to remove.
 
 ```bash
 FIREBASE_SERVICE_ACCOUNT_PATH=/path/to/read-only-key.json \
-  node scripts/reconcile/run.mjs --cutover=2026-09-16T20:15:00Z
+  node scripts/reconcile/run.mjs --cutover=2026-09-17T06:13:51Z
 ```
 
 `--json` for machine output, `--user=<uid>` to scope to one workspace.
@@ -22,6 +22,26 @@ divergence — a rejection swiped at 04:32 UTC, which turned out to predate the
 shadow-write merge at 06:25 UTC by two hours. Nothing was broken; the timestamp
 manufactured the failure. The runner now warns when the cutover is earlier than
 the first shadow write it can see.
+
+### The current window starts `2026-09-17T06:13:51Z`
+
+That is the Netlify go-live for `f7bfcd7`, and it is the value `--cutover` takes
+until Stage 1 is signed off. The merge landed at `06:12:48Z` and the deploy
+finished 63 seconds later; the merge time is the wrong number, for the reason
+directly above.
+
+The window restarted there because the swipe double-fire fix shipped in that
+build. Before it, one drag release could call `handleSwipe` twice, so a single
+gesture wrote two decision events — 88ms and 33ms apart in workspace
+`peqhaq8Cw1UUPeaYhaSLwZ0iCRk2` on 2026-09-17. Those events are still in the log
+and are staying: they record accurately what the system did, the log is
+append-only by design, and deleting them would destroy the only evidence the bug
+happened. But a gate measured across a window containing them is measuring the
+UI bug, not the shadow model.
+
+Until `summarizeActivity` is bounded by `--cutover` — it currently counts every
+event ever written, whatever you pass — this window start is the only thing
+keeping the volume figures honest. Do not read the totals without it.
 
 ## It reports writes seen, not only divergences found
 

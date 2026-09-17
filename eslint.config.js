@@ -23,7 +23,47 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': ['error', {
+        varsIgnorePattern: '^[A-Z_]',
+        // `_` as a positional placeholder is deliberate, not an oversight.
+        argsIgnorePattern: '^_',
+        // ESLint 9 flipped the `caughtErrors` default from 'none' to 'all',
+        // so `catch (error)` without a body reference became an error on the
+        // day this config landed. That is a bare `catch` written on purpose,
+        // not dead code. Restored to the pre-9 default.
+        caughtErrors: 'none',
+      }],
+    },
+  },
+
+  // ── Node-side code ────────────────────────────────────────────────────────
+  //
+  // This config arrived as the Vite React template's and declared only
+  // `globals.browser`, so every file that runs in Node — the ~150 Netlify
+  // functions above all — linted as if `process`, `Buffer`, `require`,
+  // `global` and `exports` did not exist. That was 539 of the 547 no-undef
+  // errors on main: no bug in any of them, just a runtime the config had
+  // never been told about.
+  {
+    files: [
+      'netlify/**/*.{js,jsx}',
+      'functions/**/*.{js,jsx}',
+      'scripts/**/*.{js,jsx}',
+      'src/scripts/**/*.{js,jsx}',
+      'src/test/**/*.{js,jsx}',
+      '*.config.js',
+    ],
+    languageOptions: {
+      globals: { ...globals.node },
+    },
+  },
+
+  // The service worker is neither: `clients`, `self` and `skipWaiting` come
+  // from the ServiceWorkerGlobalScope, not from window.
+  {
+    files: ['public/sw.js'],
+    languageOptions: {
+      globals: { ...globals.serviceworker },
     },
   },
 

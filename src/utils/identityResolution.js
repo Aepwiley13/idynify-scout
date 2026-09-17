@@ -489,6 +489,24 @@ const IDENTIFIER_FIELDS = Object.freeze([
 ]);
 
 /**
+ * Canonical fields a merge may FILL when the record has no value — never
+ * overwrite when it does.
+ *
+ * `CANONICAL_FIELDS` exists to stop a merge from restating a field the record
+ * already owns: an import must not rename a contact the user renamed. But the
+ * blanket refusal also blocked filling a canonical field that was simply
+ * ABSENT, and for `company_id` that silently produced contacts with no company
+ * at all. A LinkedIn import would resolve the company correctly, pass the id
+ * into the write, resolve the person to an existing record — and drop the id
+ * on the floor, because the field was canonical. The contact stayed homeless:
+ * uncountable in Saved Companies, and once engaged, excluded from People too.
+ *
+ * Filling a hole is not an overwrite. The never-clobber guard in `put` still
+ * runs for these, so a record that already names a company keeps its own.
+ */
+const FILLABLE_CANONICAL_FIELDS = Object.freeze(['company_id', 'company_name']);
+
+/**
  * Build the patch that attaches a new source's identifiers to an existing
  * contact — additive only.
  *
@@ -507,7 +525,9 @@ export function mergeIdentifiers(existingContact = {}, newSource = {}) {
 
   const put = (field, value) => {
     if (value === null || value === undefined || value === '') return;
-    if (CANONICAL_FIELDS.includes(field)) return;      // never overwrite
+    // Canonical fields are the record's own. The exceptions may be FILLED when
+    // absent — the never-clobber guard below still protects them when present.
+    if (CANONICAL_FIELDS.includes(field) && !FILLABLE_CANONICAL_FIELDS.includes(field)) return;
     const current = existingContact[field];
     if (current !== null && current !== undefined && current !== '') return; // never clobber
     patch[field] = value;
@@ -534,8 +554,9 @@ export function mergeIdentifiers(existingContact = {}, newSource = {}) {
   put('apollo_person_id', incoming.apolloPersonId);
 
   // Everything else that is an identifier or an enrichment detail, filled in
-  // only where the record has a hole.
-  for (const field of IDENTIFIER_FIELDS) {
+  // only where the record has a hole. The fillable canonical fields ride along
+  // here rather than in a second loop — `put` is what enforces the difference.
+  for (const field of [...IDENTIFIER_FIELDS, ...FILLABLE_CANONICAL_FIELDS]) {
     if (field in patch) continue;
     put(field, newSource[field]);
   }

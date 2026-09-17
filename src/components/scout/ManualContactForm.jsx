@@ -6,6 +6,7 @@ import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { recordReferralReceived } from '../../services/referralIntelligenceService';
 import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
+import { ensureCompanyForContact } from '../../services/companyIdentityService';
 import { useT } from '../../theme/ThemeContext';
 
 export default function ManualContactForm({ onContactAdded, onCancel }) {
@@ -61,6 +62,19 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
     setSaving(true);
 
     try {
+      // A hand-typed company is still a company. This form collected it as
+      // free text and wrote nothing else, so every contact added here landed
+      // with no `company_id` — countable by neither Scout people counter once
+      // the contact was engaged, because Saved Companies had no company to
+      // count it under and People excludes engaged contacts by design. Resolve
+      // it to an existing company where one matches (on name, or on the email
+      // domain the user just typed) and create one where none does.
+      const { companyId } = await ensureCompanyForContact(user.uid, {
+        name: formData.company,
+        email: formData.email,
+        domain: formData.website || null,
+      }, { source: 'manual' });
+
       // Identity resolution BEFORE the write. A hand-typed contact is the most
       // likely to duplicate someone already imported from Apollo or Gmail —
       // the user is typing from memory, not from a record.
@@ -70,6 +84,8 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
         linkedin_url: formData.linkedin_url,
         name: formData.name,
         company: formData.company,
+        company_id: companyId,
+        company_name: formData.company.trim() || null,
         source: referredBy ? 'referral' : 'manual',
       }, { source: 'ManualContactForm' });
 
@@ -89,6 +105,8 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
         email: formData.email.trim() || null,
         phone: formData.phone.trim() || null,
         company: formData.company.trim() || null,
+        company_id: companyId,
+        company_name: formData.company.trim() || null,
         title: formData.title.trim() || null,
         linkedin_url: formData.linkedin_url.trim() || null,
         address: formData.address.trim() || null,

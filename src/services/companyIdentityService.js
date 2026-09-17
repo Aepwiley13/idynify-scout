@@ -25,8 +25,9 @@
  * check both so a historical document written under either name is found.
  */
 
-import { collection, getDocs, limit, query, where } from 'firebase/firestore';
+import { collection, doc, getDocs, limit, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { normalizeLoose } from '../utils/identityNormalization';
+import { createCompanyRecord, COMPANY_STATUS } from '../schemas/companySchema';
 import { db } from '../firebase/config';
 
 /** The standard field. Everything else is a compatibility alias. */
@@ -175,6 +176,106 @@ export async function findCompanyByName(userId, name) {
 }
 
 /**
+ * Mailbox providers. A contact at one of these has a personal address, not a
+ * company one, so the domain says nothing about where they work.
+ */
+export const FREE_EMAIL_DOMAINS = Object.freeze(new Set([
+  'gmail.com', 'googlemail.com', 'yahoo.com', 'ymail.com', 'hotmail.com',
+  'outlook.com', 'live.com', 'msn.com', 'icloud.com', 'me.com', 'mac.com',
+  'aol.com', 'protonmail.com', 'proton.me', 'gmx.com', 'mail.com', 'zoho.com',
+  'yandex.com', 'comcast.net', 'verizon.net', 'att.net', 'sbcglobal.net',
+]));
+
+/**
+ * Reduce anything domain-shaped to a bare host.
+ *
+ * Callers hand this whatever they have — `acme.com`, `www.acme.com`,
+ * `https://www.acme.com/about`, a trailing-dot FQDN — and stored company
+ * documents are just as varied, because `domain`, `primary_domain` and
+ * `website_url` were each populated by a different source. One normalizer for
+ * both sides, so a comparison cannot be defeated by a protocol prefix.
+ */
+export function normalizeDomain(value) {
+  const host = String(value ?? '')
+    .trim().toLowerCase()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//, '')
+    .replace(/^www\./, '')
+    .split(/[/?#]/)[0]
+    .replace(/\.$/, '');
+  return host.includes('.') ? host : null;
+}
+
+/** The domain part of an email, normalized — null for a mailbox provider. */
+export function workDomainFromEmail(email) {
+  const at = String(email ?? '').trim().toLowerCase();
+  if (!at.includes('@')) return null;
+  const domain = normalizeDomain(at.slice(at.lastIndexOf('@') + 1));
+  if (!domain) return null;
+  return FREE_EMAIL_DOMAINS.has(domain) ? null : domain;
+}
+
+/**
+ * A provisional company name from a work-email domain.
+ *
+ * Deliberately a guess, and labelled as one by the caller: `rd-advantage.com`
+ * becomes "Rd Advantage" where the organization actually writes itself "R&D
+ * Advantage". A derived name is still strictly better than no company at all —
+ * the contact gets a home, the document carries the `domain` that produced it,
+ * and Apollo enrichment can correct the name later against that domain. What it
+ * must NOT do is masquerade as authoritative, which is why companies created
+ * this way carry `name_source: 'email_domain'`.
+ */
+export function companyNameFromDomain(domain) {
+  const label = String(domain ?? '').split('.')[0];
+  if (!label) return null;
+  return label
+    .split(/[-_]+/)
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ') || null;
+}
+
+/**
+ * Find an existing company by its domain.
+ *
+ * The third rung, below Apollo id and name. It exists because the LinkedIn
+ * import routinely returns a person with a work email and no organization at
+ * all — Apollo knows `patrick@blackdesertresort.com` without knowing Black
+ * Desert Resort — and for those the domain is the only company signal present.
+ *
+ * Reads the three fields companies have stored a domain under, and compares
+ * host-only forms so `https://www.acme.com/about` matches `acme.com`.
+ */
+export async function findCompanyByDomain(userId, domain) {
+  if (!userId) return null;
+  const target = normalizeDomain(domain);
+  if (!target) return null;
+
+  try {
+    // Unordered for the same reason the name scan is: ordering on a domain
+    // field would exclude every company document that lacks it.
+    const window = await getDocs(query(collection(db, 'users', userId, 'companies'), limit(COMPANY_SCAN_WINDOW)));
+    const hits = window.docs.filter((d) => {
+      const data = d.data() ?? {};
+      return [data.domain, data.primary_domain, data.website_url, data.website]
+        .some(v => v && normalizeDomain(v) === target);
+    });
+
+    if (hits.length === 0) return null;
+    if (hits.length > 1) {
+      console.warn('[company-identity] domain maps to several companies — refusing to choose', {
+        domain: target, companyIds: hits.map(d => d.id),
+      });
+      return null;
+    }
+    return { id: hits[0].id, ...hits[0].data(), _matchedField: 'domain' };
+  } catch (err) {
+    console.error('[company-identity] domain lookup failed', { code: err?.code, message: err?.message });
+    throw err;
+  }
+}
+
+/**
  * The dedup check every company creation path runs before writing.
  *
  * @returns {Promise<{ companyId: string|null, existing: object|null, signal: string|null }>}
@@ -182,6 +283,7 @@ export async function findCompanyByName(userId, name) {
 export async function resolveCompany(userId, candidate = {}, { source = 'unknown' } = {}) {
   const apolloOrgId = readApolloOrgId(candidate);
   const name = candidate.name ?? candidate.company_name ?? candidate.organization_name ?? null;
+  const domain = normalizeDomain(candidate.domain) ?? workDomainFromEmail(candidate.email);
 
   if (apolloOrgId) {
     const hit = await findCompanyByApolloId(userId, apolloOrgId);
@@ -201,16 +303,121 @@ export async function resolveCompany(userId, candidate = {}, { source = 'unknown
     }
   }
 
-  console.info('[company-identity] no match — new company', { source, apolloOrgId, name });
+  // Third rung. Only reached when there is no Apollo id and no name match, so
+  // it can never override a stronger signal — it only rescues the contacts
+  // those two do not see at all.
+  if (domain) {
+    const hit = await findCompanyByDomain(userId, domain);
+    if (hit) {
+      console.info('[company-identity] matched existing company on domain', { source, companyId: hit.id, domain });
+      return { companyId: hit.id, existing: hit, signal: 'domain' };
+    }
+  }
+
+  console.info('[company-identity] no match — new company', { source, apolloOrgId, name, domain });
   return { companyId: null, existing: null, signal: null };
+}
+
+/**
+ * Resolve a contact's company, creating or promoting it so the contact has a
+ * home in Saved Companies.
+ *
+ * WHY THIS EXISTS
+ * ───────────────
+ * Scout has two headline people counters and they measure different things:
+ * Saved Companies "Total Contacts" sums per-company counts over ACCEPTED
+ * companies, and People "Total Leads" counts contacts that are neither
+ * archived nor engaged. A contact with no `company_id` is invisible to the
+ * first (there is no company to count it under) and, once engaged, excluded
+ * from the second by design. It is reachable in Hunter mode, but it has no
+ * home in the Scout surfaces and neither KPI reconciles to the workspace total.
+ *
+ * Every write path that creates a contact from an outside source therefore
+ * owes it a company. This is the one implementation of that, so the paths
+ * cannot drift apart the way their Apollo-id dedup checks did.
+ *
+ * Three outcomes, in order:
+ *   matched   → an existing company; `company_id` is that document
+ *   promoted  → the match was still 'pending' (an un-swiped discovery card).
+ *               Engaging someone at a company IS accepting it, which this
+ *               module already assumed when it created new companies as
+ *               'accepted'; it simply never promoted one that already existed.
+ *               Only 'pending' promotes — 'rejected' and 'archived' are
+ *               decisions the user made and are left standing.
+ *   created   → no match and enough signal to name one
+ *
+ * Returns `companyId: null` only when there is genuinely no company signal at
+ * all (no Apollo org, no name, no work-email domain). That contact is
+ * legitimately company-less and Hunter mode is its home.
+ *
+ * @returns {Promise<{companyId: string|null, signal: string|null, created: boolean, promoted: boolean}>}
+ */
+export async function ensureCompanyForContact(userId, candidate = {}, { source = 'unknown', extraFields = {} } = {}) {
+  if (!userId) return { companyId: null, signal: null, created: false, promoted: false };
+
+  const apolloOrgId = readApolloOrgId(candidate);
+  const givenName = candidate.name ?? candidate.company_name ?? candidate.organization_name ?? null;
+  const domain = normalizeDomain(candidate.domain) ?? workDomainFromEmail(candidate.email);
+
+  const match = await resolveCompany(userId, { ...candidate, domain }, { source });
+
+  if (match.companyId) {
+    if (match.existing?.status === COMPANY_STATUS.PENDING) {
+      // `saved_at` too: SavedCompanies orders on saved_at || created_at ||
+      // swipedAt, and a discovery card has only `found_at`. Promoting without
+      // it would put the company at the bottom of the list regardless of when
+      // it was actually saved.
+      await updateDoc(doc(db, 'users', userId, 'companies', match.companyId), {
+        status: COMPANY_STATUS.ACCEPTED,
+        saved_at: match.existing.saved_at ?? new Date().toISOString(),
+        accepted_via: source,
+      });
+      console.info('[company-identity] promoted pending company to accepted', {
+        source, companyId: match.companyId, signal: match.signal,
+      });
+      return { companyId: match.companyId, signal: match.signal, created: false, promoted: true };
+    }
+    return { companyId: match.companyId, signal: match.signal, created: false, promoted: false };
+  }
+
+  const derivedName = givenName || companyNameFromDomain(domain);
+  if (!derivedName) {
+    console.info('[company-identity] no company signal on contact — leaving unlinked', { source });
+    return { companyId: null, signal: null, created: false, promoted: false };
+  }
+
+  const companyId = apolloOrgId || `company_${Date.now()}`;
+  await setDoc(doc(db, 'users', userId, 'companies', companyId), createCompanyRecord({
+    ...apolloIdFields(apolloOrgId),
+    ...extraFields,
+    name: derivedName,
+    domain: domain ?? extraFields.domain ?? null,
+    saved_at: new Date().toISOString(),
+    source,
+    status: COMPANY_STATUS.ACCEPTED,
+    contact_count: 0,
+    // Flags a name that was guessed from a domain rather than reported by a
+    // source. Enrichment may overwrite it; a name from Apollo or the user may not.
+    ...(givenName ? {} : { name_source: 'email_domain' }),
+  }));
+  console.info('[company-identity] created company for contact', {
+    source, companyId, name: derivedName, derivedFromDomain: !givenName,
+  });
+  return { companyId, signal: 'created', created: true, promoted: false };
 }
 
 export default {
   APOLLO_ORG_FIELD,
   COMPANY_SCAN_WINDOW,
+  FREE_EMAIL_DOMAINS,
   readApolloOrgId,
   apolloIdFields,
+  normalizeDomain,
+  workDomainFromEmail,
+  companyNameFromDomain,
   findCompanyByApolloId,
   findCompanyByName,
+  findCompanyByDomain,
   resolveCompany,
+  ensureCompanyForContact,
 };

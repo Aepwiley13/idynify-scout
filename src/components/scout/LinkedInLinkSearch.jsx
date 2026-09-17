@@ -7,8 +7,7 @@ import { BRAND, STATUS, BRIGADE } from '../../theme/tokens';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 import { recordReferralReceived } from '../../services/referralIntelligenceService';
-import { createCompanyRecord } from '../../schemas/companySchema';
-import { resolveCompany, apolloIdFields, readApolloOrgId } from '../../services/companyIdentityService';
+import { ensureCompanyForContact } from '../../services/companyIdentityService';
 
 export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
   const T = useT();
@@ -137,34 +136,36 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
     }
   };
 
+  /**
+   * Give the imported contact a company.
+   *
+   * Dedup runs on BOTH Apollo id field names, then name, then the work-email
+   * domain. The first two were here already; the domain rung is what this path
+   * was missing. Apollo routinely returns a person with a work email and no
+   * organization — it knows `patrick@blackdesertresort.com` without knowing
+   * Black Desert Resort — and the old `if (!companyName) return null` dropped
+   * every one of those contacts into the workspace with no company at all.
+   * Once such a contact is engaged it is countable by neither Scout people
+   * counter: Saved Companies has no company to count it under, and People
+   * excludes engaged contacts by design.
+   */
   const ensureCompanyExists = async (contact, userId) => {
-    const companyName = contact.organization_name || contact.organization?.name;
-    const apolloOrgId = contact.organization_id || contact.organization?.id;
-    if (!companyName) return null;
-    // Dedup on BOTH Apollo id field names. This path wrote and queried
-    // `apollo_id` while Scout discovery used `apollo_organization_id`, so the
-    // same organization saved through both routes produced two documents,
-    // each invisible to the other's check.
-    const match = await resolveCompany(userId, { apollo_organization_id: apolloOrgId, name: companyName },
-      { source: 'LinkedInLinkSearch.ensureCompanyExists' });
-    if (match.companyId) return match.companyId;
-
-    const companyId = apolloOrgId || `company_${Date.now()}`;
-    await setDoc(doc(db, 'users', userId, 'companies', companyId), createCompanyRecord({
-      ...apolloIdFields(apolloOrgId),
-      name: companyName,
-      industry: contact.organization?.industry || null,
-      website_url: contact.organization?.website_url || null,
-      domain: contact.organization?.primary_domain || null,
-      location: contact.organization?.city && contact.organization?.state
-        ? `${contact.organization.city}, ${contact.organization.state}` : null,
-      employee_count: contact.organization?.estimated_num_employees || null,
-      saved_at: new Date().toISOString(),
+    const { companyId } = await ensureCompanyForContact(userId, {
+      apollo_organization_id: contact.organization_id || contact.organization?.id,
+      name: contact.organization_name || contact.organization?.name,
+      email: contact.email,
+      domain: contact.organization?.primary_domain,
+    }, {
       source: 'LinkedIn Link',
-      status: 'accepted',
-      contact_count: 0,
-      apolloEnriched: false
-    }));
+      extraFields: {
+        industry: contact.organization?.industry || null,
+        website_url: contact.organization?.website_url || null,
+        location: contact.organization?.city && contact.organization?.state
+          ? `${contact.organization.city}, ${contact.organization.state}` : null,
+        employee_count: contact.organization?.estimated_num_employees || null,
+        apolloEnriched: false,
+      },
+    });
     return companyId;
   };
 

@@ -45,7 +45,7 @@
  * what lets this be one comparison rather than a merge.
  */
 
-import { RELATIONSHIP_STATE } from './icpLineage';
+import { RELATIONSHIP_STATE } from './icpLineage.js';
 
 export const RECONCILE = Object.freeze({
   AGREED: 'agreed',
@@ -143,6 +143,86 @@ export function classifyCompany({ company = {}, relationships = [], cutoverAt } 
   return { status: RECONCILE.AGREED, reason: `both=${expected}`, icpId };
 }
 
+/**
+ * What the shadow model actually RECEIVED over a window — writes seen, not
+ * divergences found.
+ *
+ * ─── WHY THIS IS HALF THE REPORT ───────────────────────────────────────────
+ * A reconciler that only counts disagreements reports "0 divergences" over a
+ * week of ZERO writes, which is clean, meaningless, and indistinguishable from
+ * success. That is the 189-vs-76 failure shape exactly: a number that looks
+ * comparable to a good result while silently measuring something else — and it
+ * would be a poor way to clear the gate this programme spent three sprints
+ * earning.
+ *
+ * Measured before this was written: production held 0 relationships and 0
+ * events, so the distinction is not hypothetical. Two explanations fitted
+ * equally — no traffic yet, or shadow writes silently not firing — and from
+ * outside they look identical. Volume and composition are what tell them apart.
+ *
+ * "A clean week" therefore means real, varied traffic: several event types, and
+ * activity spread across days rather than one burst.
+ *
+ * @param {object[]} events   lineage events in the window
+ * @param {object} [options]
+ * @param {number} [options.minDaysWithActivity=3]
+ * @param {number} [options.minEventTypes=2]
+ */
+export function summarizeActivity(events = [], { minDaysWithActivity = 3, minEventTypes = 2 } = {}) {
+  const byType = {};
+  const days = new Set();
+  let earliest = null, latest = null;
+
+  for (const e of events) {
+    const t = String(e?.eventType ?? 'unknown');
+    byType[t] = (byType[t] ?? 0) + 1;
+
+    const ms = millis(e?.occurredAt);
+    if (ms === null) continue;
+    days.add(new Date(ms).toISOString().slice(0, 10));
+    if (earliest === null || ms < earliest) earliest = ms;
+    if (latest === null || ms > latest) latest = ms;
+  }
+
+  const eventTypes = Object.keys(byType).length;
+  const daysWithActivity = days.size;
+
+  return {
+    events: events.length,
+    byType,
+    eventTypes,
+    daysWithActivity,
+    days: [...days].sort(),
+    earliest: earliest === null ? null : new Date(earliest).toISOString(),
+    latest: latest === null ? null : new Date(latest).toISOString(),
+    // Real and varied, not seven calendar days of silence.
+    varied: events.length > 0 && daysWithActivity >= minDaysWithActivity && eventTypes >= minEventTypes,
+  };
+}
+
+/**
+ * The Stage 1 gate, stated as one function so the verdict cannot be reported
+ * more generously than the numbers support.
+ *
+ * Undo gaps are reported and deliberately do NOT block: undo is unmodelled by
+ * design, and counting it as failure would fail the gate every time a user
+ * presses U.
+ */
+export function stageOneGate({ activity, reconciliation }) {
+  const reasons = [];
+  if (!activity || activity.events === 0) reasons.push('no shadow writes seen — the week has not started');
+  else if (!activity.varied) {
+    reasons.push(
+      `traffic is not varied enough (${activity.daysWithActivity} active day(s), `
+      + `${activity.eventTypes} event type(s))`,
+    );
+  }
+  if (reconciliation && reconciliation.counts[RECONCILE.DIVERGENCE] > 0) {
+    reasons.push(`${reconciliation.counts[RECONCILE.DIVERGENCE]} divergence(s)`);
+  }
+  return { pass: reasons.length === 0, reasons };
+}
+
 /** Roll a set of classifications into a report. Divergences are listed, not counted away. */
 export function summarize(results = []) {
   const counts = {
@@ -163,4 +243,7 @@ export function summarize(results = []) {
   return { counts, divergences, undoGaps, clean: counts[RECONCILE.DIVERGENCE] === 0 };
 }
 
-export default { RECONCILE, classifyCompany, summarize, legacyWrittenAt, legacyIcpId };
+export default {
+  RECONCILE, classifyCompany, summarize, summarizeActivity, stageOneGate,
+  legacyWrittenAt, legacyIcpId,
+};

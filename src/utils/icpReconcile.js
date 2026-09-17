@@ -91,18 +91,43 @@ export function legacyIcpId(company = {}) {
  * @param {number|string|Date} input.cutoverAt  When shadow writes began.
  * @returns {{status: string, reason: string, icpId: string|null}}
  */
+/** Statuses that represent a decision the user made. */
+const DECIDED = new Set(['accepted', 'rejected']);
+
 export function classifyCompany({ company = {}, relationships = [], cutoverAt } = {}) {
   const cutover = millis(cutoverAt);
   const writtenAt = legacyWrittenAt(company);
   const icpId = legacyIcpId(company);
+  const preCutover = cutover === null || writtenAt === null || writtenAt < cutover;
 
-  if (relationships.length === 0) {
+  if (relationships.length === 0 && preCutover) {
     // A legacy record that predates the cutover is the designed state, not a
     // fault. `default` is deliberately included: it is a sentinel, not a real
     // association, and it was never going to produce a relationship.
-    if (cutover === null || writtenAt === null || writtenAt < cutover) {
-      return { status: RECONCILE.EXPECTED_GAP, reason: 'predates-shadow-writes', icpId };
-    }
+    return { status: RECONCILE.EXPECTED_GAP, reason: 'predates-shadow-writes', icpId };
+  }
+
+  // ─── A DECISION MADE WITH NO ACTIVE ICP ───────────────────────────────────
+  // The shadow write is gated on an ICP actually resolving: with none, there is
+  // nothing to attribute and it deliberately records nothing rather than
+  // guessing. So for a decided company carrying no `swipedForICPId`, the ABSENCE
+  // of a shadow relationship is the system working — not a fault.
+  //
+  // The first real production run proved this rule was needed. Nine swipes read
+  // as divergences; all nine had `swipedForICPId` absent, while all three that
+  // did write shadow had it present. A perfect split, and the classifier was on
+  // the wrong side of it.
+  //
+  // The trap was `legacyIcpId()` falling back to `icpId`. That field is the
+  // DISCOVERY stamp — which ICP's search surfaced the company — and it is not a
+  // decision attribution. Matching a decision against it expects a relationship
+  // nobody ever had reason to write. Without this rule, every no-ICP swipe
+  // blocks the Stage 1 gate permanently on a fault that does not exist.
+  if (!preCutover && DECIDED.has(company.status) && !company.swipedForICPId) {
+    return { status: RECONCILE.EXPECTED_GAP, reason: 'decided-with-no-active-icp', icpId };
+  }
+
+  if (relationships.length === 0) {
     return { status: RECONCILE.DIVERGENCE, reason: 'legacy-written-after-cutover-with-no-shadow', icpId };
   }
 

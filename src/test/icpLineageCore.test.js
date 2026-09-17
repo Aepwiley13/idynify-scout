@@ -392,8 +392,12 @@ describe('T-15 — the reconciler flags real divergence and nothing else', () =>
   });
 
   it('DOES flag a post-cutover legacy write with no shadow counterpart', () => {
+    // NOTE: this case originally omitted swipedForICPId, and production proved
+    // that made it the wrong assertion — a decision taken with no active ICP
+    // has no shadow to miss. The guarantee that survives is narrower: a
+    // decision whose ICP DID resolve must have produced a shadow write.
     const r = classifyCompany({
-      company: { status: 'accepted', icpId: 'icp_A', swipedAt: after },
+      company: { status: 'accepted', icpId: 'icp_A', swipedForICPId: 'icp_A', swipedAt: after },
       relationships: [], cutoverAt: CUTOVER,
     });
     expect(r.status).toBe(RECONCILE.DIVERGENCE);
@@ -582,5 +586,72 @@ describe('Stage 1 — the runner reports, never repairs', () => {
   it('derives its verdict from stageOneGate rather than narrating one', () => {
     expect(runner).toMatch(/stageOneGate\(\{ activity, reconciliation \}\)/);
     expect(runner).toMatch(/process\.exit\(gate\.pass \? 0 : 1\)/);
+  });
+});
+
+// ─── a decision made with no active ICP ─────────────────────────────────────
+
+describe('a decision made with no active ICP is expected, not divergent', () => {
+  const CUT = Date.parse('2026-09-16T07:00:00.000Z');
+  const after = '2026-09-17T04:04:00.000Z';
+
+  // Production, 2026-09-17: nine swipes read as divergences. All nine had
+  // swipedForICPId absent; all three that DID write shadow had it present. The
+  // classifier was on the wrong side of a perfect split.
+  it.each([['accepted'], ['rejected']])(
+    'a %s company with no swipedForICPId expects no shadow relationship', (status) => {
+      const r = classifyCompany({
+        // icpId is the DISCOVERY stamp — which ICP's search found it — and is
+        // not a decision attribution.
+        company: { status, icpId: 'icp_discovered_under', swipedAt: after },
+        relationships: [], cutoverAt: CUT,
+      });
+      expect(r.status).toBe(RECONCILE.EXPECTED_GAP);
+      expect(r.reason).toBe('decided-with-no-active-icp');
+    });
+
+  it('applies even when a discovery relationship already exists', () => {
+    // Discovered under ICP A (so a pending relationship exists), then swiped
+    // with no ICP active. Shadow cannot follow the decision; legacy moved on.
+    const r = classifyCompany({
+      company: { status: 'accepted', icpId: 'icp_A', swipedAt: after },
+      relationships: [{ icpId: 'icp_A', state: 'pending' }], cutoverAt: CUT,
+    });
+    expect(r.status).toBe(RECONCILE.EXPECTED_GAP);
+  });
+
+  it('a decision WITH swipedForICPId and no shadow is still a real divergence', () => {
+    // The ICP resolved, so the shadow write should have happened.
+    const r = classifyCompany({
+      company: { status: 'accepted', swipedForICPId: 'icp_A', icpId: 'icp_A', swipedAt: after },
+      relationships: [], cutoverAt: CUT,
+    });
+    expect(r.status).toBe(RECONCILE.DIVERGENCE);
+  });
+
+  it('a post-cutover PENDING company with no shadow is still a divergence', () => {
+    // Discovery always carries an ICP — the handler refuses a search without
+    // one — so a queued company with no relationship is a genuine miss.
+    const r = classifyCompany({
+      company: { status: 'pending', icpId: 'icp_A', found_at: after },
+      relationships: [], cutoverAt: CUT,
+    });
+    expect(r.status).toBe(RECONCILE.DIVERGENCE);
+  });
+
+  it('pre-cutover records are unaffected by the new rule', () => {
+    const r = classifyCompany({
+      company: { status: 'accepted', icpId: 'icp_A', swipedAt: '2026-09-01T00:00:00Z' },
+      relationships: [], cutoverAt: CUT,
+    });
+    expect(r.reason).toBe('predates-shadow-writes');
+  });
+
+  it('still agrees when both sides carry the same decision ICP', () => {
+    const r = classifyCompany({
+      company: { status: 'accepted', swipedForICPId: 'icp_A', swipedAt: after },
+      relationships: [{ icpId: 'icp_A', state: 'accepted' }], cutoverAt: CUT,
+    });
+    expect(r.status).toBe(RECONCILE.AGREED);
   });
 });

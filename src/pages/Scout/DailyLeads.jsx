@@ -214,7 +214,10 @@ function FeedbackFace({ entityName, reasons, setReasons, note, setNote, score, s
 }
 
 // ─── CompanySwipeCard ─────────────────────────────────────────────────────────
-function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = false, icpProfile, icpWeights }) {
+// Exported for the gesture regression test (src/test/swipeSingleDecision.test.jsx),
+// which drives the real DOM events a drag release produces. The page still ships
+// as the default export; nothing else imports this.
+export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = false, icpProfile, icpWeights }) {
   const T = useT();
   const [dx, setDx] = useState(0);
   const [dy, setDy] = useState(0);
@@ -230,8 +233,38 @@ function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = false, i
   const [isFlipping, setIsFlipping] = useState(false);
   const s = useRef(null);
 
+  // ── One card, one decision ──────────────────────────────────────────────────
+  // A card instance may commit AT MOST ONE outcome, ever. This is a latch, not a
+  // debounce: there is no window to tune and no timestamp to compare.
+  //
+  // Why it is needed: a single drag release reaches `up()` more than once. The
+  // release fires onMouseUp, and `setGone` then animates the card 700px out from
+  // under the cursor, which fires onMouseLeave — bound to the same `up()`. On
+  // touch, the browser's compatibility mouse events (mousedown → mouseup) follow
+  // touchend and do it again. `dx` is never reset on the way out, so the second
+  // call re-passes the `dx > 100` threshold and schedules a SECOND onAccept.
+  //
+  // Production, workspace peqhaq8Cw1UUPeaYhaSLwZ0iCRk2 on 2026-09-17: two of
+  // three company swipes produced two lineage events 88ms and 33ms apart, both
+  // stamped swipe_gesture='drag' — i.e. both from this handler, not a drag plus
+  // a button press. The legacy write hid it by PATCHing identical values twice.
+  //
+  // The latch is per MOUNT, and the card is keyed by company id. An undo moves
+  // currentIndex back, the key changes, React mounts a fresh card, and the latch
+  // starts open again — so "swiped, undid, re-swiped" still commits a second,
+  // genuinely distinct decision with its own causeId. That is a different fact
+  // from one gesture firing twice, and it stays expressible.
+  const decidedRef = useRef(false);
+  const commit = (run) => {
+    if (decidedRef.current) return;
+    decidedRef.current = true;
+    run();
+  };
+
   const xy = e => e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.clientX, e.clientY];
-  const down = e => { s.current = xy(e); };
+  // Post-decision the card is spent; a synthesized compat mousedown must not
+  // re-arm the drag it is about to "release".
+  const down = e => { if (decidedRef.current) return; s.current = xy(e); };
   const move = e => {
     if (!s.current) return;
     const [cx, cy] = xy(e);
@@ -239,32 +272,42 @@ function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = false, i
     setDy(cy - s.current[1]);
   };
   const up = () => {
-    if (dx > 100) { setGone('r'); setTimeout(() => onAccept(null, 'drag'), 280); }
-    else if (dx < -100) { setGone('l'); setTimeout(() => onReject(null, 'drag'), 280); }
-    else { setDx(0); setDy(0); }
+    // A release only counts if a press started here. `move` has always guarded
+    // on this; `up` did not, so onMouseLeave fired a decision with no pointer
+    // down at all. Consume the press first, so re-entry finds nothing to release.
+    const pressed = s.current;
     s.current = null;
+    if (!pressed) return;
+    if (dx > 100) commit(() => { setGone('r'); setTimeout(() => onAccept(null, 'drag'), 280); });
+    else if (dx < -100) commit(() => { setGone('l'); setTimeout(() => onReject(null, 'drag'), 280); });
+    else { setDx(0); setDy(0); }
   };
 
   const handleMatchClick = (e) => {
     e.stopPropagation();
+    if (decidedRef.current) return;
     setIsFlipping(true);
     setTimeout(() => { setShowFeedback(true); setIsFlipping(false); }, 140);
   };
-  const handleSkipFeedback = () => { setGone('r'); setTimeout(() => onAccept(null, 'button'), 280); };
-  const handleSendFeedback = () => { setGone('r'); setTimeout(() => onAccept({ reasons: feedbackReasons, note: feedbackNote, score: feedbackScore }, 'button'), 280); };
+  const handleSkipFeedback = () => commit(() => { setGone('r'); setTimeout(() => onAccept(null, 'button'), 280); });
+  const handleSendFeedback = () => commit(() => { setGone('r'); setTimeout(() => onAccept({ reasons: feedbackReasons, note: feedbackNote, score: feedbackScore }, 'button'), 280); });
 
   const handleRejectClick = (e) => {
     e.stopPropagation();
+    if (decidedRef.current) return;
     setIsFlipping(true);
     setTimeout(() => { setShowRejectionFeedback(true); setIsFlipping(false); }, 140);
   };
-  const handleSkipRejectionFeedback = () => { setGone('l'); setTimeout(() => onReject(null, 'button'), 280); };
-  const handleSendRejectionFeedback = () => { setGone('l'); setTimeout(() => onReject({ reasons: rejectionReasons, note: rejectionNote }, 'button'), 280); };
+  const handleSkipRejectionFeedback = () => commit(() => { setGone('l'); setTimeout(() => onReject(null, 'button'), 280); });
+  const handleSendRejectionFeedback = () => commit(() => { setGone('l'); setTimeout(() => onReject({ reasons: rejectionReasons, note: rejectionNote }, 'button'), 280); });
   // Not a decision, so it does not animate off to either side — a skip is
   // "not now", and the card simply steps aside. Placement and styling are
   // Sprint 3's to settle; this is parity with the affordance PersonSwipeCard
   // has had all along, so Skip is reachable at all.
-  const handleSkipClick = (e) => { e.stopPropagation(); onSkip?.(); };
+  //
+  // It still latches: a skip advances the queue, so a skip followed by a stray
+  // drag release would decide a company the user has already moved past.
+  const handleSkipClick = (e) => { e.stopPropagation(); commit(() => onSkip?.()); };
 
   const tx = gone === 'r' ? 700 : gone === 'l' ? -700 : dx;
   // G1-06: a null score means "configured criteria, but nothing measurable on
@@ -599,7 +642,7 @@ function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = false, i
 }
 
 // ─── PersonSwipeCard ──────────────────────────────────────────────────────────
-function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSkip, wide = false }) {
+export function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSkip, wide = false }) {
   const T = useT();
   const [dx, setDx] = useState(0);
   const [dy, setDy] = useState(0);
@@ -613,8 +656,18 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
   const [isFlipping, setIsFlipping] = useState(false);
   const s = useRef(null);
 
+  // One card, one decision — same latch, same reason as CompanySwipeCard above.
+  // The person path writes its own lineage events (recordPersonDecision), so an
+  // unguarded `up()` double-counts people exactly as it double-counted companies.
+  const decidedRef = useRef(false);
+  const commit = (run) => {
+    if (decidedRef.current) return;
+    decidedRef.current = true;
+    run();
+  };
+
   const xy = e => e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.clientX, e.clientY];
-  const down = e => { s.current = xy(e); };
+  const down = e => { if (decidedRef.current) return; s.current = xy(e); };
   const move = e => {
     if (!s.current) return;
     const [cx, cy] = xy(e);
@@ -622,27 +675,31 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
     setDy(cy - s.current[1]);
   };
   const up = () => {
-    if (dx > 100) { setGone('r'); setTimeout(() => onAccept(null), 280); }
-    else if (dx < -100) { setGone('l'); setTimeout(onReject, 280); }
-    else { setDx(0); setDy(0); }
+    const pressed = s.current;
     s.current = null;
+    if (!pressed) return;
+    if (dx > 100) commit(() => { setGone('r'); setTimeout(() => onAccept(null), 280); });
+    else if (dx < -100) commit(() => { setGone('l'); setTimeout(onReject, 280); });
+    else { setDx(0); setDy(0); }
   };
 
   const handleMatchClick = (e) => {
     e.stopPropagation();
+    if (decidedRef.current) return;
     setIsFlipping(true);
     setTimeout(() => { setShowFeedback(true); setIsFlipping(false); }, 140);
   };
-  const handleSkipFeedback = () => { setGone('r'); setTimeout(() => onAccept(null), 280); };
-  const handleSendFeedback = () => { setGone('r'); setTimeout(() => onAccept({ reasons: feedbackReasons, note: feedbackNote }), 280); };
+  const handleSkipFeedback = () => commit(() => { setGone('r'); setTimeout(() => onAccept(null), 280); });
+  const handleSendFeedback = () => commit(() => { setGone('r'); setTimeout(() => onAccept({ reasons: feedbackReasons, note: feedbackNote }), 280); });
 
   const handleRejectClick = (e) => {
     e.stopPropagation();
+    if (decidedRef.current) return;
     setIsFlipping(true);
     setTimeout(() => { setShowRejectionFeedback(true); setIsFlipping(false); }, 140);
   };
-  const handleSkipRejectionFeedback = () => { setGone('l'); setTimeout(() => onReject(null), 280); };
-  const handleSendRejectionFeedback = () => { setGone('l'); setTimeout(() => onReject({ reasons: rejectionReasons, note: rejectionNote }), 280); };
+  const handleSkipRejectionFeedback = () => commit(() => { setGone('l'); setTimeout(() => onReject(null), 280); });
+  const handleSendRejectionFeedback = () => commit(() => { setGone('l'); setTimeout(() => onReject({ reasons: rejectionReasons, note: rejectionNote }), 280); });
 
   const tx = gone === 'r' ? 700 : gone === 'l' ? -700 : dx;
   const initials = (person.name || person.first_name || '??').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
@@ -743,7 +800,7 @@ function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSki
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', padding: wide ? '6px 16px 8px' : '4px 12px 6px' }}>
           <button
-            onClick={e => { e.stopPropagation(); onSkip(); }}
+            onClick={e => { e.stopPropagation(); commit(() => onSkip()); }}
             style={{ padding: '6px 14px', borderRadius: 10, border: 'none', background: 'transparent', color: T.textFaint, fontSize: 11, cursor: 'pointer' }}
           >⊙ Skip for Today</button>
         </div>
@@ -1456,6 +1513,10 @@ export default function DailyLeads({ onNavigate }) {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) return;
       // Don't fire when modals/panels are open
       if (showTitleSetup || showICPChat || barryPanelOpen || queueListOpen) return;
+      // Held keys autorepeat. One press is one decision — the OS repeating the
+      // keydown is not the user deciding again. The card's latch cannot help
+      // here: this path calls handleSwipe directly and never touches the card.
+      if (e.repeat) return;
 
       if (tab === 'companies' && !showBatchEnd) {
         if (e.key === 'ArrowRight' || e.key === 'l' || e.key === 'L') { e.preventDefault(); handleSwipeRef.current?.('right', null, 'keyboard'); }
@@ -1755,7 +1816,30 @@ export default function DailyLeads({ onNavigate }) {
     setCurrentIndex(0);
   }, [activeICPId, icpList, companies]);
 
+  /**
+   * One decision at a time.
+   *
+   * The card latch stops a gesture producing two callbacks; this stops two
+   * callbacks producing two decisions, whatever door they arrived through —
+   * keyboard, card, or a future caller. It is the backstop that makes the
+   * invariant hold for entry points the card never sees.
+   *
+   * It matters because the body below reads `companies[currentIndex]` up front
+   * and does not advance `currentIndex` until the end of a long await chain.
+   * Two calls that overlap that chain both resolve to the SAME company and both
+   * write — which is exactly what production shows: two lineage events 88ms
+   * apart for one drag.
+   *
+   * Deliberately NOT a subject-level "already decided" check. Cleared in
+   * `finally`, this blocks only genuinely concurrent calls; once a decision has
+   * settled, the next one is free to run. So swipe → undo → re-swipe still
+   * produces a second decision with its own timestamp and its own event id,
+   * because that is a real second decision. Only the overlap is suppressed.
+   */
+  const swipeInFlightRef = useRef(false);
+
   const handleSwipe = async (direction, feedback = null, gesture = 'unknown') => {
+    if (swipeInFlightRef.current) return;
     const user = getEffectiveUser();
     if (!user) return;
     const today = new Date().toISOString().split('T')[0];
@@ -1767,6 +1851,10 @@ export default function DailyLeads({ onNavigate }) {
     }
     const company = companies[currentIndex];
     if (!company) return;
+    // Claimed here, not at the guard above: everything between the two is
+    // synchronous, so nothing can interleave, and the rejected paths above
+    // decided nothing and must not hold the lock.
+    swipeInFlightRef.current = true;
     try {
       const companyRef = doc(db, 'users', user.uid, 'companies', company.id);
       // Hoisted so the decision has ONE timestamp: the legacy write and the
@@ -1993,6 +2081,11 @@ export default function DailyLeads({ onNavigate }) {
     } catch (error) {
       console.error('Error handling swipe:', error);
       alert('Failed to save swipe. Please try again.');
+    } finally {
+      // Released however this decision ended — committed, early-returned on a
+      // full batch, or thrown. A lock that leaked on the error path would wedge
+      // the queue for the rest of the session.
+      swipeInFlightRef.current = false;
     }
   };
 
@@ -2262,7 +2355,13 @@ export default function DailyLeads({ onNavigate }) {
     return 'Title match — outside your target industry.';
   };
 
+  // Same one-at-a-time lock as handleSwipe, for the same reason: this reads
+  // peopleQueue[currentPersonIdx] up front and advances the index only at the
+  // end, so overlapping calls decide the same person twice.
+  const personSwipeInFlightRef = useRef(false);
+
   const handlePersonSwipe = async (direction, feedback = null) => {
+    if (personSwipeInFlightRef.current) return;
     const user = getEffectiveUser();
     if (!user) return;
     const today = todayRef.current;
@@ -2275,6 +2374,7 @@ export default function DailyLeads({ onNavigate }) {
     // shadow event — and it doubles as the event's causeId, so a retry lands on
     // the same event id and is recognised as already recorded.
     const personDecidedAt = new Date().toISOString();
+    personSwipeInFlightRef.current = true;
     try {
       if (direction === 'right') {
         // Identity resolution before the write. The composite id already
@@ -2346,6 +2446,8 @@ export default function DailyLeads({ onNavigate }) {
     } catch (err) {
       console.error('Error handling person swipe:', err);
       alert('Failed to save. Please try again.');
+    } finally {
+      personSwipeInFlightRef.current = false;
     }
   };
 

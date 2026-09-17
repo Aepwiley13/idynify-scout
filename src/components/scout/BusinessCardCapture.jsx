@@ -1,11 +1,10 @@
 import { useState, useRef } from 'react';
 import { auth, db } from '../../firebase/config';
-import { collection, addDoc, doc, setDoc, getDoc, updateDoc, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { Camera, Upload, Edit3, Calendar, AlertCircle } from 'lucide-react';
 import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
-import { createCompanyRecord } from '../../schemas/companySchema';
-import { resolveCompany, apolloIdFields, readApolloOrgId } from '../../services/companyIdentityService';
+import { ensureCompanyForContact, NAME_SOURCE } from '../../services/companyIdentityService';
 import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 
 export default function BusinessCardCapture({ onContactAdded, onCancel }) {
@@ -151,11 +150,15 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
         return;
       }
 
-      // Step 1: Ensure company exists in Saved Companies (if company provided)
-      let companyId = null;
-      if (formData.company && formData.company.trim()) {
-        companyId = await ensureCompanyExists(formData.company.trim(), formData.website, user.uid);
-      }
+      // Step 1: Ensure company exists in Saved Companies.
+      //
+      // No longer gated on a typed company name. A card with no company printed
+      // on it but a work email still identifies the company, and the shared
+      // helper resolves on that domain. It returns null only when there is
+      // genuinely no signal at all.
+      const companyId = await ensureCompanyExists(
+        formData.company.trim(), formData.website, formData.email, user.uid,
+      );
 
       // Step 2: Save contact to /users/{uid}/contacts
       const contactData = {
@@ -218,49 +221,29 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
     }
   };
 
-  const ensureCompanyExists = async (companyName, website, userId) => {
-    if (!companyName) return null;
-
-    // Business cards carry no Apollo id, so this resolves on name — the same
-    // check as before, now through the shared resolver so every company path
-    // agrees on what "already have it" means.
-    const match = await resolveCompany(userId, { name: companyName },
-      { source: 'BusinessCardCapture.ensureCompanyExists' });
-    if (match.companyId) return match.companyId;
-
-    // Create new company
-    const companyId = `company_${Date.now()}`;
-    const companyRef = doc(db, 'users', userId, 'companies', companyId);
-
-    const companyData = createCompanyRecord({
-      name: companyName,
-      website_url: website || null,
-      domain: website ? extractDomain(website) : null,
-
-      // Metadata
-      saved_at: new Date().toISOString(),
+  /**
+   * Give the scanned contact a company.
+   *
+   * Routed through the shared helper rather than a local copy. A business card
+   * carries no Apollo id, so this resolves on the printed company name, then on
+   * the domain of the printed website or work email — the last of which this
+   * path previously ignored entirely, because it refused to create a company
+   * without a typed name.
+   *
+   * The name is the user's own transcription of what is printed on the card, so
+   * it is authoritative: enrichment may not overwrite it.
+   */
+  const ensureCompanyExists = async (companyName, website, email, userId) => {
+    const { companyId } = await ensureCompanyForContact(userId, {
+      name: companyName || null,
+      domain: website || null,
+      email: email || null,
+    }, {
       source: 'Scanned Business Card',
-      status: 'accepted',
-      contact_count: 0,
-
-      // For future enrichment
-      apolloEnriched: false
+      nameSource: NAME_SOURCE.USER,
+      extraFields: { website_url: website || null },
     });
-
-    await setDoc(companyRef, companyData);
-    console.log('✅ Company created from business card:', companyId);
-
     return companyId;
-  };
-
-  const extractDomain = (url) => {
-    if (!url) return null;
-    try {
-      const domain = url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
-      return domain;
-    } catch {
-      return null;
-    }
   };
 
   const updateCompanyContactCount = async (companyId, userId) => {

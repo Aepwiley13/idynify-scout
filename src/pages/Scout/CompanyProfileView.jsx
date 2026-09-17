@@ -20,6 +20,7 @@ import {
   Award, Archive, RotateCcw, RefreshCw, ChevronDown, ChevronUp,
   FileText, Tag, Phone, ExternalLink, Loader, Zap, ChevronLeft, Code, User,
 } from 'lucide-react';
+import { canEnrich, enrichmentSignals, applyCompanyEnrichment } from '../../services/companyIdentityService';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS } from '../../theme/tokens';
 import CompanyLogo from '../../components/scout/CompanyLogo';
@@ -166,10 +167,17 @@ export default function CompanyProfileView({ companyId, onBack }) {
         return;
       }
 
+      // A company created from a typed name alone carries neither a domain nor
+      // an Apollo org id, and enrichCompany rejects a request with neither.
+      if (!canEnrich(companyData)) {
+        console.info('[company-profile] no enrichment signal on this company — skipping');
+        return;
+      }
+
       const authToken = await user.getIdToken();
-      const domain = companyData.domain || extractDomain(companyData.website_url) || null;
-      // apollo_organization_id is stored by the swipe-deck pipeline; apollo_id by the contact-search pipeline
-      const organizationId = companyData.apollo_id || companyData.apollo_organization_id || null;
+      // Reads BOTH Apollo id field names — the swipe-deck pipeline stores
+      // apollo_organization_id, the contact-search pipeline apollo_id.
+      const { domain, organizationId } = enrichmentSignals(companyData);
 
       const res = await fetch('/.netlify/functions/enrichCompany', {
         method: 'POST',
@@ -182,11 +190,27 @@ export default function CompanyProfileView({ companyId, onBack }) {
       });
       const result = await res.json();
       if (result.success) {
+        // Cached blob and timestamp are view state — no identity, safe direct.
         await updateDoc(doc(db, 'users', user.uid, 'companies', companyId), {
           apolloEnrichment: result.data,
           apolloEnrichedAt: Date.now(),
-          apollo_id: result.data._raw?.apolloOrgId || null,
         });
+
+        // Identity-bearing fields go through the guard: both Apollo id field
+        // names, no overwrite of an authoritative name, and a duplicate check
+        // against the newly-discovered signals before anything is written.
+        const snapshot = result.data?.snapshot ?? {};
+        await applyCompanyEnrichment(user.uid, companyId, {
+          apollo_organization_id: result.data?._raw?.apolloOrgId ?? null,
+          domain: snapshot.domain ?? result.data?._raw?.domain ?? null,
+          name: snapshot.name ?? null,
+          website_url: snapshot.website_url ?? null,
+          linkedin_url: snapshot.linkedin_url ?? null,
+          industry: snapshot.industry ?? null,
+          employee_count: snapshot.estimated_num_employees ?? null,
+          location: snapshot.location?.full ?? null,
+        }, { source: 'CompanyProfileView.enrich' });
+
         setEnrichedData(result.data);
       }
     } catch (err) {
@@ -409,12 +433,6 @@ export default function CompanyProfileView({ companyId, onBack }) {
   }
 
   // ── Helpers ────────────────────────────────────────────────────────────────
-  function extractDomain(url) {
-    if (!url) return null;
-    try { return url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0]; }
-    catch { return null; }
-  }
-
   function getLeadershipBadge(contact) {
     const seniority = (contact.seniority || '').toLowerCase();
     const title = (contact.title || '').toLowerCase();

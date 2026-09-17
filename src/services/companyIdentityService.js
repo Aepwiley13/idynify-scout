@@ -25,7 +25,7 @@
  * check both so a historical document written under either name is found.
  */
 
-import { collection, doc, getDocs, limit, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, limit, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { normalizeLoose } from '../utils/identityNormalization';
 import { createCompanyRecord, COMPANY_STATUS } from '../schemas/companySchema';
 import { db } from '../firebase/config';
@@ -319,6 +319,26 @@ export async function resolveCompany(userId, candidate = {}, { source = 'unknown
 }
 
 /**
+ * Where a company's `name` came from, strongest first.
+ *
+ * Enrichment is allowed to correct a name it GUESSED and nothing else. A name
+ * reported by Apollo or typed by the user is authoritative and must survive an
+ * enrichment pass, or a user who renamed a company watches it revert.
+ *
+ * `email_domain` is the only overwritable value: those names are produced by
+ * `companyNameFromDomain`, which turns `rd-advantage.com` into "Rd Advantage"
+ * where the organization writes itself "R&D Advantage".
+ */
+export const NAME_SOURCE = Object.freeze({
+  APOLLO: 'apollo',
+  USER: 'user',
+  EMAIL_DOMAIN: 'email_domain',
+});
+
+/** The only name provenance an enrichment pass may overwrite. */
+export const OVERWRITABLE_NAME_SOURCES = Object.freeze(['email_domain']);
+
+/**
  * Resolve a contact's company, creating or promoting it so the contact has a
  * home in Saved Companies.
  *
@@ -352,12 +372,17 @@ export async function resolveCompany(userId, candidate = {}, { source = 'unknown
  *
  * @returns {Promise<{companyId: string|null, signal: string|null, created: boolean, promoted: boolean}>}
  */
-export async function ensureCompanyForContact(userId, candidate = {}, { source = 'unknown', extraFields = {} } = {}) {
+export async function ensureCompanyForContact(userId, candidate = {}, { source = 'unknown', extraFields = {}, nameSource = NAME_SOURCE.APOLLO } = {}) {
   if (!userId) return { companyId: null, signal: null, created: false, promoted: false };
 
   const apolloOrgId = readApolloOrgId(candidate);
   const givenName = candidate.name ?? candidate.company_name ?? candidate.organization_name ?? null;
   const domain = normalizeDomain(candidate.domain) ?? workDomainFromEmail(candidate.email);
+  // The company's own LinkedIn page, not the contact's profile. Apollo returns
+  // it on the organization object; this path used to drop it on the floor, so
+  // every company saved through a LinkedIn import lost the one URL a human
+  // would most want to click. Free to keep — it is already in the payload.
+  const linkedinUrl = candidate.linkedin_url ?? candidate.organization?.linkedin_url ?? null;
 
   const match = await resolveCompany(userId, { ...candidate, domain }, { source });
 
@@ -387,23 +412,175 @@ export async function ensureCompanyForContact(userId, candidate = {}, { source =
   }
 
   const companyId = apolloOrgId || `company_${Date.now()}`;
+  // ── Capture every enrichment signal that is free right now ───────────────
+  //
+  // Deliberately NO network call. Adding a contact is an interactive flow, and
+  // an Apollo org enrich costs credits on a record the user may never look at.
+  // What this does instead is persist the signals already sitting in the
+  // payload, so the lazy enrichment that runs on first company view has
+  // something to work with. `enrichCompany` needs a domain OR an Apollo org id
+  // — a company created with neither can never be enriched at all, which is
+  // exactly the state bare-name companies used to be born in.
   await setDoc(doc(db, 'users', userId, 'companies', companyId), createCompanyRecord({
     ...apolloIdFields(apolloOrgId),
     ...extraFields,
     name: derivedName,
-    domain: domain ?? extraFields.domain ?? null,
+    domain: domain ?? normalizeDomain(extraFields.domain) ?? null,
+    linkedin_url: linkedinUrl ?? extraFields.linkedin_url ?? null,
     saved_at: new Date().toISOString(),
     source,
     status: COMPANY_STATUS.ACCEPTED,
     contact_count: 0,
-    // Flags a name that was guessed from a domain rather than reported by a
-    // source. Enrichment may overwrite it; a name from Apollo or the user may not.
-    ...(givenName ? {} : { name_source: 'email_domain' }),
+    // Provenance of `name`, so a later enrichment knows whether it may correct
+    // it. A name derived from a domain is a guess and says so.
+    name_source: givenName ? nameSource : NAME_SOURCE.EMAIL_DOMAIN,
+    // Not yet enriched. The company-detail surfaces read this pair to decide
+    // whether to call enrichCompany on open.
+    apolloEnriched: false,
   }));
   console.info('[company-identity] created company for contact', {
     source, companyId, name: derivedName, derivedFromDomain: !givenName,
+    signals: { domain: Boolean(domain), apolloOrgId: Boolean(apolloOrgId), linkedin: Boolean(linkedinUrl) },
   });
   return { companyId, signal: 'created', created: true, promoted: false };
+}
+
+/**
+ * The identity signals `enrichCompany` needs, read off a company document.
+ *
+ * `enrichCompany` rejects a request carrying neither a domain nor an
+ * organization id, so calling it without one is a guaranteed-failing round
+ * trip — and until bare-name companies existed, every company had at least one,
+ * which is why nothing checked. A company created from a typed name with no
+ * work-email domain has neither, and would otherwise produce a failed fetch on
+ * every open of its detail page.
+ *
+ * Reads the organization id from BOTH field names. Two of the three company
+ * surfaces looked only at `apollo_id`, so a document carrying only
+ * `apollo_organization_id` — the standard — was silently unenrichable there.
+ */
+export function enrichmentSignals(company = {}) {
+  return {
+    domain: normalizeDomain(company.domain)
+      ?? normalizeDomain(company.primary_domain)
+      ?? normalizeDomain(company.website_url)
+      ?? null,
+    organizationId: readApolloOrgId(company),
+  };
+}
+
+/** Whether `enrichCompany` can do anything with this company at all. */
+export function canEnrich(company = {}) {
+  const { domain, organizationId } = enrichmentSignals(company);
+  return Boolean(domain || organizationId);
+}
+
+/**
+ * Write enrichment results back onto a company — the ONLY sanctioned path.
+ *
+ * WHY ENRICHMENT MAY NOT JUST `updateDoc`
+ * ───────────────────────────────────────
+ * Enrichment is the one moment a company's identity signals CHANGE. A company
+ * born from a typed name has no Apollo id and maybe no domain; enrichment can
+ * hand it both. That makes it the one moment a record can collide with a
+ * document that was already in the workspace under the identity nobody knew
+ * yet. Writing the discovered fields straight onto the row would quietly
+ * manufacture the duplicates this module exists to prevent.
+ *
+ * Two failure modes this guards, both of which have already happened in this
+ * codebase in one form or another:
+ *
+ *   1. THE ALIAS SPLIT. Apollo's organization id has been written under two
+ *      field names. Enrichment that writes only `apollo_organization_id` leaves
+ *      `apollo_id` unset, and every reader still on the old name stops seeing
+ *      the company — the exact split `apolloIdFields` was introduced to close.
+ *      So the id always goes through `apolloIdFields`, never written by hand.
+ *
+ *   2. THE NAME REVERT. A name from Apollo or from the user is authoritative.
+ *      Only a name this module GUESSED from a domain may be corrected. Without
+ *      that rule an enrichment pass renames a company the user deliberately
+ *      renamed, and does it again on every refresh.
+ *
+ * Returns `{ action: 'merged', into }` when the discovered signals reveal the
+ * company already exists as another document. The caller should repoint at
+ * `into` — this function does not move contacts, because re-parenting records
+ * is a migration decision and not a side effect of opening a detail page.
+ *
+ * @returns {Promise<{action:'updated'|'merged'|'noop', companyId:string, into?:string, fields:string[]}>}
+ */
+export async function applyCompanyEnrichment(userId, companyId, discovered = {}, { source = 'enrichment' } = {}) {
+  if (!userId || !companyId) return { action: 'noop', companyId, fields: [] };
+
+  const ref = doc(db, 'users', userId, 'companies', companyId);
+  const snap = await getDoc(ref);
+  if (!snap.exists()) return { action: 'noop', companyId, fields: [] };
+  const existing = snap.data() ?? {};
+
+  const apolloOrgId = readApolloOrgId(discovered);
+  const domain = normalizeDomain(discovered.domain)
+    ?? normalizeDomain(discovered.primary_domain)
+    ?? normalizeDomain(discovered.website_url);
+
+  // ── Collision check, BEFORE writing ──
+  //
+  // Only meaningful when enrichment actually discovered a NEW identity signal;
+  // re-resolving on signals the record already carries would just find itself.
+  const learnedApollo = apolloOrgId && !readApolloOrgId(existing);
+  const learnedDomain = domain && !normalizeDomain(existing.domain);
+
+  if (learnedApollo || learnedDomain) {
+    const match = await resolveCompany(
+      userId,
+      { apollo_organization_id: learnedApollo ? apolloOrgId : null, domain: learnedDomain ? domain : null },
+      { source: `${source}.collisionCheck` },
+    );
+    if (match.companyId && match.companyId !== companyId) {
+      console.warn('[company-identity] enrichment revealed an existing duplicate — not writing', {
+        source, companyId, existingCompanyId: match.companyId, signal: match.signal,
+      });
+      return { action: 'merged', companyId, into: match.companyId, fields: [] };
+    }
+  }
+
+  // ── Build the patch ──
+  const patch = {};
+
+  if (apolloOrgId) {
+    // BOTH field names, always. Never hand-write one.
+    Object.assign(patch, apolloIdFields(apolloOrgId));
+  }
+
+  if (domain && !normalizeDomain(existing.domain)) patch.domain = domain;
+
+  // Fill holes only; never restate what the record already has.
+  for (const field of ['website_url', 'linkedin_url', 'industry', 'employee_count', 'location', 'logo_url']) {
+    const value = discovered[field];
+    if (value === null || value === undefined || value === '') continue;
+    const current = existing[field];
+    if (current !== null && current !== undefined && current !== '') continue;
+    patch[field] = value;
+  }
+
+  // The name, under the provenance rule.
+  const incomingName = discovered.name ?? null;
+  if (incomingName && incomingName !== existing.name) {
+    if (OVERWRITABLE_NAME_SOURCES.includes(existing.name_source)) {
+      patch.name = incomingName;
+      patch.name_source = NAME_SOURCE.APOLLO;
+      patch.name_was = existing.name;
+    } else {
+      console.info('[company-identity] keeping authoritative company name', {
+        source, companyId, kept: existing.name, offered: incomingName,
+        nameSource: existing.name_source ?? '(unset)',
+      });
+    }
+  }
+
+  if (Object.keys(patch).length === 0) return { action: 'noop', companyId, fields: [] };
+
+  await updateDoc(ref, patch);
+  console.info('[company-identity] enrichment written back', { source, companyId, fields: Object.keys(patch) });
+  return { action: 'updated', companyId, fields: Object.keys(patch) };
 }
 
 export default {
@@ -420,4 +597,8 @@ export default {
   findCompanyByDomain,
   resolveCompany,
   ensureCompanyForContact,
+  enrichmentSignals,
+  canEnrich,
+  applyCompanyEnrichment,
+  NAME_SOURCE,
 };

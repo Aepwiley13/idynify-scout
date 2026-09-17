@@ -8,6 +8,7 @@ import './ScoutMain.css';
 import './CompanyDetail.css';
 import { searchPeople, updatePerson } from '../../services/peopleService';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { canEnrich, enrichmentSignals, applyCompanyEnrichment } from '../../services/companyIdentityService';
 import { openContact, ENTRY_POINTS } from '../../utils/navigation';
 import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 import { RECORD_STATUS } from '../../constants/statusModel';
@@ -176,7 +177,10 @@ export default function CompanyDetail({
       // spends an Apollo credit on a record the user may be about to reject.
       const isStale = !companyData.apolloEnrichedAt ||
         Date.now() - companyData.apolloEnrichedAt > 14 * 24 * 60 * 60 * 1000;
-      if (!previewOnly && (!companyData.apolloEnrichment || isStale)) {
+      // canEnrich: a company created from a typed name alone carries neither a
+      // domain nor an Apollo org id, and enrichCompany rejects a request with
+      // neither. Skipping is not a loss — there is nothing to look it up by.
+      if (!previewOnly && canEnrich(companyData) && (!companyData.apolloEnrichment || isStale)) {
         enrichCompanyData(false);
       }
     } catch (error) {
@@ -761,15 +765,13 @@ export default function CompanyDetail({
 
       const authToken = await user.getIdToken();
 
+      const { domain, organizationId } = enrichmentSignals(currentData);
+      if (!domain && !organizationId) return;   // nothing to look it up by
+
       const response = await fetch('/.netlify/functions/enrichCompany', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          authToken,
-          domain: currentData.domain || extractDomain(currentData.website_url),
-          organizationId: currentData.apollo_id || null
-        })
+        body: JSON.stringify({ userId: user.uid, authToken, domain, organizationId })
       });
 
       if (!response.ok) throw new Error('Enrichment failed');
@@ -777,11 +779,34 @@ export default function CompanyDetail({
       const result = await response.json();
       if (!result.success) throw new Error(result.error || 'Enrichment failed');
 
+      // The cached blob and its timestamp are view state — they name no
+      // identity and are safe to write directly.
       await updateDoc(companyRef, {
         apolloEnrichment: result.data,
         apolloEnrichedAt: Date.now(),
-        apollo_id: result.data._raw?.apolloOrgId || null
       });
+
+      // Everything that touches IDENTITY goes through the guard. This used to
+      // write `apollo_id` by hand — one of the two field names, sometimes null
+      // — which both re-opened the alias split and could clobber a good id.
+      // The guard writes both names, refuses to overwrite an authoritative
+      // name, and checks first whether the newly-discovered id or domain means
+      // this company already exists as another document.
+      const snapshot = result.data?.snapshot ?? {};
+      const enrichResult = await applyCompanyEnrichment(user.uid, companyId, {
+        apollo_organization_id: result.data?._raw?.apolloOrgId ?? null,
+        domain: snapshot.domain ?? result.data?._raw?.domain ?? null,
+        name: snapshot.name ?? null,
+        website_url: snapshot.website_url ?? null,
+        linkedin_url: snapshot.linkedin_url ?? null,
+        industry: snapshot.industry ?? null,
+        employee_count: snapshot.estimated_num_employees ?? null,
+        location: snapshot.location?.full ?? null,
+      }, { source: 'CompanyDetail.enrich' });
+
+      if (enrichResult.action === 'merged') {
+        console.warn('[company-detail] enrichment found this company already exists as', enrichResult.into);
+      }
 
       // Update local company state with fresh enrichment data
       setCompany(prev => ({
@@ -795,15 +820,6 @@ export default function CompanyDetail({
       console.error('❌ Enrichment failed:', err);
     } finally {
       setEnriching(false);
-    }
-  }
-
-  function extractDomain(url) {
-    if (!url) return null;
-    try {
-      return url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
-    } catch {
-      return null;
     }
   }
 

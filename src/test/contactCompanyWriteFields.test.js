@@ -297,7 +297,16 @@ describe('company documents always carry status', () => {
   const writes = collectWrites('companies');
 
   it('finds the company write sites at all', () => {
-    expect(writes.length).toBeGreaterThanOrEqual(5);
+    // A canary, not a target. Its job is to fail loudly if the parser stops
+    // finding company writes, so the status assertion below cannot pass
+    // vacuously on an empty list.
+    //
+    // The floor dropped from 5 to 3 when the contact-driven entry points were
+    // unified: FindContact, ContactSearch and BusinessCardCapture each built a
+    // company document by hand and now delegate to ensureCompanyForContact.
+    // Fewer creation sites is the point of that change — one implementation is
+    // what stops a fix landing in some of them and missing the rest.
+    expect(writes.length).toBeGreaterThanOrEqual(3);
   });
 
   it('every company-creating write sets status, or routes through the factory', () => {

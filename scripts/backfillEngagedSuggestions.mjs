@@ -49,9 +49,19 @@
  *   src/test/engagementPromotion.test.js.
  *
  *   Deliberately NOT touched:
- *     · Archived or rejected records. `is_archived: true` wins in
- *       readRecordStatus, so an archived contact has nothing to promote and
- *       engaging one must never silently undo the archive.
+ *     · Archived or rejected records — but MIND THE PRECEDENCE, because it
+ *       is the opposite of what it looks like. `readRecordStatus` checks
+ *       `record_status` BEFORE `is_archived`, so `is_archived: true` does
+ *       NOT win: an archived row whose `record_status` is still the stale
+ *       'suggested' it was stamped with at creation reads back as
+ *       'suggested'. The audited workspace has 7 such rows.
+ *
+ *       They are excluded below by an explicit archive check rather than by
+ *       `readRecordStatus`, because engaging someone the user archived must
+ *       never silently undo the archive — and that guarantee has to be
+ *       enforced, not left resting on those rows also happening to be
+ *       unengaged today. An archived + stale-'suggested' + engaged row
+ *       would otherwise be promoted to 'active' and un-archived.
  *     · The legacy `status` field when it holds an Apollo enrichment marker
  *       ('pending_enrichment', 'enrichment_failed', …). That is real state
  *       nothing else records, and clobbering it would lose it.
@@ -131,12 +141,33 @@ import {
 // that disagrees with the runtime is worse than no migration at all.
 
 /**
+ * Does any field say this record was archived?
+ *
+ * Asked of the raw fields rather than through `readRecordStatus`, which
+ * checks `record_status` first and therefore reads a stale 'suggested' on an
+ * archived row as 'suggested', stepping straight past the archive signal.
+ * See the precedence note in the header.
+ *
+ * @param   {Object}  data  The contact document.
+ * @returns {boolean}
+ */
+export function hasArchiveSignal(data = {}) {
+  return data.is_archived === true
+    || data.status === 'archived'
+    || data.status === 'people_mode_archived';
+}
+
+/**
  * Is this contact in the contradictory state the audit found?
  *
  * @param   {Object}  data  The contact document.
  * @returns {boolean}
  */
 export function isEngagedSuggestion(data = {}) {
+  // Checked first, and deliberately not folded into the expression below:
+  // an archive is a decision the user made, and no amount of engagement
+  // evidence may overturn it here.
+  if (hasArchiveSignal(data)) return false;
   return readRecordStatus(data) === RECORD_STATUS.SUGGESTED && isEngagedRecord(data);
 }
 

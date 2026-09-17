@@ -14,6 +14,7 @@
 
 import { schedule } from '@netlify/functions';
 import admin from 'firebase-admin';
+import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 
 // Initialize Firebase Admin (singleton guard)
 if (!admin.apps.length) {
@@ -128,9 +129,13 @@ async function processUserQueue(userId, results) {
 
       // Update contact status to Awaiting Reply if not already there
       if (contactStatus !== 'Awaiting Reply') {
-        await db.collection('users').doc(userId).collection('contacts').doc(contactId).update({
+        const contactRef = db.collection('users').doc(userId).collection('contacts').doc(contactId);
+        // Awaiting Reply is an engaged state, so the record can no longer be
+        // a discovery suggestion. Merged into the same write.
+        await contactRef.update({
           contact_status: 'Awaiting Reply',
-          contact_status_updated_at: admin.firestore.FieldValue.serverTimestamp()
+          contact_status_updated_at: admin.firestore.FieldValue.serverTimestamp(),
+          ...(await engagementPromotionPatch(contactRef, 'follow_up_due')),
         });
       }
 

@@ -23,6 +23,7 @@ import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { checkRelationshipGuardrail, getGuardrailPromptModifier } from './utils/barryGuardrail.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 import { LEGACY_HAIKU_4_5 } from './utils/models.js';
+import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 
 /**
  * User scope — the one line of it these surfaces need.
@@ -421,12 +422,16 @@ export const handler = async (event) => {
     });
 
     // 9. Update contact to active_mission
-    await db.collection('users').doc(userId).collection('contacts').doc(contactId).update({
+    const contactRef = db.collection('users').doc(userId).collection('contacts').doc(contactId);
+    // Being given a mission is engagement, so the record can no longer be a
+    // discovery suggestion. Merged into the same write.
+    await contactRef.update({
       hunter_status: 'active_mission',
       active_mission_id: missionId,
       processing_error: null,
       processing_error_at: null,
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      ...(await engagementPromotionPatch(contactRef, 'mission_assigned')),
     });
 
     const responseTime = Date.now() - startTime;

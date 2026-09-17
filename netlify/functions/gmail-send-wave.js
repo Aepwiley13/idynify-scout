@@ -12,6 +12,7 @@ import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
+import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {
@@ -218,9 +219,15 @@ export const handler = async (event) => {
             if (!recipient.existingThreadId && gmailThreadId) {
               contactUpdate.gmail_thread_id = gmailThreadId;
             }
-            await db.collection('users').doc(userId)
-              .collection('contacts').doc(recipient.contactId)
-              .update(contactUpdate);
+            const contactRef = db.collection('users').doc(userId)
+              .collection('contacts').doc(recipient.contactId);
+            // Engaging a contact means the user kept it, so it can no longer
+            // be a discovery suggestion. Merged into the send's own write.
+            Object.assign(
+              contactUpdate,
+              await engagementPromotionPatch(contactRef, 'gmail_send_wave'),
+            );
+            await contactRef.update(contactUpdate);
           } catch (err) {
             console.warn(`Failed to update contact ${recipient.contactId}:`, err.message);
           }

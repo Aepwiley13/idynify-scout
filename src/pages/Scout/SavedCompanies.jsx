@@ -19,6 +19,11 @@ import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { calculateICPScore, DEFAULT_WEIGHTS } from '../../utils/icpScoring';
 import { getDisplayIndustry } from '../../utils/companyDisplay';
+import {
+  RECORD_STATUS,
+  isEngagedRecord,
+  readRecordStatus,
+} from '../../constants/statusModel';
 
 // ─── SavedCompanies ───────────────────────────────────────────────────────────
 export default function SavedCompanies({ onSelectCompany }) {
@@ -65,7 +70,22 @@ export default function SavedCompanies({ onSelectCompany }) {
         const data = d.data();
         const cid = data.company_id;
         if (!cid) return;
-        if (data.status !== 'suggested') {
+        // `suggested` means discovery surfaced this person and the user has
+        // not kept them yet. Engagement IS keeping them: a contact who has
+        // been emailed, enrolled in a cadence or given a mission is a real
+        // contact whatever the row still says — auto-discovery stamps
+        // `status: 'suggested'` and no write path used to clear it.
+        //
+        // Counting those as merely suggested is how six accepted companies
+        // came to report "0 contacts" while their contacts were mid-
+        // conversation, which then pushed them into the no-contact prompt
+        // list. People excludes the same contacts for being engaged, so they
+        // showed up in neither count. Read through the compatibility helpers
+        // rather than the raw field so records written before the status
+        // migration resolve the same way as ones written today.
+        const stillSuggested =
+          readRecordStatus(data) === RECORD_STATUS.SUGGESTED && !isEngagedRecord(data);
+        if (!stillSuggested) {
           contactCountMap[cid] = (contactCountMap[cid] || 0) + 1;
         } else {
           suggestedCountMap[cid] = (suggestedCountMap[cid] || 0) + 1;

@@ -44,9 +44,13 @@
  *   Sequence completed     → Mission Complete
  */
 
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { logTimelineEvent, ACTORS } from './timelineLogger';
+import {
+  engagementPromotionFields,
+  isEngagedRecord,
+} from '../constants/statusModel';
 
 // ── Allowed Statuses ────────────────────────────────────
 
@@ -228,9 +232,13 @@ export function getContactStatus(contact) {
  * @param {string} params.contactId    - Contact document ID
  * @param {string} params.trigger      - One of STATUS_TRIGGERS
  * @param {string} [params.currentStatus] - Current contact_status (optional, avoids re-read)
+ * @param {Object} [params.contact]       - The contact doc, if the caller already
+ *   has it. Only consulted when the transition is into an engaged status, and
+ *   only to decide whether the record needs promoting out of 'suggested'. When
+ *   omitted the document is re-read, so callers that lack it stay correct.
  * @returns {Promise<string|null>} New status if updated, null if skipped or failed
  */
-export async function updateContactStatus({ userId, contactId, trigger, currentStatus }) {
+export async function updateContactStatus({ userId, contactId, trigger, currentStatus, contact = null }) {
   try {
     if (!userId || !contactId || !trigger) {
       console.error('[StateMachine] Missing required fields:', { userId, contactId, trigger });
@@ -247,10 +255,29 @@ export async function updateContactStatus({ userId, contactId, trigger, currentS
 
     // Write to Firestore
     const contactRef = doc(db, 'users', userId, 'contacts', contactId);
-    await updateDoc(contactRef, {
+    const patch = {
       contact_status: newStatus,
       contact_status_updated_at: new Date().toISOString()
-    });
+    };
+
+    // A contact the user has actually engaged is no longer a discovery
+    // suggestion, and must not be left as one. Auto-discovery writes
+    // `status: 'suggested'` and nothing used to clear it, so an emailed
+    // contact could keep that marker forever — at which point Saved Companies
+    // dropped it for being suggested and People dropped it for being engaged,
+    // and it appeared in neither surface while cadences kept running against
+    // it. Promoting in the SAME write means the two dimensions can never
+    // disagree about a contact this path has touched.
+    if (isEngagedRecord({ contact_status: newStatus })) {
+      let subject = contact;
+      if (!subject) {
+        const snap = await getDoc(contactRef);
+        subject = snap.exists() ? snap.data() : null;
+      }
+      Object.assign(patch, engagementPromotionFields(subject, { reason: trigger }));
+    }
+
+    await updateDoc(contactRef, patch);
 
     // Log timeline event
     logTimelineEvent({

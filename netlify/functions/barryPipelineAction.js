@@ -22,6 +22,7 @@ import { db } from './firebase-admin.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { createAdminAdapter } from './utils/contactResolver.js';
+import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 import { resolveContactCore, RESOLUTION } from '../../src/utils/identityResolution.js';
 
 // ── Gate 2: the model does not get to decide WHICH person ────────────────────
@@ -159,6 +160,13 @@ async function engageContact(userId, contactId) {
     last_interaction_at: FieldValue.serverTimestamp(),
     updated_at: now
   };
+
+  // Being given a mission is engagement, so the record can no longer be a
+  // discovery suggestion. Merged into the same write.
+  Object.assign(
+    contactUpdate,
+    await engagementPromotionPatch(contactRef, 'barry_assign_mission'),
+  );
 
   await contactRef.update(contactUpdate);
 

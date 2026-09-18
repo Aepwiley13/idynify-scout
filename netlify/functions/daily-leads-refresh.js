@@ -4,6 +4,7 @@
 
 import { schedule } from '@netlify/functions';
 import { admin, db } from './firebase-admin.js';
+import { alertOps } from './utils/alertOps.js';
 
 /** Typed failure so a discovery error can never be laundered into a clean zero. */
 class DiscoveryError extends Error {
@@ -130,6 +131,19 @@ const handler = async (event) => {
       usersEligible: activeUsers.length, usersProcessed: results.processed,
       usersFailed: results.failed, companiesAdded: results.refreshed, durationMs: Date.now() - startTime,
     });
+    if (!allOk) {
+      await alertOps({
+        db, job: 'daily-leads-refresh', severity: 'partial_failure',
+        summary: `${results.failed} of ${results.processed} users failed their daily refresh.`,
+        detail: {
+          usersEligible: activeUsers.length, usersProcessed: results.processed,
+          usersFailed: results.failed, usersSkipped: results.skipped,
+          firstError: results.errors[0]?.error || 'n/a',
+          firstErrorCode: results.errors[0]?.code || 'n/a',
+        },
+      });
+    }
+
     return {
       statusCode: allOk ? 200 : 207,
       body: JSON.stringify({ success: allOk, results, duration })
@@ -137,6 +151,11 @@ const handler = async (event) => {
 
   } catch (error) {
     console.error('💥 Fatal error in daily refresh:', error);
+    await alertOps({
+      db, job: 'daily-leads-refresh', severity: 'failed',
+      summary: 'The daily refresh crashed before finishing. No user was refreshed.',
+      detail: { error: error.message },
+    });
     return {
       statusCode: 500,
       body: JSON.stringify({

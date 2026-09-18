@@ -10,7 +10,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   needsArchivedStamp,
-  looksRestoredButReadsArchived,
+  archivedWithoutBooleanFlag,
+  stuckAfterRestore,
   archivedWithNoRecordStatus,
 } from '../../scripts/backfillArchivedRecordStatus.mjs';
 import { RECORD_STATUS, readRecordStatus } from '../constants/statusModel';
@@ -109,36 +110,63 @@ describe('the backfill only ever moves a row toward archived', () => {
     // The two classes must be disjoint, or a row could be both written and
     // flagged for a human — contradictory instructions about the same record.
     for (const row of EVERY_SHAPE) {
-      expect(needsArchivedStamp(row) && looksRestoredButReadsArchived(row)).toBe(false);
+      expect(needsArchivedStamp(row) && archivedWithoutBooleanFlag(row)).toBe(false);
+      expect(needsArchivedStamp(row) && stuckAfterRestore(row)).toBe(false);
     }
   });
 });
 
-describe('the inverse class is reported, never repaired', () => {
-  // Rows left behind by the restore path, which cleared is_archived but not
-  // the legacy status. They read as archived while claiming to be restored.
+describe('the two reported-only classes are told apart', () => {
+  // Measured fleet-wide: 134 rows read as archived without `is_archived: true`,
+  // and ALL of them have the boolean ABSENT, none set to false, none with
+  // restored_at. They are legacy rows from before any path wrote the flag —
+  // not contacts stuck after a restore, which is what an earlier version of
+  // this script called them. They read correctly and belong to
+  // backfillContactIsArchived.mjs.
+  const LEGACY_NO_FLAG = Object.freeze({
+    status: 'people_mode_archived',
+    // is_archived absent entirely
+  });
+
+  // The shape that WOULD be a stuck restore. Zero found fleet-wide; kept so
+  // that if one ever appears it is not lost among the 134 benign rows.
   const STUCK_RESTORED = Object.freeze({
     status: 'people_mode_archived',
     is_archived: false,
     restored_at: '2026-09-01T00:00:00.000Z',
   });
 
-  it('detects a contact that looks restored but still reads archived', () => {
-    expect(looksRestoredButReadsArchived(STUCK_RESTORED)).toBe(true);
+  it('a legacy row with no flag reads as archived and is benign', () => {
+    expect(archivedWithoutBooleanFlag(LEGACY_NO_FLAG)).toBe(true);
+    expect(readRecordStatus(LEGACY_NO_FLAG)).toBe(RECORD_STATUS.ARCHIVED);
+    // Correct, not contradictory — so not this migration's problem.
+    expect(needsArchivedStamp(LEGACY_NO_FLAG)).toBe(false);
+  });
+
+  it('a legacy row is NOT reported as stuck after a restore', () => {
+    // The distinction the first version of this script got wrong.
+    expect(stuckAfterRestore(LEGACY_NO_FLAG)).toBe(false);
+  });
+
+  it('an explicit is_archived:false that still reads archived IS flagged', () => {
+    expect(stuckAfterRestore(STUCK_RESTORED)).toBe(true);
     expect(readRecordStatus(STUCK_RESTORED)).toBe(RECORD_STATUS.ARCHIVED);
   });
 
-  it('is not repaired by the backfill', () => {
-    // Repairing means deciding the row should be ACTIVE — the one direction
-    // this script refuses to move on its own.
+  it('neither class is ever repaired', () => {
+    expect(needsArchivedStamp(LEGACY_NO_FLAG)).toBe(false);
     expect(needsArchivedStamp(STUCK_RESTORED)).toBe(false);
   });
 
   it('does not flag a genuinely active contact', () => {
-    expect(looksRestoredButReadsArchived({ status: 'active', record_status: 'active' })).toBe(false);
+    const live = { status: 'active', record_status: 'active' };
+    expect(archivedWithoutBooleanFlag(live)).toBe(false);
+    expect(stuckAfterRestore(live)).toBe(false);
   });
 
   it('does not flag a straightforwardly archived contact', () => {
-    expect(looksRestoredButReadsArchived({ is_archived: true, record_status: 'archived' })).toBe(false);
+    const ok = { is_archived: true, record_status: 'archived' };
+    expect(archivedWithoutBooleanFlag(ok)).toBe(false);
+    expect(stuckAfterRestore(ok)).toBe(false);
   });
 });

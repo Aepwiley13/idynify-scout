@@ -55,14 +55,23 @@
  *
  * IT ALSO REPORTS A SECOND CLASS IT WILL NOT REPAIR
  * ─────────────────────────────────────────────────
- * The inverse contradiction: `record_status: 'archived'` (or a legacy archive
- * status) on a row whose `is_archived` is false — a contact that looks
- * restored but still reads as archived. Those come from the restore path,
- * which cleared only the boolean.
+ * Rows that read as archived but carry no `is_archived: true` — measured
+ * fleet-wide as 134, and every one of them has the boolean ABSENT rather than
+ * false. None has `restored_at`. So these are not contacts stuck after a
+ * restore; they are legacy rows written before any Scout path set
+ * `is_archived` at all (the gap PR #510 closed).
  *
- * Repairing them means deciding a row should become ACTIVE, which is the one
- * direction this script refuses to move on its own. They are counted and
- * sampled so the size of that problem is known, and left for a human.
+ * They are NOT contradictory: `readRecordStatus` resolves them to 'archived'
+ * correctly through the legacy vocabulary, and `hasArchiveSignal` sees them.
+ * Nothing about them is wrong for this migration to fix. They matter only to
+ * Firestore queries shaped `where('is_archived','==',false)`, which an absent
+ * field does not match — and that is exactly what
+ * `scripts/backfillContactIsArchived.mjs` already exists to repair.
+ *
+ * They are counted here for visibility and pointed at that script. If a row
+ * ever shows up with `is_archived: false` EXPLICITLY, that would be a genuine
+ * stuck-after-restore case and a human should look at it — the report calls
+ * that out separately.
  *
  * USAGE
  * ─────
@@ -126,16 +135,33 @@ export function needsArchivedStamp(data = {}) {
 }
 
 /**
- * The inverse contradiction: reads as archived, but the boolean says it is not.
+ * Reads as archived, but carries no `is_archived: true`.
  *
- * Reported, never repaired — see the header. Moving one of these to 'active'
- * is a decision about a user's intent, not a mechanical repair.
+ * Reported, never repaired. Measured fleet-wide these are all MISSING the
+ * boolean rather than holding false — legacy rows from before any write path
+ * set it. They read correctly and belong to backfillContactIsArchived.mjs.
  *
  * @param   {Object}  data  The contact document.
  * @returns {boolean}
  */
-export function looksRestoredButReadsArchived(data = {}) {
+export function archivedWithoutBooleanFlag(data = {}) {
   if (data.is_archived === true) return false;
+  return readRecordStatus(data) === RECORD_STATUS.ARCHIVED;
+}
+
+/**
+ * The genuinely suspicious shape: `is_archived: false` written EXPLICITLY on a
+ * row that still reads as archived. That is a contact a restore failed to
+ * release, and a human should decide what it should be.
+ *
+ * Zero found fleet-wide as of the first run. Separated from the class above so
+ * that if one ever appears it is not lost among 134 benign legacy rows.
+ *
+ * @param   {Object}  data  The contact document.
+ * @returns {boolean}
+ */
+export function stuckAfterRestore(data = {}) {
+  if (data.is_archived !== false) return false;
   return readRecordStatus(data) === RECORD_STATUS.ARCHIVED;
 }
 
@@ -174,11 +200,12 @@ let totalUsers        = 0;
 let totalContacts     = 0;
 let totalToRepair     = 0;
 let totalNoRecordStat = 0;
-let totalInverse      = 0;
+let totalNoBoolean    = 0;
+let totalStuck        = 0;
 let totalAlreadyRight = 0;
 
 const repairSamples = [];
-const inverseSamples = [];
+const stuckSamples = [];
 
 /** Keep a small, quotable sample rather than dumping every document. */
 function sample(into, userId, docId, data) {
@@ -207,10 +234,15 @@ async function processUser(db, userId) {
     const data = docSnap.data();
     totalContacts++;
 
-    if (looksRestoredButReadsArchived(data)) {
-      totalInverse++;
-      sample(inverseSamples, userId, docSnap.id, data);
-      // Reported only. Never written.
+    if (stuckAfterRestore(data)) {
+      totalStuck++;
+      sample(stuckSamples, userId, docSnap.id, data);
+      continue;
+    }
+
+    if (archivedWithoutBooleanFlag(data)) {
+      totalNoBoolean++;
+      // Reported only. Belongs to backfillContactIsArchived.mjs.
       continue;
     }
 
@@ -294,7 +326,8 @@ async function main() {
   console.log(`  already correct:                      ${totalAlreadyRight}   (archived and said so)`);
   console.log(`  archived, no record_status field:     ${totalNoRecordStat}   (reads correctly — left alone)`);
   console.log('');
-  console.log(`  ⚠ reads archived but is_archived false: ${totalInverse}   (REPORTED ONLY — never written)`);
+  console.log(`  archived, is_archived flag absent:    ${totalNoBoolean}   (reads correctly — see backfillContactIsArchived.mjs)`);
+  console.log(`  ⚠ is_archived FALSE but reads archived: ${totalStuck}   (stuck after a restore — needs a human)`);
 
   if (repairSamples.length) {
     console.log('\n── Sample of rows to repair ──────────────────');
@@ -303,11 +336,11 @@ async function main() {
     }
   }
 
-  if (inverseSamples.length) {
-    console.log('\n── Sample of the inverse class (NOT repaired) ─');
-    console.log('   These look restored but still read as archived. Repairing one');
-    console.log('   means deciding it should be active — a human call, not a migration.');
-    for (const s of inverseSamples) {
+  if (stuckSamples.length) {
+    console.log('\n── Stuck after a restore (NOT repaired) ──────');
+    console.log('   is_archived was explicitly set false, yet the row still reads');
+    console.log('   archived. Deciding one should be active is a human call.');
+    for (const s of stuckSamples) {
       console.log(`  ${s.id}  status=${s.status}  is_archived=${s.is_archived}  record_status=${s.record_status}  reads_as=${s.reads_as}`);
     }
   }

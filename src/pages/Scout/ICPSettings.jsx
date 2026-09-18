@@ -12,7 +12,8 @@ import './ICPSettings.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import BarryICPPanel from '../../components/scout/BarryICPPanel';
 import Section9MessagingFlow from '../../components/icp/Section9MessagingFlow';
-import { setActiveIcpProfile } from '../../utils/setActiveIcpProfile';
+import { setActiveIcpProfile, nextLifecycleState } from '../../utils/setActiveIcpProfile';
+import { buildIcpCriteriaWrite } from '../../utils/icpProfileWrite';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { criteriaChanged } from '../../utils/normalizeIcpCriteria';
 
@@ -162,17 +163,31 @@ export default function ICPSettings() {
     }
   }
 
+  /**
+   * Reflect an activation in local state.
+   *
+   * `icpList` and `profile` are two views of the same documents, and this
+   * screen used to update only the first. The second went on holding the
+   * lifecycle it was mounted with, and the next save wrote that stale pair back
+   * over the activation. Both are derived here from nextLifecycleState — the
+   * same rule setActiveIcpProfile commits — so they cannot disagree.
+   */
+  function applyActivationToState(activatedId) {
+    setIcpList(prev => prev.map(i => ({ ...i, ...nextLifecycleState(i, i.id === activatedId) })));
+    setProfile(prev => (prev ? { ...prev, ...nextLifecycleState(prev, selectedICPId === activatedId) } : prev));
+  }
+
   async function handleSetActive(icpId) {
     try {
       const user = getEffectiveUser();
       await setActiveIcpProfile(user.uid, icpId, {}, icpList);
-      setIcpList(prev => prev.map(i => ({
-        ...i,
-        isActive: i.id === icpId,
-        status: i.id === icpId ? 'active' : (i.status === 'active' ? 'inactive' : i.status),
-      })));
+      applyActivationToState(icpId);
     } catch (error) {
+      // setActiveIcpProfile refuses to run when it cannot find the target, so a
+      // failure here means nothing changed. Say so: an activation that silently
+      // does nothing reads as a working button.
       console.error('Failed to set active ICP:', error);
+      alert('Could not activate this ICP. Please reload and try again.');
     }
   }
 
@@ -229,23 +244,47 @@ export default function ICPSettings() {
         updatedAt: new Date().toISOString(),
       };
 
+      // This screen edits targeting criteria. It does not own identity or
+      // lifecycle, so it writes neither: only the fields in ICP_CRITERIA_FIELDS,
+      // merged into whatever is stored.
+      //
+      // It used to persist `updatedProfile` wholesale with a non-merging
+      // setDoc. `profile` is a spread of the ICP as it was when this screen
+      // mounted, so that write replayed a stale isActive/status pair — most
+      // visibly right after an activation performed on this very screen, which
+      // it silently undid. isActive and status change through
+      // setActiveIcpProfile or they do not change.
+      const criteriaWrite = {
+        ...buildIcpCriteriaWrite(updatedProfile),
+        updatedAt: updatedProfile.updatedAt,
+      };
+
       // Save to icpProfiles collection
       await setDoc(
         doc(db, 'users', user.uid, 'icpProfiles', selectedICPId),
-        updatedProfile
+        criteriaWrite,
+        { merge: true }
       );
 
-      // Sync to bridge cache if this is the active profile
+      // Sync to bridge cache if this is the active profile.
+      //
+      // The bridge is a projection of the active ICP, and it is asserting that
+      // this profile is current — so it must never be handed a snapshot that
+      // says otherwise. Same allowlist, same merge: the lifecycle
+      // setActiveIcpProfile wrote here stays intact.
       const isActiveProfile = icpList.find(i => i.id === selectedICPId)?.isActive === true;
       if (isActiveProfile) {
         await setDoc(
           doc(db, 'users', user.uid, 'companyProfile', 'current'),
-          { ...updatedProfile, icpId: selectedICPId, icpIdSource: 'icp-settings-save' }
+          { ...criteriaWrite, icpId: selectedICPId, icpIdSource: 'icp-settings-save' },
+          { merge: true }
         );
       }
 
-      // Update local list
-      setIcpList(prev => prev.map(i => i.id === selectedICPId ? { ...i, ...updatedProfile } : i));
+      // Update local list — criteria only, for the same reason. Spreading the
+      // whole profile here pushed its stale lifecycle back into icpList, which
+      // is the source the bridge gate above reads.
+      setIcpList(prev => prev.map(i => i.id === selectedICPId ? { ...i, ...criteriaWrite } : i));
       setProfile(updatedProfile);
 
       // Match is no longer recomputed and persisted here. See the note where
@@ -1194,16 +1233,26 @@ export default function ICPSettings() {
           onComplete={({ activated, icpId: completedId }) => {
             setShowMessagingFlow(false);
             setMessagingFlowIcpId(null);
-            // Refresh local state to reflect new status/isActive
-            setIcpList(prev => prev.map(i => {
-              if (i.id === completedId) {
-                return { ...i, messagingProgress: 100, status: activated ? 'active' : 'inactive', isActive: activated };
+            // Refresh local state to reflect new status/isActive. An
+            // activation goes through the shared rule, because the flow can
+            // activate the ICP this screen is currently editing and `profile`
+            // has to learn about it too — otherwise the next save carries a
+            // lifecycle that contradicts the one just committed.
+            if (activated) {
+              applyActivationToState(completedId);
+            } else {
+              // Finishing the flow without activating retires 'pending'.
+              setIcpList(prev => prev.map(i => (
+                i.id === completedId ? { ...i, isActive: false, status: 'inactive' } : i
+              )));
+              if (completedId === selectedICPId) {
+                setProfile(prev => (prev ? { ...prev, isActive: false, status: 'inactive' } : prev));
               }
-              if (activated && i.id !== completedId) {
-                return { ...i, isActive: false, status: i.status === 'active' ? 'inactive' : i.status };
-              }
-              return i;
-            }));
+            }
+
+            const markComplete = entry => (entry ? { ...entry, messagingProgress: 100 } : entry);
+            setIcpList(prev => prev.map(i => (i.id === completedId ? markComplete(i) : i)));
+            if (completedId === selectedICPId) setProfile(markComplete);
           }}
           onDismiss={() => {
             setShowMessagingFlow(false);

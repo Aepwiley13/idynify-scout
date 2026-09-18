@@ -621,7 +621,8 @@ export const syncHandler = async () => {
         db: safeFirestore(), job: 'gmail-sync-worker', severity: 'partial_failure',
         summary: `${summary.totals.failed} Gmail account(s) failed to sync.`,
         detail: { usersConsidered: summary.usersConsidered, usersSynced: summary.usersSynced,
-                  messagesProcessed: summary.totals.processed, failed: summary.totals.failed },
+                  messagesProcessed: summary.totals.processed, failed: summary.totals.failed,
+                  firstError: summary.results.find((r) => r.error)?.error || 'n/a' },
       });
     }
 

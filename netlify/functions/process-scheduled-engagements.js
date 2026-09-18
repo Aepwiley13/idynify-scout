@@ -46,7 +46,8 @@ const handler = async () => {
   const startTime = Date.now();
   console.log('⏰ Starting process-scheduled-engagements job');
 
-  const results = { processed: 0, sent: 0, notified: 0, skipped: 0, failed: 0, wavesSent: 0, wavesProcessed: 0 };
+  // firstError is carried so the alert email can name a cause, not just a count.
+  const results = { processed: 0, sent: 0, notified: 0, skipped: 0, failed: 0, wavesSent: 0, wavesProcessed: 0, firstError: null };
   const now = new Date().toISOString();
 
   try {
@@ -58,12 +59,14 @@ const handler = async () => {
         await processUserScheduled(userId, now, results);
       } catch (userErr) {
         results.failed++;
+        results.firstError = results.firstError || userErr.message;
         console.error(`❌ process-scheduled-engagements: user ${userId} failed:`, userErr.message);
       }
       try {
         await processUserScheduledWaves(userId, now, results);
       } catch (waveErr) {
         results.failed++;
+        results.firstError = results.firstError || waveErr.message;
         console.error(`❌ process-scheduled-waves: user ${userId} failed:`, waveErr.message);
       }
     }
@@ -89,7 +92,8 @@ const handler = async () => {
         db, job: 'process-scheduled-engagements', severity: 'partial_failure',
         summary: `${results.failed} scheduled engagement(s) or wave(s) failed to send.`,
         detail: { sent: results.sent, notified: results.notified,
-                  wavesSent: results.wavesSent, failed: results.failed },
+                  wavesSent: results.wavesSent, failed: results.failed,
+                  firstError: results.firstError || 'n/a' },
       });
     }
 

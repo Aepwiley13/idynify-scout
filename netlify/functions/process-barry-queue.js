@@ -41,7 +41,10 @@ export const processBarryQueue = async () => {
   const startTime = Date.now();
   console.log('📬 Starting process-barry-queue job');
 
-  const results = { processed: 0, notified: 0, skipped: 0, failed: 0 };
+  // firstError is carried so the alert email can name a cause, not just a
+  // count. "3 users failed" sends someone to the logs; the message often does
+  // not need them to go at all.
+  const results = { processed: 0, notified: 0, skipped: 0, failed: 0, firstError: null };
 
   try {
     // Enumerate all users
@@ -53,6 +56,7 @@ export const processBarryQueue = async () => {
         await processUserQueue(userId, results);
       } catch (userErr) {
         results.failed++;
+        results.firstError = results.firstError || userErr.message;
         console.error(`❌ process-barry-queue: user ${userId} failed:`, userErr.message);
         // Continue with next user — do not abort the whole job
       }
@@ -78,7 +82,8 @@ export const processBarryQueue = async () => {
         db, job: 'process-barry-queue', severity: 'partial_failure',
         summary: `${results.failed} user queue(s) failed to process.`,
         detail: { processed: results.processed, notified: results.notified,
-                  skipped: results.skipped, failed: results.failed },
+                  skipped: results.skipped, failed: results.failed,
+                  firstError: results.firstError || 'n/a' },
       });
     }
 

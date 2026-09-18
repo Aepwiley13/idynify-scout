@@ -72,15 +72,38 @@ describe('alertOps sends', () => {
 
     const body = JSON.parse(init.body);
     expect(body.to).toBe('ops@example.com');
-    expect(body.subject).toBe('[PARTIAL FAILURE] daily-leads-refresh');
+    expect(body.subject).toBe('[PARTIAL] daily-leads-refresh — 17 failed');
     expect(body.html).toContain('17 of 17 users failed');
     expect(body.html).toContain('projectId is not defined');
   });
 
   it('labels a total failure differently from a partial one', async () => {
-    await alertOps({ ...base, severity: 'failed' });
+    await alertOps({ ...base, severity: 'failed', detail: {} });
     const body = JSON.parse(global.fetch.mock.calls[0][1].body);
     expect(body.subject).toBe('[FAILED] daily-leads-refresh');
+  });
+
+  // A subject that needs scrolling is a subject that gets ignored. Severity
+  // first, then the job, then the count — the first ~35 characters of a lock
+  // screen have to be enough to decide whether to get out of bed.
+  it('keeps the subject scannable on a phone', async () => {
+    await alertOps({ ...base, job: 'process-barry-inbox-queue', detail: { failed: 3 } });
+    const { subject } = JSON.parse(global.fetch.mock.calls[0][1].body);
+
+    expect(subject.startsWith('[PARTIAL]')).toBe(true);
+    expect(subject).toContain('process-barry-inbox-queue');
+    expect(subject).toContain('3 failed');
+    expect(subject.length).toBeLessThanOrEqual(60);
+  });
+
+  it('names the job, the counts and the first error in the body', async () => {
+    await alertOps(base);
+    const { html } = JSON.parse(global.fetch.mock.calls[0][1].body);
+
+    expect(html).toContain('daily-leads-refresh');
+    expect(html).toContain('usersFailed');
+    expect(html).toContain('17');
+    expect(html).toContain('projectId is not defined');
   });
 
   it('escapes detail values rather than injecting them into the HTML', async () => {

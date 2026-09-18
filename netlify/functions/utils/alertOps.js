@@ -74,7 +74,16 @@ export async function alertOps({ job, severity, summary, detail = {}, db = null 
       return { sent: false, reason: 'cooldown' };
     }
 
-    const label = severity === 'failed' ? 'FAILED' : 'PARTIAL FAILURE';
+    const label = severity === 'failed' ? 'FAILED' : 'PARTIAL';
+
+    // Scannable on a lock screen, where roughly the first 35 characters
+    // survive. Severity first so the eye lands on it, then the job name, then
+    // the count if there is one — "[FAILED] gmail-sync-worker" tells you what
+    // to do before the preview text has loaded.
+    const count = detail.failed ?? detail.usersFailed ?? detail.entriesFailed ?? null;
+    const subject = count === null
+      ? `[${label}] ${job}`
+      : `[${label}] ${job} — ${count} failed`;
     const rows = Object.entries(detail)
       .map(([k, v]) => `<tr><td style="padding:2px 12px 2px 0;color:#666">${escapeHtml(k)}</td>` +
                        `<td style="font-family:monospace">${escapeHtml(String(v))}</td></tr>`)
@@ -89,7 +98,7 @@ export async function alertOps({ job, severity, summary, detail = {}, db = null 
       body: JSON.stringify({
         from: FROM,
         to,
-        subject: `[${label}] ${job}`,
+        subject,
         html: `
           <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
             <h2 style="margin:0 0 4px">${escapeHtml(job)} — ${label}</h2>

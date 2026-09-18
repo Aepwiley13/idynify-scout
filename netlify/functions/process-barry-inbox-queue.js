@@ -70,7 +70,8 @@ export const processInboxQueue = async (event = {}) => {
   }
 
   const startMs = Date.now();
-  const results = { processed: 0, succeeded: 0, failed: 0, skipped: 0, entries: [] };
+  // firstError is carried so the alert email can name a cause, not just a count.
+  const results = { processed: 0, succeeded: 0, failed: 0, skipped: 0, entries: [], firstError: null };
 
   try {
     // ── Query pending queue entries ──────────────────────────────────────
@@ -246,6 +247,7 @@ export const processInboxQueue = async (event = {}) => {
         console.error(`[process-barry-inbox-queue] ❌ ${messageRecordId}:`, entryError.message);
 
         results.failed++;
+        results.firstError = results.firstError || entryError.message;
         results.entries.push({
           messageRecordId,
           contactId,
@@ -281,7 +283,7 @@ export const processInboxQueue = async (event = {}) => {
         db, job: 'process-barry-inbox-queue', severity: 'partial_failure',
         summary: `${results.failed} inbox queue entr(ies) failed to process.`,
         detail: { succeeded: results.succeeded, failed: results.failed,
-                  skipped: results.skipped },
+                  skipped: results.skipped, firstError: results.firstError || 'n/a' },
       });
     }
 

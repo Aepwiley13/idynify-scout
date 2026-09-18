@@ -357,7 +357,8 @@ rather than read from the environment. ~251 bytes for nothing.
 | `APOLLO_API_KEY` | search/enrichment functions | Yes |
 | `BARRY_MODEL_FAST` / `BARRY_MODEL_DEEP` | `utils/models.js` | Optional — literal defaults exist |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_*` | checkout / webhook fns | Yes |
-| `RESEND_API_KEY` | `send-welcome-email.js` | Yes |
+| `RESEND_API_KEY` | `send-welcome-email.js`, `daily-leads-refresh.js`, `utils/alertOps.js` | Yes |
+| `OPS_ALERT_EMAIL` | `utils/alertOps.js` — where scheduled-function failure alerts are sent | Optional — **unset means no alert is ever sent**. The five scheduled functions still return 207/500 and log, but nothing leaves the process. |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_CALENDAR_REDIRECT_URI` | Gmail/Calendar OAuth | Yes |
 | `GOOGLE_SEARCH_API_KEY` + `GOOGLE_SEARCH_ENGINE_ID` | search enrichment | Yes |
 | `GOOGLE_CUSTOM_SEARCH_API_KEY` + `GOOGLE_CUSTOM_SEARCH_ENGINE_ID` | search enrichment | **Possible duplicate of the pair above — verify** |
@@ -529,7 +530,8 @@ Sensitivity: `PUBLIC_CONFIG` / `INTERNAL_CONFIG` / `SECRET` / `HIGH_VALUE_SECRET
 | `STRIPE_SECRET_KEY` | HIGH_VALUE_SECRET | FUNCTIONS | CONTEXT_SPECIFIC | checkout | Scope to Functions. **Check the `sk_live_` / `sk_test_` prefix first** — if live, previews can move real money |
 | `STRIPE_WEBHOOK_SECRET` | HIGH_VALUE_SECRET | FUNCTIONS | CONTEXT_SPECIFIC | `stripe-webhook.js` | Scope to Functions |
 | `STRIPE_PRICE_PRO`, `STRIPE_PRICE_STARTER` | INTERNAL_CONFIG | FUNCTIONS | CONTEXT_SPECIFIC | checkout | Scope to Functions; must match the key's mode |
-| `RESEND_API_KEY` | HIGH_VALUE_SECRET | FUNCTIONS | CONTEXT_SPECIFIC | `send-welcome-email.js` | Scope to Functions. Sends real email — previews should not use the production sender |
+| `RESEND_API_KEY` | HIGH_VALUE_SECRET | FUNCTIONS | CONTEXT_SPECIFIC | `send-welcome-email.js`, `daily-leads-refresh.js`, `utils/alertOps.js` | Scope to Functions. Sends real email — previews should not use the production sender |
+| `OPS_ALERT_EMAIL` | INTERNAL_CONFIG | FUNCTIONS | CONTEXT_SPECIFIC | `utils/alertOps.js` | Scope to Functions. Set it in **production only** — a preview deploy pointing at the same inbox makes every preview run look like a production incident |
 | `GOOGLE_CLIENT_SECRET` | HIGH_VALUE_SECRET | FUNCTIONS | CONTEXT_SPECIFIC | OAuth | Scope to Functions |
 | `GOOGLE_CLIENT_ID` | INTERNAL_CONFIG | FUNCTIONS | CONTEXT_SPECIFIC | OAuth | Scope to Functions |
 | `GOOGLE_REDIRECT_URI`, `GOOGLE_CALENDAR_REDIRECT_URI` | INTERNAL_CONFIG | FUNCTIONS | **CONTEXT_SPECIFIC** | OAuth | Scope to Functions. Preview URLs differ per deploy — a production redirect URI in preview breaks OAuth there |

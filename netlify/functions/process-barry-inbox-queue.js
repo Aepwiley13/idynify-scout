@@ -21,7 +21,9 @@
  * cron, and no caller anywhere in the repository — so every entry
  * `messageProcessor` enqueued sat pending forever and no inbound reply was ever
  * analysed or drafted. It now runs on QUEUE_SCHEDULE, following the same
- * `schedule()` convention as gmail-sync-worker and process-barry-queue.
+ * `schedule()` convention as gmail-sync-worker: a NAMED `handler` export. (This
+ * line used to cite process-barry-queue as well, which was the opposite of true
+ * — that file used `export default` and had never fired. Fixed since.)
  *
  * The cadence is deliberately faster than the 10-minute Gmail sync so the queue
  * drains rather than grows. QUEUE_LIMIT is still 10 entries per run, which caps

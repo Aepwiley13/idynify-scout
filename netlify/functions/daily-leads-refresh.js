@@ -3,6 +3,9 @@
 // Tops off company queue for active users and sends email notifications
 
 import { schedule } from '@netlify/functions';
+
+/** Cron for this worker, exported so tests can assert it. */
+export const REFRESH_SCHEDULE = '0 9 * * 1-5';
 import { admin, db } from './firebase-admin.js';
 
 /** Typed failure so a discovery error can never be laundered into a clean zero. */
@@ -10,7 +13,7 @@ class DiscoveryError extends Error {
   constructor(code, detail) { super(code); this.name = 'DiscoveryError'; this.code = code; this.detail = detail; }
 }
 
-const handler = async (event) => {
+export const refreshDailyLeads = async (event) => {
   const startTime = Date.now();
   console.log('🔄 Starting daily leads refresh job');
 
@@ -446,4 +449,9 @@ async function sendDailyEmail(userEmail, userId, companyCount) {
 // Schedule: Run at 9am UTC Monday-Friday
 // Cron format: minute hour day month dayOfWeek
 // 0 9 * * 1-5 = 9am UTC, Monday-Friday
-export default schedule('0 9 * * 1-5', handler);
+// The export form is load-bearing. `export default schedule(CRON, fn)` builds,
+// deploys and reports healthy — and never fires. Netlify looks up the scheduled
+// function by its NAMED `handler` export, so a default export registers nothing
+// and the cron silently does not exist. This file shipped that way and never ran
+// once. Keep the `export const handler = schedule(...)` form.
+export const handler = schedule(REFRESH_SCHEDULE, refreshDailyLeads);

@@ -23,6 +23,7 @@ import { Archive, Linkedin } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS } from '../../theme/tokens';
 import { getDisplayIndustry } from '../../utils/companyDisplay';
+import CompanyName from '../scout/CompanyName';
 import CompanyLogo from '../scout/CompanyLogo';
 import CompanyDetailModal from '../scout/CompanyDetailModal';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
@@ -84,9 +85,11 @@ function SharedCompanyCard({
             <CompanyLogo company={company} size="default" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {company.name || 'Unnamed Company'}
-            </div>
+            <CompanyName
+              company={company}
+              fallback="Unnamed Company"
+              style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            />
             <div style={{ fontSize: 10, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
               {getDisplayIndustry(company, 'Unknown')}
             </div>

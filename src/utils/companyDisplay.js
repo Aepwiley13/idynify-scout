@@ -9,11 +9,18 @@
  *   - getCompanyName(company)→ display name       (fallback chain)
  *   - getMatchReasons(company) → reasons array     (fallback chain)
  *   - getDisplayIndustry(company) → canonical industry name for display
+ *   - getDisplayName(company) → { label, hint, derived } (name provenance)
  *
  * Presentation only — no data fetching, no scoring, no side effects.
  */
 import { STATUS } from '../theme/tokens';
 import { normalizeIndustry } from './normalizeTargeting.js';
+// The sentinel and the domain read both come from the identity module rather
+// than being restated here. Re-deriving either in a second place is the exact
+// drift companyIdentityService exists to prevent — a presentational copy that
+// disagreed about which names are guesses would be just as wrong as a second
+// dedup query.
+import { NAME_SOURCE, enrichmentSignals } from '../services/companyIdentityService';
 
 // Fit-tier thresholds — carried over verbatim from the desktop table's FitBadge
 // (≥75 green, ≥50 amber, else grey). The grey '#888' is preserved exactly so
@@ -48,4 +55,46 @@ export function getDisplayIndustry(company, fallback = 'N/A') {
   if (!raw || typeof raw !== 'string' || !raw.trim()) return fallback;
   const result = normalizeIndustry(raw);
   return result.status === 'matched' ? result.value : raw;
+}
+
+/**
+ * How a company's name should be presented, given where the name came from.
+ *
+ * A company created by `ensureCompanyForContact` from a work-email domain alone
+ * carries `name_source: 'email_domain'` and a name that is a GUESS:
+ * `rd-advantage.com` becomes "Rd Advantage" where the organization writes
+ * itself "R&D Advantage", and `blackdesertresort.com` becomes
+ * "Blackdesertresort". Enrichment corrects those names, but only once someone
+ * opens that company — so until then the guess sits in Saved Companies looking
+ * exactly as authoritative as a name Apollo confirmed.
+ *
+ * This surfaces the distinction instead of hiding it: the DOMAIN leads, because
+ * the domain is the part that is actually known, and the guess trails it muted.
+ * A name from Apollo or typed by a user is returned unchanged.
+ *
+ * A company with no `name_source` at all is treated as authoritative. Every
+ * company written before the field existed lacks it, and muting all of them
+ * would be far worse than leaving a handful of guesses unmarked.
+ *
+ * `fallback` is the caller's own empty-state wording — SharedCompaniesView says
+ * "Unnamed Company" where the Scout surfaces say "Unknown", and this must not
+ * quietly reword either.
+ *
+ * @returns {{label: string, hint: string|null, derived: boolean}}
+ *   label   — what to render as the company's name
+ *   hint    — the unconfirmed guess, to render muted beside it (null if none)
+ *   derived — whether the stored name is an unconfirmed guess
+ */
+export function getDisplayName(company, fallback = 'Unknown') {
+  const name = (company && (company.name || company.company_name)) || fallback;
+  if (!company || company.name_source !== NAME_SOURCE.EMAIL_DOMAIN) {
+    return { label: name, hint: null, derived: false };
+  }
+
+  // Derived, but nothing better to lead with — Apollo may simply not have this
+  // domain. Still flagged so the caller can mark it as unconfirmed.
+  const { domain } = enrichmentSignals(company);
+  if (!domain || domain === name) return { label: name, hint: null, derived: true };
+
+  return { label: domain, hint: name, derived: true };
 }

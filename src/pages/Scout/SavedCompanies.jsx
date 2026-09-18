@@ -14,6 +14,7 @@ import { Building2, Users, Search, Globe, Linkedin, Target, Archive, RotateCcw, 
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
 import CompanyLogo from '../../components/scout/CompanyLogo';
+import CompanyName from '../../components/scout/CompanyName';
 import CompanyDetailModal from '../../components/scout/CompanyDetailModal';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
@@ -341,7 +342,7 @@ export default function SavedCompanies({ onSelectCompany }) {
                     <CompanyLogo company={company} size="small" />
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{company.name}</div>
+                    <CompanyName company={company} style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text }} />
                     <div style={{ fontSize: 10, color: T.textFaint }}>{getDisplayIndustry(company)} · {(company.apolloEnrichment?.snapshot?.founded_year || company.founded_year) ? `Founded ${company.apolloEnrichment?.snapshot?.founded_year || company.founded_year}` : ''}</div>
                   </div>
                   {company.contact_count > 0 && (
@@ -684,7 +685,7 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
                 }}>
                   <CompanyLogo company={current} size="large" />
                 </div>
-                <div style={{ fontSize: 18, fontWeight: 700, color: T.text, textAlign: 'center' }}>{current.name}</div>
+                <CompanyName company={current} style={{ display: 'block', fontSize: 18, fontWeight: 700, color: T.text, textAlign: 'center' }} />
                 <div style={{ fontSize: 10, color: T.textFaint, marginTop: 3, letterSpacing: 1.5 }}>
                   {getDisplayIndustry(current, '').toUpperCase()}
                 </div>
@@ -808,7 +809,7 @@ function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts, onArch
             <CompanyLogo company={company} size="default" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.name}</div>
+            <CompanyName company={company} style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} />
             <div style={{ fontSize: 10, color: T.textMuted }}>{getDisplayIndustry(company)}</div>
           </div>
           {company.contact_count > 0 && (

@@ -371,12 +371,16 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
       onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
-        position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
-        height: wide ? undefined : '100%',
+        // In flow, not absolute: the card is what gives the stage its height, so
+        // the card's own content decides how tall it is. Nothing above it caps
+        // that, and a card taller than the viewport scrolls the column it sits
+        // in rather than scrolling inside itself.
+        position: 'relative', width: '100%', maxWidth: wide ? 540 : 420,
         transform: `translateX(${tx}px) translateY(${dy * 0.1}px) rotate(${dx * 0.04}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
-        touchAction: 'pan-y', top: 0, left: 0, right: 0, margin: '0 auto',
+        // Vertical touch belongs to the page; this handler only claims horizontal.
+        touchAction: 'pan-y', margin: '0 auto',
       }}
     >
       {/* Swipe overlay labels */}
@@ -399,16 +403,15 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
         }}>✗ NOT A MATCH</div>
       )}
 
-      {/* Card — scrollable on mobile when content exceeds card height */}
+      {/* Card — height comes from its content on every breakpoint. `hidden` here
+          only clips the corner radius; there is nothing to scroll past. */}
       <div style={{
         position: 'relative',
-        height: wide ? undefined : '100%',
         background: T.cardBg, border: `1px solid ${T.border2}`,
-        borderRadius: 22, overflow: wide ? 'hidden' : 'auto',
+        borderRadius: 22, overflow: 'hidden',
         boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`,
         transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)',
         transition: 'transform 0.14s ease',
-        WebkitOverflowScrolling: wide ? undefined : 'touch',
       }}>
         {/* Feedback overlay — appears after "This is a Match" click */}
         {showFeedback && (
@@ -713,13 +716,13 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
       onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
-        position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
-        height: wide ? undefined : '100%',
+        // See CompanySwipeCard: in flow so the card's content sets its height.
+        position: 'relative', width: '100%', maxWidth: wide ? 540 : 420,
         transform: `translateX(${tx}px) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
         touchAction: 'pan-y',
-        top: 0, left: 0, right: 0, margin: '0 auto',
+        margin: '0 auto',
       }}
     >
       {dx > 30 && (
@@ -728,7 +731,7 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
       {dx < -30 && (
         <div style={{ position: 'absolute', top: 22, right: 16, zIndex: 10, padding: '5px 13px', borderRadius: 8, border: `3px solid ${STATUS.red}`, color: STATUS.red, fontSize: 13, fontWeight: 700, transform: 'rotate(11deg)', background: `${STATUS.red}10` }}>✗ NOT A MATCH</div>
       )}
-      <div style={{ position: 'relative', height: wide ? undefined : '100%', background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: wide ? 'hidden' : 'auto', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)', transition: 'transform 0.14s ease', WebkitOverflowScrolling: wide ? undefined : 'touch' }}>
+      <div style={{ position: 'relative', background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: 'hidden', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)', transition: 'transform 0.14s ease' }}>
         {showFeedback && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 30, background: T.cardBg, borderRadius: 22, overflowY: 'auto' }}>
             <FeedbackFace
@@ -2509,17 +2512,16 @@ export default function DailyLeads({ onNavigate }) {
   const visibleCompanies = companies.slice(currentIndex);
   const nextCompany = companies[currentIndex + 1] || null;
 
-  // Ghost cards for depth effect — CARD_H accounts for header + batch dots + hints
-  // so the outer column never overflows and shows no scrollbar
-  const CARD_H = isDesktop
-    ? 'clamp(440px, calc(100vh - 280px), 660px)'
-    : 'clamp(400px, calc(100vh - 300px), 560px)';
+  // Ghost cards for depth effect. They stretch to the stage — i.e. to the real
+  // card's own height — instead of carrying a viewport-derived height of their
+  // own, so the deck stays a deck whatever the card in front of it measures.
   const renderGhostCards = (count) =>
     Array.from({ length: Math.min(count, 2) }).map((_, i) => (
       <div key={i} style={{
         position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8,
+        bottom: -(i + 1) * 8,
         background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22,
-        height: CARD_H, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none',
+        opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none',
       }} />
     ));
 
@@ -2940,7 +2942,12 @@ export default function DailyLeads({ onNavigate }) {
               ) : (
                 <>
                   {renderBatchDots()}
-                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, height: CARD_H, overflowX: 'hidden' }}>
+                  {/* Card stage — no height and no overflow. `overflowX: hidden`
+                      used to live here with a fixed height; because a box cannot
+                      clip one axis and leave the other visible, the browser
+                      resolved overflow-y to `auto` and the card scrolled inside
+                      the stage. The stage now takes its height from the card. */}
+                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440 }}>
                     {visibleCompanies.length > 1 && renderGhostCards(visibleCompanies.length - 1)}
                     {currentCompany && (
                       <CompanySwipeCard
@@ -3029,9 +3036,9 @@ export default function DailyLeads({ onNavigate }) {
               ) : (
                 <>
                   {renderDots(peopleQueue.length, currentPersonIdx)}
-                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, height: CARD_H, overflowX: 'hidden' }}>
+                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440 }}>
                     {peopleQueue.slice(currentPersonIdx + 1, currentPersonIdx + 3).map((_, i) => (
-                      <div key={i} style={{ position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, height: CARD_H, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none' }} />
+                      <div key={i} style={{ position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8, bottom: -(i + 1) * 8, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none' }} />
                     ))}
                     <PersonSwipeCard
                       key={`${peopleQueue[currentPersonIdx].company.id}_${peopleQueue[currentPersonIdx].person.id}`}

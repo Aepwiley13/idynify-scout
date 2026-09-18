@@ -1,5 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { MODEL_DEEP } from './utils/models.js';
+import { requireProjectId } from './utils/firebaseEnv.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -30,7 +31,7 @@ export const handler = async (event) => {
     console.log('🎯 Generating Section 1 Executive Summary for user:', userId);
 
     // Verify Firebase Auth token using REST API
-    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    const projectId = requireProjectId();
     if (!projectId) {
       throw new Error('Firebase project ID not configured');
     }

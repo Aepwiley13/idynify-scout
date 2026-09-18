@@ -4,6 +4,7 @@
 
 import { schedule } from '@netlify/functions';
 import { admin, db } from './firebase-admin.js';
+import { requireProjectId } from './utils/firebaseEnv.js';
 
 /** Typed failure so a discovery error can never be laundered into a clean zero. */
 class DiscoveryError extends Error {
@@ -331,7 +332,7 @@ async function refreshUserQueue(userId, authToken, companyProfile, icpId) {
  */
 async function logRefresh(userId, authToken, refreshResult) {
   try {
-    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    const projectId = requireProjectId();
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
 
     const logData = {

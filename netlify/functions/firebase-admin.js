@@ -8,6 +8,7 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+import { requireProjectId } from './utils/firebaseEnv.js';
 
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {
@@ -17,7 +18,7 @@ if (getApps().length === 0) {
 
   initializeApp({
     credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID || 'idynify-scout-dev',
+      projectId: requireProjectId(),
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
       privateKey: privateKey
     })

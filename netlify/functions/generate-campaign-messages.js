@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { LEGACY_SONNET_4_5 } from './utils/models.js';
+import { requireProjectId } from './utils/firebaseEnv.js';
 
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {
@@ -11,7 +12,7 @@ if (getApps().length === 0) {
 
   initializeApp({
     credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID || 'idynify-scout-dev',
+      projectId: requireProjectId(),
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
       privateKey: privateKey
     })

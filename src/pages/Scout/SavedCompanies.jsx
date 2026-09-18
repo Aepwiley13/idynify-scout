@@ -24,6 +24,7 @@ import {
   RECORD_STATUS,
   isEngagedRecord,
   readRecordStatus,
+  hasArchiveSignal,
 } from '../../constants/statusModel';
 
 // ─── SavedCompanies ───────────────────────────────────────────────────────────
@@ -84,6 +85,21 @@ export default function SavedCompanies({ onSelectCompany }) {
         // showed up in neither count. Read through the compatibility helpers
         // rather than the raw field so records written before the status
         // migration resolve the same way as ones written today.
+        //
+        // An archived contact is neither. The user removed them, so they are
+        // not a real contact for "Total Contacts" and not a pending suggestion
+        // either — they belong in no count at all. This query deliberately
+        // fetches every contact with no `where` clause, because the archive
+        // signal lives across three fields and no single Firestore filter can
+        // express it; the exclusion therefore has to happen here, in memory.
+        //
+        // Asked via hasArchiveSignal rather than re-derived, because the
+        // precedence is a trap: readRecordStatus checks `record_status` BEFORE
+        // `is_archived`, so an archived row carrying a stale 'suggested' or
+        // 'active' stamp reads back as live. 242 contacts across 8 workspaces
+        // were being counted as real for exactly that reason.
+        if (hasArchiveSignal(data)) return;
+
         const stillSuggested =
           readRecordStatus(data) === RECORD_STATUS.SUGGESTED && !isEngagedRecord(data);
         if (!stillSuggested) {

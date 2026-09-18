@@ -34,9 +34,24 @@ import {
   engagementPromotionFields,
 } from '../constants/statusModel';
 
-/** The Saved Companies classifier, as implemented in SavedCompanies.jsx. */
+/**
+ * The Saved Companies classifier, as implemented in SavedCompanies.jsx.
+ *
+ * Archived contacts are excluded from BOTH counts before the suggested test
+ * runs — the user removed them, so they are neither a real contact nor a
+ * pending suggestion. See savedCompaniesArchivedCount.test.js, which owns that
+ * behaviour; it is mirrored here so this file's counter claims stay true to
+ * the component.
+ */
 function countsAsSuggested(contact) {
+  if (hasArchiveSignal(contact)) return false;
   return readRecordStatus(contact) === RECORD_STATUS.SUGGESTED && !isEngagedRecord(contact);
+}
+
+/** Does the contact feed the "Total Contacts" KPI? */
+function countsAsRealContact(contact) {
+  if (hasArchiveSignal(contact)) return false;
+  return !(readRecordStatus(contact) === RECORD_STATUS.SUGGESTED && !isEngagedRecord(contact));
 }
 
 /** The People (scout mode) classifier, as implemented in AllLeads.jsx. */
@@ -268,10 +283,10 @@ describe('an archive is never undone by engagement', () => {
   });
 
   it('leaves the Saved Companies contact counter unchanged', () => {
-    // The counter classifies on readRecordStatus + isEngagedRecord and never
-    // calls the promotion helper, so suppressing a write cannot move it. The
-    // engaged row counts as a real contact either way: promoted, because
-    // record_status is 'active'; unpromoted, because isEngagedRecord is true.
+    // The counter never calls the promotion helper, so suppressing a write
+    // cannot move it. Stronger still now that archived rows are excluded from
+    // both counts outright: whether the promotion was written or refused, an
+    // archived contact is in neither bucket.
     const engagedArchived = { ...ARCHIVED_STALE, contact_status: 'Awaiting Reply' };
     const asIfPromoted = {
       ...engagedArchived,
@@ -279,11 +294,15 @@ describe('an archive is never undone by engagement', () => {
       status: 'active',
     };
     expect(countsAsSuggested(engagedArchived)).toBe(countsAsSuggested(asIfPromoted));
+    expect(countsAsRealContact(engagedArchived)).toBe(countsAsRealContact(asIfPromoted));
     expect(countsAsSuggested(engagedArchived)).toBe(false);
+    expect(countsAsRealContact(engagedArchived)).toBe(false);
 
-    // And the 7 audited rows, which are unengaged, still count as suggested
-    // exactly as they do today — the guard changes nothing for them.
-    expect(countsAsSuggested(ARCHIVED_STALE)).toBe(true);
+    // The 7 audited rows are archived, so they feed neither count. They are
+    // not "suggested" — the earlier version of this test said they were,
+    // because the classifier it mirrored had no archive check yet.
+    expect(countsAsSuggested(ARCHIVED_STALE)).toBe(false);
+    expect(countsAsRealContact(ARCHIVED_STALE)).toBe(false);
     expect(countsAsLead(ARCHIVED_STALE)).toBe(false);
   });
 });

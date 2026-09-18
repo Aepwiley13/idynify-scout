@@ -42,6 +42,7 @@ await env.withSecurityRulesDisabled(async (ctx) => {
     [`users/${U}/icpProfiles/i1/messagingDrafts/d1`, { body: 'x' }],
     [`users/${U}/notifications/n1`, { seen: false }],
     [`users/${U}/companies/c2`, { status: 'pending' }],
+    ['ops_alerts/daily-leads-refresh', { lastAlertAtMs: 1, job: 'daily-leads-refresh' }],
   ]) await setDoc(doc(db, p[0]), p[1]);
 });
 
@@ -70,6 +71,17 @@ const CASES = [
       await setDoc(doc(me, `users/${U}/icpProfiles/i1/criteriaVersions/v9`), { fingerprint: 'a' });
       return updateDoc(doc(me, `users/${U}/icpProfiles/i1/criteriaVersions/v9`), { fingerprint: 'b' });
     }],
+  // ── ops_alerts — the cron alert cooldown, written only by the Admin SDK.
+  // A client that could write here could push lastAlertAtMs into the future
+  // and silence every scheduled-job alert. Signed-in is not privileged here:
+  // no client is. Read is denied too — the collection reveals which jobs are
+  // failing and how often.
+  ['20  ops_alerts read', 'DENY', () => getDoc(doc(me, 'ops_alerts/daily-leads-refresh'))],
+  ['21  ops_alerts update (silence the alert)', 'DENY',
+      () => updateDoc(doc(me, 'ops_alerts/daily-leads-refresh'), { lastAlertAtMs: 9e15 })],
+  ['22  ops_alerts create a new job doc', 'DENY',
+      () => setDoc(doc(me, 'ops_alerts/gmail-sync-worker'), { lastAlertAtMs: 9e15 })],
+  ['23  ops_alerts delete', 'DENY', () => deleteDoc(doc(me, 'ops_alerts/daily-leads-refresh'))],
 ];
 
 let pass = 0, fail = 0;

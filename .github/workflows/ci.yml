@@ -3,6 +3,13 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  # Also run on main itself. Until now CI was pull_request-only, so nothing ever
+  # tested the merge result: two PRs can each be green against the main they
+  # branched from and still combine into a red main, and nobody would find out
+  # until the next PR ran. 204 runs had accumulated, every one of them on a PR
+  # head, and zero on main.
+  push:
+    branches: [main]
 
 jobs:
   test:

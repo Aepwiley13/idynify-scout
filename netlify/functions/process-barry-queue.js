@@ -13,6 +13,9 @@
  */
 
 import { schedule } from '@netlify/functions';
+
+/** Cron for this worker, exported so tests can assert it. */
+export const BARRY_QUEUE_SCHEDULE = '0 9 * * 1-5';
 import admin from 'firebase-admin';
 import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 
@@ -33,7 +36,7 @@ const db = admin.firestore();
 // no need to create a follow-up notification.
 const ALREADY_ENGAGED_STATUSES = new Set(['Engaged', 'In Conversation', 'Active Mission']);
 
-const handler = async () => {
+export const processBarryQueue = async () => {
   const startTime = Date.now();
   console.log('📬 Starting process-barry-queue job');
 
@@ -171,4 +174,9 @@ async function markProcessed(docRef) {
 }
 
 // Schedule: 9am UTC Monday–Friday
-export default schedule('0 9 * * 1-5', handler);
+// The export form is load-bearing. `export default schedule(CRON, fn)` builds,
+// deploys and reports healthy — and never fires. Netlify looks up the scheduled
+// function by its NAMED `handler` export, so a default export registers nothing
+// and the cron silently does not exist. This file shipped that way and never ran
+// once. Keep the `export const handler = schedule(...)` form.
+export const handler = schedule(BARRY_QUEUE_SCHEDULE, processBarryQueue);

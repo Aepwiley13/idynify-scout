@@ -816,10 +816,61 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
 }
 
 // ─── QueueListPanel ───────────────────────────────────────────────────────────
-function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo, onClose, mobile = false }) {
+export function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo, onClose, mobile = false, returnFocusRef = null }) {
   const T = useT();
   const upcoming = companies.slice(currentIndex);
   const rejected = companies.filter(c => rejectedIds.includes(c.id));
+
+  // ── Dismissal (desktop only) ───────────────────────────────────────────────
+  // The mobile sheet already has a backdrop that closes it; the desktop sidebar
+  // has none, so outside-interaction and Escape are wired up here.
+  const panelRef = useRef(null);
+  // Closing runs through a ref so the listeners are attached once per open,
+  // not re-bound on every parent re-render (an inline onClose is a new function
+  // each time, and a mid-drag re-bind would lose the drag origin below).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
+  const pendingCloseRef = useRef(false);
+
+  useEffect(() => {
+    if (mobile) return undefined;
+
+    const isInside = (target) => {
+      if (!(target instanceof Node)) return false;
+      if (panelRef.current?.contains(target)) return true;
+      const el = target instanceof Element ? target : target.parentElement;
+      // The trigger counts as inside: it owns the toggle, so the document
+      // listener must not also fire and turn one click into close-then-reopen.
+      // [data-queue-panel] keeps any portalled panel content inside too.
+      return !!el?.closest?.('[data-queue-panel],[data-queue-trigger]');
+    };
+
+    // pointerdown records where the interaction began; the close decision waits
+    // for pointerup so a drag started inside (selecting text) and released
+    // outside leaves the panel open.
+    const onPointerDown = (e) => { pendingCloseRef.current = !isInside(e.target); };
+    const onPointerUp = (e) => {
+      const shouldClose = pendingCloseRef.current && !isInside(e.target);
+      pendingCloseRef.current = false;
+      // No focus is moved here — the outside click already picked its target.
+      if (shouldClose) onCloseRef.current?.();
+    };
+    const onKeyDown = (e) => {
+      if (e.key !== 'Escape') return;
+      onCloseRef.current?.();
+      returnFocusRef?.current?.focus?.();
+    };
+
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('pointerup', onPointerUp, true);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('pointerup', onPointerUp, true);
+      document.removeEventListener('keydown', onKeyDown);
+      pendingCloseRef.current = false;
+    };
+  }, [mobile, returnFocusRef]);
 
   if (mobile) {
     // Bottom-sheet overlay for mobile
@@ -910,7 +961,7 @@ function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo, onClos
   }
 
   return (
-    <div style={{
+    <div ref={panelRef} data-queue-panel style={{
       position: 'fixed', top: 0, right: 0, bottom: 0, width: 320, maxWidth: '100vw', zIndex: 500,
       background: T.cardBg, borderLeft: `1px solid ${T.border}`,
       display: 'flex', flexDirection: 'column',
@@ -1441,6 +1492,13 @@ export default function DailyLeads({ onNavigate }) {
 
   // ── Queue list view ──────────────────────────────────────────────────────────
   const [queueListOpen, setQueueListOpen] = useState(false);
+  // Remembers which trigger opened the panel so Escape can hand focus back.
+  const queueTriggerRef = useRef(null);
+  const toggleQueueList = useCallback((e) => {
+    queueTriggerRef.current = e?.currentTarget ?? null;
+    setQueueListOpen(o => !o);
+  }, []);
+  const closeQueueList = useCallback(() => setQueueListOpen(false), []);
 
   // ── Barry side panel ─────────────────────────────────────────────────────────
   const [barryPanelOpen, setBarryPanelOpen] = useState(false);
@@ -2604,7 +2662,8 @@ export default function DailyLeads({ onNavigate }) {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             {isDesktop && (
               <button
-                onClick={() => setQueueListOpen(o => !o)}
+                onClick={toggleQueueList}
+                data-queue-trigger
                 title="View Queue"
                 style={{ width: 34, height: 34, borderRadius: 9, background: queueListOpen ? T.accentBg : T.surface, border: `1px solid ${queueListOpen ? T.accentBdr : T.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
               >
@@ -3055,7 +3114,8 @@ export default function DailyLeads({ onNavigate }) {
                 <div style={{ fontSize: 22, fontWeight: 800, color: T.text, lineHeight: 1 }}>{Math.max(0, companies.length - currentIndex)}</div>
               </div>
               <button
-                onClick={() => setQueueListOpen(o => !o)}
+                onClick={toggleQueueList}
+                data-queue-trigger
                 style={{ padding: '5px 10px', borderRadius: 7, background: queueListOpen ? T.accentBg : 'transparent', border: `1px solid ${queueListOpen ? T.accentBdr : T.border2}`, color: queueListOpen ? BRAND.pink : T.textFaint, fontSize: 11, cursor: 'pointer' }}
               >
                 View
@@ -3185,8 +3245,9 @@ export default function DailyLeads({ onNavigate }) {
           currentIndex={currentIndex}
           rejectedIds={rejectedInSession}
           onJumpTo={(idx) => setCurrentIndex(idx)}
-          onClose={() => setQueueListOpen(false)}
+          onClose={closeQueueList}
           mobile={!isDesktop}
+          returnFocusRef={queueTriggerRef}
         />
       )}
 

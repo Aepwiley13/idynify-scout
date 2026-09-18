@@ -18,6 +18,7 @@ import { schedule } from '@netlify/functions';
 export const BARRY_QUEUE_SCHEDULE = '0 9 * * 1-5';
 import admin from 'firebase-admin';
 import { engagementPromotionPatch } from './utils/engagementPromotion.js';
+import { alertOps } from './utils/alertOps.js';
 
 // Initialize Firebase Admin (singleton guard)
 if (!admin.apps.length) {
@@ -63,12 +64,36 @@ export const processBarryQueue = async () => {
       `${results.skipped} skipped, ${results.failed} failed in ${duration}s`
     );
 
+    // 207 on partial failure, matching daily-leads-refresh: a 200 must mean
+    // every user's queue was processed. An honest zero still returns 200.
+    const allOk = results.failed === 0;
+    console.log(allOk ? 'barryqueue.scheduled.ok' : 'barryqueue.scheduled.partial_failure', {
+      usersProcessed: results.processed, usersNotified: results.notified,
+      usersSkipped: results.skipped, usersFailed: results.failed,
+      durationMs: Date.now() - startTime,
+    });
+
+    if (!allOk) {
+      await alertOps({
+        db, job: 'process-barry-queue', severity: 'partial_failure',
+        summary: `${results.failed} user queue(s) failed to process.`,
+        detail: { processed: results.processed, notified: results.notified,
+                  skipped: results.skipped, failed: results.failed },
+      });
+    }
+
     return {
-      statusCode: 200,
-      body: JSON.stringify({ success: true, results, duration })
+      statusCode: allOk ? 200 : 207,
+      body: JSON.stringify({ success: allOk, results, duration })
     };
   } catch (fatalErr) {
     console.error('💥 process-barry-queue fatal error:', fatalErr);
+    console.error('barryqueue.scheduled.failed', { error: fatalErr.message });
+    await alertOps({
+      db, job: 'process-barry-queue', severity: 'failed',
+      summary: 'The Barry queue processor crashed before finishing.',
+      detail: { error: fatalErr.message },
+    });
     return {
       statusCode: 500,
       body: JSON.stringify({ success: false, error: fatalErr.message })

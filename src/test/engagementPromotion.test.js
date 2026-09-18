@@ -30,6 +30,7 @@ import {
   RECORD_STATUS,
   readRecordStatus,
   isEngagedRecord,
+  hasArchiveSignal,
   engagementPromotionFields,
 } from '../constants/statusModel';
 
@@ -167,7 +168,9 @@ describe('promotion is narrow — it changes nothing it should not', () => {
 
   it('does not resurrect an archived contact', () => {
     const archived = { status: 'suggested', is_archived: true, contact_status: 'Engaged' };
-    // is_archived wins in readRecordStatus, so there is nothing to promote.
+    // This one has no `record_status`, so readRecordStatus does fall through
+    // to is_archived. That is why it passed even before the guard existed —
+    // and why it proved nothing. See the stale-'suggested' cases below.
     expect(engagementPromotionFields(archived)).toEqual({});
   });
 
@@ -197,5 +200,90 @@ describe('promotion is narrow — it changes nothing it should not', () => {
     });
     expect(fields.record_status_promoted_at).toBe('2026-09-15T00:00:00.000Z');
     expect(fields.record_status_promoted_by).toBe('message_sent');
+  });
+});
+
+describe('an archive is never undone by engagement', () => {
+  // THE GAP THIS CLOSES
+  // ───────────────────
+  // `readRecordStatus` checks `record_status` BEFORE `is_archived`, so
+  // `is_archived: true` does not win. `createStatusFields` stamps
+  // `record_status: 'suggested'` at creation and the archive paths never
+  // update it, so an archived row keeps reading back as 'suggested' and
+  // walks straight past the archive signal into the promotion.
+  //
+  // Workspace peqhaq8Cw1UUPeaYhaSLwZ0iCRk2 holds 7 rows in exactly this
+  // state. None was promoted before the guard only because all 7 are
+  // unengaged today — luck, not a rule. The promotion helper is wired into
+  // contactStateMachine and six Netlify send paths, so an archived row that
+  // is also engaged would be promoted on a real send.
+
+  /** The shape of the 7 audited rows: archived, but stale-stamped 'suggested'. */
+  const ARCHIVED_STALE = Object.freeze({
+    status: 'people_mode_archived',
+    is_archived: true,
+    record_status: 'suggested',
+  });
+
+  it('reproduces the precedence that made the guard necessary', () => {
+    // Not an assertion about what SHOULD happen — a record of why the
+    // readRecordStatus test alone was never enough.
+    expect(readRecordStatus(ARCHIVED_STALE)).toBe(RECORD_STATUS.SUGGESTED);
+    expect(hasArchiveSignal(ARCHIVED_STALE)).toBe(true);
+  });
+
+  it('refuses to promote an archived, stale-suggested, engaged contact', () => {
+    const contact = { ...ARCHIVED_STALE, contact_status: 'Awaiting Reply' };
+    // Engaged and reading as 'suggested' — every condition the promotion
+    // wants. The archive is the only thing standing in the way, and it holds.
+    expect(isEngagedRecord(contact)).toBe(true);
+    expect(readRecordStatus(contact)).toBe(RECORD_STATUS.SUGGESTED);
+    expect(engagementPromotionFields(contact)).toEqual({});
+  });
+
+  it.each([
+    ['contact_status', { contact_status: 'In Conversation' }],
+    ['hunter_status', { hunter_status: 'active_mission' }],
+    ['relationship_status', { relationship_status: 'engaged' }],
+  ])('holds whatever field carries the engagement (%s)', (_label, engagement) => {
+    const contact = { ...ARCHIVED_STALE, ...engagement };
+    expect(isEngagedRecord(contact)).toBe(true);
+    expect(engagementPromotionFields(contact)).toEqual({});
+  });
+
+  it.each([
+    ['is_archived', { is_archived: true, status: 'suggested' }],
+    ['status archived', { status: 'archived' }],
+    ['status people_mode_archived', { status: 'people_mode_archived' }],
+  ])('honours every archive signal (%s)', (_label, archival) => {
+    const contact = { record_status: 'suggested', contact_status: 'Engaged', ...archival };
+    expect(engagementPromotionFields(contact)).toEqual({});
+  });
+
+  it('still promotes an engaged suggestion that was never archived', () => {
+    // The guard must not swallow the case the helper exists for.
+    const contact = { status: 'suggested', record_status: 'suggested', contact_status: 'Engaged' };
+    expect(hasArchiveSignal(contact)).toBe(false);
+    expect(engagementPromotionFields(contact).record_status).toBe(RECORD_STATUS.ACTIVE);
+  });
+
+  it('leaves the Saved Companies contact counter unchanged', () => {
+    // The counter classifies on readRecordStatus + isEngagedRecord and never
+    // calls the promotion helper, so suppressing a write cannot move it. The
+    // engaged row counts as a real contact either way: promoted, because
+    // record_status is 'active'; unpromoted, because isEngagedRecord is true.
+    const engagedArchived = { ...ARCHIVED_STALE, contact_status: 'Awaiting Reply' };
+    const asIfPromoted = {
+      ...engagedArchived,
+      record_status: RECORD_STATUS.ACTIVE,
+      status: 'active',
+    };
+    expect(countsAsSuggested(engagedArchived)).toBe(countsAsSuggested(asIfPromoted));
+    expect(countsAsSuggested(engagedArchived)).toBe(false);
+
+    // And the 7 audited rows, which are unengaged, still count as suggested
+    // exactly as they do today — the guard changes nothing for them.
+    expect(countsAsSuggested(ARCHIVED_STALE)).toBe(true);
+    expect(countsAsLead(ARCHIVED_STALE)).toBe(false);
   });
 });

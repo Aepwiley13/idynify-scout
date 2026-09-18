@@ -59,6 +59,30 @@ const COMPANY = {
 
 const PERSON = { id: 'p1', name: 'Dana Reyes', title: 'CEO / Owner' };
 
+// The longest values the card realistically receives: a full HQ string and a
+// CEO with a compound title. Both are `white-space: nowrap`, which is what used
+// to widen the stats grid's right column past the card.
+const LONG_VALUES = {
+  id: 'long',
+  name: 'Meridian Consumer Brands Holdings International',
+  industry: 'Apparel & Fashion',
+  headquarters_city: 'Rancho Santa Margarita',
+  headquarters_state: 'California',
+  ceo_name: 'Priyadarshini Raghunathan-Winterbottom · Chief Executive Officer & Co-Founder',
+  employee_count: 22,
+  revenue: '$20M-$50M',
+  founded_year: 2008,
+  fit_score: 100,
+};
+
+/** The six stats cells, as [labelEl, valueEl] pairs. */
+const statCells = (container) => {
+  const grid = [...container.querySelectorAll('div')]
+    .find(d => d.style.display === 'grid' && d.style.gridTemplateColumns === '1fr 1fr'
+      && /INDUSTRY/.test(d.textContent || ''));
+  return { grid, cells: [...(grid?.children || [])].map(c => [c, c.lastElementChild]) };
+};
+
 /** The draggable root, and the card surface inside it. */
 const parts = (container) => {
   const root = container.firstChild;
@@ -125,6 +149,72 @@ describe('Daily Discovery card — content decides its height', () => {
     // Absolute positioning takes the card out of flow and leaves the stage to
     // supply a height of its own — which is where the fixed height came from.
     expect(parts(container).root.style.position).toBe('relative');
+  });
+});
+
+describe('Daily Discovery card — the stats grid stays inside the card', () => {
+  // The card clips both axes now, so anything wider than the card is cut rather
+  // than scrolled sideways. A grid item's automatic minimum size is its content,
+  // and each value line is `white-space: nowrap`, so a long CEO name used to
+  // push the right column ~4px past the card at 360px wide.
+  //
+  // jsdom lays nothing out, so this asserts the three declarations that hold the
+  // columns to half the card each, with a fixture whose values overflow. The
+  // geometry itself is verified in Chromium: at 360x640 the card is 324px wide
+  // and both columns measure 161px, with no cell crossing the card's edge.
+  const renderLong = (wide) => render(
+    <CompanySwipeCard company={LONG_VALUES} onAccept={() => {}} onReject={() => {}} onSkip={() => {}} wide={wide} />,
+  );
+
+  for (const wide of [true, false]) {
+    const at = wide ? 'desktop' : 'mobile';
+
+    it(`[${at}] the grid splits the card in two equal columns`, () => {
+      const { grid, cells } = statCells(renderLong(wide).container);
+      expect(grid, 'the stats grid is gone or no longer 1fr 1fr').toBeTruthy();
+      expect(cells).toHaveLength(6);
+    });
+
+    it(`[${at}] every cell may shrink below its content`, () => {
+      // Without this the column tracks grow to fit an unbreakable value and the
+      // grid outgrows the card. This is the declaration that keeps it inside.
+      for (const [cell] of statCells(renderLong(wide).container).cells) {
+        expect(cell.style.minWidth, `${cell.textContent.slice(0, 12)} can outgrow its column`).toBe('0px');
+      }
+    });
+
+    it(`[${at}] every value line ellipsizes rather than overflowing`, () => {
+      for (const [, value] of statCells(renderLong(wide).container).cells) {
+        expect(value.style.overflow).toBe('hidden');
+        expect(value.style.textOverflow).toBe('ellipsis');
+        expect(value.style.whiteSpace).toBe('nowrap');
+      }
+    });
+  }
+
+  it('a truncated value keeps its full text on hover', () => {
+    const { cells } = statCells(renderLong(false).container);
+    const byLabel = Object.fromEntries(cells.map(([cell, value]) => [cell.firstElementChild.textContent, value]));
+    expect(byLabel.HQ.getAttribute('title')).toBe('Rancho Santa Margarita, California');
+    expect(byLabel.CEO.getAttribute('title')).toBe(LONG_VALUES.ceo_name);
+    expect(byLabel.INDUSTRY.getAttribute('title')).toBe('Apparel & Fashion');
+  });
+
+  it('a placeholder carries no tooltip — there is nothing withheld', () => {
+    const { cells } = statCells(render(
+      <CompanySwipeCard company={COMPANY} onAccept={() => {}} onReject={() => {}} onSkip={() => {}} wide />,
+    ).container);
+    const byLabel = Object.fromEntries(cells.map(([cell, value]) => [cell.firstElementChild.textContent, value]));
+    expect(byLabel.HQ.textContent, 'fixture should have no HQ').toBe('—');
+    expect(byLabel.HQ.getAttribute('title')).toBeNull();
+    expect(byLabel.EMPLOYEES.getAttribute('title')).toBeNull();
+  });
+
+  it('the header lines that ellipsize keep their full text too', () => {
+    const { container } = renderLong(false);
+    const name = [...container.querySelectorAll('div')].find(d => d.textContent === LONG_VALUES.name);
+    expect(name.style.textOverflow, 'the name line no longer ellipsizes').toBe('ellipsis');
+    expect(name.getAttribute('title')).toBe(LONG_VALUES.name);
   });
 });
 

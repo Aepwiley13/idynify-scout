@@ -453,14 +453,16 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
         }}>
           <CompanyLogo company={company} size="card" />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: wide ? 20 : 18, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 90 }}>{company.name}</div>
+            {/* Same bargain as the stats cells below: these three lines
+                ellipsize, so each keeps its full value on hover. */}
+            <div title={company.name} style={{ fontSize: wide ? 20 : 18, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 90 }}>{company.name}</div>
             {getDisplayIndustry(company, '') && getDisplayIndustry(company, '').toLowerCase() !== 'unknown' && (
-              <div style={{ fontSize: 11, color: T.textMuted, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div title={getDisplayIndustry(company, '')} style={{ fontSize: 11, color: T.textMuted, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {getDisplayIndustry(company, '')}
               </div>
             )}
             {hqLocation && hqLocation.toLowerCase() !== 'unknown' && (
-              <div style={{ fontSize: 10, color: T.textFaint, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div title={hqLocation} style={{ fontSize: 10, color: T.textFaint, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 <MapPin size={10} style={{ flexShrink: 0 }} />{hqLocation}
               </div>
             )}
@@ -484,17 +486,24 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
             ['FOUNDED',   company.founded_year || 'N/A'],
             ['HQ',        hqLocation || '—'],
             ['CEO',       ceoName || '—'],
-          ].map(([l, v]) => (
-            // `minWidth: 0` so the ellipsis below governs. A grid item's
-            // automatic minimum is its content, and the value line is
-            // `white-space: nowrap`, so a long CEO name widened the right
-            // column past the card — ~4px at 360px wide, which the card's
-            // clipping now cuts instead of scrolling sideways.
-            <div key={l} style={{ minWidth: 0, padding: wide ? '10px 18px' : '8px 14px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
-              <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>{l}</div>
-              <div style={{ fontSize: wide ? 12 : 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
-            </div>
-          ))}
+          ].map(([l, v]) => {
+            // A value too long for its cell is cut by the ellipsis on the line
+            // below, which says it was cut but not what was cut. The full
+            // string stays reachable on hover and to a screen reader; '—' and
+            // 'N/A' are already whole, so they carry no tooltip.
+            const full = (v === '—' || v === 'N/A' || v == null) ? undefined : String(v);
+            return (
+              // `minWidth: 0` so that ellipsis governs. A grid item's automatic
+              // minimum is its content, and the value line is
+              // `white-space: nowrap`, so a long CEO name widened the right
+              // column past the card — ~4px at 360px wide, which the card's
+              // clipping now cuts instead of scrolling sideways.
+              <div key={l} style={{ minWidth: 0, padding: wide ? '10px 18px' : '8px 14px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
+                <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>{l}</div>
+                <div title={full} style={{ fontSize: wide ? 12 : 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
+              </div>
+            );
+          })}
         </div>
 
         {/* ICP Score row — clickable to expand breakdown */}

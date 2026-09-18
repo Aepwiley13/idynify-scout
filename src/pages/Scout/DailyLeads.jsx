@@ -485,7 +485,12 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
             ['HQ',        hqLocation || '—'],
             ['CEO',       ceoName || '—'],
           ].map(([l, v]) => (
-            <div key={l} style={{ padding: wide ? '10px 18px' : '8px 14px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
+            // `minWidth: 0` so the ellipsis below governs. A grid item's
+            // automatic minimum is its content, and the value line is
+            // `white-space: nowrap`, so a long CEO name widened the right
+            // column past the card — ~4px at 360px wide, which the card's
+            // clipping now cuts instead of scrolling sideways.
+            <div key={l} style={{ minWidth: 0, padding: wide ? '10px 18px' : '8px 14px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
               <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>{l}</div>
               <div style={{ fontSize: wide ? 12 : 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
             </div>
@@ -2512,6 +2517,26 @@ export default function DailyLeads({ onNavigate }) {
   const visibleCompanies = companies.slice(currentIndex);
   const nextCompany = companies[currentIndex + 1] || null;
 
+  // A floor under the stage, so the deck does not resize on every swipe.
+  //
+  // Card height follows content, and content is uneven: a company with an HQ, a
+  // CEO, four measured ICP factors and a long Barry Intel renders ~96px taller
+  // than a sparse one on desktop and ~151px taller on mobile. Measured over ten
+  // cards spanning sparse to dense, these are the medians — 584/522 for company
+  // cards, 512/456 for person cards, which are consistently shorter.
+  //
+  // It is a floor, not a cap: a card taller than this still sets its own height,
+  // and nothing clips or scrolls. Cards shorter than it sit at a stable height
+  // instead of shrinking the deck under the queue.
+  //
+  // `flexShrink: 0` travels with the floor. The stage is a flex item in the
+  // card column, and an explicit min-height replaces the automatic minimum size
+  // that was keeping a content-sized item from being shrunk below its content —
+  // without it, a card taller than the floor gets squeezed back to the floor and
+  // paints over whatever follows.
+  const COMPANY_STAGE_MIN_H = isDesktop ? 584 : 522;
+  const PERSON_STAGE_MIN_H = isDesktop ? 512 : 456;
+
   // Ghost cards for depth effect. They stretch to the stage — i.e. to the real
   // card's own height — instead of carrying a viewport-derived height of their
   // own, so the deck stays a deck whatever the card in front of it measures.
@@ -2942,12 +2967,13 @@ export default function DailyLeads({ onNavigate }) {
               ) : (
                 <>
                   {renderBatchDots()}
-                  {/* Card stage — no height and no overflow. `overflowX: hidden`
-                      used to live here with a fixed height; because a box cannot
-                      clip one axis and leave the other visible, the browser
-                      resolved overflow-y to `auto` and the card scrolled inside
-                      the stage. The stage now takes its height from the card. */}
-                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440 }}>
+                  {/* Card stage — no height, no max-height, no overflow, and a
+                      measured floor. `height: CARD_H` with `overflowX: hidden`
+                      used to live here; because a box cannot clip one axis and
+                      leave the other visible, the browser resolved overflow-y to
+                      `auto` and the card scrolled inside the stage. The stage
+                      now takes its height from the card, never the reverse. */}
+                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, minHeight: COMPANY_STAGE_MIN_H, flexShrink: 0 }}>
                     {visibleCompanies.length > 1 && renderGhostCards(visibleCompanies.length - 1)}
                     {currentCompany && (
                       <CompanySwipeCard
@@ -3036,7 +3062,7 @@ export default function DailyLeads({ onNavigate }) {
               ) : (
                 <>
                   {renderDots(peopleQueue.length, currentPersonIdx)}
-                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440 }}>
+                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, minHeight: PERSON_STAGE_MIN_H, flexShrink: 0 }}>
                     {peopleQueue.slice(currentPersonIdx + 1, currentPersonIdx + 3).map((_, i) => (
                       <div key={i} style={{ position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8, bottom: -(i + 1) * 8, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none' }} />
                     ))}

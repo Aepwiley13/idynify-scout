@@ -20,6 +20,10 @@
  * that line: no height constraint on the stage or the card, no scrolling
  * overflow on either, and `touch-action: pan-y` still on the swipe root so a
  * vertical drag pans the page instead of being eaten by the gesture handler.
+ *
+ * The one thing the stage may set is a min-height — a measured floor, so the
+ * deck does not resize under the queue on every swipe. A floor cannot clip and
+ * cannot scroll: a card taller than it still sets its own height.
  */
 
 import { render } from '@testing-library/react';
@@ -124,7 +128,7 @@ describe('Daily Discovery card — content decides its height', () => {
   });
 });
 
-describe('Daily Discovery card — the stage carries no constraint either', () => {
+describe('Daily Discovery card — the stage constrains nothing, and floors only', () => {
   const here = dirname(fileURLToPath(import.meta.url));
   const src = readFileSync(resolve(here, '../pages/Scout/DailyLeads.jsx'), 'utf8');
 
@@ -136,14 +140,33 @@ describe('Daily Discovery card — the stage carries no constraint either', () =
     expect(stages).toHaveLength(2);
   });
 
-  it('no stage sets a height or an overflow', () => {
+  it('no stage sets a height, a max-height or an overflow', () => {
     for (const stage of stages) {
-      expect(stage, 'stage pins a height').not.toMatch(/height:/);
-      expect(stage, 'stage clips or scrolls').not.toMatch(/overflow/);
+      expect(stage, 'stage pins a height').not.toMatch(/[^a-zA-Z]height:/);
+      expect(stage, 'stage caps its height').not.toMatch(/maxHeight/);
+      expect(stage, 'stage clips or scrolls').not.toMatch(/overflow/i);
+    }
+  });
+
+  it('each stage carries a min-height floor and refuses to be shrunk below it', () => {
+    // The floor keeps the deck from resizing under the queue: card height
+    // follows content, and content is uneven. It is a floor, so a taller card
+    // still sets its own height — but an explicit min-height replaces a flex
+    // item's automatic minimum size, so `flexShrink: 0` has to travel with it
+    // or the column squeezes a tall card back down onto what follows.
+    for (const [stage, floor] of stages.map((s, i) => [s, ['COMPANY_STAGE_MIN_H', 'PERSON_STAGE_MIN_H'][i]])) {
+      expect(stage, `${floor} is missing`).toMatch(new RegExp(`minHeight: ${floor}`));
+      expect(stage, `${floor} without flexShrink: 0`).toMatch(/flexShrink: 0/);
+    }
+    for (const floor of ['COMPANY_STAGE_MIN_H', 'PERSON_STAGE_MIN_H']) {
+      expect(src, `${floor} is not a measured per-breakpoint constant`)
+        .toMatch(new RegExp(`const ${floor} = isDesktop \\? \\d+ : \\d+;`));
     }
   });
 
   it('nothing reintroduces a viewport-derived card height', () => {
     expect(src, 'a calc(100vh …) card height is back').not.toMatch(/const CARD_H/);
+    expect(src, 'a viewport clamp is driving card height again')
+      .not.toMatch(/clamp\([^)]*100vh[^)]*\)/);
   });
 });

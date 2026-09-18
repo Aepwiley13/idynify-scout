@@ -264,7 +264,7 @@ const MODES = ['SUGGEST', 'PRIORITIZE', 'GROWTH'];
 
 // ── PipelineMoveRow — single row in an ORGANIZE_PIPELINE response ─────────────
 
-function PipelineMoveRow({ move, onExecute }) {
+export function PipelineMoveRow({ move, onExecute, T = DEFAULT_TOKENS }) {
   const [status, setStatus] = useState('idle'); // idle | loading | done | error
 
   const stageLabels = {
@@ -1513,6 +1513,7 @@ export default function BarryChatPanel({
                               key={mi}
                               move={move}
                               onExecute={executePipelineAction}
+                              T={T}
                             />
                           ))}
                         </div>

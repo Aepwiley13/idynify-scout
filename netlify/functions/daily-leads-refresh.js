@@ -61,6 +61,10 @@ const handler = async (event) => {
       errors: []
     };
 
+    // Same resolution as logRefresh() below — the ICP read at the top of the
+    // loop is a REST call to the same Firestore project.
+    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+
     // Process each user
     for (const user of activeUsers) {
       try {

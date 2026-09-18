@@ -28,6 +28,10 @@ export const handler = async (event) => {
     };
   }
 
+  // Declared out here on purpose: the catch below renders a Return link with
+  // it, and a `const` inside the try block is not in scope from the catch.
+  let safeReturnTo = null;
+
   try {
     // Extract OAuth code and state from query params.
     // State format: "userId" or "userId|return_to_path" (pipe-delimited).
@@ -36,7 +40,7 @@ export const handler = async (event) => {
     const rawState = params.state || '';
     const [userId, returnTo] = rawState.split('|');
     // Sanitize return_to: must start with / and no protocol to prevent open redirect
-    const safeReturnTo = (returnTo && returnTo.startsWith('/') && !returnTo.includes('//'))
+    safeReturnTo = (returnTo && returnTo.startsWith('/') && !returnTo.includes('//'))
       ? returnTo
       : null;
 

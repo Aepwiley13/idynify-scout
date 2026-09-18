@@ -644,6 +644,12 @@ export const syncHandler = async () => {
     // and nothing outside the logs was looking. The comment justified it as
     // keeping Netlify from retry-storming; the cost was that 144 runs a day
     // could fail in a row and report success every time.
+    //
+    // The retry-storm risk does not apply. Netlify retries BACKGROUND
+    // functions (once after a minute, again after two). SCHEDULED functions
+    // are not retried — a failed run is simply skipped until the next cron
+    // tick, and Netlify's own remedy for a missed run is to invoke the
+    // function manually. The two function types were being conflated.
     return { statusCode: 500, body: JSON.stringify({ success: false, error: err.message }) };
   }
 };

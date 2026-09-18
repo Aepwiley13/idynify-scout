@@ -14,6 +14,9 @@ import {
 import { Globe, Linkedin, Check, X, RefreshCw, Loader, Settings, RotateCcw, MessageCircle, ArrowRight, MapPin, User, List, ChevronDown, Flame, Trophy } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
+import ScorePip from '../../components/scout/ScorePip';
+import { UNSCORED_LABEL } from '../../utils/scoreDisplay';
+import { compareByFit, pickTopMatch } from '../../utils/fitRanking';
 import CompanyLogo from '../../components/scout/CompanyLogo';
 import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
 import BarryICPPanel, { BarryAvatar } from '../../components/scout/BarryICPPanel';
@@ -818,15 +821,6 @@ function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo, onClos
   const upcoming = companies.slice(currentIndex);
   const rejected = companies.filter(c => rejectedIds.includes(c.id));
 
-  const ScorePip = ({ score }) => {
-    const c = score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : STATUS.red;
-    return (
-      <span style={{ fontSize: 10, fontWeight: 700, color: c, padding: '2px 6px', background: `${c}18`, borderRadius: 4, border: `1px solid ${c}40` }}>
-        {score}
-      </span>
-    );
-  };
-
   if (mobile) {
     // Bottom-sheet overlay for mobile
     return (
@@ -881,7 +875,7 @@ function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo, onClos
                     </div>
                     <div style={{ fontSize: 10, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getDisplayIndustry(co, '—')}</div>
                   </div>
-                  <ScorePip score={co.fit_score || co.score || 0} />
+                  <ScorePip score={co.fit_score ?? co.score ?? null} />
                 </div>
               ))}
               {upcoming.length === 0 && (
@@ -904,7 +898,7 @@ function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo, onClos
                       <div style={{ fontSize: 12, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
                       <div style={{ fontSize: 10, color: T.textFaint }}>Re-review</div>
                     </div>
-                    <ScorePip score={co.fit_score || co.score || 0} />
+                    <ScorePip score={co.fit_score ?? co.score ?? null} />
                   </div>
                 ))}
               </>
@@ -954,7 +948,7 @@ function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo, onClos
                 </div>
                 <div style={{ fontSize: 10, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getDisplayIndustry(co, '—')}</div>
               </div>
-              <ScorePip score={co.fit_score || co.score || 0} />
+              <ScorePip score={co.fit_score ?? co.score ?? null} />
             </div>
           ))}
           {upcoming.length === 0 && (
@@ -984,7 +978,7 @@ function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo, onClos
                   <div style={{ fontSize: 12, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
                   <div style={{ fontSize: 10, color: T.textFaint }}>Re-review</div>
                 </div>
-                <ScorePip score={co.fit_score || co.score || 0} />
+                <ScorePip score={co.fit_score ?? co.score ?? null} />
               </div>
             ))}
           </>
@@ -998,9 +992,10 @@ function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo, onClos
 function SessionSummaryScreen({ reviewed, saved, rejected, streak, savedCompanies, onViewSaved, onDismiss, onRefresh, isRefreshing }) {
   const T = useT();
   const matchRate = reviewed > 0 ? Math.round((saved / reviewed) * 100) : 0;
-  const topMatch = savedCompanies.length > 0
-    ? savedCompanies.reduce((best, c) => ((c.fit_score || 0) > (best.fit_score || 0) ? c : best), savedCompanies[0])
-    : null;
+  // Only a measured, qualifying score earns the badge. On a queue where nothing
+  // was scored there is no best, and pickTopMatch returns null rather than
+  // promoting whichever company happened to be first.
+  const topMatch = pickTopMatch(savedCompanies);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 24px', maxWidth: 420, width: '100%', animation: 'slideUp 0.3s ease' }}>
@@ -1032,7 +1027,9 @@ function SessionSummaryScreen({ reviewed, saved, rejected, streak, savedCompanie
             <div style={{ fontSize: 13, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topMatch.name}</div>
             <div style={{ fontSize: 10, color: T.textFaint }}>{topMatch.industry || '—'}</div>
           </div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: STATUS.green, flexShrink: 0 }}>{topMatch.fit_score || 0}</div>
+          {/* pickTopMatch only ever returns a measured, qualifying score, so
+              there is no unscored case to render here. */}
+          <div style={{ fontSize: 18, fontWeight: 800, color: STATUS.green, flexShrink: 0 }}>{topMatch.fit_score}</div>
         </div>
       )}
 
@@ -1613,11 +1610,10 @@ export default function DailyLeads({ onNavigate }) {
               / Math.max(1, computeCoverage(c, activeProfile).relevant.length)) * 100),
         fit_reasons: generateMatchReasons(c, activeProfile),
       }));
-      // G1-06: tie-break on how much of the model was actually measured, so a
-      // fully-evaluated match outranks a half-evaluated one at the same score.
-      scoredData.sort((a, b) =>
-        ((b.fit_score ?? 0) - (a.fit_score ?? 0))
-        || ((b.fit_confidence ?? 0) - (a.fit_confidence ?? 0)));
+      // Qualifying matches, then unscored by recency, then everything measured
+      // below the bar. The G1-06 confidence tie-break still applies within the
+      // measured tiers — see utils/fitRanking.
+      scoredData.sort(compareByFit);
 
       // Save the full unfiltered pool so ICP switching can re-filter without re-fetching
       allCompaniesRef.current = allPendingData;
@@ -1809,9 +1805,7 @@ export default function DailyLeads({ onNavigate }) {
             / Math.max(1, computeCoverage(c, selectedICP).relevant.length)) * 100),
       fit_reasons: generateMatchReasons(c, selectedICP),
     }));
-    rescored.sort((a, b) =>
-      ((b.fit_score ?? 0) - (a.fit_score ?? 0))
-      || ((b.fit_confidence ?? 0) - (a.fit_confidence ?? 0)));
+    rescored.sort(compareByFit);
     setCompanies(rescored);
     setCurrentIndex(0);
   }, [activeICPId, icpList, companies]);
@@ -3085,7 +3079,11 @@ export default function DailyLeads({ onNavigate }) {
                         <CompanyLogo company={co} size="small" />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 11, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
-                          <div style={{ fontSize: 10, color: T.textFaint }}>{co.fit_score || 0}/100</div>
+                          {/* G1-06: "0/100" is a measured verdict; an unscored
+                              company has not earned one. */}
+                          <div style={{ fontSize: 10, color: T.textFaint }}>
+                            {co.fit_score == null ? UNSCORED_LABEL : `${co.fit_score}/100`}
+                          </div>
                         </div>
                         <button
                           onClick={() => navigate('/recon', { state: { companyId: co.id } })}

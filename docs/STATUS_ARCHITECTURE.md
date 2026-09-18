@@ -83,6 +83,7 @@ vocabulary → **default `active`**.
 | `suggested` | `suggested` | |
 | `active`, `saved`, `accepted` | `active` | |
 | `archived`, `people_mode_archived` | `archived` | |
+| `people_mode_skipped` | `suggested` | A **deferral**, not a decision — DailyLeads re-offers the person once `skipped_date !== today`. Never `archived`: that would turn "not today" into "never", irreversibly. Ask `isDeferredRecord` whether to list the row |
 | `rejected` | `rejected` | |
 | `pending_enrichment`, `enrichment_failed`, `connected`, … | *falls through* | Enrichment lifecycle — says nothing about whether the row counts |
 

@@ -1,11 +1,11 @@
 /**
  * The server must refuse to guess which Firebase project it is talking to.
  *
- * Twenty-two call sites read `process.env.FIREBASE_PROJECT_ID ||
- * 'idynify-scout-dev'`. That fallback is why a deploy with no environment
- * configured did not fail: it connected to the one project serving real
- * customers, from previews and branch deploys as readily as from production.
- * The literal looked like a safety net and worked as a trapdoor.
+ * Twenty-two call sites read `process.env.FIREBASE_PROJECT_ID` OR-ed with a
+ * hardcoded production project id. That fallback is why a deploy with no
+ * environment configured did not fail: it connected to the one project serving
+ * real customers, from previews and branch deploys as readily as from
+ * production. The literal looked like a safety net and worked as a trapdoor.
  *
  * These tests pin the replacement behaviour — throw, with a message that names
  * the variable — because the failure mode being prevented is silent, and a
@@ -38,8 +38,10 @@ describe('requireProjectId', () => {
 
   it('never falls back to the production project', () => {
     delete process.env.FIREBASE_PROJECT_ID;
-    // The specific regression: returning 'idynify-scout-dev' rather than
-    // throwing is what let a misconfigured deploy reach real customer data.
+    // The specific regression: returning the production project id rather
+    // than throwing is what let a misconfigured deploy reach real customer
+    // data. Spelling that id out here would trip check:env, which is the
+    // point of check:env.
     let returned;
     try { returned = requireProjectId(); } catch { /* expected */ }
     expect(returned).toBeUndefined();

@@ -975,3 +975,99 @@
 .linkedin-quick-add-btn-secondary:hover {
   background: var(--bg-secondary);
 }
+
+/* ── Shell region crash fallback ──
+   Shown by ShellRegionBoundary in place of ONE overlay or chrome region.
+   Deliberately small: the rest of the shell is still rendering, and a
+   full-size error card here would make a contained failure look total. */
+.shell-region-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 10px;
+  padding: 10px 14px;
+  border: 1px solid rgba(180, 68, 63, 0.22);
+  border-radius: 10px;
+  background: rgba(180, 68, 63, 0.08);
+  text-align: center;
+}
+
+.shell-region-error-text {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+}
+
+.shell-region-error-retry {
+  padding: 5px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── Root crash fallback ──
+   Shown by RootErrorBoundary when the failure is above the shell. This is the
+   ONE place a full-page fallback is right: there is no surviving navigation to
+   offer, so a reload is genuinely the only next step. */
+.root-error {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg-primary, #0b0818);
+}
+
+.root-error-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  max-width: 420px;
+  padding: 32px 28px;
+  border: 1px solid var(--border, #ffffff1a);
+  border-radius: 16px;
+  background: var(--bg-secondary, #110e1e);
+  text-align: center;
+}
+
+.root-error-title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary, #f0eaff);
+}
+
+.root-error-body {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--text-secondary, #a898c8);
+}
+
+.root-error-reload {
+  padding: 9px 20px;
+  border: 1px solid var(--border, #ffffff1a);
+  border-radius: 9px;
+  background: var(--bg-secondary, #1a1530);
+  color: var(--text-primary, #f0eaff);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.root-error-detail {
+  margin: 0;
+  font-size: 0.6875rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--text-secondary, #a898c8);
+  opacity: 0.7;
+  overflow-wrap: anywhere;
+}

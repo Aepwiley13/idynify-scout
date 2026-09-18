@@ -29,6 +29,7 @@ import ReconSection0 from './pages/Recon/ReconSection0';
 import BarryTraining from './pages/Recon/BarryTraining';
 import AlignmentBrief from './pages/Recon/AlignmentBrief';
 import ReconErrorBoundary from './components/recon/ReconErrorBoundary';
+import RootErrorBoundary from './components/RootErrorBoundary';
 import Questionnaire from './pages/Questionnaire';
 import UnifiedDashboard from './pages/UnifiedDashboard';
 import ScoutDashboardPage from './pages/ScoutDashboardPage';
@@ -329,6 +330,7 @@ function App() {
   }
 
   return (
+    <RootErrorBoundary>
     <ImpersonationProvider session={impersonationSession}>
     <BrowserRouter>
       {updateAvailable && <UpdateBanner />}
@@ -807,6 +809,7 @@ function App() {
       </Routes>
     </BrowserRouter>
     </ImpersonationProvider>
+    </RootErrorBoundary>
   );
 }
 

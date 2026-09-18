@@ -36,6 +36,7 @@ import BottomNav from './BottomNav';
 import MoreSheet from './MoreSheet';
 import ModuleMoreSheet from './ModuleMoreSheet';
 import ModuleErrorBoundary from './ModuleErrorBoundary';
+import ShellRegionBoundary from './ShellRegionBoundary';
 import BarrySessionHistoryPanel from '../barry/BarrySessionHistoryPanel';
 import BarryChatPanel from '../dashboard/BarryChatPanel';
 import NotificationCenter from '../notifications/NotificationCenter';
@@ -201,15 +202,17 @@ function ShellChrome({ children, user }) {
 
   return (
     <div className={`main-layout ${fullBleed ? 'shell-fixed-height' : ''} sidebar-${sidebarMode}`}>
-      <Sidebar
-        mobileMenuOpen={mobileMenuOpen}
-        onCloseMobileMenu={() => setMobileMenuOpen(false)}
-        onToggleBarry={() => toggleBarry({ returnFocusTo: barryButtonRef.current })}
-        barryOpen={barryOpen}
-        barryButtonRef={barryButtonRef}
-        user={shellUser ?? user}
-        onLogout={handleLogout}
-      />
+      <ShellRegionBoundary label="The sidebar">
+        <Sidebar
+          mobileMenuOpen={mobileMenuOpen}
+          onCloseMobileMenu={() => setMobileMenuOpen(false)}
+          onToggleBarry={() => toggleBarry({ returnFocusTo: barryButtonRef.current })}
+          barryOpen={barryOpen}
+          barryButtonRef={barryButtonRef}
+          user={shellUser ?? user}
+          onLogout={handleLogout}
+        />
+      </ShellRegionBoundary>
 
       {mobileMenuOpen && (
         <div className="mobile-menu-backdrop" onClick={() => setMobileMenuOpen(false)} />
@@ -322,51 +325,63 @@ function ShellChrome({ children, user }) {
       </div>
 
       {/* Mobile bottom nav — the module's sections, always. */}
-      <BottomNav onOpenMore={() => setMoreSheetOpen(true)} moreButtonRef={moreButtonRef} />
+      <ShellRegionBoundary label="The bottom bar">
+        <BottomNav onOpenMore={() => setMoreSheetOpen(true)} moreButtonRef={moreButtonRef} />
+      </ShellRegionBoundary>
 
       {/* Two More surfaces, never both.
           Inside a module with overflow sections, More belongs to the module.
           On Mission Control, Settings or anything unmatched, the bar lists
           modules and More is the global sheet. Which one opens follows from
           which bar is showing, so the trigger and its sheet always agree. */}
-      {moduleHasOwnMore ? (
-        <ModuleMoreSheet
-          isOpen={moreSheetOpen}
-          onClose={() => setMoreSheetOpen(false)}
-        />
-      ) : (
-        <MoreSheet
-          isOpen={moreSheetOpen}
-          onClose={() => setMoreSheetOpen(false)}
-          onOpenBarry={() => openBarry({ returnFocusTo: moreButtonRef.current })}
-        />
-      )}
+      <ShellRegionBoundary label="The More menu" resetKey={moreSheetOpen}>
+        {moduleHasOwnMore ? (
+          <ModuleMoreSheet
+            isOpen={moreSheetOpen}
+            onClose={() => setMoreSheetOpen(false)}
+          />
+        ) : (
+          <MoreSheet
+            isOpen={moreSheetOpen}
+            onClose={() => setMoreSheetOpen(false)}
+            onOpenBarry={() => openBarry({ returnFocusTo: moreButtonRef.current })}
+          />
+        )}
+      </ShellRegionBoundary>
 
-      <BarrySessionHistoryPanel isOpen={historyOpen} onClose={() => setHistoryOpen(false)} />
+      <ShellRegionBoundary label="Barry's history" resetKey={historyOpen}>
+        <BarrySessionHistoryPanel isOpen={historyOpen} onClose={() => setHistoryOpen(false)} />
+      </ShellRegionBoundary>
 
       {/* Global search overlay. Mounted here — once, above every route — and
           never conditionally: the ⌘K listener lives inside it, so unmounting
           while closed would take the shortcut with it. It renders no panel
           until opened. */}
-      <CommandBar
-        isOpen={commandBarOpen}
-        onOpen={() => setCommandBarOpen(true)}
-        onClose={() => setCommandBarOpen(false)}
-      />
+      <ShellRegionBoundary label="Search" resetKey={commandBarOpen}>
+        <CommandBar
+          isOpen={commandBarOpen}
+          onOpen={() => setCommandBarOpen(true)}
+          onClose={() => setCommandBarOpen(false)}
+        />
+      </ShellRegionBoundary>
 
       {/* Stage-transition announcements. Only explicit announce() calls
           surface here — routine navigation never produces one. */}
-      <ShellAnnouncements />
+      <ShellRegionBoundary label="Announcements">
+        <ShellAnnouncements />
+      </ShellRegionBoundary>
 
       {/* LinkedIn Quick Add — Scout-only overlay. Lazy-loaded so the Scout+
           component tree does not inflate the shell bundle for non-Scout users. */}
       {linkedInQuickAddOpen && (
-        <Suspense fallback={null}>
-          <LinkedInQuickAdd
-            isOpen={linkedInQuickAddOpen}
-            onClose={() => setLinkedInQuickAddOpen(false)}
-          />
-        </Suspense>
+        <ShellRegionBoundary label="LinkedIn Quick Add" resetKey={linkedInQuickAddOpen}>
+          <Suspense fallback={null}>
+            <LinkedInQuickAdd
+              isOpen={linkedInQuickAddOpen}
+              onClose={() => setLinkedInQuickAddOpen(false)}
+            />
+          </Suspense>
+        </ShellRegionBoundary>
       )}
 
       {/* Quick Engage — shell-hosted so it overlays whatever is underneath
@@ -413,13 +428,15 @@ function ShellChrome({ children, user }) {
             >
               ✕
             </button>
-            <BarryChatPanel
-              userId={activeUserId || auth.currentUser?.uid}
-              kpiContext={barryPageContext.kpiContext}
-              kpiContextReady={effectiveKpiContextReady}
-              onOrientationChange={setOrientation}
-              navigationContext={navigationContext}
-            />
+            <ShellRegionBoundary label="Barry" resetKey={barryOpen}>
+              <BarryChatPanel
+                userId={activeUserId || auth.currentUser?.uid}
+                kpiContext={barryPageContext.kpiContext}
+                kpiContextReady={effectiveKpiContextReady}
+                onOrientationChange={setOrientation}
+                navigationContext={navigationContext}
+              />
+            </ShellRegionBoundary>
           </div>
         );
       })()}

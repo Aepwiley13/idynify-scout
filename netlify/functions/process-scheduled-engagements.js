@@ -25,6 +25,7 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
 import { writeTimelineEvent, ACTORS } from './utils/timelineWrite.js';
+import { alertOps } from './utils/alertOps.js';
 import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 
 // Initialize Firebase Admin (singleton guard)
@@ -48,7 +49,8 @@ export const processScheduledEngagements = async () => {
   const startTime = Date.now();
   console.log('⏰ Starting process-scheduled-engagements job');
 
-  const results = { processed: 0, sent: 0, notified: 0, skipped: 0, failed: 0, wavesSent: 0, wavesProcessed: 0 };
+  // firstError is carried so the alert email can name a cause, not just a count.
+  const results = { processed: 0, sent: 0, notified: 0, skipped: 0, failed: 0, wavesSent: 0, wavesProcessed: 0, firstError: null };
   const now = new Date().toISOString();
 
   try {
@@ -60,12 +62,14 @@ export const processScheduledEngagements = async () => {
         await processUserScheduled(userId, now, results);
       } catch (userErr) {
         results.failed++;
+        results.firstError = results.firstError || userErr.message;
         console.error(`❌ process-scheduled-engagements: user ${userId} failed:`, userErr.message);
       }
       try {
         await processUserScheduledWaves(userId, now, results);
       } catch (waveErr) {
         results.failed++;
+        results.firstError = results.firstError || waveErr.message;
         console.error(`❌ process-scheduled-waves: user ${userId} failed:`, waveErr.message);
       }
     }
@@ -76,12 +80,38 @@ export const processScheduledEngagements = async () => {
       `${results.notified} notified, ${results.wavesSent} wave emails, ${results.failed} failed in ${duration}s`
     );
 
+    // 207 on partial failure, matching daily-leads-refresh: a 200 must mean
+    // every scheduled engagement and wave was handled. An honest zero — nothing
+    // was due this quarter-hour — still returns 200.
+    const allOk = results.failed === 0;
+    console.log(allOk ? 'engagements.scheduled.ok' : 'engagements.scheduled.partial_failure', {
+      sent: results.sent, notified: results.notified,
+      wavesSent: results.wavesSent, usersFailed: results.failed,
+      durationMs: Date.now() - startTime,
+    });
+
+    if (!allOk) {
+      await alertOps({
+        db, job: 'process-scheduled-engagements', severity: 'partial_failure',
+        summary: `${results.failed} scheduled engagement(s) or wave(s) failed to send.`,
+        detail: { sent: results.sent, notified: results.notified,
+                  wavesSent: results.wavesSent, failed: results.failed,
+                  firstError: results.firstError || 'n/a' },
+      });
+    }
+
     return {
-      statusCode: 200,
-      body: JSON.stringify({ success: true, results, duration })
+      statusCode: allOk ? 200 : 207,
+      body: JSON.stringify({ success: allOk, results, duration })
     };
   } catch (fatalErr) {
     console.error('💥 process-scheduled-engagements fatal error:', fatalErr);
+    console.error('engagements.scheduled.failed', { error: fatalErr.message });
+    await alertOps({
+      db, job: 'process-scheduled-engagements', severity: 'failed',
+      summary: 'The scheduled engagement sender crashed before finishing.',
+      detail: { error: fatalErr.message },
+    });
     return {
       statusCode: 500,
       body: JSON.stringify({ success: false, error: fatalErr.message })

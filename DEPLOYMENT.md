@@ -326,3 +326,35 @@ Your Idynify Scout platform should now be fully operational with:
 - ✅ Auto-save functionality
 - ✅ AI-powered section generation
 - ✅ Unified state management
+
+---
+
+## Scheduled-function failure alerting
+
+Five functions run on a schedule. Each returns **200** only when every unit of
+work succeeded, **207** when some failed, and **500** when the run crashed
+outright, and each logs a named line — `discovery.scheduled.partial_failure`,
+`gmail.sync.partial_failure`, `barryqueue.scheduled.partial_failure`,
+`barryinbox.scheduled.partial_failure`, `engagements.scheduled.partial_failure`.
+
+| Function | Schedule |
+|---|---|
+| `daily-leads-refresh` | `0 9 * * 1-5` |
+| `gmail-sync-worker` | `*/10 * * * *` |
+| `process-barry-inbox-queue` | `*/5 * * * *` |
+| `process-scheduled-engagements` | `*/15 * * * *` |
+| `process-barry-queue` | `0 9 * * 1-5` |
+
+`utils/alertOps.js` emails `OPS_ALERT_EMAIL` on the non-ok branch of each, at
+most once per job per hour (cooldown state in `ops_alerts/{job}`).
+
+**Set `OPS_ALERT_EMAIL` in the Netlify production environment.** Until it is
+set, `alertOps` returns `{sent:false, reason:'no_ops_alert_email'}` and nothing
+is sent. That is deliberate — an environment that has not opted in stays quiet
+rather than crashing — but it does mean the alerting is inert until the
+variable exists.
+
+**Known gap:** this cannot detect a run that never happened. A broken deploy, a
+removed schedule, or `DISCOVERY_CRON_ENABLED=false` means no code runs and no
+alert sends. Silence still reads as health. Closing that needs a heartbeat
+written on success and something outside these functions reading it.

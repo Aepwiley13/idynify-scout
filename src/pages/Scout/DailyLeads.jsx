@@ -2419,7 +2419,13 @@ export default function DailyLeads({ onNavigate }) {
         // Rejecting a lead archives it. This wrote status and archived_at but
         // not is_archived, so readers that key off the boolean — quick search
         // among them — kept treating rejected people as live contacts.
-        await setDoc(contactRef, { apollo_person_id: person.id, company_id: company.id, status: 'people_mode_archived', source: 'people_mode', is_archived: true, archived_at: new Date().toISOString(), ...(feedback ? { barryRejectionFeedback: feedback, rejectionFeedbackAt: new Date().toISOString() } : {}) }, { merge: true });
+        //
+        // record_status is stamped too. The row was created as 'suggested' and
+        // nothing used to clear that, so an archived row kept reading back as
+        // a live suggestion: readRecordStatus checks record_status BEFORE
+        // is_archived. Set only the lifecycle field — relationship_status and
+        // stage stay whatever they were.
+        await setDoc(contactRef, { apollo_person_id: person.id, company_id: company.id, status: 'people_mode_archived', source: 'people_mode', is_archived: true, record_status: RECORD_STATUS.ARCHIVED, archived_at: new Date().toISOString(), ...(feedback ? { barryRejectionFeedback: feedback, rejectionFeedbackAt: new Date().toISOString() } : {}) }, { merge: true });
         if (activeICPId) {
           await recordPersonDecision({
             userId: user.uid, contactId, icpId: activeICPId,

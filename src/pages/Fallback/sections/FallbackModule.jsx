@@ -16,6 +16,7 @@ import {
 import { collection, query, where, getDocs, updateDoc, doc, Timestamp } from 'firebase/firestore';
 import { db } from '../../../firebase/config';
 import { PEOPLE_PATHS } from '../../../schemas/peopleSchema';
+import { RECORD_STATUS } from '../../../constants/statusModel';
 import { useT } from '../../../theme/ThemeContext';
 import { useActiveUser } from '../../../context/ImpersonationContext';
 import { auth } from '../../../firebase/config';
@@ -204,14 +205,31 @@ export default function FallbackModule() {
     setRestoringId(person.id);
     try {
       const ref = doc(db, PEOPLE_PATHS.allPeople(uid), person.id);
-      await updateDoc(ref, {
+      // EVERY archive signal has to be cleared, not just the boolean.
+      // `readRecordStatus` checks `record_status` first and falls back to the
+      // legacy `status` vocabulary, in which 'people_mode_archived' means
+      // archived — so clearing `is_archived` alone left a "restored" contact
+      // still reading as archived, invisible to every active view and
+      // unpromotable by `engagementPromotionFields`. The restore did nothing
+      // the rest of the system could see.
+      const patch = {
         is_archived: false,
         archived_at: null,
         archived_reason: null,
         restored_at: new Date().toISOString(),
         stage: 'scout',
         stage_source: 'auto',
-      });
+        record_status: RECORD_STATUS.ACTIVE,
+      };
+      // Only rewrite the legacy field when the legacy field is the thing
+      // saying archived. `status` also carries Apollo enrichment markers
+      // ('pending_enrichment', …) that say nothing about whether the record
+      // counts, and clobbering one would lose real state — the same narrowness
+      // engagementPromotionFields applies in the opposite direction.
+      if (person.status === 'people_mode_archived' || person.status === 'archived') {
+        patch.status = 'active';
+      }
+      await updateDoc(ref, patch);
       setContacts(prev => prev.filter(c => c.id !== person.id));
     } catch (err) {
       console.error('[FallbackModule] restore error:', err);

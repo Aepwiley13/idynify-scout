@@ -24,6 +24,7 @@ import { logApiUsage } from './utils/logApiUsage.js';
 import { createAdminAdapter } from './utils/contactResolver.js';
 import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 import { resolveContactCore, RESOLUTION } from '../../src/utils/identityResolution.js';
+import { RECORD_STATUS } from '../../src/constants/statusModel.js';
 
 // ── Gate 2: the model does not get to decide WHICH person ────────────────────
 
@@ -399,6 +400,12 @@ async function archiveContact(userId, contactId) {
 
   await contactRef.update({
     is_archived: true,
+    // The lifecycle field, stamped alongside the boolean. Without it an
+    // archived row keeps whatever record_status it was created with —
+    // 'suggested' for anything Scout discovered — and readRecordStatus reads
+    // that BEFORE is_archived. Deliberately not createStatusFields: this is an
+    // update, and that helper would also reset relationship_status and stage.
+    record_status: RECORD_STATUS.ARCHIVED,
     archived_at: FieldValue.serverTimestamp(),
     archived_reason: 'barry_chat',
     updated_at: new Date().toISOString()

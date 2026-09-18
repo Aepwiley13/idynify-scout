@@ -30,6 +30,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { PEOPLE_PATHS, createPersonRecord } from '../schemas/peopleSchema';
+import { RECORD_STATUS } from '../constants/statusModel';
 import { recommendBrigade, BRIGADE_DEFINITIONS } from '../data/brigadeSystem';
 import { resolvePersonTypeStatusTrigger, updateContactStatus, STATUS_TRIGGERS } from '../utils/contactStateMachine';
 import { logTimelineEvent, logPersonTypeChanged, logBrigadeAssigned, ACTORS } from '../utils/engagementHistoryLogger';
@@ -452,6 +453,12 @@ export async function archivePerson(userId, contactId, reason) {
     await updateDoc(doc(db, PEOPLE_PATHS.person(userId, contactId)), {
       is_archived: true,
       status: 'people_mode_archived',
+      // Written explicitly, and NOT via createStatusFields: that helper is for
+      // record creation and would also stamp relationship_status 'new' and
+      // stage 'scout', resetting an archived customer to a fresh scout lead.
+      // Only the record lifecycle changes here; the relationship and the
+      // pipeline position are what they were.
+      record_status: RECORD_STATUS.ARCHIVED,
       archived_at: new Date().toISOString(),
       archived_reason: reason || 'other',
       updatedAt: new Date().toISOString()

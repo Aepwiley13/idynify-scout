@@ -637,6 +637,16 @@
   cursor: not-allowed;
 }
 
+/* ── Short desktop viewports ──
+   The 1280px and 1536px rules above add height to the bar for "better
+   spacing". On a 720p laptop that spacing is 8-16px the module below does not
+   have: Scout's Daily Discoveries card already overhangs the fold there. Where
+   the viewport is wide but short, the bar goes back to its 64px height. The
+   horizontal padding stays as the width rule set it. */
+@media (min-width: 1280px) and (max-height: 820px) {
+  .top-bar { height: 64px; padding-top: 1rem; padding-bottom: 1rem; }
+}
+
 /* ── Full-bleed content ──
    Module hubs manage their own padding and scrolling. Document-style screens
    (Mission Control) keep the padded boundary. */

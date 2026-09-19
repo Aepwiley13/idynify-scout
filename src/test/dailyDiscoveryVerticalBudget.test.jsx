@@ -58,16 +58,33 @@ describe('Daily Discoveries chrome — the reclaimed space stays reclaimed', () 
   });
 
   it('the header band and the card column stay tight', () => {
-    // Half the previous padding above the title, and a third off the column.
-    expect(src, 'header padding grew back').toMatch(/padding: isDesktop \? '12px 32px 0' : '10px 26px 0'/);
+    expect(src, 'header padding grew back').toMatch(/padding: isDesktop \? '4px 32px 0' : '10px 26px 0'/);
     expect(src, 'card column padding grew back')
-      .toMatch(/padding: isDesktop \? '10px 16px 6px' : '10px 12px 6px'/);
+      .toMatch(/padding: isDesktop \? '4px 16px 6px' : '10px 12px 6px'/);
   });
 
-  it('the card itself is not what got smaller', () => {
-    // The stage floors from #657 are measured medians of the card's own
-    // height. If a change to the card had shrunk it, these would have moved.
-    expect(src).toMatch(/const COMPANY_STAGE_MIN_H = isDesktop \? 584 : 522;/);
+  it('the ICP chips ride the title line only where the line is wide enough', () => {
+    // Inlining the chips is worth ~40px, but only above 1280px: narrower than
+    // that the title takes the line and the chips become a one-chip scroll
+    // strip with the active ICP out of view.
+    expect(src, 'the 1280px gate is gone').toMatch(/const \[isWide, setIsWide\] = useState\(\(\) => window\.innerWidth >= 1280\);/);
+    expect(src, 'the chips no longer ride the title line').toMatch(/\{isWide && renderIcpChips\(\)\}/);
+    expect(src, 'the chips lost their own row below 1280px').toMatch(/\{!isWide && renderIcpChips\(\)\}/);
+  });
+
+  it('the card got wider rather than shorter', () => {
+    // The width lever reflows text over a longer measure. Nothing is hidden,
+    // and the card's own padding and type scale are untouched.
+    expect(src, 'the desktop card width constant is gone').toMatch(/const CARD_MAX_W = 680;/);
+    expect(src, 'the stage no longer clears the ghost-card offsets')
+      .toMatch(/maxWidth: isDesktop \? CARD_MAX_W \+ 20 : 440/);
+  });
+
+  it('the stage floors are re-measured medians, not guesses', () => {
+    // A wider card is a shorter card: the desktop company median moved
+    // 583.9 -> 563.9 when the card went to CARD_MAX_W. Person cards and every
+    // mobile card keep their width, so their floors did not move.
+    expect(src).toMatch(/const COMPANY_STAGE_MIN_H = isDesktop \? 564 : 522;/);
     expect(src).toMatch(/const PERSON_STAGE_MIN_H = isDesktop \? 512 : 456;/);
   });
 });

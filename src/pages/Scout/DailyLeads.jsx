@@ -47,6 +47,14 @@ function Av({ initials, color = BRAND.pink, size = 70 }) {
   );
 }
 
+// The swipe card's width above 1024px, where the column has room to spare.
+// Wider is shorter: the same text — Barry Intel above all — reflows over fewer
+// lines, which buys vertical space without hiding a word of it. The stage it
+// sits in is 20px wider still, which is what the ghost cards' 8px/16px offsets
+// need to stay inside. Below 1024px the card stays at 420: there is no spare
+// width to trade.
+const CARD_MAX_W = 680;
+
 // ─── Match feedback ───────────────────────────────────────────────────────────
 const MATCH_REASONS = ['Industry fit', 'Right size', 'Good location', 'Revenue match', 'Strong signals', 'Known brand'];
 
@@ -375,7 +383,7 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
         // the card's own content decides how tall it is. Nothing above it caps
         // that, and a card taller than the viewport scrolls the column it sits
         // in rather than scrolling inside itself.
-        position: 'relative', width: '100%', maxWidth: wide ? 540 : 420,
+        position: 'relative', width: '100%', maxWidth: wide ? CARD_MAX_W : 420,
         transform: `translateX(${tx}px) translateY(${dy * 0.1}px) rotate(${dx * 0.04}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
@@ -731,7 +739,7 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
         // See CompanySwipeCard: in flow so the card's content sets its height.
-        position: 'relative', width: '100%', maxWidth: wide ? 540 : 420,
+        position: 'relative', width: '100%', maxWidth: wide ? CARD_MAX_W : 420,
         transform: `translateX(${tx}px) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
@@ -1458,8 +1466,16 @@ export default function DailyLeads({ onNavigate }) {
 
   // ── Responsive state ────────────────────────────────────────────────────────
   const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 1024);
+  // The ICP chips ride the title line only where that line has room for them:
+  // 1280px, the same width at which the shell's own top bar changes. Between
+  // 1024 and 1280 the title alone eats the line, and inlined chips end up a
+  // one-chip scroll strip — so there they keep a row of their own.
+  const [isWide, setIsWide] = useState(() => window.innerWidth >= 1280);
   useEffect(() => {
-    const handler = () => setIsDesktop(window.innerWidth >= 1024);
+    const handler = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+      setIsWide(window.innerWidth >= 1280);
+    };
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
   }, []);
@@ -2529,10 +2545,12 @@ export default function DailyLeads({ onNavigate }) {
   // A floor under the stage, so the deck does not resize on every swipe.
   //
   // Card height follows content, and content is uneven: a company with an HQ, a
-  // CEO, four measured ICP factors and a long Barry Intel renders ~96px taller
+  // CEO, four measured ICP factors and a long Barry Intel renders ~90px taller
   // than a sparse one on desktop and ~151px taller on mobile. Measured over ten
-  // cards spanning sparse to dense, these are the medians — 584/522 for company
-  // cards, 512/456 for person cards, which are consistently shorter.
+  // cards spanning sparse to dense, these are the medians — 564/522 for company
+  // cards, 512/456 for person cards, which are consistently shorter. The desktop
+  // company figure came down from 584 when the card went to CARD_MAX_W: the same
+  // text over a wider measure is fewer lines, so the median card is shorter.
   //
   // It is a floor, not a cap: a card taller than this still sets its own height,
   // and nothing clips or scrolls. Cards shorter than it sit at a stable height
@@ -2543,7 +2561,7 @@ export default function DailyLeads({ onNavigate }) {
   // that was keeping a content-sized item from being shrunk below its content —
   // without it, a card taller than the floor gets squeezed back to the floor and
   // paints over whatever follows.
-  const COMPANY_STAGE_MIN_H = isDesktop ? 584 : 522;
+  const COMPANY_STAGE_MIN_H = isDesktop ? 564 : 522;
   const PERSON_STAGE_MIN_H = isDesktop ? 512 : 456;
 
   // Ghost cards for depth effect. They stretch to the stage — i.e. to the real
@@ -2558,6 +2576,43 @@ export default function DailyLeads({ onNavigate }) {
         opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none',
       }} />
     ));
+
+  // ICP chips. Above 1024px they sit on the title line, which is 44px tall
+  // anyway once they are in it — so the chip row stops costing a row of its
+  // own (46px plus its 6px gap) without any chip losing its 44px tap target.
+  const renderIcpChips = () => {
+    const chips = icpList.filter(i => i.status !== 'pending');
+    if (chips.length <= 1) return null;
+    return (
+      <div style={{
+        display: 'flex', gap: 6, alignItems: 'center',
+        marginBottom: isWide ? 0 : 6,
+        ...(isWide ? { flex: '1 1 auto', minWidth: 0, justifyContent: 'flex-end' } : null),
+        overflowX: 'auto',
+        msOverflowStyle: 'none', scrollbarWidth: 'none',
+      }}>
+        {chips.map(icp => (
+          <button
+            key={icp.id}
+            onClick={() => handleICPSwitch(icp.id)}
+            onDoubleClick={() => navigate(`/scout?tab=icp-settings&icpId=${icp.id}`)}
+            title="Double-click to edit ICP"
+            style={{
+              padding: '5px 14px', minHeight: 44, borderRadius: 20,
+              fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              border: `1.5px solid ${activeICPId === icp.id ? BRAND.pink : T.border2}`,
+              background: activeICPId === icp.id ? T.accentBg : T.surface,
+              color: activeICPId === icp.id ? BRAND.pink : T.textMuted,
+              transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0,
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {icp.name || 'ICP'}
+          </button>
+        ))}
+      </div>
+    );
+  };
 
   // Progress. The dot rows that used to sit between the tabs and the card are
   // gone: ten 7px dots cost a 27px band above a card that already overhangs the
@@ -2662,18 +2717,19 @@ export default function DailyLeads({ onNavigate }) {
       {/* Header + tabs. Type scale is untouched; what came out is the band
           around it — the title and its subtitle share a line now instead of
           stacking, and the padding above them is half what it was. */}
-      <div style={{ padding: isDesktop ? '12px 32px 0' : '10px 26px 0', background: T.appBg }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+      <div style={{ padding: isDesktop ? '4px 32px 0' : '10px 26px 0', background: T.appBg }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: isDesktop ? 6 : 8 }}>
           {/* Inline above 1024px, where the two fit on one line. Narrower than
               that they wrap, and a wrapped pair is taller than a stacked one —
               so on mobile they stay stacked and the saving comes from the
               padding around them instead. */}
-          <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: isDesktop ? 10 : 0, minWidth: 0, ...(isDesktop ? null : { display: 'block' }) }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: isDesktop ? 10 : 0, minWidth: 0, flexShrink: 0, ...(isDesktop ? null : { display: 'block' }) }}>
             <h2 style={{ margin: 0, fontSize: isDesktop ? 22 : 18, fontWeight: 700, color: T.text }}>Daily Discoveries</h2>
             <p style={{ margin: isDesktop ? 0 : '2px 0 0', fontSize: isDesktop ? 13 : 11, color: T.textFaint }}>
               Matches based on {icpList.length > 1 ? (icpList.find(i => i.id === activeICPId)?.name || 'your ICP') : 'your ICP'}
             </p>
           </div>
+          {isWide && renderIcpChips()}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
             {/* The batch count the dot row used to carry. It rides the control
                 cluster rather than the subtitle, so it costs no height and no
@@ -2732,34 +2788,9 @@ export default function DailyLeads({ onNavigate }) {
             {feedbackImpactMsg}
           </div>
         )}
-        {/* ICP tab bar — shown when user has multiple non-pending ICPs */}
-        {icpList.filter(i => i.status !== 'pending').length > 1 && (
-          <div style={{
-            display: 'flex', gap: 6, marginBottom: 6,
-            overflowX: 'auto',
-            msOverflowStyle: 'none', scrollbarWidth: 'none',
-          }}>
-            {icpList.filter(i => i.status !== 'pending').map(icp => (
-              <button
-                key={icp.id}
-                onClick={() => handleICPSwitch(icp.id)}
-                onDoubleClick={() => navigate(`/scout?tab=icp-settings&icpId=${icp.id}`)}
-                title="Double-click to edit ICP"
-                style={{
-                  padding: '5px 14px', minHeight: 44, borderRadius: 20,
-                  fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                  border: `1.5px solid ${activeICPId === icp.id ? BRAND.pink : T.border2}`,
-                  background: activeICPId === icp.id ? T.accentBg : T.surface,
-                  color: activeICPId === icp.id ? BRAND.pink : T.textMuted,
-                  transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0,
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                {icp.name || 'ICP'}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Below 1280px the chips keep a row of their own — see renderIcpChips
+            for why the title line only takes them when it is wide enough. */}
+        {!isWide && renderIcpChips()}
 
         {/* Tab switcher */}
         <div style={{ display: 'flex', gap: 0, borderBottom: `1px solid ${T.border}` }}>
@@ -2786,7 +2817,7 @@ export default function DailyLeads({ onNavigate }) {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minWidth: 0 }}>
 
         {/* ── Card column ── */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isDesktop ? '10px 16px 6px' : '10px 12px 6px', overflowY: 'auto', overflowX: 'hidden', position: 'relative', WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isDesktop ? '4px 16px 6px' : '10px 12px 6px', overflowY: 'auto', overflowX: 'hidden', position: 'relative', WebkitOverflowScrolling: 'touch' }}>
 
           {/* ── Companies Tab ── */}
           {tab === 'companies' && (
@@ -2966,7 +2997,7 @@ export default function DailyLeads({ onNavigate }) {
                       leave the other visible, the browser resolved overflow-y to
                       `auto` and the card scrolled inside the stage. The stage
                       now takes its height from the card, never the reverse. */}
-                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, minHeight: COMPANY_STAGE_MIN_H, flexShrink: 0 }}>
+                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, minHeight: COMPANY_STAGE_MIN_H, flexShrink: 0 }}>
                     {visibleCompanies.length > 1 && renderGhostCards(visibleCompanies.length - 1)}
                     {currentCompany && (
                       <CompanySwipeCard
@@ -3008,7 +3039,7 @@ export default function DailyLeads({ onNavigate }) {
                       <RotateCcw size={13} />Undo last skip
                     </button>
                   )}
-                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? 560 : 440, fontSize: 10, color: T.textGhost }}>
+                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, fontSize: 10, color: T.textGhost }}>
                     <span>← Sharpens targeting</span>
                     <span>Add to hunt list →</span>
                   </div>
@@ -3054,7 +3085,7 @@ export default function DailyLeads({ onNavigate }) {
                 </div>
               ) : (
                 <>
-                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, minHeight: PERSON_STAGE_MIN_H, flexShrink: 0 }}>
+                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, minHeight: PERSON_STAGE_MIN_H, flexShrink: 0 }}>
                     {peopleQueue.slice(currentPersonIdx + 1, currentPersonIdx + 3).map((_, i) => (
                       <div key={i} style={{ position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8, bottom: -(i + 1) * 8, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none' }} />
                     ))}
@@ -3069,7 +3100,7 @@ export default function DailyLeads({ onNavigate }) {
                       wide={isDesktop}
                     />
                   </div>
-                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? 560 : 440, fontSize: 10, color: T.textGhost }}>
+                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, fontSize: 10, color: T.textGhost }}>
                     <span>← Not this person</span>
                     <span>Save to engage →</span>
                   </div>

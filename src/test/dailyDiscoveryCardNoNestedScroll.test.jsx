@@ -224,7 +224,7 @@ describe('Daily Discovery card — the stage constrains nothing, and floors only
 
   // jsdom computes no layout, so the stage's own declarations are read from
   // source. Both the Companies and the People tab render one.
-  const stages = src.match(/<div style=\{\{ position: 'relative', width: '100%', maxWidth: isDesktop \? 560 : 440[^}]*\}\}>/g) || [];
+  const stages = src.match(/<div style=\{\{ position: 'relative', width: '100%', maxWidth: isDesktop \? CARD_MAX_W \+ 20 : 440[^}]*\}\}>/g) || [];
 
   it('both tabs render a card stage', () => {
     expect(stages).toHaveLength(2);

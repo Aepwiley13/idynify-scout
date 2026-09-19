@@ -14,6 +14,11 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm install
+      # The project id must never be hardcoded again. This is cheap and runs
+      # before the suite so a reintroduced literal fails in seconds rather
+      # than after the full corpus.
+      - name: No hardcoded Firebase project id
+        run: npm run check:env
       # Test exclusions (policy, 2026-08-28): this gate runs the whole corpus.
       # An exclusion added here must carry, in a comment beside it: the reason,
       # a named owner, and the condition or date on which it is removed. An

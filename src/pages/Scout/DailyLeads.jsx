@@ -2559,40 +2559,13 @@ export default function DailyLeads({ onNavigate }) {
       }} />
     ));
 
-  // Batch progress dots (10 dots, one per swipe in current batch)
-  const renderBatchDots = () => (
-    <div style={{ display: 'flex', gap: 5, marginBottom: 16, alignItems: 'center', justifyContent: 'center' }}>
-      {Array.from({ length: BATCH_SIZE }).map((_, i) => (
-        <div key={i} style={{
-          width: 7, height: 7, borderRadius: 4,
-          background: i < batchSwipeCount
-            ? (i < batchSaves ? BRAND.pink : T.isDark ? '#ffffff30' : '#00000020')
-            : T.isDark ? '#ffffff0d' : '#00000010',
-          transition: 'all 0.3s',
-        }} />
-      ))}
-      <span style={{ fontSize: 10, color: T.textFaint, marginLeft: 6 }}>{batchSwipeCount}/{BATCH_SIZE}</span>
-    </div>
-  );
-
-  // Progress dots
-  const renderDots = (total, current) => {
-    const displayTotal = Math.min(total, 8);
-    const remaining = total - current;
-    return (
-      <div style={{ display: 'flex', gap: 5, marginBottom: 16, alignItems: 'center', justifyContent: 'center' }}>
-        {Array.from({ length: displayTotal }).map((_, i) => (
-          <div key={i} style={{
-            width: i === 0 ? 18 : 7, height: 7, borderRadius: 4,
-            background: i < remaining ? (i === 0 ? BRAND.pink : T.isDark ? '#ffffff30' : '#00000020') : T.isDark ? '#ffffff0d' : '#00000010',
-            transition: 'all 0.3s',
-          }} />
-        ))}
-        {total > 8 && <span style={{ fontSize: 10, color: T.textFaint }}>+{total - 8}</span>}
-        <span style={{ fontSize: 10, color: T.textFaint, marginLeft: 4 }}>{current}/{total}</span>
-      </div>
-    );
-  };
+  // Progress. The dot rows that used to sit between the tabs and the card are
+  // gone: ten 7px dots cost a 27px band above a card that already overhangs the
+  // fold, and they said nothing the count beside them did not. The count itself
+  // stays — it moves onto the header's subtitle line, which had room for it.
+  const progressLabel = tab === 'people'
+    ? (peopleQueue.length > 0 ? `${currentPersonIdx}/${peopleQueue.length}${isDesktop ? ' reviewed' : ''}` : null)
+    : `${batchSwipeCount}/${BATCH_SIZE}${isDesktop ? ' this batch' : ''}`;
 
   if (loading) {
     return (
@@ -2686,16 +2659,28 @@ export default function DailyLeads({ onNavigate }) {
         </div>
       )}
 
-      {/* Header + tabs */}
-      <div style={{ padding: isDesktop ? '20px 32px 0' : '16px 26px 0', background: T.appBg }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isDesktop ? 16 : 14 }}>
-          <div>
+      {/* Header + tabs. Type scale is untouched; what came out is the band
+          around it — the title and its subtitle share a line now instead of
+          stacking, and the padding above them is half what it was. */}
+      <div style={{ padding: isDesktop ? '12px 32px 0' : '10px 26px 0', background: T.appBg }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
+          {/* Inline above 1024px, where the two fit on one line. Narrower than
+              that they wrap, and a wrapped pair is taller than a stacked one —
+              so on mobile they stay stacked and the saving comes from the
+              padding around them instead. */}
+          <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: isDesktop ? 10 : 0, minWidth: 0, ...(isDesktop ? null : { display: 'block' }) }}>
             <h2 style={{ margin: 0, fontSize: isDesktop ? 22 : 18, fontWeight: 700, color: T.text }}>Daily Discoveries</h2>
-            <p style={{ margin: '3px 0 0', fontSize: isDesktop ? 13 : 11, color: T.textFaint }}>
+            <p style={{ margin: isDesktop ? 0 : '2px 0 0', fontSize: isDesktop ? 13 : 11, color: T.textFaint }}>
               Matches based on {icpList.length > 1 ? (icpList.find(i => i.id === activeICPId)?.name || 'your ICP') : 'your ICP'}
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+            {/* The batch count the dot row used to carry. It rides the control
+                cluster rather than the subtitle, so it costs no height and no
+                width that a narrow viewport would have to wrap. */}
+            {progressLabel && (
+              <span style={{ fontSize: 10, color: T.textFaint, whiteSpace: 'nowrap' }}>{progressLabel}</span>
+            )}
             {isDesktop && (
               <button
                 onClick={toggleQueueList}
@@ -2750,8 +2735,8 @@ export default function DailyLeads({ onNavigate }) {
         {/* ICP tab bar — shown when user has multiple non-pending ICPs */}
         {icpList.filter(i => i.status !== 'pending').length > 1 && (
           <div style={{
-            display: 'flex', gap: 6, marginBottom: 10,
-            overflowX: 'auto', paddingBottom: 2,
+            display: 'flex', gap: 6, marginBottom: 6,
+            overflowX: 'auto',
             msOverflowStyle: 'none', scrollbarWidth: 'none',
           }}>
             {icpList.filter(i => i.status !== 'pending').map(icp => (
@@ -2801,7 +2786,7 @@ export default function DailyLeads({ onNavigate }) {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minWidth: 0 }}>
 
         {/* ── Card column ── */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isDesktop ? '20px 16px 8px' : '18px 12px 8px', overflowY: 'auto', overflowX: 'hidden', position: 'relative', WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isDesktop ? '10px 16px 6px' : '10px 12px 6px', overflowY: 'auto', overflowX: 'hidden', position: 'relative', WebkitOverflowScrolling: 'touch' }}>
 
           {/* ── Companies Tab ── */}
           {tab === 'companies' && (
@@ -2975,7 +2960,6 @@ export default function DailyLeads({ onNavigate }) {
                 </div>
               ) : (
                 <>
-                  {renderBatchDots()}
                   {/* Card stage — no height, no max-height, no overflow, and a
                       measured floor. `height: CARD_H` with `overflowX: hidden`
                       used to live here; because a box cannot clip one axis and
@@ -3024,7 +3008,7 @@ export default function DailyLeads({ onNavigate }) {
                       <RotateCcw size={13} />Undo last skip
                     </button>
                   )}
-                  <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? 560 : 440, fontSize: 10, color: T.textGhost }}>
+                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? 560 : 440, fontSize: 10, color: T.textGhost }}>
                     <span>← Sharpens targeting</span>
                     <span>Add to hunt list →</span>
                   </div>
@@ -3070,7 +3054,6 @@ export default function DailyLeads({ onNavigate }) {
                 </div>
               ) : (
                 <>
-                  {renderDots(peopleQueue.length, currentPersonIdx)}
                   <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, minHeight: PERSON_STAGE_MIN_H, flexShrink: 0 }}>
                     {peopleQueue.slice(currentPersonIdx + 1, currentPersonIdx + 3).map((_, i) => (
                       <div key={i} style={{ position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8, bottom: -(i + 1) * 8, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none' }} />
@@ -3086,7 +3069,7 @@ export default function DailyLeads({ onNavigate }) {
                       wide={isDesktop}
                     />
                   </div>
-                  <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? 560 : 440, fontSize: 10, color: T.textGhost }}>
+                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? 560 : 440, fontSize: 10, color: T.textGhost }}>
                     <span>← Not this person</span>
                     <span>Save to engage →</span>
                   </div>

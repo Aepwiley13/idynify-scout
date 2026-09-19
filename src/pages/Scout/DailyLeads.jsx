@@ -371,12 +371,16 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
       onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
-        position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
-        height: wide ? undefined : '100%',
+        // In flow, not absolute: the card is what gives the stage its height, so
+        // the card's own content decides how tall it is. Nothing above it caps
+        // that, and a card taller than the viewport scrolls the column it sits
+        // in rather than scrolling inside itself.
+        position: 'relative', width: '100%', maxWidth: wide ? 540 : 420,
         transform: `translateX(${tx}px) translateY(${dy * 0.1}px) rotate(${dx * 0.04}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
-        touchAction: 'pan-y', top: 0, left: 0, right: 0, margin: '0 auto',
+        // Vertical touch belongs to the page; this handler only claims horizontal.
+        touchAction: 'pan-y', margin: '0 auto',
       }}
     >
       {/* Swipe overlay labels */}
@@ -399,16 +403,15 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
         }}>✗ NOT A MATCH</div>
       )}
 
-      {/* Card — scrollable on mobile when content exceeds card height */}
+      {/* Card — height comes from its content on every breakpoint. `hidden` here
+          only clips the corner radius; there is nothing to scroll past. */}
       <div style={{
         position: 'relative',
-        height: wide ? undefined : '100%',
         background: T.cardBg, border: `1px solid ${T.border2}`,
-        borderRadius: 22, overflow: wide ? 'hidden' : 'auto',
+        borderRadius: 22, overflow: 'hidden',
         boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`,
         transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)',
         transition: 'transform 0.14s ease',
-        WebkitOverflowScrolling: wide ? undefined : 'touch',
       }}>
         {/* Feedback overlay — appears after "This is a Match" click */}
         {showFeedback && (
@@ -450,14 +453,16 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
         }}>
           <CompanyLogo company={company} size="card" />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: wide ? 20 : 18, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 90 }}>{company.name}</div>
+            {/* Same bargain as the stats cells below: these three lines
+                ellipsize, so each keeps its full value on hover. */}
+            <div title={company.name} style={{ fontSize: wide ? 20 : 18, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 90 }}>{company.name}</div>
             {getDisplayIndustry(company, '') && getDisplayIndustry(company, '').toLowerCase() !== 'unknown' && (
-              <div style={{ fontSize: 11, color: T.textMuted, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div title={getDisplayIndustry(company, '')} style={{ fontSize: 11, color: T.textMuted, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {getDisplayIndustry(company, '')}
               </div>
             )}
             {hqLocation && hqLocation.toLowerCase() !== 'unknown' && (
-              <div style={{ fontSize: 10, color: T.textFaint, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div title={hqLocation} style={{ fontSize: 10, color: T.textFaint, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 <MapPin size={10} style={{ flexShrink: 0 }} />{hqLocation}
               </div>
             )}
@@ -481,12 +486,24 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
             ['FOUNDED',   company.founded_year || 'N/A'],
             ['HQ',        hqLocation || '—'],
             ['CEO',       ceoName || '—'],
-          ].map(([l, v]) => (
-            <div key={l} style={{ padding: wide ? '10px 18px' : '8px 14px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
-              <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>{l}</div>
-              <div style={{ fontSize: wide ? 12 : 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
-            </div>
-          ))}
+          ].map(([l, v]) => {
+            // A value too long for its cell is cut by the ellipsis on the line
+            // below, which says it was cut but not what was cut. The full
+            // string stays reachable on hover and to a screen reader; '—' and
+            // 'N/A' are already whole, so they carry no tooltip.
+            const full = (v === '—' || v === 'N/A' || v == null) ? undefined : String(v);
+            return (
+              // `minWidth: 0` so that ellipsis governs. A grid item's automatic
+              // minimum is its content, and the value line is
+              // `white-space: nowrap`, so a long CEO name widened the right
+              // column past the card — ~4px at 360px wide, which the card's
+              // clipping now cuts instead of scrolling sideways.
+              <div key={l} style={{ minWidth: 0, padding: wide ? '10px 18px' : '8px 14px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
+                <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>{l}</div>
+                <div title={full} style={{ fontSize: wide ? 12 : 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
+              </div>
+            );
+          })}
         </div>
 
         {/* ICP Score row — clickable to expand breakdown */}
@@ -713,13 +730,13 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
       onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
-        position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
-        height: wide ? undefined : '100%',
+        // See CompanySwipeCard: in flow so the card's content sets its height.
+        position: 'relative', width: '100%', maxWidth: wide ? 540 : 420,
         transform: `translateX(${tx}px) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
         touchAction: 'pan-y',
-        top: 0, left: 0, right: 0, margin: '0 auto',
+        margin: '0 auto',
       }}
     >
       {dx > 30 && (
@@ -728,7 +745,7 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
       {dx < -30 && (
         <div style={{ position: 'absolute', top: 22, right: 16, zIndex: 10, padding: '5px 13px', borderRadius: 8, border: `3px solid ${STATUS.red}`, color: STATUS.red, fontSize: 13, fontWeight: 700, transform: 'rotate(11deg)', background: `${STATUS.red}10` }}>✗ NOT A MATCH</div>
       )}
-      <div style={{ position: 'relative', height: wide ? undefined : '100%', background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: wide ? 'hidden' : 'auto', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)', transition: 'transform 0.14s ease', WebkitOverflowScrolling: wide ? undefined : 'touch' }}>
+      <div style={{ position: 'relative', background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: 'hidden', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)', transition: 'transform 0.14s ease' }}>
         {showFeedback && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 30, background: T.cardBg, borderRadius: 22, overflowY: 'auto' }}>
             <FeedbackFace
@@ -2509,17 +2526,36 @@ export default function DailyLeads({ onNavigate }) {
   const visibleCompanies = companies.slice(currentIndex);
   const nextCompany = companies[currentIndex + 1] || null;
 
-  // Ghost cards for depth effect — CARD_H accounts for header + batch dots + hints
-  // so the outer column never overflows and shows no scrollbar
-  const CARD_H = isDesktop
-    ? 'clamp(440px, calc(100vh - 280px), 660px)'
-    : 'clamp(400px, calc(100vh - 300px), 560px)';
+  // A floor under the stage, so the deck does not resize on every swipe.
+  //
+  // Card height follows content, and content is uneven: a company with an HQ, a
+  // CEO, four measured ICP factors and a long Barry Intel renders ~96px taller
+  // than a sparse one on desktop and ~151px taller on mobile. Measured over ten
+  // cards spanning sparse to dense, these are the medians — 584/522 for company
+  // cards, 512/456 for person cards, which are consistently shorter.
+  //
+  // It is a floor, not a cap: a card taller than this still sets its own height,
+  // and nothing clips or scrolls. Cards shorter than it sit at a stable height
+  // instead of shrinking the deck under the queue.
+  //
+  // `flexShrink: 0` travels with the floor. The stage is a flex item in the
+  // card column, and an explicit min-height replaces the automatic minimum size
+  // that was keeping a content-sized item from being shrunk below its content —
+  // without it, a card taller than the floor gets squeezed back to the floor and
+  // paints over whatever follows.
+  const COMPANY_STAGE_MIN_H = isDesktop ? 584 : 522;
+  const PERSON_STAGE_MIN_H = isDesktop ? 512 : 456;
+
+  // Ghost cards for depth effect. They stretch to the stage — i.e. to the real
+  // card's own height — instead of carrying a viewport-derived height of their
+  // own, so the deck stays a deck whatever the card in front of it measures.
   const renderGhostCards = (count) =>
     Array.from({ length: Math.min(count, 2) }).map((_, i) => (
       <div key={i} style={{
         position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8,
+        bottom: -(i + 1) * 8,
         background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22,
-        height: CARD_H, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none',
+        opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none',
       }} />
     ));
 
@@ -2940,7 +2976,13 @@ export default function DailyLeads({ onNavigate }) {
               ) : (
                 <>
                   {renderBatchDots()}
-                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, height: CARD_H, overflowX: 'hidden' }}>
+                  {/* Card stage — no height, no max-height, no overflow, and a
+                      measured floor. `height: CARD_H` with `overflowX: hidden`
+                      used to live here; because a box cannot clip one axis and
+                      leave the other visible, the browser resolved overflow-y to
+                      `auto` and the card scrolled inside the stage. The stage
+                      now takes its height from the card, never the reverse. */}
+                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, minHeight: COMPANY_STAGE_MIN_H, flexShrink: 0 }}>
                     {visibleCompanies.length > 1 && renderGhostCards(visibleCompanies.length - 1)}
                     {currentCompany && (
                       <CompanySwipeCard
@@ -3029,9 +3071,9 @@ export default function DailyLeads({ onNavigate }) {
               ) : (
                 <>
                   {renderDots(peopleQueue.length, currentPersonIdx)}
-                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, height: CARD_H, overflowX: 'hidden' }}>
+                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, minHeight: PERSON_STAGE_MIN_H, flexShrink: 0 }}>
                     {peopleQueue.slice(currentPersonIdx + 1, currentPersonIdx + 3).map((_, i) => (
-                      <div key={i} style={{ position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, height: CARD_H, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none' }} />
+                      <div key={i} style={{ position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8, bottom: -(i + 1) * 8, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none' }} />
                     ))}
                     <PersonSwipeCard
                       key={`${peopleQueue[currentPersonIdx].company.id}_${peopleQueue[currentPersonIdx].person.id}`}

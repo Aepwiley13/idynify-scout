@@ -31,6 +31,7 @@ import {
   readRecordStatus,
   isEngagedRecord,
   hasArchiveSignal,
+  isDeferredRecord,
   engagementPromotionFields,
 } from '../constants/statusModel';
 
@@ -39,13 +40,16 @@ function countsAsSuggested(contact) {
   return readRecordStatus(contact) === RECORD_STATUS.SUGGESTED && !isEngagedRecord(contact);
 }
 
-/** The People (scout mode) classifier, as implemented in AllLeads.jsx. */
+/**
+ * The People (scout mode) classifier, as implemented in AllLeads.jsx.
+ *
+ * Calls the shared helpers rather than restating the rule. It used to inline
+ * `['people_mode_archived', 'people_mode_skipped']`, which quietly made this
+ * test agree that a deferral is an archive — see skipIsNotArchive.test.js.
+ */
 function countsAsLead(contact) {
-  const s = contact.status || '';
-  const archived =
-    contact.is_archived === true ||
-    ['people_mode_archived', 'people_mode_skipped'].includes(s);
-  return !archived && !isEngagedRecord(contact);
+  if (isDeferredRecord(contact)) return false;
+  return !hasArchiveSignal(contact) && !isEngagedRecord(contact);
 }
 
 /**

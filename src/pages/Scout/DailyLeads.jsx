@@ -2716,7 +2716,18 @@ export default function DailyLeads({ onNavigate }) {
 
       {/* Header + tabs. Type scale is untouched; what came out is the band
           around it — the title and its subtitle share a line now instead of
-          stacking, and the padding above them is half what it was. */}
+          stacking, and the padding above them is half what it was.
+          ─────────────────────────────────────────────────────────────────────
+          THIS HEADER HAS NO SLACK LEFT AT 1280x720. The card below it is
+          content-sized (see COMPANY_STAGE_MIN_H) and the two fit the viewport
+          by single-digit pixels: the median card clears the fold by 5.6px and
+          the next card in the measured spread misses it by 7.4px. A row added
+          here — a banner, a filter, a second line of anything — puts the
+          decision buttons back under the fold on a 720p laptop, which is the
+          bug PR #657 and #658 were about. The tests pin these paddings and the
+          floors against accidents; they cannot stop a deliberate addition.
+          If you need a row here, re-measure first and take it from somewhere:
+          the levers and what each is worth are costed in #658. */}
       <div style={{ padding: isDesktop ? '4px 32px 0' : '10px 26px 0', background: T.appBg }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: isDesktop ? 6 : 8 }}>
           {/* Inline above 1024px, where the two fit on one line. Narrower than

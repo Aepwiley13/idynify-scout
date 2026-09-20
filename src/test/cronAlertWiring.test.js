@@ -62,7 +62,7 @@ vi.mock('firebase-admin', () => ({
 }));
 
 process.env.FIREBASE_PRIVATE_KEY = 'x';
-const { default: handler } = await import('../../netlify/functions/process-barry-queue.js');
+const { handler } = await import('../../netlify/functions/process-barry-queue.js');
 
 let logSpy, errSpy;
 beforeEach(() => {

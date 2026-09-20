@@ -35,6 +35,7 @@
 
 import { schedule } from '@netlify/functions';
 import { db } from './firebase-admin.js';
+import { alertOps } from './utils/alertOps.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { analyzeInboundMessage } from './utils/barryInboxAnalyzer.js';
 import { composeDraftReply } from './utils/barryDraftComposer.js';
@@ -69,7 +70,8 @@ export const processInboxQueue = async (event = {}) => {
   }
 
   const startMs = Date.now();
-  const results = { processed: 0, succeeded: 0, failed: 0, skipped: 0, entries: [] };
+  // firstError is carried so the alert email can name a cause, not just a count.
+  const results = { processed: 0, succeeded: 0, failed: 0, skipped: 0, entries: [], firstError: null };
 
   try {
     // ── Query pending queue entries ──────────────────────────────────────
@@ -245,6 +247,7 @@ export const processInboxQueue = async (event = {}) => {
         console.error(`[process-barry-inbox-queue] ❌ ${messageRecordId}:`, entryError.message);
 
         results.failed++;
+        results.firstError = results.firstError || entryError.message;
         results.entries.push({
           messageRecordId,
           contactId,
@@ -267,14 +270,37 @@ export const processInboxQueue = async (event = {}) => {
       `${results.failed} failed, ${results.skipped} skipped in ${processingMs}ms`
     );
 
+    // 207 on partial failure, matching daily-leads-refresh: a 200 must mean
+    // every queue entry was handled. An empty queue still returns 200.
+    const allOk = results.failed === 0;
+    console.log(allOk ? 'barryinbox.scheduled.ok' : 'barryinbox.scheduled.partial_failure', {
+      entriesSucceeded: results.succeeded, entriesFailed: results.failed,
+      entriesSkipped: results.skipped, durationMs: processingMs,
+    });
+
+    if (!allOk) {
+      await alertOps({
+        db, job: 'process-barry-inbox-queue', severity: 'partial_failure',
+        summary: `${results.failed} inbox queue entr(ies) failed to process.`,
+        detail: { succeeded: results.succeeded, failed: results.failed,
+                  skipped: results.skipped, firstError: results.firstError || 'n/a' },
+      });
+    }
+
     return {
-      statusCode: 200,
+      statusCode: allOk ? 200 : 207,
       headers: CORS_HEADERS,
-      body: JSON.stringify({ success: true, results, processingMs }),
+      body: JSON.stringify({ success: allOk, results, processingMs }),
     };
 
   } catch (error) {
     console.error('[process-barry-inbox-queue] Fatal error:', error);
+    console.error('barryinbox.scheduled.failed', { error: error.message });
+    await alertOps({
+      db, job: 'process-barry-inbox-queue', severity: 'failed',
+      summary: 'The Barry inbox queue processor crashed before finishing.',
+      detail: { error: error.message },
+    });
     return {
       statusCode: 500,
       headers: CORS_HEADERS,

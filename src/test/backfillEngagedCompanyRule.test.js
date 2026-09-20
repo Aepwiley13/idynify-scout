@@ -39,13 +39,25 @@ describe('who the backfill considers', () => {
     expect(isEngaged({})).toBe(false);
   });
 
-  it('recognises archival from the boolean and from the two status values', () => {
+  it('recognises archival from the boolean and from the archive status', () => {
     expect(isArchived({ is_archived: true })).toBe(true);
     expect(isArchived({ status: 'people_mode_archived' })).toBe(true);
-    expect(isArchived({ status: 'people_mode_skipped' })).toBe(true);
 
     expect(isArchived({ is_archived: false, status: 'active' })).toBe(false);
     expect(isArchived({})).toBe(false);
+  });
+
+  it('does NOT treat a skipped contact as archived', () => {
+    // A skip defers someone to a later day; DailyLeads re-offers them once
+    // skipped_date is not today. The sibling backfill's inferIsArchived has
+    // always agreed, and this rule used to contradict it.
+    //
+    // Harmless in practice either way — the skip write path always sets
+    // company_id, so a skipped row fails repair 1's `!company_id` gate and
+    // repair 2's `isEngaged` gate whatever this says — but an exported,
+    // unit-tested rule should not assert the opposite of what the product
+    // means. See src/test/skipIsNotArchive.test.js.
+    expect(isArchived({ status: 'people_mode_skipped', skipped_date: '2026-01-04' })).toBe(false);
   });
 });
 

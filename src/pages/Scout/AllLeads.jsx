@@ -28,6 +28,7 @@ import { useT } from '../../theme/ThemeContext';
 import { useSubscription } from '../../hooks/useSubscription';
 import { BRAND, STATUS, BRIGADE, STATUS_COLORS, ASSETS } from '../../theme/tokens';
 import { resolveContactStage } from '../../constants/stageSystem';
+import { hasArchiveSignal, isDeferredRecord } from '../../constants/statusModel';
 import { getContactEngageStatus, ENGAGE_BADGE_CONFIG, ENGAGE_SORT_ORDER, ENGAGE_STATUS_CONFIG } from '../../utils/contactEngageStatus';
 import ContactProfile from './ContactProfile';
 import LinkedInLinkSearch from '../../components/scout/LinkedInLinkSearch';
@@ -1390,8 +1391,19 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
       const contactsList = contactsSnapshot.docs
         .map(d => ({ ...d.data(), id: d.id }))
         .filter(c => {
-          const s = c.status || '';
-          const isArchived = c.is_archived === true || ['people_mode_archived', 'people_mode_skipped'].includes(s);
+          // A people-mode skip is a deferral, not a rejection. DailyLeads
+          // re-offers a skipped person on any later day, so they are neither
+          // lost nor decided — FallBack is not their home, and listing them
+          // there is how "not today" came to read as "no". They are not a
+          // scout lead either: the skip write path stores no name, title or
+          // email, so the row is a queue bookmark that would render blank.
+          // Excluded from every lens, and checked FIRST so the archive test
+          // below cannot swallow it again.
+          if (isDeferredRecord(c)) return false;
+          // The canonical reader rather than a hand-rolled list — it also
+          // catches plain `status: 'archived'`, which the old expression
+          // missed and which therefore used to show up as a live lead.
+          const isArchived = hasArchiveSignal(c);
           if (mode === 'fallback') return isArchived; // FallBack: only archived/lost people
           if (isArchived) return false;
           const isEngaged = ENGAGED_HUNTER_STATUSES.has(c.hunter_status) || ENGAGED_CONTACT_STATUSES.has(c.contact_status);

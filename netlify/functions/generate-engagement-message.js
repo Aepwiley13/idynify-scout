@@ -7,6 +7,7 @@ import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { checkRelationshipGuardrail, getGuardrailPromptModifier } from './utils/barryGuardrail.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 import { LEGACY_SONNET_4_5 } from './utils/models.js';
+import { requireProjectId } from './utils/firebaseEnv.js';
 
 /**
  * GENERATE ENGAGEMENT MESSAGE - Barry AI Intelligence Engine
@@ -35,7 +36,7 @@ if (getApps().length === 0) {
 
   initializeApp({
     credential: cert({
-      projectId: process.env.FIREBASE_PROJECT_ID || 'idynify-scout-dev',
+      projectId: requireProjectId(),
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
       privateKey: privateKey
     })

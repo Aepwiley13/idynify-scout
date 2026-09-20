@@ -3,6 +3,7 @@ import { logApiUsage } from './utils/logApiUsage.js';
 import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
 import { logApolloError } from './utils/apolloErrorLogger.js';
 import { ensureCriteriaVersion, recordDiscoveryEncounter } from './utils/icpRelationshipWriter.js';
+import { requireProjectId } from './utils/firebaseEnv.js';
 
 // ---------------------------------------------------------------------------
 // Post-fetch age filter helpers
@@ -369,7 +370,7 @@ export const handler = async (event) => {
       throw new Error('Firebase API key not configured. Please contact support.');
     }
 
-    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    const projectId = requireProjectId();
     if (!projectId) {
       console.error('❌ FIREBASE_PROJECT_ID not configured in environment');
       throw new Error('Firebase Project ID not configured. Please contact support.');
@@ -846,7 +847,7 @@ export const handler = async (event) => {
     // same REST pattern; never let this mask the original failure.
     try {
       const { userId, authToken } = JSON.parse(event.body);
-      const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+      const projectId = requireProjectId();
       if (userId && authToken && projectId) {
         const userDocUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${userId}?updateMask.fieldPaths=barryState`;
         const stateResponse = await fetch(userDocUrl, {
@@ -1079,7 +1080,7 @@ export function partitionPendingQueue(companies, icpId, fingerprint) {
  * decision needs.
  */
 async function fetchPendingCompanyDocs(userId, authToken) {
-  const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+  const projectId = requireProjectId();
   if (!projectId) {
     console.error('❌ Firebase Project ID not configured');
     return null;
@@ -1214,7 +1215,7 @@ export const DEDUP_BLOCKING_STATUSES = ['accepted', 'rejected', 'pending'];
  */
 async function getExistingCompanyIds(userId, authToken) {
   try {
-    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    const projectId = requireProjectId();
 
     if (!projectId) {
       return new Set();
@@ -1334,7 +1335,7 @@ function buildBarryIntel(company, companyProfile) {
 
 async function saveCompaniesToFirestore(userId, authToken, companies, companyProfile, icpId, criteriaFingerprint, cycleId = null) {
   try {
-    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    const projectId = requireProjectId();
 
     if (!projectId) {
       console.error('❌ Firebase Project ID not configured');

@@ -21,6 +21,7 @@
 
 import { logApiUsage } from './utils/logApiUsage.js';
 import { searchLinkedInPhoto, searchLinkedInProfile } from './utils/linkedinSearch.js';
+import { requireProjectId } from './utils/firebaseEnv.js';
 
 const MAX_RETRIES_PER_HOUR = 3;
 const PHOTO_VALIDATE_TIMEOUT = 5000;
@@ -183,7 +184,7 @@ export const handler = async (event) => {
     console.log(`📷 Photo retry for contact ${contactId} | LinkedIn: ${linkedinUrl || 'NONE'} | Name: ${contactName}`);
 
     // ─── Rate Limiting ───
-    const projectId = process.env.FIREBASE_PROJECT_ID || process.env.VITE_FIREBASE_PROJECT_ID || 'idynify-scout-dev';
+    const projectId = requireProjectId();
     const firestoreUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents`;
     const retryDocUrl = `${firestoreUrl}/users/${userId}/contacts/${contactId}`;
     const contactResponse = await fetch(retryDocUrl);

@@ -125,6 +125,27 @@ describe('alertOps never breaks its caller', () => {
     await expect(alertOps(base)).resolves.toEqual({ sent: false, reason: 'resend_422' });
   });
 
+  // Every call site awaits alertOps, so an unbounded fetch is the one way this
+  // module can still break its caller: gmail-sync-worker and
+  // process-barry-inbox-queue are capped at 300s, and a hung connection held
+  // past that turns a reported PARTIAL failure into a total timeout.
+  it('bounds the send with a timeout signal', async () => {
+    await alertOps(base);
+
+    const [, init] = global.fetch.mock.calls[0];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(__testing.SEND_TIMEOUT_MS).toBeLessThan(300_000);
+  });
+
+  it('reports a timed-out send as timeout, not as a crash', async () => {
+    global.fetch = vi.fn(async () => {
+      // What AbortSignal.timeout() produces when the deadline passes.
+      throw new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    });
+
+    await expect(alertOps(base)).resolves.toEqual({ sent: false, reason: 'timeout' });
+  });
+
   it('is silent, not fatal, when no API key is configured', async () => {
     delete process.env.RESEND_API_KEY;
     await expect(alertOps(base)).resolves.toEqual({ sent: false, reason: 'no_resend_key' });

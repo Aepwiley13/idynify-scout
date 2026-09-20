@@ -46,6 +46,19 @@ const FROM = 'Idynify Alerts <aaron@idynify.com>';
 const COOLDOWN_MS = 60 * 60 * 1000;
 
 /**
+ * How long to wait for Resend before giving up on the alert.
+ *
+ * Every call site awaits this function, so an unbounded fetch is the one way
+ * this module can still break its caller: gmail-sync-worker and
+ * process-barry-inbox-queue are capped at 300s (netlify.toml), and a hung
+ * connection held past that turns a run that was reporting a PARTIAL failure
+ * into a total timeout — the alert taking down the job it was reporting on.
+ * Ten seconds is far beyond a healthy Resend POST and far inside every
+ * function's budget.
+ */
+const SEND_TIMEOUT_MS = 10_000;
+
+/**
  * Report a failed or partially-failed scheduled run.
  *
  * NEVER THROWS. An alerting failure must not turn a partial failure into a
@@ -91,6 +104,7 @@ export async function alertOps({ job, severity, summary, detail = {}, db = null 
 
     const response = await fetch(RESEND_ENDPOINT, {
       method: 'POST',
+      signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${apiKey}`,
@@ -122,6 +136,15 @@ export async function alertOps({ job, severity, summary, detail = {}, db = null 
   } catch (err) {
     // Swallowed on purpose, and logged. The caller is already reporting a
     // failure; it must not also fail because the alert could not be sent.
+    //
+    // A timed-out send is named rather than folded into `threw`: "the alert
+    // could not be delivered in 10s" and "alertOps has a bug" are different
+    // problems, and the whole point of this module is that a failure says
+    // which one it is.
+    if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+      console.error('alertOps.timed_out', { job, timeoutMs: SEND_TIMEOUT_MS });
+      return { sent: false, reason: 'timeout' };
+    }
     console.error('alertOps.threw', { job, error: err?.message });
     return { sent: false, reason: 'threw' };
   }
@@ -164,4 +187,4 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;');
 }
 
-export const __testing = { COOLDOWN_MS, FROM, RESEND_ENDPOINT };
+export const __testing = { COOLDOWN_MS, SEND_TIMEOUT_MS, FROM, RESEND_ENDPOINT };

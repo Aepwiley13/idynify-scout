@@ -95,5 +95,18 @@ service cloud.firestore {
     match /impersonationSessions/{sessionId} {
       allow read, write: if false;
     }
+
+    // Cooldown state for utils/alertOps.js — when each scheduled job last
+    // emailed OPS_ALERT_EMAIL. Written only by the Admin SDK, which bypasses
+    // rules entirely, so denying every client is free.
+    //
+    // Stated explicitly rather than left to Firestore's default-deny. A client
+    // that could write here could set lastAlertAtMs into the future and
+    // silence every cron alert indefinitely, and the collection would look
+    // unprotected to anyone reading this file for what is covered. Default
+    // behaviour is not a decision until it is written down.
+    match /ops_alerts/{job} {
+      allow read, write: if false;
+    }
   }
 }

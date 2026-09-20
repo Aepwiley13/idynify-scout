@@ -3,7 +3,11 @@
 // Tops off company queue for active users and sends email notifications
 
 import { schedule } from '@netlify/functions';
+
+/** Cron for this worker, exported so tests can assert it. */
+export const REFRESH_SCHEDULE = '0 9 * * 1-5';
 import { admin, db } from './firebase-admin.js';
+import { alertOps } from './utils/alertOps.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 
 /** Typed failure so a discovery error can never be laundered into a clean zero. */
@@ -11,7 +15,7 @@ class DiscoveryError extends Error {
   constructor(code, detail) { super(code); this.name = 'DiscoveryError'; this.code = code; this.detail = detail; }
 }
 
-const handler = async (event) => {
+export const refreshDailyLeads = async (event) => {
   const startTime = Date.now();
   console.log('🔄 Starting daily leads refresh job');
 
@@ -61,6 +65,10 @@ const handler = async (event) => {
       skippedReasons: {},
       errors: []
     };
+
+    // Same resolution as logRefresh() below — the ICP read at the top of the
+    // loop is a REST call to the same Firestore project.
+    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
 
     // Process each user
     for (const user of activeUsers) {
@@ -131,6 +139,19 @@ const handler = async (event) => {
       usersEligible: activeUsers.length, usersProcessed: results.processed,
       usersFailed: results.failed, companiesAdded: results.refreshed, durationMs: Date.now() - startTime,
     });
+    if (!allOk) {
+      await alertOps({
+        db, job: 'daily-leads-refresh', severity: 'partial_failure',
+        summary: `${results.failed} of ${results.processed} users failed their daily refresh.`,
+        detail: {
+          usersEligible: activeUsers.length, usersProcessed: results.processed,
+          usersFailed: results.failed, usersSkipped: results.skipped,
+          firstError: results.errors[0]?.error || 'n/a',
+          firstErrorCode: results.errors[0]?.code || 'n/a',
+        },
+      });
+    }
+
     return {
       statusCode: allOk ? 200 : 207,
       body: JSON.stringify({ success: allOk, results, duration })
@@ -138,6 +159,11 @@ const handler = async (event) => {
 
   } catch (error) {
     console.error('💥 Fatal error in daily refresh:', error);
+    await alertOps({
+      db, job: 'daily-leads-refresh', severity: 'failed',
+      summary: 'The daily refresh crashed before finishing. No user was refreshed.',
+      detail: { error: error.message },
+    });
     return {
       statusCode: 500,
       body: JSON.stringify({
@@ -447,4 +473,9 @@ async function sendDailyEmail(userEmail, userId, companyCount) {
 // Schedule: Run at 9am UTC Monday-Friday
 // Cron format: minute hour day month dayOfWeek
 // 0 9 * * 1-5 = 9am UTC, Monday-Friday
-export default schedule('0 9 * * 1-5', handler);
+// The export form is load-bearing. `export default schedule(CRON, fn)` builds,
+// deploys and reports healthy — and never fires. Netlify looks up the scheduled
+// function by its NAMED `handler` export, so a default export registers nothing
+// and the cron silently does not exist. This file shipped that way and never ran
+// once. Keep the `export const handler = schedule(...)` form.
+export const handler = schedule(REFRESH_SCHEDULE, refreshDailyLeads);

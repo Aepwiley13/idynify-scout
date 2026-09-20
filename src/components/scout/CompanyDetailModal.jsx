@@ -8,6 +8,7 @@ import { db, auth } from '../../firebase/config';
 import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Linkedin, ExternalLink, Loader, AlertCircle, TrendingUp, Code, Award, CheckCircle, UserPlus, RefreshCw, Search, User, Phone } from 'lucide-react';
 import CompanyLogo from './CompanyLogo';
 import { searchPeople, updatePerson } from '../../services/peopleService';
+import { canEnrich, enrichmentSignals, applyCompanyEnrichment } from '../../services/companyIdentityService';
 import './CompanyDetailModal.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { getDisplayIndustry } from '../../utils/companyDisplay';
@@ -121,6 +122,16 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
         console.log('🔄 Force refresh requested - bypassing cache');
       }
 
+      // A company created from a typed name alone carries neither a domain nor
+      // an Apollo org id, and enrichCompany rejects a request with neither.
+      // Without this the modal fires a guaranteed-failing round trip on every
+      // open of such a company, and shows the user an error for it.
+      if (!canEnrich(currentData)) {
+        console.info('[company-modal] no enrichment signal on this company — skipping');
+        setLoading(false);
+        return;
+      }
+
       // Only show full-page loading spinner when there is no existing data
       if (!existingEnrichment) {
         setLoading(true);
@@ -139,8 +150,7 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
         body: JSON.stringify({
           userId: user.uid,
           authToken: authToken,
-          domain: company.domain || extractDomain(company.website_url),
-          organizationId: currentData.apollo_id || null
+          ...enrichmentSignals(currentData ?? company),
         })
       });
 
@@ -157,11 +167,27 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
       console.log('✅ Apollo enrichment successful');
 
       // Store enriched data in Firestore
+      // The cached blob and its timestamp are view state — no identity, safe to
+      // write directly. Everything identity-bearing goes through the guard,
+      // which writes BOTH Apollo id field names, refuses to overwrite an
+      // authoritative name, and first checks whether the newly-discovered id or
+      // domain means this company already exists as another document.
       await updateDoc(companyRef, {
         apolloEnrichment: result.data,
         apolloEnrichedAt: Date.now(),
-        apollo_id: result.data._raw?.apolloOrgId || null
       });
+
+      const snapshot = result.data?.snapshot ?? {};
+      await applyCompanyEnrichment(user.uid, company.id, {
+        apollo_organization_id: result.data?._raw?.apolloOrgId ?? null,
+        domain: snapshot.domain ?? result.data?._raw?.domain ?? null,
+        name: snapshot.name ?? null,
+        website_url: snapshot.website_url ?? null,
+        linkedin_url: snapshot.linkedin_url ?? null,
+        industry: snapshot.industry ?? null,
+        employee_count: snapshot.estimated_num_employees ?? null,
+        location: snapshot.location?.full ?? null,
+      }, { source: 'CompanyDetailModal.enrich' });
 
       setEnrichedData(result.data);
       setLoading(false);
@@ -182,16 +208,6 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
         });
       }
       // If we had cached data already showing, silently ignore the refresh failure
-    }
-  }
-
-  function extractDomain(url) {
-    if (!url) return null;
-    try {
-      const domain = url.replace(/^https?:\/\//, '').replace(/^www\./, '').split('/')[0];
-      return domain;
-    } catch {
-      return null;
     }
   }
 

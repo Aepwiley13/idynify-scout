@@ -113,7 +113,15 @@ const ENGAGED_CONTACT_STATUSES = new Set([
   'Active Customer', 'Past Customer', 'Partner', 'Network',
 ]);
 
-const ARCHIVED_STATUSES = new Set(['people_mode_archived', 'people_mode_skipped']);
+// `people_mode_skipped` is NOT here. A skip defers someone to a later day —
+// it is not a rejection, which is why `inferIsArchived` in the sibling
+// backfill refuses to set is_archived for one. Dropping it changes nothing
+// this script actually does: every skipped row carries a company_id (the skip
+// write path always sets one), so it fails the `!data.company_id` gate in
+// repair 1 and the `isEngaged` gate in repair 2 regardless. It is corrected
+// so the exported, unit-tested rule stops asserting the opposite of what the
+// product means.
+const ARCHIVED_STATUSES = new Set(['people_mode_archived']);
 
 export function isEngaged(contact = {}) {
   return ENGAGED_HUNTER_STATUSES.has(contact.hunter_status)

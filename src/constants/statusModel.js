@@ -111,6 +111,20 @@ const LEGACY_RECORD_STATUS = Object.freeze({
   archived: RECORD_STATUS.ARCHIVED,
   people_mode_archived: RECORD_STATUS.ARCHIVED,
   rejected: RECORD_STATUS.REJECTED,
+  // A people-mode skip is a DEFERRAL, not a decision — "not today", not "no".
+  // DailyLeads re-queues the person on any later day (the queue test is
+  // `status === 'people_mode_skipped' && skipped_date !== today`), and the
+  // relationship layer records it as its own SKIPPED event carrying
+  // `skippedInCycle`, with `recordResurface` waiting for it to come back.
+  //
+  // So it must NEVER map to `archived`: that would turn "not today" into
+  // "never" for every row at once, which is exactly why the skip write path
+  // leaves `is_archived` alone and why the backfill's `inferIsArchived`
+  // refuses to set it. `suggested` is the honest reading — discovery surfaced
+  // this person and the user has not kept them yet. Leaving it unmapped fell
+  // through to the `active` default, which asserts the one thing a skip
+  // disproves: that the user kept them.
+  people_mode_skipped: RECORD_STATUS.SUGGESTED,
 });
 
 /**
@@ -136,6 +150,87 @@ export function readRecordStatus(contact) {
   if (mapped) return mapped;
 
   return RECORD_STATUS.ACTIVE;
+}
+
+/**
+ * Does any field say the user archived this record?
+ *
+ * MIND THE PRECEDENCE — it is the opposite of what it looks like.
+ * `readRecordStatus` checks `record_status` BEFORE `is_archived`, so
+ * `is_archived: true` does NOT win: an archived row whose `record_status` is
+ * still the stale 'suggested' it was stamped with at creation reads back as
+ * 'suggested' and walks straight past the archive signal. `createStatusFields`
+ * writes that stamp and the archive paths never update it, so the combination
+ * is ordinary, not exotic — the audited workspace holds 7 such rows.
+ *
+ * That precedence is deliberate and stays: the new field is authoritative when
+ * it is present. So anything that must not act on an archived record asks THIS
+ * of the raw fields instead, and asks it FIRST.
+ *
+ * `people_mode_skipped` IS DELIBERATELY ABSENT AND MUST STAY ABSENT. It looks
+ * like an oversight beside `people_mode_archived`, and two read paths once
+ * "corrected" it by listing the two together. A skip is a deferral the daily
+ * queue undoes tomorrow; an archive is a decision nothing here may undo. Since
+ * this predicate is what `engagementPromotionFields` consults to refuse to
+ * resurrect a record, adding the skip value would make every skip permanent
+ * and unpromotable. Ask `isDeferredRecord` for that question instead.
+ *
+ * @param   {object}  contact  The contact document.
+ * @returns {boolean}
+ */
+export function hasArchiveSignal(contact) {
+  if (!contact) return false;
+  return contact.is_archived === true
+    || contact.status === 'archived'
+    || contact.status === 'people_mode_archived';
+}
+
+/**
+ * Legacy `status` values that mean "the user passed on this person FOR NOW".
+ *
+ * One value today. It is a Set rather than a comparison so the next deferral
+ * vocabulary (company-mode skip, if it ever writes one) has somewhere to go
+ * that is not the archive list.
+ */
+const DEFERRED_STATUSES = Object.freeze(new Set(['people_mode_skipped']));
+
+/**
+ * Has the user deferred this record rather than decided on it?
+ *
+ * WHY THIS IS NOT A `record_status`
+ * ─────────────────────────────────
+ * Deferral is a property of the DISCOVERY QUEUE, not of the row's lifecycle,
+ * so it does not get a fourth RECORD_STATUS — "the fix is not a bigger enum",
+ * as the header says. The row still counts; it resolves to `suggested`. What
+ * this predicate answers is the separate question the lead lists are actually
+ * asking: should this row appear in a list of PEOPLE right now?
+ *
+ * The answer is no, in every lens, and for a reason that is easy to miss: the
+ * skip write path stores five fields — `apollo_person_id`, `company_id`,
+ * `status`, `source`, `skipped_date` — and nothing else. No name, no title,
+ * no email. The document is a bookmark the daily queue leaves for itself so
+ * it can re-offer the person tomorrow, not a contact anyone saved. Rendering
+ * it in a lead list produces a nameless row.
+ *
+ * It is emphatically NOT an archive signal, and must never be folded into
+ * `hasArchiveSignal` — see the warning there.
+ *
+ * ENGAGEMENT ENDS A DEFERRAL. A contact who has been emailed, enrolled or
+ * given a mission is not someone the queue is still waiting to re-offer, and
+ * no write path clears the `people_mode_skipped` marker once something else
+ * promotes the row. Without this guard a stale marker would hide a live,
+ * engaged contact from every lead list at once — the same disappearance the
+ * status model exists to prevent. Same reasoning as `isEngagedRecord`: any
+ * field saying "engaged" is enough, because over-detecting engagement keeps a
+ * record visible, which is the safe direction to be wrong in.
+ *
+ * @param   {object}  contact  The contact document.
+ * @returns {boolean}
+ */
+export function isDeferredRecord(contact) {
+  if (!contact) return false;
+  if (!DEFERRED_STATUSES.has(contact.status)) return false;
+  return !isEngagedRecord(contact);
 }
 
 /** Legacy `contact_status` (title case, space separated) → relationship_status. */
@@ -307,9 +402,17 @@ export function isEngagedRecord(contact) {
  * contact that is being engaged right now.
  *
  * Returns `{}` — an empty patch, safe to spread into any update — when the
- * record is not `suggested`. Archived and rejected records are deliberately
- * NOT resurrected: engaging someone the user archived should not silently
- * undo the archive, and `record_status` is not the field that decides it.
+ * record is not `suggested`, and when any field says it was archived.
+ *
+ * Archived and rejected records are deliberately NOT resurrected: engaging
+ * someone the user archived must not silently undo the archive. That is
+ * enforced by `hasArchiveSignal`, checked FIRST and deliberately not folded
+ * into the `readRecordStatus` test below — because `readRecordStatus` reads
+ * `record_status` before `is_archived`, so an archived row carrying a stale
+ * 'suggested' resolves to 'suggested' and would otherwise be promoted to
+ * 'active'. The guarantee has to be enforced, not left resting on such rows
+ * also happening to be unengaged today. An archive is a decision the user
+ * made, and no amount of engagement evidence may overturn it here.
  *
  * @param {object} contact  The contact document as it exists BEFORE the write.
  * @param {object} [opts]
@@ -317,6 +420,7 @@ export function isEngagedRecord(contact) {
  * @param {string} [opts.reason]  What engaged it — appears on the record.
  */
 export function engagementPromotionFields(contact, { now, reason = 'engagement' } = {}) {
+  if (hasArchiveSignal(contact)) return {};
   if (readRecordStatus(contact) !== RECORD_STATUS.SUGGESTED) return {};
 
   const out = {
@@ -409,6 +513,8 @@ export default {
   readStage,
   readStatusTriple,
   isActiveRecord,
+  hasArchiveSignal,
+  isDeferredRecord,
   isEngagedRecord,
   ENGAGED_HUNTER_STATUSES,
   engagementPromotionFields,

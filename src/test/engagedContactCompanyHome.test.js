@@ -204,7 +204,11 @@ describe('ensureCompanyForContact — cause A: Apollo returns no organization', 
 
     const written = WRITES.find(w => w.op === 'set').data;
     expect(written.name).toBe('Sunny Street App');
-    expect(written.name_source).toBeUndefined();
+    // Provenance is now recorded on every company, not only on guessed names —
+    // enrichment needs to know which names it may correct, and "no value" had
+    // to mean "do not touch" for the historical workspace. A reported name is
+    // marked with its reporter rather than left unmarked.
+    expect(written.name_source).not.toBe('email_domain');
   });
 
   it('does not let the domain rung override a name match', async () => {

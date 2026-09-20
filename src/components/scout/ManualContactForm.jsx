@@ -6,7 +6,7 @@ import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { recordReferralReceived } from '../../services/referralIntelligenceService';
 import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
-import { ensureCompanyForContact } from '../../services/companyIdentityService';
+import { ensureCompanyForContact, NAME_SOURCE } from '../../services/companyIdentityService';
 import { useT } from '../../theme/ThemeContext';
 
 export default function ManualContactForm({ onContactAdded, onCancel }) {
@@ -73,7 +73,12 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
         name: formData.company,
         email: formData.email,
         domain: formData.website || null,
-      }, { source: 'manual' });
+      }, {
+        source: 'manual',
+        // The user typed this name. Enrichment may not overwrite it.
+        nameSource: NAME_SOURCE.USER,
+        extraFields: { website_url: formData.website || null },
+      });
 
       // Identity resolution BEFORE the write. A hand-typed contact is the most
       // likely to duplicate someone already imported from Apollo or Gmail —

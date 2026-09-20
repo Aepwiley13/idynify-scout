@@ -124,9 +124,21 @@ describe('Match — every consumer derives against a known ICP or shows nothing'
   });
 
   it('badges render an explicit marker, not a rounded zero', () => {
-    expect(read('../pages/Scout/MissionControlDashboardV2.jsx')).toMatch(/unattributed \? '—'/);
+    // FitBadge was extracted out of MissionControlDashboardV2 so its rendering
+    // could be asserted directly rather than inferred from source — see
+    // fitBadgeNullScore.test.jsx. The marker moved with it.
+    const badge = read('../components/mission-control/FitBadge.jsx');
+    expect(badge).toMatch(/unattributed \? UNATTRIBUTED_MARK/);
+    expect(badge).toMatch(/UNATTRIBUTED_MARK = '—'/);
     expect(read('../components/mission-control/MobileCompanyCard.jsx')).toMatch(/No active ICP/);
     expect(read('../pages/Scout/SavedCompanies.jsx')).toMatch(/No active ICP/);
+  });
+
+  it('no FitBadge caller pre-rounds the score past the guard', () => {
+    // The drawer used to pass `Math.round(score)`, and `Math.round(null)` is 0,
+    // so an unscored company reached the badge looking scored.
+    expect(read('../pages/Scout/MissionControlDashboardV2.jsx'))
+      .not.toMatch(/<FitBadge score=\{Math\.round/);
   });
 });
 

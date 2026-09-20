@@ -14,6 +14,9 @@ import {
 import { Globe, Linkedin, Check, X, RefreshCw, Loader, Settings, RotateCcw, MessageCircle, ArrowRight, MapPin, User, List, ChevronDown, Flame, Trophy } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
+import ScorePip from '../../components/scout/ScorePip';
+import { UNSCORED_LABEL } from '../../utils/scoreDisplay';
+import { compareByFit, pickTopMatch } from '../../utils/fitRanking';
 import CompanyLogo from '../../components/scout/CompanyLogo';
 import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
 import BarryICPPanel, { BarryAvatar } from '../../components/scout/BarryICPPanel';
@@ -43,6 +46,14 @@ function Av({ initials, color = BRAND.pink, size = 70 }) {
     </div>
   );
 }
+
+// The swipe card's width above 1024px, where the column has room to spare.
+// Wider is shorter: the same text — Barry Intel above all — reflows over fewer
+// lines, which buys vertical space without hiding a word of it. The stage it
+// sits in is 20px wider still, which is what the ghost cards' 8px/16px offsets
+// need to stay inside. Below 1024px the card stays at 420: there is no spare
+// width to trade.
+const CARD_MAX_W = 680;
 
 // ─── Match feedback ───────────────────────────────────────────────────────────
 const MATCH_REASONS = ['Industry fit', 'Right size', 'Good location', 'Revenue match', 'Strong signals', 'Known brand'];
@@ -261,6 +272,18 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
     run();
   };
 
+  // ── Which card this decision was made ON ────────────────────────────────────
+  // Every callback below is deferred 280ms behind the exit animation, and the
+  // page does not hold its swipe lock for that window — handleSwipe has not been
+  // called yet. Anything that advances the queue in the meantime (a keyboard
+  // press, a skip, an undo, a jump) leaves the deferred callback describing a
+  // gesture made on a card that is no longer current.
+  //
+  // So the gesture carries its own subject. The page decides THIS company or it
+  // decides nothing; it never falls through to whoever is current at t=280.
+  // The card is keyed by company id, so this is fixed for the life of the mount.
+  const subjectId = company.id;
+
   const xy = e => e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.clientX, e.clientY];
   // Post-decision the card is spent; a synthesized compat mousedown must not
   // re-arm the drag it is about to "release".
@@ -278,8 +301,8 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
     const pressed = s.current;
     s.current = null;
     if (!pressed) return;
-    if (dx > 100) commit(() => { setGone('r'); setTimeout(() => onAccept(null, 'drag'), 280); });
-    else if (dx < -100) commit(() => { setGone('l'); setTimeout(() => onReject(null, 'drag'), 280); });
+    if (dx > 100) commit(() => { setGone('r'); setTimeout(() => onAccept(null, 'drag', subjectId), 280); });
+    else if (dx < -100) commit(() => { setGone('l'); setTimeout(() => onReject(null, 'drag', subjectId), 280); });
     else { setDx(0); setDy(0); }
   };
 
@@ -289,8 +312,8 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
     setIsFlipping(true);
     setTimeout(() => { setShowFeedback(true); setIsFlipping(false); }, 140);
   };
-  const handleSkipFeedback = () => commit(() => { setGone('r'); setTimeout(() => onAccept(null, 'button'), 280); });
-  const handleSendFeedback = () => commit(() => { setGone('r'); setTimeout(() => onAccept({ reasons: feedbackReasons, note: feedbackNote, score: feedbackScore }, 'button'), 280); });
+  const handleSkipFeedback = () => commit(() => { setGone('r'); setTimeout(() => onAccept(null, 'button', subjectId), 280); });
+  const handleSendFeedback = () => commit(() => { setGone('r'); setTimeout(() => onAccept({ reasons: feedbackReasons, note: feedbackNote, score: feedbackScore }, 'button', subjectId), 280); });
 
   const handleRejectClick = (e) => {
     e.stopPropagation();
@@ -298,8 +321,8 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
     setIsFlipping(true);
     setTimeout(() => { setShowRejectionFeedback(true); setIsFlipping(false); }, 140);
   };
-  const handleSkipRejectionFeedback = () => commit(() => { setGone('l'); setTimeout(() => onReject(null, 'button'), 280); });
-  const handleSendRejectionFeedback = () => commit(() => { setGone('l'); setTimeout(() => onReject({ reasons: rejectionReasons, note: rejectionNote }, 'button'), 280); });
+  const handleSkipRejectionFeedback = () => commit(() => { setGone('l'); setTimeout(() => onReject(null, 'button', subjectId), 280); });
+  const handleSendRejectionFeedback = () => commit(() => { setGone('l'); setTimeout(() => onReject({ reasons: rejectionReasons, note: rejectionNote }, 'button', subjectId), 280); });
   // Not a decision, so it does not animate off to either side — a skip is
   // "not now", and the card simply steps aside. Placement and styling are
   // Sprint 3's to settle; this is parity with the affordance PersonSwipeCard
@@ -307,7 +330,7 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
   //
   // It still latches: a skip advances the queue, so a skip followed by a stray
   // drag release would decide a company the user has already moved past.
-  const handleSkipClick = (e) => { e.stopPropagation(); commit(() => onSkip?.()); };
+  const handleSkipClick = (e) => { e.stopPropagation(); commit(() => onSkip?.(subjectId)); };
 
   const tx = gone === 'r' ? 700 : gone === 'l' ? -700 : dx;
   // G1-06: a null score means "configured criteria, but nothing measurable on
@@ -368,12 +391,16 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
       onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
-        position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
-        height: wide ? undefined : '100%',
+        // In flow, not absolute: the card is what gives the stage its height, so
+        // the card's own content decides how tall it is. Nothing above it caps
+        // that, and a card taller than the viewport scrolls the column it sits
+        // in rather than scrolling inside itself.
+        position: 'relative', width: '100%', maxWidth: wide ? CARD_MAX_W : 420,
         transform: `translateX(${tx}px) translateY(${dy * 0.1}px) rotate(${dx * 0.04}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
-        touchAction: 'pan-y', top: 0, left: 0, right: 0, margin: '0 auto',
+        // Vertical touch belongs to the page; this handler only claims horizontal.
+        touchAction: 'pan-y', margin: '0 auto',
       }}
     >
       {/* Swipe overlay labels */}
@@ -396,16 +423,15 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
         }}>✗ NOT A MATCH</div>
       )}
 
-      {/* Card — scrollable on mobile when content exceeds card height */}
+      {/* Card — height comes from its content on every breakpoint. `hidden` here
+          only clips the corner radius; there is nothing to scroll past. */}
       <div style={{
         position: 'relative',
-        height: wide ? undefined : '100%',
         background: T.cardBg, border: `1px solid ${T.border2}`,
-        borderRadius: 22, overflow: wide ? 'hidden' : 'auto',
+        borderRadius: 22, overflow: 'hidden',
         boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`,
         transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)',
         transition: 'transform 0.14s ease',
-        WebkitOverflowScrolling: wide ? undefined : 'touch',
       }}>
         {/* Feedback overlay — appears after "This is a Match" click */}
         {showFeedback && (
@@ -447,14 +473,16 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
         }}>
           <CompanyLogo company={company} size="card" />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: wide ? 20 : 18, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 90 }}>{company.name}</div>
+            {/* Same bargain as the stats cells below: these three lines
+                ellipsize, so each keeps its full value on hover. */}
+            <div title={company.name} style={{ fontSize: wide ? 20 : 18, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 90 }}>{company.name}</div>
             {getDisplayIndustry(company, '') && getDisplayIndustry(company, '').toLowerCase() !== 'unknown' && (
-              <div style={{ fontSize: 11, color: T.textMuted, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div title={getDisplayIndustry(company, '')} style={{ fontSize: 11, color: T.textMuted, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {getDisplayIndustry(company, '')}
               </div>
             )}
             {hqLocation && hqLocation.toLowerCase() !== 'unknown' && (
-              <div style={{ fontSize: 10, color: T.textFaint, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div title={hqLocation} style={{ fontSize: 10, color: T.textFaint, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 <MapPin size={10} style={{ flexShrink: 0 }} />{hqLocation}
               </div>
             )}
@@ -478,12 +506,24 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
             ['FOUNDED',   company.founded_year || 'N/A'],
             ['HQ',        hqLocation || '—'],
             ['CEO',       ceoName || '—'],
-          ].map(([l, v]) => (
-            <div key={l} style={{ padding: wide ? '10px 18px' : '8px 14px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
-              <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>{l}</div>
-              <div style={{ fontSize: wide ? 12 : 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
-            </div>
-          ))}
+          ].map(([l, v]) => {
+            // A value too long for its cell is cut by the ellipsis on the line
+            // below, which says it was cut but not what was cut. The full
+            // string stays reachable on hover and to a screen reader; '—' and
+            // 'N/A' are already whole, so they carry no tooltip.
+            const full = (v === '—' || v === 'N/A' || v == null) ? undefined : String(v);
+            return (
+              // `minWidth: 0` so that ellipsis governs. A grid item's automatic
+              // minimum is its content, and the value line is
+              // `white-space: nowrap`, so a long CEO name widened the right
+              // column past the card — ~4px at 360px wide, which the card's
+              // clipping now cuts instead of scrolling sideways.
+              <div key={l} style={{ minWidth: 0, padding: wide ? '10px 18px' : '8px 14px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
+                <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>{l}</div>
+                <div title={full} style={{ fontSize: wide ? 12 : 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
+              </div>
+            );
+          })}
         </div>
 
         {/* ICP Score row — clickable to expand breakdown */}
@@ -666,6 +706,14 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
     run();
   };
 
+  // ── Which card this decision was made ON ────────────────────────────────────
+  // Identical deferral to CompanySwipeCard, identical reason: the callbacks wait
+  // out a 280ms exit animation during which the page holds no lock, so a
+  // deferred decision must name its own subject rather than trust whoever is
+  // current when it finally runs. The id is the contact's composite key, which
+  // is also what the card is keyed by — fixed for the life of the mount.
+  const subjectId = `${company.id}_${person.id}`;
+
   const xy = e => e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.clientX, e.clientY];
   const down = e => { if (decidedRef.current) return; s.current = xy(e); };
   const move = e => {
@@ -678,8 +726,8 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
     const pressed = s.current;
     s.current = null;
     if (!pressed) return;
-    if (dx > 100) commit(() => { setGone('r'); setTimeout(() => onAccept(null), 280); });
-    else if (dx < -100) commit(() => { setGone('l'); setTimeout(onReject, 280); });
+    if (dx > 100) commit(() => { setGone('r'); setTimeout(() => onAccept(null, subjectId), 280); });
+    else if (dx < -100) commit(() => { setGone('l'); setTimeout(() => onReject(null, subjectId), 280); });
     else { setDx(0); setDy(0); }
   };
 
@@ -689,8 +737,8 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
     setIsFlipping(true);
     setTimeout(() => { setShowFeedback(true); setIsFlipping(false); }, 140);
   };
-  const handleSkipFeedback = () => commit(() => { setGone('r'); setTimeout(() => onAccept(null), 280); });
-  const handleSendFeedback = () => commit(() => { setGone('r'); setTimeout(() => onAccept({ reasons: feedbackReasons, note: feedbackNote }), 280); });
+  const handleSkipFeedback = () => commit(() => { setGone('r'); setTimeout(() => onAccept(null, subjectId), 280); });
+  const handleSendFeedback = () => commit(() => { setGone('r'); setTimeout(() => onAccept({ reasons: feedbackReasons, note: feedbackNote }, subjectId), 280); });
 
   const handleRejectClick = (e) => {
     e.stopPropagation();
@@ -698,8 +746,8 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
     setIsFlipping(true);
     setTimeout(() => { setShowRejectionFeedback(true); setIsFlipping(false); }, 140);
   };
-  const handleSkipRejectionFeedback = () => commit(() => { setGone('l'); setTimeout(() => onReject(null), 280); });
-  const handleSendRejectionFeedback = () => commit(() => { setGone('l'); setTimeout(() => onReject({ reasons: rejectionReasons, note: rejectionNote }), 280); });
+  const handleSkipRejectionFeedback = () => commit(() => { setGone('l'); setTimeout(() => onReject(null, subjectId), 280); });
+  const handleSendRejectionFeedback = () => commit(() => { setGone('l'); setTimeout(() => onReject({ reasons: rejectionReasons, note: rejectionNote }, subjectId), 280); });
 
   const tx = gone === 'r' ? 700 : gone === 'l' ? -700 : dx;
   const initials = (person.name || person.first_name || '??').split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
@@ -710,13 +758,13 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
       onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
       onTouchStart={down} onTouchMove={move} onTouchEnd={up}
       style={{
-        position: 'absolute', width: '100%', maxWidth: wide ? 540 : 420,
-        height: wide ? undefined : '100%',
+        // See CompanySwipeCard: in flow so the card's content sets its height.
+        position: 'relative', width: '100%', maxWidth: wide ? CARD_MAX_W : 420,
         transform: `translateX(${tx}px) translateY(${dy}px) rotate(${dx * 0.055}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
         touchAction: 'pan-y',
-        top: 0, left: 0, right: 0, margin: '0 auto',
+        margin: '0 auto',
       }}
     >
       {dx > 30 && (
@@ -725,7 +773,7 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
       {dx < -30 && (
         <div style={{ position: 'absolute', top: 22, right: 16, zIndex: 10, padding: '5px 13px', borderRadius: 8, border: `3px solid ${STATUS.red}`, color: STATUS.red, fontSize: 13, fontWeight: 700, transform: 'rotate(11deg)', background: `${STATUS.red}10` }}>✗ NOT A MATCH</div>
       )}
-      <div style={{ position: 'relative', height: wide ? undefined : '100%', background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: wide ? 'hidden' : 'auto', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)', transition: 'transform 0.14s ease', WebkitOverflowScrolling: wide ? undefined : 'touch' }}>
+      <div style={{ position: 'relative', background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: 'hidden', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)', transition: 'transform 0.14s ease' }}>
         {showFeedback && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 30, background: T.cardBg, borderRadius: 22, overflowY: 'auto' }}>
             <FeedbackFace
@@ -800,7 +848,7 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', padding: wide ? '6px 16px 8px' : '4px 12px 6px' }}>
           <button
-            onClick={e => { e.stopPropagation(); commit(() => onSkip()); }}
+            onClick={e => { e.stopPropagation(); commit(() => onSkip(subjectId)); }}
             style={{ padding: '6px 14px', borderRadius: 10, border: 'none', background: 'transparent', color: T.textFaint, fontSize: 11, cursor: 'pointer' }}
           >⊙ Skip for Today</button>
         </div>
@@ -813,19 +861,61 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
 }
 
 // ─── QueueListPanel ───────────────────────────────────────────────────────────
-function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo, onClose, mobile = false }) {
+export function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo, onClose, mobile = false, returnFocusRef = null }) {
   const T = useT();
   const upcoming = companies.slice(currentIndex);
   const rejected = companies.filter(c => rejectedIds.includes(c.id));
 
-  const ScorePip = ({ score }) => {
-    const c = score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : STATUS.red;
-    return (
-      <span style={{ fontSize: 10, fontWeight: 700, color: c, padding: '2px 6px', background: `${c}18`, borderRadius: 4, border: `1px solid ${c}40` }}>
-        {score}
-      </span>
-    );
-  };
+  // ── Dismissal (desktop only) ───────────────────────────────────────────────
+  // The mobile sheet already has a backdrop that closes it; the desktop sidebar
+  // has none, so outside-interaction and Escape are wired up here.
+  const panelRef = useRef(null);
+  // Closing runs through a ref so the listeners are attached once per open,
+  // not re-bound on every parent re-render (an inline onClose is a new function
+  // each time, and a mid-drag re-bind would lose the drag origin below).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => { onCloseRef.current = onClose; });
+  const pendingCloseRef = useRef(false);
+
+  useEffect(() => {
+    if (mobile) return undefined;
+
+    const isInside = (target) => {
+      if (!(target instanceof Node)) return false;
+      if (panelRef.current?.contains(target)) return true;
+      const el = target instanceof Element ? target : target.parentElement;
+      // The trigger counts as inside: it owns the toggle, so the document
+      // listener must not also fire and turn one click into close-then-reopen.
+      // [data-queue-panel] keeps any portalled panel content inside too.
+      return !!el?.closest?.('[data-queue-panel],[data-queue-trigger]');
+    };
+
+    // pointerdown records where the interaction began; the close decision waits
+    // for pointerup so a drag started inside (selecting text) and released
+    // outside leaves the panel open.
+    const onPointerDown = (e) => { pendingCloseRef.current = !isInside(e.target); };
+    const onPointerUp = (e) => {
+      const shouldClose = pendingCloseRef.current && !isInside(e.target);
+      pendingCloseRef.current = false;
+      // No focus is moved here — the outside click already picked its target.
+      if (shouldClose) onCloseRef.current?.();
+    };
+    const onKeyDown = (e) => {
+      if (e.key !== 'Escape') return;
+      onCloseRef.current?.();
+      returnFocusRef?.current?.focus?.();
+    };
+
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('pointerup', onPointerUp, true);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('pointerup', onPointerUp, true);
+      document.removeEventListener('keydown', onKeyDown);
+      pendingCloseRef.current = false;
+    };
+  }, [mobile, returnFocusRef]);
 
   if (mobile) {
     // Bottom-sheet overlay for mobile
@@ -881,7 +971,7 @@ function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo, onClos
                     </div>
                     <div style={{ fontSize: 10, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getDisplayIndustry(co, '—')}</div>
                   </div>
-                  <ScorePip score={co.fit_score || co.score || 0} />
+                  <ScorePip score={co.fit_score ?? co.score ?? null} />
                 </div>
               ))}
               {upcoming.length === 0 && (
@@ -904,7 +994,7 @@ function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo, onClos
                       <div style={{ fontSize: 12, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
                       <div style={{ fontSize: 10, color: T.textFaint }}>Re-review</div>
                     </div>
-                    <ScorePip score={co.fit_score || co.score || 0} />
+                    <ScorePip score={co.fit_score ?? co.score ?? null} />
                   </div>
                 ))}
               </>
@@ -916,7 +1006,7 @@ function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo, onClos
   }
 
   return (
-    <div style={{
+    <div ref={panelRef} data-queue-panel style={{
       position: 'fixed', top: 0, right: 0, bottom: 0, width: 320, maxWidth: '100vw', zIndex: 500,
       background: T.cardBg, borderLeft: `1px solid ${T.border}`,
       display: 'flex', flexDirection: 'column',
@@ -954,7 +1044,7 @@ function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo, onClos
                 </div>
                 <div style={{ fontSize: 10, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getDisplayIndustry(co, '—')}</div>
               </div>
-              <ScorePip score={co.fit_score || co.score || 0} />
+              <ScorePip score={co.fit_score ?? co.score ?? null} />
             </div>
           ))}
           {upcoming.length === 0 && (
@@ -984,7 +1074,7 @@ function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo, onClos
                   <div style={{ fontSize: 12, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
                   <div style={{ fontSize: 10, color: T.textFaint }}>Re-review</div>
                 </div>
-                <ScorePip score={co.fit_score || co.score || 0} />
+                <ScorePip score={co.fit_score ?? co.score ?? null} />
               </div>
             ))}
           </>
@@ -998,9 +1088,10 @@ function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo, onClos
 function SessionSummaryScreen({ reviewed, saved, rejected, streak, savedCompanies, onViewSaved, onDismiss, onRefresh, isRefreshing }) {
   const T = useT();
   const matchRate = reviewed > 0 ? Math.round((saved / reviewed) * 100) : 0;
-  const topMatch = savedCompanies.length > 0
-    ? savedCompanies.reduce((best, c) => ((c.fit_score || 0) > (best.fit_score || 0) ? c : best), savedCompanies[0])
-    : null;
+  // Only a measured, qualifying score earns the badge. On a queue where nothing
+  // was scored there is no best, and pickTopMatch returns null rather than
+  // promoting whichever company happened to be first.
+  const topMatch = pickTopMatch(savedCompanies);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '32px 24px', maxWidth: 420, width: '100%', animation: 'slideUp 0.3s ease' }}>
@@ -1032,7 +1123,9 @@ function SessionSummaryScreen({ reviewed, saved, rejected, streak, savedCompanie
             <div style={{ fontSize: 13, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topMatch.name}</div>
             <div style={{ fontSize: 10, color: T.textFaint }}>{topMatch.industry || '—'}</div>
           </div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: STATUS.green, flexShrink: 0 }}>{topMatch.fit_score || 0}</div>
+          {/* pickTopMatch only ever returns a measured, qualifying score, so
+              there is no unscored case to render here. */}
+          <div style={{ fontSize: 18, fontWeight: 800, color: STATUS.green, flexShrink: 0 }}>{topMatch.fit_score}</div>
         </div>
       )}
 
@@ -1393,8 +1486,16 @@ export default function DailyLeads({ onNavigate }) {
 
   // ── Responsive state ────────────────────────────────────────────────────────
   const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 1024);
+  // The ICP chips ride the title line only where that line has room for them:
+  // 1280px, the same width at which the shell's own top bar changes. Between
+  // 1024 and 1280 the title alone eats the line, and inlined chips end up a
+  // one-chip scroll strip — so there they keep a row of their own.
+  const [isWide, setIsWide] = useState(() => window.innerWidth >= 1280);
   useEffect(() => {
-    const handler = () => setIsDesktop(window.innerWidth >= 1024);
+    const handler = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+      setIsWide(window.innerWidth >= 1280);
+    };
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
   }, []);
@@ -1444,6 +1545,13 @@ export default function DailyLeads({ onNavigate }) {
 
   // ── Queue list view ──────────────────────────────────────────────────────────
   const [queueListOpen, setQueueListOpen] = useState(false);
+  // Remembers which trigger opened the panel so Escape can hand focus back.
+  const queueTriggerRef = useRef(null);
+  const toggleQueueList = useCallback((e) => {
+    queueTriggerRef.current = e?.currentTarget ?? null;
+    setQueueListOpen(o => !o);
+  }, []);
+  const closeQueueList = useCallback(() => setQueueListOpen(false), []);
 
   // ── Barry side panel ─────────────────────────────────────────────────────────
   const [barryPanelOpen, setBarryPanelOpen] = useState(false);
@@ -1613,11 +1721,10 @@ export default function DailyLeads({ onNavigate }) {
               / Math.max(1, computeCoverage(c, activeProfile).relevant.length)) * 100),
         fit_reasons: generateMatchReasons(c, activeProfile),
       }));
-      // G1-06: tie-break on how much of the model was actually measured, so a
-      // fully-evaluated match outranks a half-evaluated one at the same score.
-      scoredData.sort((a, b) =>
-        ((b.fit_score ?? 0) - (a.fit_score ?? 0))
-        || ((b.fit_confidence ?? 0) - (a.fit_confidence ?? 0)));
+      // Qualifying matches, then unscored by recency, then everything measured
+      // below the bar. The G1-06 confidence tie-break still applies within the
+      // measured tiers — see utils/fitRanking.
+      scoredData.sort(compareByFit);
 
       // Save the full unfiltered pool so ICP switching can re-filter without re-fetching
       allCompaniesRef.current = allPendingData;
@@ -1809,9 +1916,7 @@ export default function DailyLeads({ onNavigate }) {
             / Math.max(1, computeCoverage(c, selectedICP).relevant.length)) * 100),
       fit_reasons: generateMatchReasons(c, selectedICP),
     }));
-    rescored.sort((a, b) =>
-      ((b.fit_score ?? 0) - (a.fit_score ?? 0))
-      || ((b.fit_confidence ?? 0) - (a.fit_confidence ?? 0)));
+    rescored.sort(compareByFit);
     setCompanies(rescored);
     setCurrentIndex(0);
   }, [activeICPId, icpList, companies]);
@@ -1830,15 +1935,39 @@ export default function DailyLeads({ onNavigate }) {
    * write — which is exactly what production shows: two lineage events 88ms
    * apart for one drag.
    *
-   * Deliberately NOT a subject-level "already decided" check. Cleared in
-   * `finally`, this blocks only genuinely concurrent calls; once a decision has
-   * settled, the next one is free to run. So swipe → undo → re-swipe still
-   * produces a second decision with its own timestamp and its own event id,
-   * because that is a real second decision. Only the overlap is suppressed.
+   * It is NOT sufficient on its own, because the two calls need not overlap.
+   * `decidedSubjectsRef` below covers the case where they do not.
    */
   const swipeInFlightRef = useRef(false);
 
-  const handleSwipe = async (direction, feedback = null, gesture = 'unknown') => {
+  /**
+   * One subject, one live decision.
+   *
+   * The card commits a decision synchronously but defers the callback 280ms
+   * behind its exit animation. handleSwipe has not been called yet, so the lock
+   * above is unclaimed for that entire window. A keyboard press inside it runs
+   * the full decision — Firestore chain included — and can SETTLE before t=280,
+   * releasing the lock. The deferred drag callback then arrives at an open door
+   * and decides a second time.
+   *
+   * It decides the same company, not the next one: the callback closes over the
+   * `onAccept` prop from the render the gesture happened in, and that closure
+   * still holds the old `currentIndex`. So the queue does not skip anyone — the
+   * user makes one gesture-pair and gets two lineage events on one company,
+   * stamped with two different gestures ('keyboard' and 'drag'). That is the
+   * same defect the card latch closes for one card; this closes it across entry
+   * points, which no per-card latch can see.
+   *
+   * Claimed per subject rather than per call so that the guard outlives the
+   * in-flight window. Cleared by `handleUndo`, because an undo makes the company
+   * genuinely undecided again — swipe → undo → re-swipe must still produce a
+   * second, real decision, and that fact stays expressible. Cleared on the error
+   * path too: a decision that failed and told the user to try again must be
+   * retryable.
+   */
+  const decidedSubjectsRef = useRef(new Set());
+
+  const handleSwipe = async (direction, feedback = null, gesture = 'unknown', subjectId = null) => {
     if (swipeInFlightRef.current) return;
     const user = getEffectiveUser();
     if (!user) return;
@@ -1851,10 +1980,20 @@ export default function DailyLeads({ onNavigate }) {
     }
     const company = companies[currentIndex];
     if (!company) return;
+    // A gesture that named its subject decides THAT company or nothing. If the
+    // queue moved on while the callback waited out the card's exit animation,
+    // this decision has no subject on screen and must not land on whoever is
+    // current now. A null subjectId means a caller that cannot name one — the
+    // keyboard, which decides the current card by definition.
+    if (subjectId && subjectId !== company.id) return;
+    // Already decided and not undone, so this is a second delivery of a decision
+    // the user made once. See `decidedSubjectsRef` above.
+    if (decidedSubjectsRef.current.has(company.id)) return;
     // Claimed here, not at the guard above: everything between the two is
     // synchronous, so nothing can interleave, and the rejected paths above
     // decided nothing and must not hold the lock.
     swipeInFlightRef.current = true;
+    decidedSubjectsRef.current.add(company.id);
     try {
       const companyRef = doc(db, 'users', user.uid, 'companies', company.id);
       // Hoisted so the decision has ONE timestamp: the legacy write and the
@@ -2080,6 +2219,10 @@ export default function DailyLeads({ onNavigate }) {
       }
     } catch (error) {
       console.error('Error handling swipe:', error);
+      // The user is being told to try again, so the subject must be decidable
+      // again. Released here rather than in `finally` — a decision that SUCCEEDED
+      // keeps its claim until an undo retracts it.
+      decidedSubjectsRef.current.delete(company.id);
       alert('Failed to save swipe. Please try again.');
     } finally {
       // Released however this decision ended — committed, early-returned on a
@@ -2103,11 +2246,14 @@ export default function DailyLeads({ onNavigate }) {
    * swipedForICPId, no swipe_gesture. A skip that left decision fields behind
    * would read as a rejection to every consumer of those fields.
    */
-  const handleSkipCompany = async () => {
+  const handleSkipCompany = async (subjectId = null) => {
     const user = getEffectiveUser();
     if (!user) return;
     const company = companies[currentIndex];
     if (!company) return;
+    // Not a decision, so no ledger entry — but a stale skip must no more land on
+    // the wrong company than a stale decision does.
+    if (subjectId && subjectId !== company.id) return;
 
     try {
       const skippedAt = new Date().toISOString();
@@ -2167,6 +2313,10 @@ export default function DailyLeads({ onNavigate }) {
         setRejectedInSession(prev => prev.filter(id => id !== entry.company.id));
       }
       setSessionReviewed(prev => Math.max(0, prev - 1));
+      // The company is genuinely undecided again, so it becomes decidable again.
+      // This is what keeps swipe → undo → re-swipe a real second decision rather
+      // than something `decidedSubjectsRef` swallows.
+      decidedSubjectsRef.current.delete(entry.company.id);
       // Pop from history
       setSwipeHistory(prev => prev.slice(0, -1));
       setLastSwipe(swipeHistory.length > 1 ? swipeHistory[swipeHistory.length - 2] : null);
@@ -2360,7 +2510,14 @@ export default function DailyLeads({ onNavigate }) {
   // end, so overlapping calls decide the same person twice.
   const personSwipeInFlightRef = useRef(false);
 
-  const handlePersonSwipe = async (direction, feedback = null) => {
+  // Same subject ledger as `decidedSubjectsRef`, for the identical 280ms hole:
+  // the person card defers its callback behind the same exit animation, and the
+  // lock above is unclaimed for that whole window. People mode has no undo, so
+  // nothing retracts a claim here — a settled person stays settled for the
+  // session, which is already true of the queue itself.
+  const decidedPeopleRef = useRef(new Set());
+
+  const handlePersonSwipe = async (direction, feedback = null, subjectId = null) => {
     if (personSwipeInFlightRef.current) return;
     const user = getEffectiveUser();
     if (!user) return;
@@ -2369,12 +2526,16 @@ export default function DailyLeads({ onNavigate }) {
     if (!personItem) return;
     const { person, company } = personItem;
     const contactId = `${company.id}_${person.id}`;
+    // The gesture decides the card it was made on, or nothing. See handleSwipe.
+    if (subjectId && subjectId !== contactId) return;
+    if (decidedPeopleRef.current.has(contactId)) return;
     const contactRef = doc(db, 'users', user.uid, 'contacts', contactId);
     // One timestamp for this decision, shared by the legacy write and the
     // shadow event — and it doubles as the event's causeId, so a retry lands on
     // the same event id and is recognised as already recorded.
     const personDecidedAt = new Date().toISOString();
     personSwipeInFlightRef.current = true;
+    decidedPeopleRef.current.add(contactId);
     try {
       if (direction === 'right') {
         // Identity resolution before the write. The composite id already
@@ -2445,6 +2606,8 @@ export default function DailyLeads({ onNavigate }) {
       if (nextIdx >= peopleQueue.length && nextCompanyIdxRef.current >= companyPoolRef.current.length) setPeopleModeEmpty('exhausted');
     } catch (err) {
       console.error('Error handling person swipe:', err);
+      // Told to try again, so it must be retryable. Mirrors handleSwipe.
+      decidedPeopleRef.current.delete(contactId);
       alert('Failed to save. Please try again.');
     } finally {
       personSwipeInFlightRef.current = false;
@@ -2457,54 +2620,85 @@ export default function DailyLeads({ onNavigate }) {
   const visibleCompanies = companies.slice(currentIndex);
   const nextCompany = companies[currentIndex + 1] || null;
 
-  // Ghost cards for depth effect — CARD_H accounts for header + batch dots + hints
-  // so the outer column never overflows and shows no scrollbar
-  const CARD_H = isDesktop
-    ? 'clamp(440px, calc(100vh - 280px), 660px)'
-    : 'clamp(400px, calc(100vh - 300px), 560px)';
+  // A floor under the stage, so the deck does not resize on every swipe.
+  //
+  // Card height follows content, and content is uneven: a company with an HQ, a
+  // CEO, four measured ICP factors and a long Barry Intel renders ~90px taller
+  // than a sparse one on desktop and ~151px taller on mobile. Measured over ten
+  // cards spanning sparse to dense, these are the medians — 564/522 for company
+  // cards, 512/456 for person cards, which are consistently shorter. The desktop
+  // company figure came down from 584 when the card went to CARD_MAX_W: the same
+  // text over a wider measure is fewer lines, so the median card is shorter.
+  //
+  // It is a floor, not a cap: a card taller than this still sets its own height,
+  // and nothing clips or scrolls. Cards shorter than it sit at a stable height
+  // instead of shrinking the deck under the queue.
+  //
+  // `flexShrink: 0` travels with the floor. The stage is a flex item in the
+  // card column, and an explicit min-height replaces the automatic minimum size
+  // that was keeping a content-sized item from being shrunk below its content —
+  // without it, a card taller than the floor gets squeezed back to the floor and
+  // paints over whatever follows.
+  const COMPANY_STAGE_MIN_H = isDesktop ? 564 : 522;
+  const PERSON_STAGE_MIN_H = isDesktop ? 512 : 456;
+
+  // Ghost cards for depth effect. They stretch to the stage — i.e. to the real
+  // card's own height — instead of carrying a viewport-derived height of their
+  // own, so the deck stays a deck whatever the card in front of it measures.
   const renderGhostCards = (count) =>
     Array.from({ length: Math.min(count, 2) }).map((_, i) => (
       <div key={i} style={{
         position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8,
+        bottom: -(i + 1) * 8,
         background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22,
-        height: CARD_H, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none',
+        opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none',
       }} />
     ));
 
-  // Batch progress dots (10 dots, one per swipe in current batch)
-  const renderBatchDots = () => (
-    <div style={{ display: 'flex', gap: 5, marginBottom: 16, alignItems: 'center', justifyContent: 'center' }}>
-      {Array.from({ length: BATCH_SIZE }).map((_, i) => (
-        <div key={i} style={{
-          width: 7, height: 7, borderRadius: 4,
-          background: i < batchSwipeCount
-            ? (i < batchSaves ? BRAND.pink : T.isDark ? '#ffffff30' : '#00000020')
-            : T.isDark ? '#ffffff0d' : '#00000010',
-          transition: 'all 0.3s',
-        }} />
-      ))}
-      <span style={{ fontSize: 10, color: T.textFaint, marginLeft: 6 }}>{batchSwipeCount}/{BATCH_SIZE}</span>
-    </div>
-  );
-
-  // Progress dots
-  const renderDots = (total, current) => {
-    const displayTotal = Math.min(total, 8);
-    const remaining = total - current;
+  // ICP chips. Above 1024px they sit on the title line, which is 44px tall
+  // anyway once they are in it — so the chip row stops costing a row of its
+  // own (46px plus its 6px gap) without any chip losing its 44px tap target.
+  const renderIcpChips = () => {
+    const chips = icpList.filter(i => i.status !== 'pending');
+    if (chips.length <= 1) return null;
     return (
-      <div style={{ display: 'flex', gap: 5, marginBottom: 16, alignItems: 'center', justifyContent: 'center' }}>
-        {Array.from({ length: displayTotal }).map((_, i) => (
-          <div key={i} style={{
-            width: i === 0 ? 18 : 7, height: 7, borderRadius: 4,
-            background: i < remaining ? (i === 0 ? BRAND.pink : T.isDark ? '#ffffff30' : '#00000020') : T.isDark ? '#ffffff0d' : '#00000010',
-            transition: 'all 0.3s',
-          }} />
+      <div style={{
+        display: 'flex', gap: 6, alignItems: 'center',
+        marginBottom: isWide ? 0 : 6,
+        ...(isWide ? { flex: '1 1 auto', minWidth: 0, justifyContent: 'flex-end' } : null),
+        overflowX: 'auto',
+        msOverflowStyle: 'none', scrollbarWidth: 'none',
+      }}>
+        {chips.map(icp => (
+          <button
+            key={icp.id}
+            onClick={() => handleICPSwitch(icp.id)}
+            onDoubleClick={() => navigate(`/scout?tab=icp-settings&icpId=${icp.id}`)}
+            title="Double-click to edit ICP"
+            style={{
+              padding: '5px 14px', minHeight: 44, borderRadius: 20,
+              fontSize: 11, fontWeight: 600, cursor: 'pointer',
+              border: `1.5px solid ${activeICPId === icp.id ? BRAND.pink : T.border2}`,
+              background: activeICPId === icp.id ? T.accentBg : T.surface,
+              color: activeICPId === icp.id ? BRAND.pink : T.textMuted,
+              transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0,
+              WebkitTapHighlightColor: 'transparent',
+            }}
+          >
+            {icp.name || 'ICP'}
+          </button>
         ))}
-        {total > 8 && <span style={{ fontSize: 10, color: T.textFaint }}>+{total - 8}</span>}
-        <span style={{ fontSize: 10, color: T.textFaint, marginLeft: 4 }}>{current}/{total}</span>
       </div>
     );
   };
+
+  // Progress. The dot rows that used to sit between the tabs and the card are
+  // gone: ten 7px dots cost a 27px band above a card that already overhangs the
+  // fold, and they said nothing the count beside them did not. The count itself
+  // stays — it moves onto the header's subtitle line, which had room for it.
+  const progressLabel = tab === 'people'
+    ? (peopleQueue.length > 0 ? `${currentPersonIdx}/${peopleQueue.length}${isDesktop ? ' reviewed' : ''}` : null)
+    : `${batchSwipeCount}/${BATCH_SIZE}${isDesktop ? ' this batch' : ''}`;
 
   if (loading) {
     return (
@@ -2598,19 +2792,44 @@ export default function DailyLeads({ onNavigate }) {
         </div>
       )}
 
-      {/* Header + tabs */}
-      <div style={{ padding: isDesktop ? '20px 32px 0' : '16px 26px 0', background: T.appBg }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: isDesktop ? 16 : 14 }}>
-          <div>
+      {/* Header + tabs. Type scale is untouched; what came out is the band
+          around it — the title and its subtitle share a line now instead of
+          stacking, and the padding above them is half what it was.
+          ─────────────────────────────────────────────────────────────────────
+          THIS HEADER HAS NO SLACK LEFT AT 1280x720. The card below it is
+          content-sized (see COMPANY_STAGE_MIN_H) and the two fit the viewport
+          by single-digit pixels: the median card clears the fold by 5.6px and
+          the next card in the measured spread misses it by 7.4px. A row added
+          here — a banner, a filter, a second line of anything — puts the
+          decision buttons back under the fold on a 720p laptop, which is the
+          bug PR #657 and #658 were about. The tests pin these paddings and the
+          floors against accidents; they cannot stop a deliberate addition.
+          If you need a row here, re-measure first and take it from somewhere:
+          the levers and what each is worth are costed in #658. */}
+      <div style={{ padding: isDesktop ? '4px 32px 0' : '10px 26px 0', background: T.appBg }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: isDesktop ? 6 : 8 }}>
+          {/* Inline above 1024px, where the two fit on one line. Narrower than
+              that they wrap, and a wrapped pair is taller than a stacked one —
+              so on mobile they stay stacked and the saving comes from the
+              padding around them instead. */}
+          <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: isDesktop ? 10 : 0, minWidth: 0, flexShrink: 0, ...(isDesktop ? null : { display: 'block' }) }}>
             <h2 style={{ margin: 0, fontSize: isDesktop ? 22 : 18, fontWeight: 700, color: T.text }}>Daily Discoveries</h2>
-            <p style={{ margin: '3px 0 0', fontSize: isDesktop ? 13 : 11, color: T.textFaint }}>
+            <p style={{ margin: isDesktop ? 0 : '2px 0 0', fontSize: isDesktop ? 13 : 11, color: T.textFaint }}>
               Matches based on {icpList.length > 1 ? (icpList.find(i => i.id === activeICPId)?.name || 'your ICP') : 'your ICP'}
             </p>
           </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {isWide && renderIcpChips()}
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
+            {/* The batch count the dot row used to carry. It rides the control
+                cluster rather than the subtitle, so it costs no height and no
+                width that a narrow viewport would have to wrap. */}
+            {progressLabel && (
+              <span style={{ fontSize: 10, color: T.textFaint, whiteSpace: 'nowrap' }}>{progressLabel}</span>
+            )}
             {isDesktop && (
               <button
-                onClick={() => setQueueListOpen(o => !o)}
+                onClick={toggleQueueList}
+                data-queue-trigger
                 title="View Queue"
                 style={{ width: 34, height: 34, borderRadius: 9, background: queueListOpen ? T.accentBg : T.surface, border: `1px solid ${queueListOpen ? T.accentBdr : T.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
               >
@@ -2658,34 +2877,9 @@ export default function DailyLeads({ onNavigate }) {
             {feedbackImpactMsg}
           </div>
         )}
-        {/* ICP tab bar — shown when user has multiple non-pending ICPs */}
-        {icpList.filter(i => i.status !== 'pending').length > 1 && (
-          <div style={{
-            display: 'flex', gap: 6, marginBottom: 10,
-            overflowX: 'auto', paddingBottom: 2,
-            msOverflowStyle: 'none', scrollbarWidth: 'none',
-          }}>
-            {icpList.filter(i => i.status !== 'pending').map(icp => (
-              <button
-                key={icp.id}
-                onClick={() => handleICPSwitch(icp.id)}
-                onDoubleClick={() => navigate(`/scout?tab=icp-settings&icpId=${icp.id}`)}
-                title="Double-click to edit ICP"
-                style={{
-                  padding: '5px 14px', minHeight: 44, borderRadius: 20,
-                  fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                  border: `1.5px solid ${activeICPId === icp.id ? BRAND.pink : T.border2}`,
-                  background: activeICPId === icp.id ? T.accentBg : T.surface,
-                  color: activeICPId === icp.id ? BRAND.pink : T.textMuted,
-                  transition: 'all 0.15s', whiteSpace: 'nowrap', flexShrink: 0,
-                  WebkitTapHighlightColor: 'transparent',
-                }}
-              >
-                {icp.name || 'ICP'}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Below 1280px the chips keep a row of their own — see renderIcpChips
+            for why the title line only takes them when it is wide enough. */}
+        {!isWide && renderIcpChips()}
 
         {/* Tab switcher */}
         <div style={{ display: 'flex', gap: 0, borderBottom: `1px solid ${T.border}` }}>
@@ -2712,7 +2906,7 @@ export default function DailyLeads({ onNavigate }) {
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', minWidth: 0 }}>
 
         {/* ── Card column ── */}
-        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isDesktop ? '20px 16px 8px' : '18px 12px 8px', overflowY: 'auto', overflowX: 'hidden', position: 'relative', WebkitOverflowScrolling: 'touch' }}>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', padding: isDesktop ? '4px 16px 6px' : '10px 12px 6px', overflowY: 'auto', overflowX: 'hidden', position: 'relative', WebkitOverflowScrolling: 'touch' }}>
 
           {/* ── Companies Tab ── */}
           {tab === 'companies' && (
@@ -2886,15 +3080,20 @@ export default function DailyLeads({ onNavigate }) {
                 </div>
               ) : (
                 <>
-                  {renderBatchDots()}
-                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, height: CARD_H, overflowX: 'hidden' }}>
+                  {/* Card stage — no height, no max-height, no overflow, and a
+                      measured floor. `height: CARD_H` with `overflowX: hidden`
+                      used to live here; because a box cannot clip one axis and
+                      leave the other visible, the browser resolved overflow-y to
+                      `auto` and the card scrolled inside the stage. The stage
+                      now takes its height from the card, never the reverse. */}
+                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, minHeight: COMPANY_STAGE_MIN_H, flexShrink: 0 }}>
                     {visibleCompanies.length > 1 && renderGhostCards(visibleCompanies.length - 1)}
                     {currentCompany && (
                       <CompanySwipeCard
                         key={currentCompany.id}
                         company={currentCompany}
-                        onAccept={(feedback, gesture) => handleSwipe('right', feedback, gesture)}
-                        onReject={(feedback, gesture) => handleSwipe('left', feedback, gesture)}
+                        onAccept={(feedback, gesture, subjectId) => handleSwipe('right', feedback, gesture, subjectId)}
+                        onReject={(feedback, gesture, subjectId) => handleSwipe('left', feedback, gesture, subjectId)}
                         onSkip={handleSkipCompany}
                         wide={isDesktop}
                         icpProfile={icpProfile}
@@ -2929,7 +3128,7 @@ export default function DailyLeads({ onNavigate }) {
                       <RotateCcw size={13} />Undo last skip
                     </button>
                   )}
-                  <div style={{ marginTop: 10, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? 560 : 440, fontSize: 10, color: T.textGhost }}>
+                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, fontSize: 10, color: T.textGhost }}>
                     <span>← Sharpens targeting</span>
                     <span>Add to hunt list →</span>
                   </div>
@@ -2975,23 +3174,22 @@ export default function DailyLeads({ onNavigate }) {
                 </div>
               ) : (
                 <>
-                  {renderDots(peopleQueue.length, currentPersonIdx)}
-                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? 560 : 440, height: CARD_H, overflowX: 'hidden' }}>
+                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, minHeight: PERSON_STAGE_MIN_H, flexShrink: 0 }}>
                     {peopleQueue.slice(currentPersonIdx + 1, currentPersonIdx + 3).map((_, i) => (
-                      <div key={i} style={{ position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, height: CARD_H, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none' }} />
+                      <div key={i} style={{ position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8, bottom: -(i + 1) * 8, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none' }} />
                     ))}
                     <PersonSwipeCard
                       key={`${peopleQueue[currentPersonIdx].company.id}_${peopleQueue[currentPersonIdx].person.id}`}
                       person={peopleQueue[currentPersonIdx].person}
                       company={peopleQueue[currentPersonIdx].company}
                       matchText={getBarryText(peopleQueue[currentPersonIdx].person, peopleQueue[currentPersonIdx].company, targetTitles)}
-                      onAccept={(feedback) => handlePersonSwipe('right', feedback)}
-                      onReject={(feedback) => handlePersonSwipe('left', feedback)}
-                      onSkip={() => handlePersonSwipe('skip')}
+                      onAccept={(feedback, subjectId) => handlePersonSwipe('right', feedback, subjectId)}
+                      onReject={(feedback, subjectId) => handlePersonSwipe('left', feedback, subjectId)}
+                      onSkip={(subjectId) => handlePersonSwipe('skip', null, subjectId)}
                       wide={isDesktop}
                     />
                   </div>
-                  <div style={{ marginTop: 14, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? 560 : 440, fontSize: 10, color: T.textGhost }}>
+                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, fontSize: 10, color: T.textGhost }}>
                     <span>← Not this person</span>
                     <span>Save to engage →</span>
                   </div>
@@ -3061,7 +3259,8 @@ export default function DailyLeads({ onNavigate }) {
                 <div style={{ fontSize: 22, fontWeight: 800, color: T.text, lineHeight: 1 }}>{Math.max(0, companies.length - currentIndex)}</div>
               </div>
               <button
-                onClick={() => setQueueListOpen(o => !o)}
+                onClick={toggleQueueList}
+                data-queue-trigger
                 style={{ padding: '5px 10px', borderRadius: 7, background: queueListOpen ? T.accentBg : 'transparent', border: `1px solid ${queueListOpen ? T.accentBdr : T.border2}`, color: queueListOpen ? BRAND.pink : T.textFaint, fontSize: 11, cursor: 'pointer' }}
               >
                 View
@@ -3085,7 +3284,11 @@ export default function DailyLeads({ onNavigate }) {
                         <CompanyLogo company={co} size="small" />
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontSize: 11, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
-                          <div style={{ fontSize: 10, color: T.textFaint }}>{co.fit_score || 0}/100</div>
+                          {/* G1-06: "0/100" is a measured verdict; an unscored
+                              company has not earned one. */}
+                          <div style={{ fontSize: 10, color: T.textFaint }}>
+                            {co.fit_score == null ? UNSCORED_LABEL : `${co.fit_score}/100`}
+                          </div>
                         </div>
                         <button
                           onClick={() => navigate('/recon', { state: { companyId: co.id } })}
@@ -3187,8 +3390,9 @@ export default function DailyLeads({ onNavigate }) {
           currentIndex={currentIndex}
           rejectedIds={rejectedInSession}
           onJumpTo={(idx) => setCurrentIndex(idx)}
-          onClose={() => setQueueListOpen(false)}
+          onClose={closeQueueList}
           mobile={!isDesktop}
+          returnFocusRef={queueTriggerRef}
         />
       )}
 

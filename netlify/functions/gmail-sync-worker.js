@@ -26,6 +26,7 @@ import { google } from 'googleapis';
 
 import { validateNormalizedMessage } from '../../src/types/normalizedMessage.js';
 import { processNormalizedMessage } from './utils/messageProcessor.js';
+import { alertOps } from './utils/alertOps.js';
 import {
   recordIngestFailure,
   clearIngestFailure,
@@ -586,15 +587,71 @@ export async function runGmailSync(db, options = {}) {
   };
 }
 
+/**
+ * The alert must not depend on the thing that may have just failed. If
+ * Firebase init is the reason we are in the catch block, getFirestore() throws
+ * — so resolving the handle is itself guarded, and a null simply means the
+ * alert sends without its cooldown rather than not sending at all.
+ */
+function safeFirestore() {
+  try {
+    return getFirestore();
+  } catch {
+    return null;
+  }
+}
+
 export const syncHandler = async () => {
   try {
     const summary = await runGmailSync(getFirestore());
-    return { statusCode: 200, body: JSON.stringify(summary) };
+
+    // 207 on partial failure, matching daily-leads-refresh: a 200 must mean
+    // every account synced. An honest zero (nobody had new mail) is still 200.
+    const allOk = summary.totals.failed === 0;
+    console.log(allOk ? 'gmail.sync.ok' : 'gmail.sync.partial_failure', {
+      usersConsidered: summary.usersConsidered,
+      usersSynced: summary.usersSynced,
+      usersDeferred: summary.usersDeferred,
+      messagesProcessed: summary.totals.processed,
+      usersFailed: summary.totals.failed,
+      durationMs: summary.durationMs,
+    });
+
+    if (!allOk) {
+      await alertOps({
+        db: safeFirestore(), job: 'gmail-sync-worker', severity: 'partial_failure',
+        summary: `${summary.totals.failed} Gmail account(s) failed to sync.`,
+        detail: { usersConsidered: summary.usersConsidered, usersSynced: summary.usersSynced,
+                  messagesProcessed: summary.totals.processed, failed: summary.totals.failed,
+                  firstError: summary.results.find((r) => r.error)?.error || 'n/a' },
+      });
+    }
+
+    return {
+      statusCode: allOk ? 200 : 207,
+      body: JSON.stringify({ success: allOk, ...summary }),
+    };
   } catch (err) {
     console.error('[gmail-sync] Run failed:', err);
-    // A 200 keeps Netlify from retry-storming a systemic failure; the error is
-    // in the logs and every per-user failure is already recorded in Firestore.
-    return { statusCode: 200, body: JSON.stringify({ error: err.message }) };
+    console.error('gmail.sync.failed', { error: err.message });
+    await alertOps({
+      db: safeFirestore(), job: 'gmail-sync-worker', severity: 'failed',
+      summary: 'The Gmail sync worker crashed before finishing. No account was synced.',
+      detail: { error: err.message },
+    });
+
+    // This used to return 200 on a total crash, so that a systemic failure
+    // could not be told apart from a clean run by anything outside the logs —
+    // and nothing outside the logs was looking. The comment justified it as
+    // keeping Netlify from retry-storming; the cost was that 144 runs a day
+    // could fail in a row and report success every time.
+    //
+    // The retry-storm risk does not apply. Netlify retries BACKGROUND
+    // functions (once after a minute, again after two). SCHEDULED functions
+    // are not retried — a failed run is simply skipped until the next cron
+    // tick, and Netlify's own remedy for a missed run is to invoke the
+    // function manually. The two function types were being conflated.
+    return { statusCode: 500, body: JSON.stringify({ success: false, error: err.message }) };
   }
 };
 

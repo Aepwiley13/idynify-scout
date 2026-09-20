@@ -560,13 +560,31 @@ const BarryOnboarding = forwardRef(function BarryOnboarding({
           source: 'barry_onboarding_confirmed',
           createdAt: new Date().toISOString(),
         });
-        await setActiveIcpProfile(user.uid, icpId);
       }
 
-      // Projection of the ICP just confirmed, carrying its identity.
+      // The bridge has exactly one writer, on both branches: setActiveIcpProfile.
+      // It re-reads the profile that was just stored and projects the whole of
+      // it, together with the isActive/status pair the resolver requires — so
+      // the projection cannot disagree with the ICP it names, and cannot keep
+      // criteria left over from whichever ICP the bridge held before.
+      //
+      // The write-through branch needs this call as much as the creation branch
+      // does. Confirmation is what makes this definition the active one; an ICP
+      // that was already active stays active, and any second profile still
+      // carrying an active flag is normalized away rather than left to make the
+      // selection ambiguous.
+      await setActiveIcpProfile(user.uid, icpId);
+
+      // Attribution is onboarding's to record, and attribution is all it
+      // records. Merged, and naming no lifecycle field: a whole-document write
+      // here would erase the isActive/status pair the projection above just
+      // established, leaving the bridge held with no isActive and no status —
+      // the state ICPSettings' loadICPProfiles describes, where the canonical
+      // resolver can never see the profile onboarding just confirmed.
       await setDoc(
         doc(db, 'users', user.uid, 'companyProfile', 'current'),
-        { ...icpProfile, icpId, icpIdSource: 'barry_onboarding_confirmed' }
+        { icpId, icpIdSource: 'barry_onboarding_confirmed' },
+        { merge: true }
       );
 
       // Update conversation as completed

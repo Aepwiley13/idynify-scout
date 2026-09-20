@@ -104,8 +104,15 @@ describe('every company decision records the gesture that made it', () => {
   });
 
   it('the parent forwards the gesture instead of dropping it', () => {
+    // Widened for the third argument: the card now also names the SUBJECT the
+    // gesture was made on, so a callback deferred behind the exit animation can
+    // be matched against the current card instead of landing on it blind. See
+    // swipeSubjectIdentity.test.jsx. The gesture must still survive the hop —
+    // that is what this asserts, and it is unchanged.
     for (const handler of ['onAccept', 'onReject']) {
-      const re = new RegExp(`${handler}=\\{\\(feedback, gesture\\) => handleSwipe\\('(right|left)', feedback, gesture\\)\\}`);
+      const re = new RegExp(
+        `${handler}=\\{\\(feedback, gesture, subjectId\\) => handleSwipe\\('(right|left)', feedback, gesture, subjectId\\)\\}`,
+      );
       expect(src, `${handler} drops the gesture on the way to handleSwipe`).toMatch(re);
     }
   });

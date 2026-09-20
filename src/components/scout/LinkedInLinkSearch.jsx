@@ -155,6 +155,11 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
       name: contact.organization_name || contact.organization?.name,
       email: contact.email,
       domain: contact.organization?.primary_domain,
+      // The COMPANY's LinkedIn page, not the person's profile. Apollo returns
+      // it on the organization and this path used to discard it: every company
+      // saved through a LinkedIn import had no LinkedIn URL, while companies
+      // from Scout discovery had one 100% of the time. Free to keep.
+      linkedin_url: contact.organization?.linkedin_url,
     }, {
       source: 'LinkedIn Link',
       extraFields: {
@@ -163,7 +168,6 @@ export default function LinkedInLinkSearch({ onContactAdded, onCancel }) {
         location: contact.organization?.city && contact.organization?.state
           ? `${contact.organization.city}, ${contact.organization.state}` : null,
         employee_count: contact.organization?.estimated_num_employees || null,
-        apolloEnriched: false,
       },
     });
     return companyId;

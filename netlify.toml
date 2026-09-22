@@ -7,6 +7,24 @@
   # Netlify's default Node 20 is pre-20.19, so pin explicitly.
   NODE_VERSION = "22"
 
+  # Netlify's secrets scanner fails the build when an env var's VALUE appears
+  # in the build output. These two are client-visible by design, so their
+  # presence in `dist/` is correct and the scan is a false positive:
+  #
+  #   FIREBASE_API_KEY        A Firebase web API key is shipped to every
+  #                           browser by design. It identifies the project; it
+  #                           does not authorize anything. Access is controlled
+  #                           by Firestore Security Rules and by the API key's
+  #                           HTTP-referrer restrictions, not by keeping the
+  #                           string private.
+  #   GOOGLE_SEARCH_ENGINE_ID A Custom Search `cx` identifier. It names which
+  #                           search engine to query and carries no privilege.
+  #
+  # GOOGLE_SEARCH_API_KEY IS DELIBERATELY NOT LISTED HERE. That one is a real
+  # credential and its flag must stay loud. Do not add it to silence a build;
+  # the fix is to keep it out of the output, not out of the scan.
+  SECRETS_SCAN_OMIT_KEYS = "FIREBASE_API_KEY,GOOGLE_SEARCH_ENGINE_ID"
+
 # ─── Non-production contexts ─────────────────────────────────────────────────
 #
 # DEFENCE IN DEPTH ONLY. Read the limits before trusting this.

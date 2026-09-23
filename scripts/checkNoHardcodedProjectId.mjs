@@ -1,46 +1,82 @@
 /**
- * Fail the build if the Firebase project id is hardcoded again.
+ * Fail the build if a Firebase project id is hardcoded in source.
  *
- * Twenty-two call sites read the project as
- * `process.env.FIREBASE_PROJECT_ID || 'idynify-scout-dev'`, and six client
- * values were literals in src/firebase/config.js. The effect was that a deploy
- * with no environment configured did not fail — it silently connected to the
- * one project that serves real customers, from previews and branch deploys as
- * readily as from production.
+ * WHY THIS EXISTS. Twenty-two call sites once read
  *
- * Removing them once is not the same as keeping them gone. The pattern is easy
- * to reintroduce (it makes a local run "just work"), reads as harmless in
- * review, and fails silently in exactly the direction that matters. So the
- * removal is enforced rather than remembered.
+ *     process.env.FIREBASE_PROJECT_ID || 'idynify-scout-dev'
  *
- * Run: node scripts/checkNoHardcodedProjectId.mjs
+ * so an environment with nothing configured did not fail — it connected to the
+ * project serving real customers, from a branch deploy, a preview or a fork,
+ * and looked exactly like a correct deploy while doing it. PR #644 removed
+ * them and added this guard.
+ *
+ * WHY IT WAS REWRITTEN. The first version banned one string, the literal
+ * `idynify-scout-dev`. On 2026-09-22 it printed
+ *
+ *     ✓ no hardcoded "idynify-scout-dev" in src, netlify/functions
+ *
+ * while netlify/functions/admin-get-users.js carried
+ *
+ *     process.env.FIREBASE_PROJECT_ID || 'idynify-mission-control'
+ *
+ * A guard that reports success next to a live instance of the bug it exists to
+ * prevent is worse than no guard, because it is trusted. The defect was never
+ * one project's name — it is the SHAPE: a literal standing in for
+ * configuration. So this matches the shape.
+ *
+ * THREE DETECTORS, deliberately narrow to stay quiet on ordinary code:
+ *
+ *   env-fallback   a Firebase/project env var read with a string fallback
+ *   literal-config a projectId assigned a string literal
+ *   org-project    any 'idynify-…' literal, whatever it is named next
+ *
+ * Comment-only lines are skipped, so a docblock may quote the broken pattern
+ * in order to explain it — which is how the next reader learns what was wrong.
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 const ROOT = new URL('..', import.meta.url).pathname;
-const SCANNED = ['src', 'netlify/functions'];
-const LITERAL = 'idynify-scout-dev';
+const SCANNED = ['src', 'netlify/functions', 'scripts'];
+
+const DETECTORS = [
+  {
+    name: 'env-fallback',
+    // process.env.FIREBASE_PROJECT_ID || 'anything'
+    re: /(?:process\.env|import\.meta\.env)\s*\.\s*[A-Z_]*(?:FIREBASE|PROJECT)[A-Z_]*\s*\|\|\s*['"`][^'"`]+['"`]/,
+    why: 'an env var with a literal fallback — the fallback is the trapdoor',
+  },
+  {
+    name: 'literal-config',
+    // projectId: 'anything'  /  projectId = "anything"
+    re: /\bprojectId\s*[:=]\s*['"`][a-z0-9][a-z0-9-]{4,29}['"`]/,
+    why: 'a projectId assigned a literal instead of configuration',
+  },
+  {
+    name: 'org-project',
+    // any of this org's project names, present or future
+    re: /['"`]idynify-[a-z0-9-]+['"`]/,
+    why: "an 'idynify-…' project literal in source",
+  },
+];
 
 /**
- * Documented exceptions. Each is a place the string appears as DOCUMENTATION
- * or as a TEST FIXTURE rather than as configuration — never as a value the app
- * would actually connect with.
- *
- * This list only shrinks. Adding to it means a new place is allowed to name
- * the production project in source, which is a review conversation, not a
- * convenience.
+ * Documented exceptions. Each is a place a project id appears as a TEST
+ * FIXTURE or as the subject of an assertion — never as a value the app would
+ * connect with. This list only shrinks; adding to it is a review conversation.
  */
 const ALLOWED = new Map([
-  ['src/firebase/config.js',
-   'Comment explaining that the project is named "-dev" but IS production. The config itself reads import.meta.env.'],
   ['src/test/telemetryAttribution.test.js',
-   'Fixture. The test asserts a project id containing "dev" must NOT colour the environment label — the literal is the thing under test.'],
-  ['netlify/functions/utils/firebaseEnv.js',
-   'Docblock quoting the removed fallback pattern, so the next reader knows what was wrong with it.'],
-  ['netlify/functions/utils/logApiUsage.js',
-   'Comment explaining the same naming accident for the telemetry label.'],
+   'Fixture. Asserts a project id containing "dev" must NOT colour the environment label — the literal is the thing under test.'],
+  ['src/test/authErrorMapping.test.js',
+   'Fixture. Asserts two configs sharing a projectId but differing by API key stay distinguishable.'],
+  ['scripts/rules-check/cases.mjs',
+   'Emulator fixture. Firebase reserves the "demo-" prefix for projects that cannot reach a real backend, so this literal is safe by construction.'],
 ]);
+
+/** A line that is only a comment cannot configure anything. */
+const isComment = (line) => /^\s*(\/\/|\*|\/\*)/.test(line);
 
 function walk(dir, out = []) {
   for (const entry of readdirSync(dir)) {
@@ -58,23 +94,21 @@ const allowedHit = new Set();
 for (const base of SCANNED) {
   for (const file of walk(join(ROOT, base))) {
     const rel = relative(ROOT, file);
-    const lines = readFileSync(file, 'utf8').split('\n');
-
-    lines.forEach((line, i) => {
-      if (!line.includes(LITERAL)) return;
+    readFileSync(file, 'utf8').split('\n').forEach((line, i) => {
+      if (isComment(line)) return;
+      const hit = DETECTORS.find((d) => d.re.test(line));
+      if (!hit) return;
       if (ALLOWED.has(rel)) { allowedHit.add(rel); return; }
-      violations.push({ rel, line: i + 1, text: line.trim() });
+      violations.push({ rel, line: i + 1, text: line.trim(), detector: hit.name, why: hit.why });
     });
   }
 }
 
-// An allowlist entry that no longer matches anything is stale. Say so — the
-// list is supposed to shrink, and an entry nobody removed is an entry nobody
-// checked.
 const stale = [...ALLOWED.keys()].filter((f) => !allowedHit.has(f));
 
 if (violations.length === 0) {
-  console.log(`✓ no hardcoded "${LITERAL}" in ${SCANNED.join(', ')}`);
+  console.log(`✓ no hardcoded Firebase project id in ${SCANNED.join(', ')}`);
+  console.log(`  detectors: ${DETECTORS.map((d) => d.name).join(', ')}`);
   if (stale.length) {
     console.log('\n  Note — allowlist entries that matched nothing (safe to delete):');
     for (const f of stale) console.log(`    ${f}`);
@@ -84,15 +118,16 @@ if (violations.length === 0) {
 
 console.error(`\n✗ Hardcoded Firebase project id found in ${violations.length} place(s).\n`);
 for (const v of violations) {
-  console.error(`  ${v.rel}:${v.line}`);
-  console.error(`    ${v.text}\n`);
+  console.error(`  ${v.rel}:${v.line}  [${v.detector}]`);
+  console.error(`    ${v.text}`);
+  console.error(`    ↳ ${v.why}\n`);
 }
 console.error(
   'The project id must come from the environment, with no fallback:\n' +
   '  · Netlify functions — import { requireProjectId } from "./utils/firebaseEnv.js"\n' +
   '  · Client code       — import.meta.env.VITE_FIREBASE_PROJECT_ID\n\n' +
   'A literal here means a misconfigured deploy reaches real customer data\n' +
-  'instead of failing. If this occurrence is documentation rather than\n' +
-  'configuration, add it to ALLOWED in this script with a reason.\n'
+  'instead of failing. If this occurrence is a test fixture rather than\n' +
+  'configuration, add it to ALLOWED in this file with a reason.\n'
 );
 process.exit(1);

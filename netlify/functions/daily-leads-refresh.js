@@ -67,8 +67,10 @@ export const refreshDailyLeads = async (event) => {
     };
 
     // Same resolution as logRefresh() below — the ICP read at the top of the
-    // loop is a REST call to the same Firestore project.
-    const projectId = process.env.VITE_FIREBASE_PROJECT_ID || process.env.FIREBASE_PROJECT_ID;
+    // loop is a REST call to the same Firestore project. It now genuinely is
+    // the same: this read preferred VITE_FIREBASE_PROJECT_ID, a client-side
+    // variable name, over the server one, so the two could disagree silently.
+    const projectId = requireProjectId();
 
     // Process each user
     for (const user of activeUsers) {

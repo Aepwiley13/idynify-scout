@@ -7,6 +7,35 @@
   # Netlify's default Node 20 is pre-20.19, so pin explicitly.
   NODE_VERSION = "22"
 
+  # Netlify's secrets scanner fails the build when an env var's VALUE appears
+  # in the build output or in repo code. Everything listed here is
+  # client-visible by construction, so those matches are correct and expected.
+  #
+  # THE SIX VITE_FIREBASE_* VALUES ARE A FIREBASE WEB CONFIG. It ships to every
+  # browser by design — vite.config.js requires all six and says so in as many
+  # words: "None of these is secret ... the point of this gate is
+  # configuration, not confidentiality." They identify a project. They
+  # authorize nothing. Access is held by Firestore Security Rules and by the
+  # API key's HTTP-referrer restrictions.
+  #
+  # All six are listed, not just the one that happens to fail first. The scan
+  # matches on variable NAME, and every one of the six appears as a literal in
+  # public/check-test26.html (31-36) and public/retry-leads.html (74-79) —
+  # debug pages that Vite copies to dist/ verbatim — as well as in the bundle
+  # via import.meta.env. Adding them one per failed build costs a deploy cycle
+  # each and converges on this same list.
+  #
+  # FIREBASE_API_KEY is the server-side name for the same key, read by ~10
+  # functions. GOOGLE_SEARCH_ENGINE_ID is a Custom Search `cx` handle: it
+  # names an engine and carries no privilege.
+  #
+  # NOT LISTED, DELIBERATELY: GOOGLE_SEARCH_API_KEY and GOOGLE_VISION_API_KEY.
+  # Those are real credentials. Their flags must stay loud. If either ever
+  # appears in this list, something was silenced that should have been fixed —
+  # the remedy is to keep the value out of the output, not out of the scan.
+  # See issue #666.
+  SECRETS_SCAN_OMIT_KEYS = "FIREBASE_API_KEY,VITE_FIREBASE_API_KEY,VITE_FIREBASE_AUTH_DOMAIN,VITE_FIREBASE_PROJECT_ID,VITE_FIREBASE_STORAGE_BUCKET,VITE_FIREBASE_MESSAGING_SENDER_ID,VITE_FIREBASE_APP_ID,GOOGLE_SEARCH_ENGINE_ID"
+
 # ─── Non-production contexts ─────────────────────────────────────────────────
 #
 # DEFENCE IN DEPTH ONLY. Read the limits before trusting this.

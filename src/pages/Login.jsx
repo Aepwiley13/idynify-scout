@@ -4,6 +4,7 @@ import { auth } from '../firebase/config';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, ArrowRight } from 'lucide-react';
 import { resolveMfaSignIn } from '../utils/mfa';
+import { describeAuthError } from '../utils/authErrors';
 import AuthLayout from '../components/auth/AuthLayout';
 import AuthField from '../components/auth/AuthField';
 import PasswordField from '../components/auth/PasswordField';
@@ -42,20 +43,21 @@ export default function Login() {
       await signInWithEmailAndPassword(auth, email, password);
       navigate('/');
     } catch (error) {
-      // Record the real Firebase error code and the project this client is
-      // actually talking to. Every non-MFA failure below renders as the same
-      // sentence, which makes a wrong-project misconfiguration and a wrong
-      // password indistinguishable from the screen. That ambiguity is how a
-      // config incident was read as a password problem for two days.
-      setDiag(`${error.code || 'unknown-error'} \u00b7 ${auth?.app?.options?.projectId || 'no-project-id'}`);
-
       if (error.code === 'auth/multi-factor-auth-required') {
         // MFA is enrolled — prompt for TOTP code
         setMfaRequired(true);
         setMfaError(error);
-      } else {
-        setError('Invalid credentials. Please try again.');
+        return;
       }
+
+      // Say which failure this was. See utils/authErrors.js — the short
+      // version is that a misconfigured deployment and a wrong password used
+      // to be the same sentence on screen, and the fingerprint is there
+      // because Firebase Auth routes by API key, not by projectId.
+      const { message, technical } = describeAuthError(error, auth);
+      setError(message);
+      setDiag(technical);
+      console.error('[auth] sign-in failed:', technical, error);
     } finally {
       setLoading(false);
     }

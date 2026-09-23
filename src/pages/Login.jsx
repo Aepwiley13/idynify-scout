@@ -24,6 +24,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [diag, setDiag] = useState('');
   const [mfaRequired, setMfaRequired] = useState(false);
   const [mfaError, setMfaError] = useState(null);
   const [mfaCode, setMfaCode] = useState('');
@@ -34,12 +35,20 @@ export default function Login() {
     e.preventDefault();
     if (loading) return;
     setError('');
+    setDiag('');
     setLoading(true);
 
     try {
       await signInWithEmailAndPassword(auth, email, password);
       navigate('/');
     } catch (error) {
+      // Record the real Firebase error code and the project this client is
+      // actually talking to. Every non-MFA failure below renders as the same
+      // sentence, which makes a wrong-project misconfiguration and a wrong
+      // password indistinguishable from the screen. That ambiguity is how a
+      // config incident was read as a password problem for two days.
+      setDiag(`${error.code || 'unknown-error'} \u00b7 ${auth?.app?.options?.projectId || 'no-project-id'}`);
+
       if (error.code === 'auth/multi-factor-auth-required') {
         // MFA is enrolled — prompt for TOTP code
         setMfaRequired(true);
@@ -56,6 +65,7 @@ export default function Login() {
     e.preventDefault();
     if (loading) return;
     setError('');
+    setDiag('');
     setLoading(true);
 
     try {
@@ -108,6 +118,20 @@ export default function Login() {
           {error && (
             <div className="auth-alert" role="alert" aria-live="polite">
               <span>{error}</span>
+              {diag && (
+                <span
+                  style={{
+                    display: 'block',
+                    marginTop: 6,
+                    fontSize: 11,
+                    opacity: 0.75,
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                    wordBreak: 'break-all',
+                  }}
+                >
+                  {diag}
+                </span>
+              )}
             </div>
           )}
 
@@ -166,6 +190,20 @@ export default function Login() {
           {error && (
             <div className="auth-alert" role="alert" aria-live="polite">
               <span>{error}</span>
+              {diag && (
+                <span
+                  style={{
+                    display: 'block',
+                    marginTop: 6,
+                    fontSize: 11,
+                    opacity: 0.75,
+                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
+                    wordBreak: 'break-all',
+                  }}
+                >
+                  {diag}
+                </span>
+              )}
             </div>
           )}
 

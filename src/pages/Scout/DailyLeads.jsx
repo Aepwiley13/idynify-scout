@@ -9,7 +9,7 @@ import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
 import {
   collection, query, where, getDocs, doc, getDoc,
-  setDoc, updateDoc, deleteDoc,
+  setDoc, updateDoc,
 } from 'firebase/firestore';
 import { Globe, Linkedin, Check, X, RefreshCw, Loader, Settings, RotateCcw, MessageCircle, ArrowRight, MapPin, User, List, ChevronDown, Flame, Trophy } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
@@ -29,9 +29,12 @@ import { calculateReconConfidence } from '../../utils/reconConfidence';
 import { ARRIVAL_REVIEW_ICP } from '../../utils/firstExperienceMode';
 import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
 import {
-  recordDecision, recordSkip,
-  recordPersonEncounter, recordPersonDecision, recordPersonSkip,
+  recordPersonDecision, recordPersonSkip,
 } from '../../services/icpRelationshipService';
+import {
+  DECISION_SURFACE, recordCompanyDecision, skipCompany, triggerPeopleDiscovery,
+  undoCompanyDecision, undoApprovalSideEffects,
+} from '../../services/companyDecision';
 
 // ─── Initials avatar ─────────────────────────────────────────────────────────
 function Av({ initials, color = BRAND.pink, size = 70 }) {
@@ -1995,49 +1998,21 @@ export default function DailyLeads({ onNavigate }) {
     swipeInFlightRef.current = true;
     decidedSubjectsRef.current.add(company.id);
     try {
-      const companyRef = doc(db, 'users', user.uid, 'companies', company.id);
-      // Hoisted so the decision has ONE timestamp: the legacy write and the
-      // shadow event must describe the same moment, and it doubles as the
-      // shadow write's causeId — a retry of this decision lands on the same
-      // event id and is recognised as already recorded rather than duplicated.
-      const swipedAt = new Date().toISOString();
-      await updateDoc(companyRef, {
-        status: direction === 'right' ? 'accepted' : 'rejected',
-        swipedAt,
-        swipeDirection: direction,
-        // WHICH gesture produced this decision — keyboard | drag | button.
-        // Distinct from `swipe_source`, which names the SURFACE (people_mode,
-        // barry_first_value). Recorded because all three reject gestures wrote
-        // byte-identical documents, so a rejection's origin was unrecoverable:
-        // a keyboard press and a deliberate "Not a Match" were indistinguishable
-        // forever. Written, never read — it exists so the question stays
-        // answerable later. 'unknown' means a call site forgot to say.
-        swipe_gesture: gesture,
-        ...(activeICPId ? { swipedForICPId: activeICPId } : {}),
-        ...(direction === 'right' && feedback ? { barryFeedback: feedback, feedbackAt: new Date().toISOString() } : {}),
-        ...(direction === 'left' && feedback ? { barryRejectionFeedback: feedback, rejectionFeedbackAt: new Date().toISOString() } : {}),
+      // The decision itself — legacy write, then the fail-soft shadow write,
+      // under ONE timestamp — goes through the canonical company decision path
+      // every surface shares. This page's ICP is the surface ICP.
+      const decision = await recordCompanyDecision({
+        userId: user.uid,
+        company,
+        direction,
+        surface: DECISION_SURFACE.DAILY_DISCOVERIES,
+        surfaceIcpId: activeICPId,
+        gesture,
+        feedback,
       });
-
-      // ── Shadow write (Sprint 1A) ────────────────────────────────────────
-      // Strictly AFTER the legacy write has committed, and strictly fail-soft:
-      // the service swallows its own errors, so a shadow failure can never undo
-      // or block a decision the user already made. Nothing reads what this
-      // writes until the Sprint 3 cutover.
-      //
-      // The ICP recorded is `activeICPId` — the one the legacy write stamps as
-      // swipedForICPId — so the two can never disagree about which ICP the user
-      // was deciding under. With no ICP resolved there is nothing to attribute
-      // and the shadow write is skipped rather than guessed.
-      if (activeICPId) {
-        await recordDecision({
-          userId: user.uid,
-          subjectId: company.id,
-          icpId: activeICPId,
-          accepted: direction === 'right',
-          causeId: swipedAt,
-          source: company.source ?? null,
-        });
-      }
+      // A duplicate the shared guard caught: the decision already stands.
+      if (!decision.recorded) return;
+      const { swipedAt } = decision;
 
       const isInterested = direction === 'right';
       const newSwipeCount = isInterested
@@ -2066,68 +2041,7 @@ export default function DailyLeads({ onNavigate }) {
       const swipeIcp = await resolveSearchIcp(user);
       const icpTitles = swipeIcp.profile?.targetTitles || [];
       if (direction === 'right' && icpTitles.length > 0) {
-        const formattedTitles = icpTitles.map((title, index) => ({ title, rank: index + 1, score: 100 - (index * 10) }));
-        await updateDoc(companyRef, { selected_titles: formattedTitles, titles_updated_at: new Date().toISOString(), titles_source: 'icp_auto' });
-        if (company.apollo_organization_id) {
-          const authToken = await user.getIdToken();
-          fetch('/.netlify/functions/searchPeople', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: user.uid, authToken, organizationId: company.apollo_organization_id, titles: icpTitles, maxResults: 3 }),
-          }).then(res => res.json()).then(async result => {
-            if (result.success && result.people?.length > 0) {
-              for (const person of result.people) {
-                const contactId = `${company.id}_${person.id}`;
-
-                // Identity resolution before every auto-discovered write.
-                // This path runs in the BACKGROUND after a swipe, so a
-                // duplicate created here is one the user never saw made and
-                // has no reason to look for.
-                const decision = await prepareContactWrite(user.uid, {
-                  contactId,
-                  apollo_person_id: person.id,
-                  email: person.email,
-                  linkedin_url: person.linkedin_url,
-                  name: person.name,
-                  company_id: company.id,
-                  company_name: company.name,
-                  source: 'icp_auto_discovery',
-                }, { source: 'DailyLeads.autoDiscovery', recordStatus: RECORD_STATUS.SUGGESTED });
-
-                if (decision.action === 'merge') {
-                  await applyContactMerge(user.uid, decision);
-                  continue;
-                }
-
-                await setDoc(doc(db, 'users', user.uid, 'contacts', contactId), {
-                  ...person,
-                  // Identity envelope after the spread, never from it: `person`
-                  // is an enrichment API payload and carries no archival state,
-                  // no normalized identifiers and no status dimensions.
-                  ...decision.fields,
-                  company_id: company.id, company_name: company.name,
-                  lead_owner: user.uid, status: 'suggested', source: 'icp_auto_discovery',
-                  discovered_at: new Date().toISOString(),
-                });
-
-                // Shadow (Sprint 2), after the legacy write. This search ran
-                // because of an ICP, so the person was genuinely encountered
-                // under it — a DIRECT association, not an inherited one.
-                // activeICPId is the same ICP the company was just swiped for.
-                if (activeICPId) {
-                  await recordPersonEncounter({
-                    userId: user.uid,
-                    contactId,
-                    icpId: activeICPId,
-                    causeId: swipedAt,
-                    source: 'icp_auto_discovery',
-                  });
-                }
-              }
-              await updateDoc(companyRef, { auto_contact_status: 'completed', auto_contact_count: result.people.length, auto_contact_searched_at: new Date().toISOString() });
-            }
-          }).catch(err => console.error('Background contact search failed:', err));
-        }
+        await triggerPeopleDiscovery({ user, company, icpTitles, activeICPId, causeId: swipedAt });
       }
       if (direction === 'right' && !hasSeenTitleSetup) {
         const titlePrefsRef = doc(db, 'users', user.uid, 'contactScoring', 'titlePreferences');
@@ -2256,27 +2170,12 @@ export default function DailyLeads({ onNavigate }) {
     if (subjectId && subjectId !== company.id) return;
 
     try {
-      const skippedAt = new Date().toISOString();
-
-      // Legacy first, and field-scoped: this document carries a lifetime of
-      // provenance that an unmasked write would delete.
-      await updateDoc(doc(db, 'users', user.uid, 'companies', company.id), {
-        skippedInCycle: currentCycleId ?? null,
-        skippedAt,
+      await skipCompany({
+        userId: user.uid,
+        company,
+        surfaceIcpId: activeICPId,
+        currentCycleId: currentCycleId ?? null,
       });
-
-      // Shadow second, fail-soft. The relationship moves to `skipped` and
-      // records the cycle, so the guard agrees on both sides at cutover.
-      if (activeICPId) {
-        await recordSkip({
-          userId: user.uid,
-          subjectId: company.id,
-          icpId: activeICPId,
-          causeId: skippedAt,
-          cycleId: currentCycleId ?? null,
-          source: company.source ?? null,
-        });
-      }
 
       setActionToast({ message: `${company.name} — back next run`, type: 'info' });
       setTimeout(() => setActionToast(null), 2200);
@@ -2295,17 +2194,13 @@ export default function DailyLeads({ onNavigate }) {
     if (!user) return;
     const today = new Date().toISOString().split('T')[0];
     try {
-      const companyRef = doc(db, 'users', user.uid, 'companies', entry.company.id);
-      await updateDoc(companyRef, { status: 'pending', swipedAt: null, swipeDirection: null, swipe_gesture: null });
+      await undoCompanyDecision({ userId: user.uid, companyId: entry.company.id });
       if (entry.direction === 'right') {
         const swipeProgressRef = doc(db, 'users', user.uid, 'scoutProgress', 'swipes');
         await setDoc(swipeProgressRef, { dailySwipeCount: entry.previousSwipeCount, lastSwipeDate: today, hasSeenTitleSetup });
         setDailySwipeCount(entry.previousSwipeCount);
         setTotalAcceptedCompanies(prev => Math.max(0, prev - 1));
-        await updateDoc(companyRef, { selected_titles: null, titles_updated_at: null, titles_source: null, auto_contact_status: null, auto_contact_count: null, auto_contact_searched_at: null });
-        const autoContactsQuery = query(collection(db, 'users', user.uid, 'contacts'), where('company_id', '==', entry.company.id), where('source', '==', 'icp_auto_discovery'));
-        const autoContactDocs = await getDocs(autoContactsQuery);
-        for (const contactDoc of autoContactDocs.docs) await deleteDoc(contactDoc.ref);
+        await undoApprovalSideEffects({ userId: user.uid, companyId: entry.company.id });
         setSessionSaved(prev => Math.max(0, prev - 1));
         setSessionSavedCompanies(prev => prev.filter(c => c.id !== entry.company.id));
       } else {

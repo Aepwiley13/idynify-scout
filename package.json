@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check:env": "node scripts/checkNoHardcodedProjectId.mjs"
+    "check:env": "node scripts/checkNoHardcodedProjectId.mjs",
+    "check:firebase-key": "node scripts/checkFirebaseKeyProject.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.71.1",

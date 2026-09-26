@@ -28,7 +28,7 @@
  * touching anyone real.
  */
 
-import { readFileSync, appendFileSync } from 'node:fs';
+import { appendFileSync } from 'node:fs';
 
 /**
  * Append-on-creation ledger.
@@ -161,7 +161,10 @@ if (!accepted) {
   } catch (e) { err = e?.code || e?.message; }
   line('signs in with the non-compliant password', signedIn ? 'YES' : `NO — ${err}`);
   line('forced into a password change?', err === 'auth/password-does-not-meet-requirements' ? 'YES (FAIL)' : 'NO');
-  const live = await (await fetch(`https://identitytoolkit.googleapis.com/v2/passwordPolicy?key=${JSON.parse(JSON.stringify(readFileSync(new URL('../src/firebase/config.js', import.meta.url), 'utf8').match(/apiKey:\s*"([^"]+)"/)[1]))}`)).json();
+  // The key comes from the initialised app, not from scraping config.js. That
+  // file held an `apiKey: "…"` literal until #644 moved it to the environment,
+  // at which point the old regex began matching nothing and throwing on [1].
+  const live = await (await fetch(`https://identitytoolkit.googleapis.com/v2/passwordPolicy?key=${auth.app.options.apiKey}`)).json();
   line('live enforcementState', live.enforcementState);
   line('live forceUpgradeOnSignin', `${live.forceUpgradeOnSignin}   ← see #546`);
 }

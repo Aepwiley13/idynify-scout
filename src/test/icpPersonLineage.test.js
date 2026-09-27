@@ -25,7 +25,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(resolve(here, rel), 'utf8');
 const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
-const daily = strip(read('../pages/Scout/DailyLeads.jsx'));
+// Daily Discoveries plus the canonical company decision path it calls, which
+// owns the persona auto-discovery an approve fires.
+const daily = strip(read('../pages/Scout/DailyLeads.jsx')) + '\n' + strip(read('../services/companyDecision.js'));
 const bulk = strip(read('../components/scout/BulkSendExecutor.jsx'));
 const service = strip(read('../services/icpRelationshipService.js'));
 

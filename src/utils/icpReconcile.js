@@ -23,8 +23,18 @@
  *                 decision. Undo is not modelled in Sprint 1, so this is a known
  *                 consequence rather than a failure — see below
  *   divergence    anything else that disagrees, or a legacy record written AFTER
- *                 the cutover with no shadow counterpart. The only category that
- *                 should ever be non-zero.
+ *                 the cutover with no shadow counterpart, or a decision made
+ *                 after the canonical decision path deployed with no ICP stamp.
+ *                 The only category that should ever be non-zero.
+ *   historical-bypass
+ *                 a decision written BEFORE the canonical decision path by a
+ *                 surface that bypassed it. Reported in its own bucket; never
+ *                 repaired, never blocking.
+ *   people-mode-legacy-bypass
+ *                 the one KNOWN writer that still bypasses the canonical path
+ *                 after it deployed. Named, counted, never blocking, never
+ *                 clean — and temporary until Step 1A. See
+ *                 isPeopleModeLegacyAcceptance below.
  *
  * ─── WHY UNDO GETS ITS OWN CATEGORY ────────────────────────────────────────
  * The legacy undo path sets a company back to `pending` and writes no event, so
@@ -52,6 +62,8 @@ export const RECONCILE = Object.freeze({
   EXPECTED_GAP: 'expected-gap',
   UNDO_GAP: 'undo-gap',
   DIVERGENCE: 'divergence',
+  HISTORICAL_BYPASS: 'historical-bypass',
+  PEOPLE_MODE_LEGACY_BYPASS: 'people-mode-legacy-bypass',
 });
 
 /** Legacy company status → the relationship state it should imply. */
@@ -82,6 +94,63 @@ export function legacyIcpId(company = {}) {
   return company.swipedForICPId ?? company.icpId ?? null;
 }
 
+/** When the user made the decision, as far as the record can say. */
+export function legacyDecidedAt(company = {}) {
+  return millis(company.swipedAt) ?? millis(company.approvedAt) ?? null;
+}
+
+/**
+ * Which pre-canonical bypass path, if any, wrote this decision.
+ *
+ * Before the canonical company decision path (services/companyDecision.js),
+ * three surfaces accepted companies with a bare status write — no ICP stamp, no
+ * shadow event — and People mode still does. Their marks, in the only fields
+ * they left behind. A record carrying `decision_icp_basis` came through the
+ * canonical path and is never a bypass.
+ */
+export function bypassPath(company = {}) {
+  if (company.decision_icp_basis) return null;
+  if (company.swipe_source === 'barry_first_value') return company.swipe_source;
+  if (company.approved_from) return company.approved_from;
+  if (company.approvedAt && !company.swipedAt) return 'mission_control';
+  return null;
+}
+
+/**
+ * PEOPLE_MODE_LEGACY_BYPASS — TEMPORARY, UNTIL STEP 1A.
+ *
+ * Saving a person in People mode also accepts that person's company when it
+ * is still pending (DailyLeads.jsx, handlePersonSwipe). That company
+ * acceptance still bypasses the canonical company decision path: no
+ * swipedForICPId, no shadow decision event.
+ *
+ * STEP 1A — PEOPLE-MODE COMPANY ACCEPTANCE — is mandatory. It runs after Step 1
+ * passes production verification and before Step 2 begins, and is scoped only
+ * to routing that acceptance through services/companyDecision.js. When it
+ * ships, this exception and its bucket are removed and any further People-mode
+ * bypass becomes a real gap like every other.
+ *
+ * Identified by the exact document that writer leaves, never by a missing ICP
+ * stamp:
+ *
+ *   status: 'accepted' + swipeDirection: 'right' + swipe_source: 'people_mode'
+ *   and NO decision_icp_basis
+ *
+ * `swipe_source: 'people_mode'` is written to a company by that one statement
+ * and nothing else. The canonical path writes swipe_source from
+ * DECISION_SURFACE, which has no People-mode value, and it overwrites the
+ * field and stamps decision_icp_basis on every decision — so once a company is
+ * decided canonically it can never match here. Anything that does not match
+ * exactly falls through to the ordinary rules, where an unstamped post-deploy
+ * decision is a real gap: an unknown bypass cannot hide in this bucket.
+ */
+export function isPeopleModeLegacyAcceptance(company = {}) {
+  return company.status === 'accepted'
+    && company.swipeDirection === 'right'
+    && company.swipe_source === 'people_mode'
+    && !company.decision_icp_basis;
+}
+
 /**
  * Classify one company against its shadow relationships.
  *
@@ -89,16 +158,57 @@ export function legacyIcpId(company = {}) {
  * @param {object}   input.company        The legacy company document.
  * @param {object[]} input.relationships  Shadow relationships for this subject.
  * @param {number|string|Date} input.cutoverAt  When shadow writes began.
+ * @param {number|string|Date} [input.decisionCutoverAt]  When the canonical
+ *   company decision path was deployed. From then on every surface stamps the
+ *   deciding ICP, so a decision without one is a real gap.
  * @returns {{status: string, reason: string, icpId: string|null}}
  */
 /** Statuses that represent a decision the user made. */
 const DECIDED = new Set(['accepted', 'rejected']);
 
-export function classifyCompany({ company = {}, relationships = [], cutoverAt } = {}) {
+export function classifyCompany({ company = {}, relationships = [], cutoverAt, decisionCutoverAt } = {}) {
   const cutover = millis(cutoverAt);
   const writtenAt = legacyWrittenAt(company);
   const icpId = legacyIcpId(company);
   const preCutover = cutover === null || writtenAt === null || writtenAt < cutover;
+
+  // ─── DECISIONS AND THE CANONICAL DECISION PATH ────────────────────────────
+  // Once every decision surface routes through one path that stamps the
+  // deciding ICP, a decision WITHOUT `swipedForICPId` is no longer the system
+  // working as designed — it is a decision nobody can attribute. From the
+  // canonical deploy on, it is a real gap whichever way it arose: made with no
+  // surface ICP (the reason names the basis the path recorded), or made by a
+  // path that still bypasses it (`no-canonical-stamp`).
+  //
+  // Decisions before that deploy are not re-judged. The ones a bypass path
+  // wrote get their own bucket, so they are reported rather than buried in
+  // expected-gap, and never repaired.
+  const decisionCutover = millis(decisionCutoverAt);
+  const decidedAt = legacyDecidedAt(company);
+  const afterDecisionCutover = decisionCutover !== null && decidedAt !== null && decidedAt >= decisionCutover;
+
+  // The known People-mode bypass (temporary until Step 1A — see above). Checked
+  // before the ICP stamp, so a stale swipedForICPId left by an undone decision
+  // can never pass a People-mode acceptance off as a clean canonical one.
+  if (isPeopleModeLegacyAcceptance(company)) {
+    return afterDecisionCutover
+      ? { status: RECONCILE.PEOPLE_MODE_LEGACY_BYPASS, reason: 'people-mode-company-acceptance:until-step-1a', icpId }
+      : { status: RECONCILE.HISTORICAL_BYPASS, reason: 'bypass:people_mode', icpId };
+  }
+
+  if (DECIDED.has(company.status) && !company.swipedForICPId) {
+    if (afterDecisionCutover) {
+      return {
+        status: RECONCILE.DIVERGENCE,
+        reason: `decided-after-canonical-path-without-icp-stamp:${company.decision_icp_basis ?? 'no-canonical-stamp'}`,
+        icpId,
+      };
+    }
+    const bypass = bypassPath(company);
+    if (bypass) {
+      return { status: RECONCILE.HISTORICAL_BYPASS, reason: `bypass:${bypass}`, icpId };
+    }
+  }
 
   if (relationships.length === 0 && preCutover) {
     // A legacy record that predates the cutover is the designed state, not a
@@ -255,20 +365,31 @@ export function summarize(results = []) {
     [RECONCILE.EXPECTED_GAP]: 0,
     [RECONCILE.UNDO_GAP]: 0,
     [RECONCILE.DIVERGENCE]: 0,
+    [RECONCILE.HISTORICAL_BYPASS]: 0,
+    [RECONCILE.PEOPLE_MODE_LEGACY_BYPASS]: 0,
   };
   const divergences = [];
   const undoGaps = [];
+  const historicalBypass = [];
+  const peopleModeLegacyBypass = [];
   for (const r of results) {
     counts[r.status] = (counts[r.status] ?? 0) + 1;
     if (r.status === RECONCILE.DIVERGENCE) divergences.push(r);
     if (r.status === RECONCILE.UNDO_GAP) undoGaps.push(r);
+    if (r.status === RECONCILE.HISTORICAL_BYPASS) historicalBypass.push(r);
+    if (r.status === RECONCILE.PEOPLE_MODE_LEGACY_BYPASS) peopleModeLegacyBypass.push(r);
   }
-  // `clean` is the acceptance signal and counts DIVERGENCE only. Undo gaps are
-  // reported in full alongside it so they stay visible rather than swept up.
-  return { counts, divergences, undoGaps, clean: counts[RECONCILE.DIVERGENCE] === 0 };
+  // `clean` is the acceptance signal and counts DIVERGENCE only. Undo gaps,
+  // historical bypass decisions and the People-mode legacy bypass are reported
+  // in full alongside it so they stay visible rather than swept up; none is
+  // repaired, and none is ever counted as agreed.
+  return {
+    counts, divergences, undoGaps, historicalBypass, peopleModeLegacyBypass,
+    clean: counts[RECONCILE.DIVERGENCE] === 0,
+  };
 }
 
 export default {
   RECONCILE, classifyCompany, summarize, summarizeActivity, stageOneGate,
-  legacyWrittenAt, legacyIcpId,
+  legacyWrittenAt, legacyIcpId, legacyDecidedAt, bypassPath, isPeopleModeLegacyAcceptance,
 };

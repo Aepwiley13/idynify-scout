@@ -78,6 +78,7 @@ const BarryOnboarding = forwardRef(function BarryOnboarding({
   onBarryMessage = null,
   onProcessing = null,
   onStepChange = null,
+  onIcpConfirmed = null,
 }, ref) {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
@@ -100,6 +101,7 @@ const BarryOnboarding = forwardRef(function BarryOnboarding({
   function emitMessage(msg) { if (embedded && onBarryMessage) onBarryMessage(msg); }
   function emitStep(s) { if (embedded && onStepChange) onStepChange(s); }
   function emitProcessing(busy) { if (embedded && onProcessing) onProcessing(busy); }
+  function emitIcpConfirmed(id) { if (embedded && onIcpConfirmed) onIcpConfirmed(id); }
 
   useImperativeHandle(ref, () => ({
     submit: (text) => handleSubmit(null, text),
@@ -624,6 +626,10 @@ const BarryOnboarding = forwardRef(function BarryOnboarding({
         },
         { merge: true }
       );
+
+      // Hand the host the exact ICP the user just confirmed, so decisions made
+      // on what this search finds are recorded under it.
+      emitIcpConfirmed(icpId);
 
       // Trigger immediate lead search in the background, carrying the identity
       // of the ICP the user just confirmed.

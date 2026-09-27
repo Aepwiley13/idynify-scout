@@ -23,7 +23,13 @@
  *
  * USAGE
  *   FIREBASE_SERVICE_ACCOUNT_PATH=/path/to/key.json \
- *     node scripts/reconcile/run.mjs --cutover=2026-09-16T00:00:00Z [--json] [--user=<uid>]
+ *     node scripts/reconcile/run.mjs --cutover=2026-09-16T00:00:00Z \
+ *       --decision-cutover=<canonical decision path deploy time> [--json] [--user=<uid>]
+ *
+ * --decision-cutover is REQUIRED too, and it is also a DEPLOY time: the moment
+ * the canonical company decision path (src/services/companyDecision.js) began
+ * running. Decisions from then on without an ICP stamp are real gaps; bypass
+ * decisions before it are reported in their own bucket.
  *
  * --cutover is REQUIRED, and it is the DEPLOY time — the moment the shadow-write
  * code began running in production — NOT the merge time and not midnight.
@@ -57,6 +63,13 @@ if (!args.cutover) {
   process.exit(2);
 }
 
+if (!args['decision-cutover']) {
+  console.error('\n  --decision-cutover=<ISO timestamp> is required.');
+  console.error('  It is when the canonical company decision path deployed. Without it a');
+  console.error('  decision made with no ICP stamp cannot be told from the historical corpus.\n');
+  process.exit(2);
+}
+
 const keyPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
 if (!keyPath) {
   console.error('\n  FIREBASE_SERVICE_ACCOUNT_PATH is required (read-only key).\n');
@@ -70,6 +83,11 @@ const db = admin.firestore();
 const cutoverAt = Date.parse(args.cutover);
 if (Number.isNaN(cutoverAt)) {
   console.error(`\n  --cutover is not a parseable timestamp: ${args.cutover}\n`);
+  process.exit(2);
+}
+const decisionCutoverAt = Date.parse(args['decision-cutover']);
+if (Number.isNaN(decisionCutoverAt)) {
+  console.error(`\n  --decision-cutover is not a parseable timestamp: ${args['decision-cutover']}\n`);
   process.exit(2);
 }
 
@@ -131,6 +149,7 @@ for (const u of users) {
       company: c.data(),
       relationships: relsBySubject.get(c.id) ?? [],
       cutoverAt,
+      decisionCutoverAt,
     });
     results.push({ ...r, uid: u.id, companyId: c.id });
     if (r.status === RECONCILE.DIVERGENCE) userDivergences++;
@@ -158,14 +177,15 @@ const cutoverWarning = (activity.earliest && Date.parse(activity.earliest) < cut
       : null);
 
 if (args.json) {
-  console.log(JSON.stringify({ cutover: args.cutover, cutoverWarning, activity, reconciliation, gate, perUser }, null, 2));
+  console.log(JSON.stringify({ cutover: args.cutover, decisionCutover: args['decision-cutover'], cutoverWarning, activity, reconciliation, gate, perUser }, null, 2));
   process.exit(gate.pass ? 0 : 1);
 }
 
 const n = (v) => String(v).padStart(6);
 
 console.log(`\n  RECONCILER — project ${sa.project_id}`);
-console.log(`  cutover ${args.cutover}   workspaces ${perUser.length}   companies ${companies}\n`);
+console.log(`  cutover ${args.cutover}   decision cutover ${args['decision-cutover']}`);
+console.log(`  workspaces ${perUser.length}   companies ${companies}\n`);
 
 console.log('  ── WRITES SEEN ──────────────────────────────────────────────');
 console.log(`  ${n(relationships)}  icpRelationships     ${JSON.stringify(bySubjectType)}`);
@@ -185,6 +205,8 @@ console.log(`  ${n(reconciliation.counts[RECONCILE.AGREED])}  agreed`);
 console.log(`  ${n(reconciliation.counts[RECONCILE.EXPECTED_GAP])}  expected-gap    (pre-cutover corpus — by design, not a fault)`);
 console.log(`  ${n(reconciliation.counts[RECONCILE.UNDO_GAP])}  undo-gap        (undo unmodelled — reported, does not block)`);
 console.log(`  ${n(reconciliation.counts[RECONCILE.DIVERGENCE])}  DIVERGENCE      (the only count that should be zero)`);
+console.log(`  ${n(reconciliation.counts[RECONCILE.HISTORICAL_BYPASS])}  historical-bypass (decided by a bypass path before the canonical path — reported, not repaired)`);
+console.log(`  ${n(reconciliation.counts[RECONCILE.PEOPLE_MODE_LEGACY_BYPASS])}  PEOPLE_MODE_LEGACY_BYPASS (known, does not block — TEMPORARY until Step 1A)`);
 
 if (reconciliation.divergences.length) {
   console.log('\n  ── DIVERGENCES ──────────────────────────────────────────────');
@@ -194,6 +216,12 @@ if (reconciliation.divergences.length) {
   if (reconciliation.divergences.length > 40) {
     console.log(`    … and ${reconciliation.divergences.length - 40} more`);
   }
+}
+
+if (reconciliation.historicalBypass?.length) {
+  const byPath = {};
+  for (const b of reconciliation.historicalBypass) byPath[b.reason] = (byPath[b.reason] ?? 0) + 1;
+  console.log(`\n  historical bypass decisions: ${reconciliation.historicalBypass.length}  ${JSON.stringify(byPath)}`);
 }
 
 if (reconciliation.undoGaps?.length) {

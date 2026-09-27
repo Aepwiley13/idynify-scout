@@ -40,7 +40,6 @@ import RelationshipFirstValue from '../../components/onboarding/RelationshipFirs
 import CompanyResultsCard from '../../components/onboarding/CompanyResultsCard';
 import { useOnboardingState } from '../../hooks/useOnboardingState';
 import { calculateICPScore } from '../../utils/icpScoring';
-import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import BarryResultSet from '../../components/barry/BarryResultSet';
 import BarryResolutionPreview from '../../components/barry/BarryResolutionPreview';
 import { buildCandidatePayloads, mintClientRef } from '../../utils/candidatePayload';
@@ -83,7 +82,10 @@ export default function BarryWorkspace() {
   const [prospectingBusy, setProspectingBusy] = useState(false);
   const [prospectingStep, setProspectingStep] = useState(null);
   const [resultCompanies, setResultCompanies] = useState(null);
-  const [resultsIcpId, setResultsIcpId] = useState(null);
+  // The exact ICP the user confirmed in this conversation, as BarryOnboarding
+  // reports it. The surface ICP for decisions on the results card; null if no
+  // confirmation happened in this mount, and never replaced by a lookup.
+  const [confirmedIcpId, setConfirmedIcpId] = useState(null);
   const resultsDeliveredRef = useRef(false);
 
   const { barryState, companiesFoundCount } = useOnboardingState();
@@ -163,11 +165,6 @@ export default function BarryWorkspace() {
 
         scored.sort((a, b) => b._fitScore - a._fitScore);
         const top = scored.slice(0, 5);
-        // The ICP the user just confirmed is the one Barry searched under, and
-        // confirming it made it active. It is the surface ICP for decisions on
-        // the results card. Unresolved stays null — the card never guesses.
-        const icpResolution = await resolveActiveIcp(user.uid);
-        setResultsIcpId(isResolved(icpResolution) ? icpResolution.icpId : null);
         setResultCompanies(top);
 
         const total = companiesSnap.size;
@@ -475,6 +472,7 @@ export default function BarryWorkspace() {
                             onBarryMessage={(content) => feCtrl.addTurn({ role: 'assistant', content })}
                             onProcessing={setProspectingBusy}
                             onStepChange={setProspectingStep}
+                            onIcpConfirmed={setConfirmedIcpId}
                           />
                         </div>
                       )}
@@ -493,7 +491,7 @@ export default function BarryWorkspace() {
                           <CompanyResultsCard
                             companies={resultCompanies}
                             totalCount={companiesFoundCount || resultCompanies.length}
-                            icpId={resultsIcpId}
+                            icpId={confirmedIcpId}
                             onAccept={(company) => {
                               feCtrl.addTurn({
                                 role: 'assistant',

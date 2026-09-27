@@ -7,9 +7,10 @@ import { getDisplayIndustry } from '../../utils/companyDisplay';
 import './CompanyResultsCard.css';
 
 /**
- * `icpId` is the ICP this conversation searched under — the surface ICP the
- * decisions here are recorded against. Null when none resolved, in which case
- * the canonical path records fallback provenance or nothing, never a guess.
+ * `icpId` is the exact ICP the user confirmed in this conversation — the
+ * surface ICP the decisions here are recorded under. Null when no confirmation
+ * is in hand, in which case the canonical path records the discovery ICP as
+ * provenance only, or nothing — never a guess.
  */
 export default function CompanyResultsCard({ companies, totalCount, onAccept, icpId = null }) {
   const T = useT();

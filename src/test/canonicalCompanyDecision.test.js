@@ -13,9 +13,9 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, resolve } from 'node:path';
+import { dirname, resolve, join } from 'node:path';
 
 // ── In-memory Firestore ─────────────────────────────────────────────────────
 
@@ -154,8 +154,20 @@ describe('each decision surface routes through the canonical path', () => {
     expect(code('../components/onboarding/CompanyResultsCard.jsx')).toMatch(/surfaceIcpId: icpId/);
     expect(code('../pages/Scout/MissionControlDashboardV2.jsx')).toMatch(/surfaceIcpId: activeIcpProfile\?\.id \?\? null/);
     expect(code('../pages/Scout/CompanyDetail.jsx')).toMatch(/surfaceIcpId: matchIcp\?\.id \?\? null/);
-    expect(code('../pages/Barry/BarryWorkspace.jsx'))
-      .toMatch(/setResultsIcpId\(isResolved\(icpResolution\) \? icpResolution\.icpId : null\)/);
+  });
+
+  it('/barry records decisions under the exact ICP the user confirmed, not a global lookup', () => {
+    // BarryOnboarding hands over the id its confirmation just wrote…
+    const onboarding = code('../pages/Onboarding/BarryOnboarding.jsx');
+    const confirmAt = onboarding.indexOf('await setActiveIcpProfile(user.uid, icpId);');
+    const emitAt = onboarding.indexOf('emitIcpConfirmed(icpId);');
+    expect(confirmAt).toBeGreaterThan(-1);
+    expect(emitAt).toBeGreaterThan(confirmAt);
+    // …and the workspace passes exactly that to the card.
+    const workspace = code('../pages/Barry/BarryWorkspace.jsx');
+    expect(workspace).toMatch(/onIcpConfirmed=\{setConfirmedIcpId\}/);
+    expect(workspace).toMatch(/icpId=\{confirmedIcpId\}/);
+    expect(workspace, 'the card ICP must not come from the active-ICP resolver').not.toMatch(/resolveActiveIcp/);
   });
 
   it('Daily Discoveries still owns its persona resolution and passes the titles in', () => {
@@ -174,7 +186,7 @@ function canonical(doc) {
     swipeDirection: doc.swipeDirection,
     swipe_gesture: doc.swipe_gesture,
     swipedForICPId: doc.swipedForICPId,
-    decision_icp_id: doc.decision_icp_id,
+    decision_discovery_icp_id: doc.decision_discovery_icp_id,
     decision_icp_basis: doc.decision_icp_basis,
     titles_source: doc.titles_source,
     selected_titles: doc.selected_titles,
@@ -207,7 +219,7 @@ describe('every surface leaves the same canonical state for an approve', () => {
     }
     expect(states[0]).toEqual({
       status: 'accepted', swipedAt: 'ISO', swipeDirection: 'right', swipe_gesture: 'button',
-      swipedForICPId: ICP, decision_icp_id: ICP, decision_icp_basis: DECISION_ICP_BASIS.SURFACE,
+      swipedForICPId: ICP, decision_discovery_icp_id: ICP, decision_icp_basis: DECISION_ICP_BASIS.SURFACE,
       titles_source: 'icp_auto',
       selected_titles: [
         { title: 'Executive Director', rank: 1, score: 100 },
@@ -295,14 +307,27 @@ describe('every surface leaves the same canonical state for a skip', () => {
 describe('the deciding ICP: surface wins, discovery is provenance only, never a guess', () => {
   it('an explicit surface ICP wins over the discovery stamp', () => {
     expect(resolveDecisionIcp({ surfaceIcpId: 'icp_B', company: { icpId: ICP } }))
-      .toEqual({ activeICPId: 'icp_B', decisionIcpId: 'icp_B', basis: DECISION_ICP_BASIS.SURFACE });
+      .toEqual({ activeICPId: 'icp_B', discoveryIcpId: ICP, basis: DECISION_ICP_BASIS.SURFACE });
+  });
+
+  it('discovered under one ICP and approved under another keeps both facts apart', async () => {
+    STORE.set(`users/${UID}/icpProfiles/icp_B`, { industries: ['food'], targetTitles: [] });
+    const company = seedCompany('ab_1');   // discovered under icp_A
+    await approveCompany({ user: USER, company, surface: DECISION_SURFACE.BARRY_FIRST_VALUE, surfaceIcpId: 'icp_B' })
+      .then(r => r.peopleDiscovery);
+    const d = STORE.get(companyPath('ab_1'));
+    expect(d.swipedForICPId).toBe('icp_B');
+    expect(d.decision_discovery_icp_id).toBe(ICP);
+    expect(d.icpId).toBe(ICP);               // the discovery stamp is never overwritten
+    expect(relationship('icp_B', 'ab_1')?.state).toBe('accepted');
+    expect(relationship(ICP, 'ab_1')).toBeUndefined();
   });
 
   it('with no surface ICP the discovery icpId is recorded as fallback provenance — not stamped, not shadowed', async () => {
     const company = seedCompany('fb_1');
     await approveCompany({ user: USER, company, surface: DECISION_SURFACE.MISSION_CONTROL, surfaceIcpId: null }).then(r => r.peopleDiscovery);
     const d = STORE.get(companyPath('fb_1'));
-    expect(d.decision_icp_id).toBe(ICP);
+    expect(d.decision_discovery_icp_id).toBe(ICP);
     expect(d.decision_icp_basis).toBe(DECISION_ICP_BASIS.DISCOVERY_FALLBACK);
     expect('swipedForICPId' in d).toBe(false);
     expect(events()).toEqual([]);
@@ -315,7 +340,7 @@ describe('the deciding ICP: surface wins, discovery is provenance only, never a 
       const company = seedCompany(id, { icpId });
       await recordCompanyDecision({ userId: UID, company, direction: 'right', surface: DECISION_SURFACE.COMPANY_DETAIL, gesture: 'button' });
       const d = STORE.get(companyPath(id));
-      expect(d.decision_icp_id).toBe(null);
+      expect(d.decision_discovery_icp_id).toBe(null);
       expect(d.decision_icp_basis).toBe(DECISION_ICP_BASIS.UNATTRIBUTED);
       expect('swipedForICPId' in d).toBe(false);
     }
@@ -333,9 +358,9 @@ describe('reconciler — the canonical decision deploy', () => {
     classifyCompany({ company, relationships, cutoverAt: CUTOVER, decisionCutoverAt: DECISION_CUTOVER });
 
   it.each([
-    ['fallback provenance', { decision_icp_basis: 'discovery_fallback', decision_icp_id: ICP }, 'discovery_fallback'],
-    ['unattributed', { decision_icp_basis: 'unattributed', decision_icp_id: null }, 'unattributed'],
-    ['a path that still bypasses it', { swipe_source: 'people_mode' }, 'no-canonical-stamp'],
+    ['fallback provenance', { decision_icp_basis: 'discovery_fallback', decision_discovery_icp_id: ICP }, 'discovery_fallback'],
+    ['unattributed', { decision_icp_basis: 'unattributed', decision_discovery_icp_id: null }, 'unattributed'],
+    ['an unknown bypass', { swipeDirection: 'right' }, 'no-canonical-stamp'],
   ])('a decision after the deploy with no ICP stamp is a REAL gap — %s', (_l, extra, basis) => {
     const r = classify({ status: 'accepted', icpId: ICP, swipedAt: after, ...extra });
     expect(r.status).toBe(RECONCILE.DIVERGENCE);
@@ -352,11 +377,81 @@ describe('reconciler — the canonical decision deploy', () => {
     ['the /barry results card', { swipe_source: 'barry_first_value', swipedAt: before }, 'bypass:barry_first_value'],
     ['Mission Control', { approvedAt: { _seconds: Date.parse(before) / 1000 } }, 'bypass:mission_control'],
     ['Company Detail', { approvedAt: before, approved_from: 'company_detail_preview' }, 'bypass:company_detail_preview'],
-    ['People mode', { swipe_source: 'people_mode', swipedAt: before }, 'bypass:people_mode'],
+    ['People mode', { swipe_source: 'people_mode', swipeDirection: 'right', swipedAt: before }, 'bypass:people_mode'],
   ])('a historical bypass decision from %s goes in its own bucket', (_l, extra, reason) => {
     const r = classify({ status: 'accepted', icpId: ICP, found_at: '2026-09-01T00:00:00Z', ...extra });
     expect(r.status).toBe(RECONCILE.HISTORICAL_BYPASS);
     expect(r.reason).toBe(reason);
+  });
+
+  // ── PEOPLE_MODE_LEGACY_BYPASS — temporary until Step 1A ──────────────────
+  const PEOPLE_MODE_WRITE = { status: 'accepted', swipeDirection: 'right', swipe_source: 'people_mode' };
+
+  it('the People-mode company acceptance after the deploy is named, not a gap and not clean', () => {
+    const r = classify({ ...PEOPLE_MODE_WRITE, icpId: ICP, swipedAt: after });
+    expect(r.status).toBe(RECONCILE.PEOPLE_MODE_LEGACY_BYPASS);
+    expect(r.reason).toBe('people-mode-company-acceptance:until-step-1a');
+  });
+
+  it('a stale swipedForICPId cannot pass a People-mode acceptance off as clean', () => {
+    // Left behind by an undone Daily Discoveries decision, with shadow agreeing.
+    const r = classify({ ...PEOPLE_MODE_WRITE, swipedForICPId: ICP, swipedAt: after }, [{ icpId: ICP, state: 'accepted' }]);
+    expect(r.status).toBe(RECONCILE.PEOPLE_MODE_LEGACY_BYPASS);
+  });
+
+  it('before the deploy it is a historical bypass like the others', () => {
+    const r = classify({ ...PEOPLE_MODE_WRITE, icpId: ICP, swipedAt: before });
+    expect(r.status).toBe(RECONCILE.HISTORICAL_BYPASS);
+    expect(r.reason).toBe('bypass:people_mode');
+  });
+
+  it.each([
+    ['a rejection carrying the People-mode source', { status: 'rejected', swipeDirection: 'left', swipe_source: 'people_mode' }],
+    ['the People-mode source with no direction', { status: 'accepted', swipe_source: 'people_mode' }],
+    ['a canonical stamp alongside it', { ...PEOPLE_MODE_WRITE, decision_icp_basis: 'unattributed' }],
+    ['another surface', { status: 'accepted', swipeDirection: 'right', swipe_source: 'mission_control' }],
+    ['no source at all', { status: 'accepted', swipeDirection: 'right' }],
+  ])('an unknown post-deploy bypass cannot hide in the People-mode bucket — %s', (_l, doc) => {
+    const r = classify({ ...doc, icpId: ICP, swipedAt: after });
+    expect(r.status).not.toBe(RECONCILE.PEOPLE_MODE_LEGACY_BYPASS);
+    expect(r.status).toBe(RECONCILE.DIVERGENCE);
+  });
+
+  it('the People-mode bucket is counted on every run and never blocks', () => {
+    const s = summarize([
+      { status: RECONCILE.AGREED },
+      { status: RECONCILE.PEOPLE_MODE_LEGACY_BYPASS, reason: 'people-mode-company-acceptance:until-step-1a' },
+    ]);
+    expect(s.clean).toBe(true);
+    expect(s.counts[RECONCILE.PEOPLE_MODE_LEGACY_BYPASS]).toBe(1);
+    expect(s.counts[RECONCILE.AGREED]).toBe(1);
+    expect(s.peopleModeLegacyBypass).toHaveLength(1);
+    expect(summarize([]).counts[RECONCILE.PEOPLE_MODE_LEGACY_BYPASS]).toBe(0);
+    expect(code('../../scripts/reconcile/run.mjs')).toMatch(/counts\[RECONCILE\.PEOPLE_MODE_LEGACY_BYPASS\]/);
+  });
+
+  it('the signature has exactly one writer, and the canonical path cannot produce it', () => {
+    // Every client, server and script source that could write a company.
+    const walk = (dir, out = []) => {
+      for (const name of readdirSync(dir)) {
+        if (name === 'node_modules' || name === 'test') continue;
+        const p = join(dir, name);
+        if (statSync(p).isDirectory()) walk(p, out);
+        else if (/\.(js|jsx|mjs|cjs|ts)$/.test(name)) out.push(p);
+      }
+      return out;
+    };
+    const root = resolve(here, '../..');
+    const hits = ['src', 'netlify', 'functions', 'scripts']
+      .flatMap(d => { try { return walk(resolve(root, d)); } catch { return []; } })
+      .filter(f => /swipe_source:\s*['"]people_mode['"]/.test(readFileSync(f, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')))
+      .map(f => f.slice(root.length + 1));
+    expect(hits).toEqual(['src/pages/Scout/DailyLeads.jsx']);
+    expect([...code('../pages/Scout/DailyLeads.jsx').matchAll(/swipe_source: 'people_mode'/g)]).toHaveLength(1);
+    expect(Object.values(DECISION_SURFACE)).not.toContain('people_mode');
+    // …and the canonical path stamps what the signature requires to be absent.
+    expect(code('../services/companyDecision.js')).toMatch(/swipe_source: surface,[\s\S]{0,120}decision_icp_basis: basis/);
   });
 
   it('historical bypass is reported in full and never blocks', () => {

@@ -206,6 +206,7 @@ console.log(`  ${n(reconciliation.counts[RECONCILE.EXPECTED_GAP])}  expected-gap
 console.log(`  ${n(reconciliation.counts[RECONCILE.UNDO_GAP])}  undo-gap        (undo unmodelled — reported, does not block)`);
 console.log(`  ${n(reconciliation.counts[RECONCILE.DIVERGENCE])}  DIVERGENCE      (the only count that should be zero)`);
 console.log(`  ${n(reconciliation.counts[RECONCILE.HISTORICAL_BYPASS])}  historical-bypass (decided by a bypass path before the canonical path — reported, not repaired)`);
+console.log(`  ${n(reconciliation.counts[RECONCILE.PEOPLE_MODE_LEGACY_BYPASS])}  PEOPLE_MODE_LEGACY_BYPASS (known, does not block — TEMPORARY until Step 1A)`);
 
 if (reconciliation.divergences.length) {
   console.log('\n  ── DIVERGENCES ──────────────────────────────────────────────');

@@ -23,11 +23,18 @@
  *   · an explicit surface ICP always wins. It is the only ICP stamped as
  *     `swipedForICPId`, the only one the shadow write attributes the decision
  *     to, and the only one whose persona drives people discovery;
- *   · otherwise the company's DISCOVERY icpId is recorded as fallback
- *     provenance only (`decision_icp_basis: 'discovery_fallback'`). It says
- *     which search surfaced the company, not what the user was deciding
- *     under, so it is never stamped as swipedForICPId and never shadow-written;
+ *   · otherwise the decision rests on the company's DISCOVERY icpId as
+ *     fallback provenance only (`decision_icp_basis: 'discovery_fallback'`).
+ *     It says which search surfaced the company, not what the user was
+ *     deciding under, so it is never stamped as swipedForICPId and never
+ *     shadow-written;
  *   · otherwise the decision is recorded as unattributed. Never guessed.
+ *
+ * Discovery and decision are different facts — a company found under ICP A
+ * can be approved under ICP B — so they never share a field. The discovery ICP
+ * is frozen on every decision as `decision_discovery_icp_id`, whatever the
+ * basis; `swipedForICPId` holds only the explicit decision ICP; the company's
+ * own `icpId` is never written here.
  *
  * ─── SKIP IS NOT A DECISION ────────────────────────────────────────────────
  * Skip means "not now". It keeps `status: 'pending'`, writes no decision field,
@@ -75,18 +82,18 @@ const SURFACE_LEGACY_FIELDS = {
 /**
  * The ICP a decision is recorded under — see the header. `activeICPId` is the
  * surface ICP or null; it is the only value that may be stamped as the
- * decision context.
+ * decision context. `discoveryIcpId` is provenance, kept apart from it.
  */
 export function resolveDecisionIcp({ surfaceIcpId = null, company = {} } = {}) {
-  if (surfaceIcpId) {
-    return { activeICPId: surfaceIcpId, decisionIcpId: surfaceIcpId, basis: DECISION_ICP_BASIS.SURFACE };
-  }
   // `default` is a legacy sentinel, not an association.
-  const discovered = company?.icpId && company.icpId !== DEFAULT_ICP_ID ? company.icpId : null;
-  if (discovered) {
-    return { activeICPId: null, decisionIcpId: discovered, basis: DECISION_ICP_BASIS.DISCOVERY_FALLBACK };
+  const discoveryIcpId = company?.icpId && company.icpId !== DEFAULT_ICP_ID ? company.icpId : null;
+  if (surfaceIcpId) {
+    return { activeICPId: surfaceIcpId, discoveryIcpId, basis: DECISION_ICP_BASIS.SURFACE };
   }
-  return { activeICPId: null, decisionIcpId: null, basis: DECISION_ICP_BASIS.UNATTRIBUTED };
+  if (discoveryIcpId) {
+    return { activeICPId: null, discoveryIcpId, basis: DECISION_ICP_BASIS.DISCOVERY_FALLBACK };
+  }
+  return { activeICPId: null, discoveryIcpId: null, basis: DECISION_ICP_BASIS.UNATTRIBUTED };
 }
 
 // ── Double-tap guard ────────────────────────────────────────────────────────
@@ -130,7 +137,7 @@ export async function recordCompanyDecision({
   if (decided.get(key) === direction) return { recorded: false, reason: 'already-decided' };
   inFlight.add(key);
 
-  const { activeICPId, decisionIcpId, basis } = resolveDecisionIcp({ surfaceIcpId, company });
+  const { activeICPId, discoveryIcpId, basis } = resolveDecisionIcp({ surfaceIcpId, company });
   try {
     const companyRef = doc(db, 'users', userId, 'companies', company.id);
     // One timestamp for the decision: the legacy write and the shadow event
@@ -147,8 +154,8 @@ export async function recordCompanyDecision({
       swipe_gesture: gesture,
       swipe_source: surface,
       ...(activeICPId ? { swipedForICPId: activeICPId } : {}),
-      decision_icp_id: decisionIcpId,
       decision_icp_basis: basis,
+      decision_discovery_icp_id: discoveryIcpId,
       ...(direction === 'right' && feedback ? { barryFeedback: feedback, feedbackAt: new Date().toISOString() } : {}),
       ...(direction === 'left' && feedback ? { barryRejectionFeedback: feedback, rejectionFeedbackAt: new Date().toISOString() } : {}),
     });
@@ -169,7 +176,7 @@ export async function recordCompanyDecision({
     }
 
     decided.set(key, direction);
-    return { recorded: true, swipedAt, activeICPId, decisionIcpId, basis };
+    return { recorded: true, swipedAt, activeICPId, discoveryIcpId, basis };
   } finally {
     inFlight.delete(key);
   }

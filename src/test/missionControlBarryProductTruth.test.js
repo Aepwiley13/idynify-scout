@@ -117,7 +117,9 @@ describe('Mission Control Barry — conversation turn, new account, no targeting
 
   it('is told targeting is not set and to send the user to the /barry targeting flow', () => {
     expect(prompt).toContain('TARGETING STATUS: Not set yet');
-    expect(prompt).toMatch(/find matching companies as soon as you know who they want to reach/);
+    expect(prompt).toMatch(/say plainly that Idynify can find companies for them, and that it needs to know who they are targeting first/);
+    expect(prompt).toMatch(/Do not offer to search now/);
+    expect(prompt).toMatch(/no search can run until their targeting is defined/);
     expect(prompt).toMatch(/send them to Barry at \/barry to define their target/);
   });
 

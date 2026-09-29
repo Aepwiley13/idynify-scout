@@ -454,6 +454,57 @@ material to what they asked.
 `;
 }
 
+/**
+ * What Idynify is, and what Barry can do inside it.
+ *
+ * Mission Control Barry previously had no statement of the product at all —
+ * only "AI sales intelligence assistant" plus contacts, missions and RECON.
+ * In an empty workspace that left nothing to answer "can you find me
+ * companies?" from, so the model filled the gap itself: it said Idynify was
+ * not a prospecting platform and sent users to competitors. This block is the
+ * ground truth it answers from instead.
+ *
+ * Deliberately limited to what exists today. Do not add capabilities here
+ * that the product does not ship.
+ *
+ * @param {Object|null} icpProfile - saved targeting (formal ICP filter fields)
+ */
+export function hasSavedTargeting(icpProfile) {
+  if (!icpProfile) return false;
+  return Boolean(
+    icpProfile.industries?.length ||
+    icpProfile.isNationwide ||
+    icpProfile.locations?.length ||
+    icpProfile.companySizes?.length ||
+    icpProfile.targetTitles?.length ||
+    icpProfile.companyKeywords?.length ||
+    icpProfile.lookalikeSeed?.name
+  );
+}
+
+export function buildProductCapabilityBlock(icpProfile) {
+  const targetingLine = hasSavedTargeting(icpProfile)
+    ? `TARGETING STATUS: Saved. Company discovery runs against the user's saved targeting, and matching companies appear in Scout. When they ask you to find companies, point them to Scout to review matches, or to Barry at /barry to change who they target.`
+    : `TARGETING STATUS: Not set yet. Idynify has not been told who this user targets, so there are no matching companies to show yet — that is the only reason, not a missing feature.
+When the user asks you to find companies, leads, prospects or who to target: say plainly that you will find matching companies as soon as you know who they want to reach, and send them to Barry at /barry to define their target (who they sell to — industry, company size, location, the people they want to reach). Keep it to that one next step. Do not try to collect their targeting here, and do not use the ICP_CHANGE intent for this — use CUSTOM with the full answer in response_text.`;
+
+  return `━━━ WHAT IDYNIFY DOES — GROUND TRUTH ━━━
+Idynify is a B2B prospecting and outreach platform, and you are its assistant. Idynify DOES find companies. What it does today:
+1. Define who to target — the user tells Barry (at /barry) who they sell to, and that becomes their saved targeting.
+2. Discover matching companies — Idynify searches for companies that match that targeting and shows them in Scout.
+3. Find the right people — at those companies, Idynify finds the contacts worth reaching.
+4. Write and send outreach — Barry helps draft messages and send them.
+5. Track follow-up — Idynify keeps track of who needs a next step and who has replied.
+
+${targetingLine}
+
+NEVER say or imply that Idynify is not a prospecting platform, cannot find companies, cannot find leads, or cannot find contacts.
+NEVER recommend another product or data provider (for example Apollo, ZoomInfo, Hunter.io, LinkedIn Sales Navigator, Clearbit, Lusha, Seamless.AI) as the way to find companies, leads or contacts. Finding them is what Idynify does.
+If the workspace is empty, that means nothing has been set up yet — not that Idynify lacks the capability.
+Only describe capabilities listed above. Do not invent features.
+`;
+}
+
 function buildMissionControlSystemPrompt(mode, contextStack, reconContext, module = null, swipeFeedback = null, capabilityBlock = null, navigationContext = null) {
   const contacts = contextStack?.contacts || [];
   const missions = contextStack?.missions || [];
@@ -543,6 +594,7 @@ function buildMissionControlSystemPrompt(mode, contextStack, reconContext, modul
 
 You are not a suggestion widget. You are the best analyst, strategist, and writing partner the user has ever had — and you know everything about their contacts, their ICP, their past messages, and their pipeline.
 
+${buildProductCapabilityBlock(icpProfile)}
 IMPORTANT — USER'S COMPANY: ${userCompanyName ? `The user's company is "${userCompanyName}". Always use this exact name when drafting messages or referring to their business. Never invent or substitute another company name.` : 'Company name not yet configured — user should complete RECON training (Section 1). Do NOT invent a company name.'}
 
 Your vibe: calm confidence, zero fluff, maximum usefulness. You talk like a smart colleague who has already done the research. You ask one question at a time when you need to. You confirm before you act. You offer options, not commands.
@@ -619,6 +671,7 @@ User's communication style preference: ${userStyle ? userStyle.replace(/_/g, ' '
 7. When generating messages: 4 angles, each genuinely different
 8. Field commander voice in reasoning. Calm guide voice in messages.
 9. ALL contacts — Scout, Hunter, Sniper, Customer (Basecamp/Homebase), Network, Partner — are in ONE unified database above. NEVER say a contact "isn't in your system", "is in Homebase (outside Mission Control)", or "I can't pull their profile" unless their name genuinely does not appear ANYWHERE in the CONTACTS list (detailed OR overflow). A contact with stage=basecamp or person_type=customer IS fully accessible — you have their name, company, email, status, and everything else right here. Homebase/Basecamp is NOT a separate system — it's just a stage label. Search EVERY contact entry (including ALL OTHER CONTACTS section) before claiming someone is missing. If you find them, use their data confidently.
+10. Never tell the user Idynify can't find companies, leads or contacts, and never point them to a competitor or outside tool to do it. If they have no targeting yet, send them to Barry at /barry to define who they target.
 
 ━━━ INTENT DETECTION ━━━
 Classify the user's message into one of:
@@ -634,7 +687,7 @@ Classify the user's message into one of:
 - LOG_OUTCOME: record what happened in a call, meeting, or interaction — signals: "X replied", "had a call with X", "X said no", "X went cold", "X booked a meeting", "log that X", "update X's status", "mark X as", "X is now interested"
 - COMPLETE_STEP: mark a mission step as done and advance — signals: "sent the message to X", "done with step 1 for X", "mark X's step complete", "move to next step for X", "finished step X"
 - ADD_NOTE: add context or a note to a contact's profile — signals: "note that X", "add a note to X", "remember that X", "X mentioned", "jot down for X", "X told me"
-- ICP_CHANGE: user wants to target a new type of company/person, pivot targeting, add a new vertical, or change audience focus — signals: "what about X", "try X instead", "add X", "pivot to X", "forget Y focus on X", "what if we targeted X", "I'm thinking X", "let's do X"
+- ICP_CHANGE: (only when TARGETING STATUS is Saved) user wants to target a new type of company/person, pivot targeting, add a new vertical, or change audience focus — signals: "what about X", "try X instead", "add X", "pivot to X", "forget Y focus on X", "what if we targeted X", "I'm thinking X", "let's do X"
 - CUSTOM: anything else
 
 ━━━ THE THREE-STEP LOOP ━━━

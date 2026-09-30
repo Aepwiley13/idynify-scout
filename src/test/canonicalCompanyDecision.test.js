@@ -157,12 +157,17 @@ describe('each decision surface routes through the canonical path', () => {
   });
 
   it('/barry records decisions under the exact ICP the user confirmed, not a global lookup', () => {
-    // BarryOnboarding hands over the id its confirmation just wrote…
+    // BarryOnboarding hands over the id its confirmation just wrote — the
+    // activation itself now happens inside the awaited confirmAndActivateIcp
+    // call, shared with Mission Control Barry's targeting handoff.
     const onboarding = code('../pages/Onboarding/BarryOnboarding.jsx');
-    const confirmAt = onboarding.indexOf('await setActiveIcpProfile(user.uid, icpId);');
+    const confirmAt = onboarding.indexOf('await confirmAndActivateIcp(user, extractedICP,');
     const emitAt = onboarding.indexOf('emitIcpConfirmed(icpId);');
     expect(confirmAt).toBeGreaterThan(-1);
     expect(emitAt).toBeGreaterThan(confirmAt);
+
+    const confirmIcp = code('../utils/confirmAndActivateIcp.js');
+    expect(confirmIcp).toMatch(/await setActiveIcpProfile\(user\.uid, icpId\)/);
     // …and the workspace passes exactly that to the card.
     const workspace = code('../pages/Barry/BarryWorkspace.jsx');
     expect(workspace).toMatch(/onIcpConfirmed=\{setConfirmedIcpId\}/);

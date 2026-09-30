@@ -27,7 +27,9 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { getStaleContacts } from './utils/contactUtils.js';
 import { buildCapabilityBlock, computeReconState } from './utils/reconCapability.js';
-import { LEGACY_HAIKU_4_5 } from './utils/models.js';
+import { LEGACY_HAIKU_4_5, LEGACY_SONNET_4_5 } from './utils/models.js';
+import { processInitialInput, processFollowup } from './barryICPConversation.js';
+import { normalizeClassification, INTENT_PROSPECTING } from '../../src/utils/firstExperienceIntent.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -1285,6 +1287,114 @@ Return valid JSON only:
           console.warn('[barryMissionChat] Could not load context:', ctxErr.message);
           effectiveContextStack = { contacts: [], missions: [], recon: {}, module };
         }
+      }
+
+      // ── Prospecting handoff gate ─────────────────────────────────────────────
+      //
+      // Deterministic gate: the classifier below is only ever consulted when no
+      // targeting is saved. Reuses the existing First Experience classifier
+      // (see isFirstExperience above) rather than adding a second one — the
+      // same PROSPECTING category already means "wants to find companies/people
+      // not yet known," and its own rules already bias away from false-firing.
+      // A pendingICP already present means the client is continuing an
+      // extraction started on a prior turn — go straight to the follow-up
+      // extractor without reclassifying.
+      const hasTargeting = hasSavedTargeting(effectiveContextStack?.icpProfile || null);
+      const pendingICP = body.pendingICP || null;
+      const icpExtractionStep = typeof body.icpExtractionStep === 'string' ? body.icpExtractionStep : 'clarifying';
+
+      let enterExtraction = Boolean(pendingICP);
+
+      if (!enterExtraction && !hasTargeting && message) {
+        const gateController = new AbortController();
+        const gateTimeout = setTimeout(() => gateController.abort(), 8000);
+        try {
+          const gateResponse = await anthropic.messages.create(
+            {
+              model: LEGACY_HAIKU_4_5,
+              max_tokens: 300,
+              system: buildFirstExperienceClassifierPrompt(null),
+              messages: [{ role: 'user', content: message.slice(0, 2000) }],
+            },
+            { signal: gateController.signal }
+          );
+          const classification = normalizeClassification(extractJson(gateResponse.content[0].text));
+          if (classification.intent === INTENT_PROSPECTING && !classification.needsConfirmation) {
+            enterExtraction = true;
+          }
+        } catch (gateErr) {
+          console.warn('[barryMissionChat] Prospecting gate classification failed (non-fatal):', gateErr.message);
+        } finally {
+          clearTimeout(gateTimeout);
+        }
+      }
+
+      if (enterExtraction) {
+        // ── Targeting extraction handoff ────────────────────────────────────
+        //
+        // Reuses the existing create-from-scratch extractor verbatim (the same
+        // logic BarryOnboarding.jsx already calls over HTTP) rather than a
+        // second implementation, seeded from Mission Control's own
+        // conversation history so the user is never asked to repeat what they
+        // already told Barry.
+        let extraction;
+        try {
+          extraction = pendingICP
+            ? await processFollowup(anthropic, message, icpExtractionStep, conversationHistory, pendingICP)
+            : await processInitialInput(anthropic, message, null);
+        } catch (extractErr) {
+          console.warn('[barryMissionChat] Targeting extraction failed:', extractErr.message);
+          extraction = null;
+        }
+
+        if (extraction?.barryResponse) {
+          const { barryResponse, step: nextStep } = extraction;
+          const readyToConfirm = nextStep === 'confirming';
+          const responseText = barryResponse.followUpQuestion || barryResponse.mappingExplanation
+            || "Tell me more about who you're looking for.";
+
+          const extractionParsed = {
+            intent: 'CUSTOM',
+            barry_mode: effectiveMode,
+            step: 'execute',
+            response_text: responseText,
+            contact_id: null,
+            has_message_angles: false,
+            angles: [],
+            actions: [],
+            clarifying_question: null,
+            pendingICP: barryResponse.understood || pendingICP,
+            icpExtractionStep: nextStep,
+            readyToConfirm,
+          };
+
+          const extractionHistory = [
+            ...conversationHistory,
+            { role: 'user', content: message },
+            { role: 'assistant', content: JSON.stringify(extractionParsed) },
+          ];
+
+          await logApiUsage(userId, 'barryMissionChat', 'success', {
+            provider: 'anthropic',
+            model: LEGACY_SONNET_4_5,
+            traceId,
+            responseTime: Date.now() - startTime,
+            metadata: { type: 'prospecting_targeting_extraction', readyToConfirm },
+          });
+
+          return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            body: JSON.stringify({
+              success: true,
+              response: extractionParsed.response_text,
+              updatedHistory: extractionHistory,
+              ...extractionParsed,
+            }),
+          };
+        }
+        // Extraction failed — fall through to normal Mission Control generation
+        // below rather than leaving the user with no response at all.
       }
 
       // ── Fuzzy name search: if user mentions a name not in the context, find them ──

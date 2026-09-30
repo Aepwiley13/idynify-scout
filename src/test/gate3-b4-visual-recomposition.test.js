@@ -27,6 +27,10 @@ const code = src => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm
 const workspaceCss = read('../pages/Barry/BarryWorkspace.css');
 const barryOnboarding = read('../pages/Onboarding/BarryOnboarding.jsx');
 const barryCode = code(barryOnboarding);
+// The write/activate/bridge/search sequence itself lives in
+// confirmAndActivateIcp.js, shared with Mission Control Barry's targeting
+// handoff — BarryOnboarding.jsx now only calls it.
+const confirmIcpCode = code(read('../utils/confirmAndActivateIcp.js'));
 const workspace = read('../pages/Barry/BarryWorkspace.jsx');
 const workspaceCode = code(workspace);
 
@@ -229,15 +233,16 @@ describe('V9 — Intelligence behavior untouched', () => {
   });
 
   it('ICP authority sequence preserved', () => {
-    expect(barryCode).toMatch(/resolveActiveIcp\(user\.uid\)/);
-    expect(barryCode).toMatch(/'icpProfiles', icpId/);
-    expect(barryCode).toMatch(/setActiveIcpProfile\(user\.uid, icpId\)/);
-    expect(barryCode).toMatch(/icpIdSource: 'barry_onboarding_confirmed'/);
+    expect(confirmIcpCode).toMatch(/resolveActiveIcp\(user\.uid\)/);
+    expect(confirmIcpCode).toMatch(/'icpProfiles', icpId/);
+    expect(confirmIcpCode).toMatch(/setActiveIcpProfile\(user\.uid, icpId\)/);
+    expect(confirmIcpCode).toMatch(/icpIdSource: `\$\{source\}_confirmed`/);
+    expect(barryCode).toMatch(/confirmAndActivateIcp\(user, extractedICP, 'barry_onboarding'\)/);
   });
 
   it('handleConfirm still runs search when constraints exist', () => {
     expect(barryCode).toMatch(/canSearch/);
-    expect(barryCode).toMatch(/search-companies/);
+    expect(confirmIcpCode).toMatch(/search-companies/);
   });
 
   it('website analysis still merges into targeting', () => {

@@ -117,7 +117,10 @@ describe('D7 — the first-search gate matches the real constraint set', () => {
   });
 
   it('and the component is wired to it rather than carrying its own', () => {
-    expect(onboarding).toMatch(/const canSearch = hasRetrievalConstraint\(icpProfile\)/);
+    // The gate itself is applied inside confirmAndActivateIcp.js now, shared
+    // with Mission Control Barry's targeting handoff.
+    const confirmIcp = read('../utils/confirmAndActivateIcp.js');
+    expect(confirmIcp).toMatch(/const canSearch = hasRetrievalConstraint\(icpProfile\)/);
     expect(onboarding).not.toMatch(/const hasRetrievalConstraint =/);
   });
 });

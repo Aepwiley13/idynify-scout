@@ -29,7 +29,7 @@ import MessageAngleBlock from '../shared/MessageAngleBlock';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { useShell } from '../../context/ShellContext';
 import { appendTurn, loadOrSeedRecentTurns } from '../../utils/barryCanonical';
-import { confirmAndActivateIcp } from '../../utils/confirmAndActivateIcp';
+import { confirmAndActivateIcp, effectiveTargeting, formatCompanySizeRange } from '../../utils/confirmAndActivateIcp';
 import { BRAND, STATUS } from '../../theme/tokens';
 
 const DEFAULT_TOKENS = {
@@ -1549,6 +1549,16 @@ export default function BarryChatPanel({
 
                   // ── Targeting confirmation bubble ──
                   if (msg.role === 'targeting_confirm') {
+                    // The authoritative facts of what Confirm will execute —
+                    // built from the same structured object confirmAndActivateIcp
+                    // persists (effectiveTargeting), not regenerated from prose.
+                    // mappingExplanation above is Barry's conversational lead-in;
+                    // this block is what the user is actually agreeing to.
+                    const { company, people } = effectiveTargeting(msg.icp || {});
+                    const geography = company.isNationwide
+                      ? 'Nationwide'
+                      : (company.locations.length > 0 ? company.locations.join(', ') : null);
+                    const sizeLine = formatCompanySizeRange(company.companySizes);
                     return (
                       <div key={i} className="flex gap-2 flex-row">
                         <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
@@ -1556,6 +1566,24 @@ export default function BarryChatPanel({
                           {msg.responseText && (
                             <div className="mb-3" style={{ color: T.text }}>{msg.responseText}</div>
                           )}
+                          <div className="mb-3" style={{ color: T.text }}>
+                            {(geography || sizeLine) && (
+                              <div className="mb-2">
+                                <div className="font-mono text-xs uppercase tracking-wide mb-1" style={{ color: T.textMuted }}>Company discovery</div>
+                                {geography && <div>• {geography}</div>}
+                                {sizeLine && <div>• {sizeLine}</div>}
+                              </div>
+                            )}
+                            {people.targetTitles.length > 0 && (
+                              <div className="mb-2">
+                                <div className="font-mono text-xs uppercase tracking-wide mb-1" style={{ color: T.textMuted }}>People targeting</div>
+                                {people.targetTitles.map(title => <div key={title}>• {title}</div>)}
+                              </div>
+                            )}
+                            <div className="text-xs" style={{ color: T.textMuted }}>
+                              Company discovery doesn't currently narrow by county or revenue.
+                            </div>
+                          </div>
                           <div className="flex gap-2 flex-wrap">
                             <button
                               onClick={async () => { await confirmTargetingExtraction(msg.icp); }}

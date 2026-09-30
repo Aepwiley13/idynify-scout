@@ -202,7 +202,7 @@ describe('Jordan River — confirming the gathered targeting', () => {
     }));
     vi.doMock('../firebase/config', () => ({ db: {} }));
 
-    const { confirmAndActivateIcp } = await import('../utils/confirmAndActivateIcp');
+    const { confirmAndActivateIcp, effectiveTargeting, formatCompanySizeRange } = await import('../utils/confirmAndActivateIcp');
 
     let searchBody = null;
     const user = {
@@ -221,6 +221,19 @@ describe('Jordan River — confirming the gathered targeting', () => {
       industries: [], companySizes: ['501-1,000', '1,001-2,000', '2,001-5,000', '5,001-10,000', '10,001+'],
       locations: ['Utah'], targetTitles: ['CEO', 'Founder', 'CMO', 'CSR / Community Relations'], companyKeywords: [],
     };
+
+    // What BarryChatPanel's targeting_confirm bubble would have displayed to
+    // the user, computed from the exact same pendingICP object confirmation
+    // hands to confirmAndActivateIcp below — the same function both read.
+    const displayed = effectiveTargeting(pendingICP);
+    expect(displayed.company.locations).toEqual(['Utah']);
+    expect(displayed.company.isNationwide).toBe(false);
+    expect(formatCompanySizeRange(displayed.company.companySizes)).toBe('501+ employees');
+    expect(displayed.people.targetTitles).toEqual(['CEO', 'Founder', 'CMO', 'CSR / Community Relations']);
+    // Neither county nor revenue appears anywhere in what would be displayed
+    // — there is no field for either to hide in.
+    expect(displayed.company.locations).not.toContain('Salt Lake County');
+    expect(JSON.stringify(displayed)).not.toMatch(/revenue|50M/i);
 
     const { icpId, icpProfile, canSearch } = await confirmAndActivateIcp(user, pendingICP, 'mission_control');
 
@@ -250,5 +263,76 @@ describe('Jordan River — confirming the gathered targeting', () => {
     // profile object (available to whatever reads it later) but are not
     // filters this call is asking Apollo to apply.
     expect(searchBody.companyProfile.targetTitles).toEqual(['CEO', 'Founder', 'CMO', 'CSR / Community Relations']);
+
+    // The full chain: what was displayed to the user equals what was
+    // persisted equals what was actually sent as search-companies
+    // constraints. Not three independent implementations that happen to
+    // agree today — displayed and persisted both came from the one call to
+    // effectiveTargeting() above, so they cannot structurally drift apart.
+    expect(displayed.company.locations).toEqual(icpProfile.locations);
+    expect(displayed.company.locations).toEqual(searchBody.companyProfile.locations);
+    expect(displayed.company.companySizes).toEqual(icpProfile.companySizes);
+    expect(displayed.company.companySizes).toEqual(searchBody.companyProfile.companySizes);
+    expect(displayed.people.targetTitles).toEqual(icpProfile.targetTitles);
+    expect(displayed.people.targetTitles).toEqual(searchBody.companyProfile.targetTitles);
+  });
+});
+
+// ── Part 3: a normal, simple ICP — the confirmation must stay simple, not
+//    become a wall of text just because the machinery now supports more. ──
+
+describe('Normal case — a simple ICP confirms without becoming a wall of text', () => {
+  it('Utah SaaS companies, 51-200 employees, Founders and VP Sales', async () => {
+    vi.resetModules();
+
+    const STORE = new Map();
+    const pathOf = (first, rest) => (first && first.__path ? [first.__path, ...rest] : rest).join('/');
+    const clone = v => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
+    function write(path, data, options) {
+      STORE.set(path, options?.merge ? { ...(STORE.get(path) || {}), ...clone(data) } : clone(data));
+    }
+    vi.doMock('firebase/firestore', () => ({
+      collection: (first, ...rest) => ({ __path: pathOf(first, rest) }),
+      doc: (first, ...rest) => { const p = pathOf(first, rest); return { __path: p, id: p.split('/').pop() }; },
+      getDoc: async ref => { const d = STORE.get(ref.__path); return { exists: () => d !== undefined, data: () => clone(d) }; },
+      getDocs: async q => {
+        const prefix = q.__path + '/';
+        const docs = [...STORE.entries()].filter(([k]) => k.startsWith(prefix) && !k.slice(prefix.length).includes('/'))
+          .map(([k, v]) => ({ id: k.split('/').pop(), data: () => clone(v), ref: { __path: k, id: k.split('/').pop() } }));
+        return { empty: docs.length === 0, docs };
+      },
+      setDoc: async (ref, data, options) => write(ref.__path, data, options),
+      writeBatch: () => { const staged = []; return { set: (r, d, o) => staged.push([r.__path, d, o]), update: (r, d) => staged.push([r.__path, d, { merge: true }]), commit: async () => staged.forEach(([p, d, o]) => write(p, d, o)) }; },
+      query: (q, ...rest) => ({ ...q, __constraints: rest }),
+      orderBy: (...a) => ({ __orderBy: a }),
+      limit: n => ({ __limit: n }),
+    }));
+    vi.doMock('../firebase/config', () => ({ db: {} }));
+
+    const { confirmAndActivateIcp, effectiveTargeting, formatCompanySizeRange } = await import('../utils/confirmAndActivateIcp');
+
+    const user = { uid: 'normal_case_user', getIdToken: async () => 'tok' };
+    globalThis.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ companiesAdded: 40 }) }));
+
+    const pendingICP = {
+      industries: ['SaaS'], companySizes: ['51-200'], locations: ['Utah'],
+      targetTitles: ['Founder', 'VP Sales'], companyKeywords: [],
+    };
+
+    const displayed = effectiveTargeting(pendingICP);
+
+    // Exactly one line of geography, one line of size, one line of titles —
+    // a short confirmation, not an enumeration of every field the schema
+    // could theoretically carry.
+    expect(displayed.company.locations).toEqual(['Utah']);
+    expect(formatCompanySizeRange(displayed.company.companySizes)).toBe('51-200 employees');
+    expect(displayed.people.targetTitles).toEqual(['Founder', 'VP Sales']);
+
+    const { icpProfile, canSearch } = await confirmAndActivateIcp(user, pendingICP, 'mission_control');
+    expect(icpProfile.industries).toEqual(['SaaS']);
+    expect(icpProfile.locations).toEqual(displayed.company.locations);
+    expect(icpProfile.companySizes).toEqual(displayed.company.companySizes);
+    expect(icpProfile.targetTitles).toEqual(displayed.people.targetTitles);
+    expect(canSearch).toBe(true);
   });
 });

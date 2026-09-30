@@ -22,6 +22,28 @@ import { db } from '../firebase/config';
 import { hasRetrievalConstraint } from './targetingProposal';
 import { resolveActiveIcp, isResolved } from './resolveActiveIcp';
 import { setActiveIcpProfile } from './setActiveIcpProfile';
+import { COMPANY_SIZE_OPTIONS } from '../constants/targetingCanon';
+
+/**
+ * Collapses a companySizes bucket array into a short human line for a
+ * targeting confirmation. Presentational only: parses our own known
+ * COMPANY_SIZE_OPTIONS bucket-string format, never user text — not the
+ * keyword/regex parsing of conversation content the targeting handoff
+ * explicitly avoids.
+ */
+export function formatCompanySizeRange(sizes) {
+  if (!sizes || sizes.length === 0) return null;
+  if (sizes.length === 1) return `${sizes[0]} employees`;
+
+  const lowerBound = sizes[0].split('-')[0];
+  const topBucket = COMPANY_SIZE_OPTIONS[COMPANY_SIZE_OPTIONS.length - 1];
+  if (sizes[sizes.length - 1] === topBucket) {
+    return `${lowerBound}+ employees`;
+  }
+  const lastBucket = sizes[sizes.length - 1];
+  const upperBound = lastBucket.includes('-') ? lastBucket.split('-')[1] : lastBucket;
+  return `${lowerBound}–${upperBound} employees`;
+}
 
 export const DEFAULT_SCORING_WEIGHTS = {
   industry: 50,
@@ -29,6 +51,38 @@ export const DEFAULT_SCORING_WEIGHTS = {
   employeeSize: 15,
   revenue: 10,
 };
+
+/**
+ * The single source of truth for what a confirmation screen may claim
+ * Idynify is about to do — and what confirmAndActivateIcp actually persists.
+ * Both read from this function so the two can never drift apart.
+ *
+ * Deliberately narrow: company-search criteria (what actually narrows Apollo
+ * retrieval — see hasRetrievalConstraint) versus people-targeting criteria
+ * (titles, used downstream, never sent to Apollo as a company filter).
+ * Revenue is excluded on purpose — the extractor never captures it, so there
+ * is nothing effective to display; inventing a value here would be the same
+ * dishonesty this exists to prevent.
+ *
+ * @param {Object} extractedICP - the extractor's understood/icp_params shape
+ * @returns {{
+ *   company: { locations: string[], isNationwide: boolean, companySizes: string[] },
+ *   people: { targetTitles: string[] },
+ * }}
+ */
+export function effectiveTargeting(extractedICP) {
+  const isNationwide = extractedICP.locations === 'nationwide';
+  return {
+    company: {
+      locations: isNationwide ? [] : (extractedICP.locations || []),
+      isNationwide,
+      companySizes: extractedICP.companySizes || [],
+    },
+    people: {
+      targetTitles: extractedICP.targetTitles || [],
+    },
+  };
+}
 
 /**
  * @param {{uid: string, getIdToken: () => Promise<string>}} user - Firebase Auth user
@@ -45,14 +99,15 @@ export const DEFAULT_SCORING_WEIGHTS = {
  *   promise does not delay it, it only lets a caller observe it.
  */
 export async function confirmAndActivateIcp(user, extractedICP, source = 'barry_onboarding') {
+  const { company, people } = effectiveTargeting(extractedICP);
   const icpProfile = {
     industries: extractedICP.industries || [],
-    companySizes: extractedICP.companySizes || [],
+    companySizes: company.companySizes,
     revenueRanges: [],
     skipRevenue: true,
-    locations: extractedICP.locations === 'nationwide' ? [] : (extractedICP.locations || []),
-    isNationwide: extractedICP.locations === 'nationwide',
-    targetTitles: extractedICP.targetTitles || [],
+    locations: company.locations,
+    isNationwide: company.isNationwide,
+    targetTitles: people.targetTitles,
     searchStrategy: extractedICP.searchStrategy || 'industry_only',
     lookalikeSeed: extractedICP.lookalikeSeed || null,
     companyKeywords: extractedICP.companyKeywords || [],

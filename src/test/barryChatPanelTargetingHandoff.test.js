@@ -20,7 +20,7 @@ const src = readFileSync(resolve(here, '../components/dashboard/BarryChatPanel.j
 
 describe('BarryChatPanel — targeting extraction handoff', () => {
   it('imports the shared confirm/persist/search function rather than a second implementation', () => {
-    expect(src).toMatch(/import \{ confirmAndActivateIcp \} from '\.\.\/\.\.\/utils\/confirmAndActivateIcp'/);
+    expect(src).toMatch(/import \{ confirmAndActivateIcp,[^}]*\} from '\.\.\/\.\.\/utils\/confirmAndActivateIcp'/);
   });
 
   it('carries pendingICP forward on the request rather than re-asking', () => {
@@ -55,8 +55,24 @@ describe('BarryChatPanel — targeting extraction handoff', () => {
     expect(fnBody).toMatch(/confirmAndActivateIcp\(user, icp, 'mission_control'\)/);
 
     const renderAt = src.indexOf("msg.role === 'targeting_confirm'");
-    const renderBlock = src.slice(renderAt, renderAt + 900);
+    const nextBlockAt = src.indexOf("msg.role === 'pipeline_result'", renderAt);
+    const renderBlock = src.slice(renderAt, nextBlockAt);
     expect(renderBlock).toMatch(/confirmTargetingExtraction\(msg\.icp\)/);
+  });
+
+  it('the confirmation bubble is built from structured effectiveTargeting, not free-form model prose, and shows the capability boundary', () => {
+    const renderAt = src.indexOf("msg.role === 'targeting_confirm'");
+    const nextBlockAt = src.indexOf("msg.role === 'pipeline_result'", renderAt);
+    const renderBlock = src.slice(renderAt, nextBlockAt);
+
+    // Sourced from the same effectiveTargeting() confirmAndActivateIcp persists.
+    expect(renderBlock).toMatch(/effectiveTargeting\(msg\.icp/);
+    // Company vs. people are two visually distinct sections, not one blended list.
+    expect(renderBlock).toMatch(/Company discovery/);
+    expect(renderBlock).toMatch(/People targeting/);
+    // A fixed, always-true capability-boundary statement — never derived from
+    // parsing what the user originally typed (no county/revenue support exists).
+    expect(renderBlock).toMatch(/doesn't currently narrow by county or revenue/);
   });
 
   it('a normal response clears stale extraction state rather than leaving it pinned forever', () => {

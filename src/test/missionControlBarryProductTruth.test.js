@@ -82,8 +82,13 @@ async function systemPromptFor(body) {
     body: JSON.stringify({ userId: 'u1', authToken: 't', ...body }),
   });
   expect(res.statusCode).toBe(200);
-  expect(CALLS).toHaveLength(1);
-  return CALLS[0].system;
+  expect(CALLS.length).toBeGreaterThanOrEqual(1);
+  // The prospecting handoff gate (barryMissionChat.js) may issue a preceding
+  // classifier call when no targeting is saved, before the real Mission
+  // Control call — the mocked classifier response never classifies as
+  // PROSPECTING, so these tests always fall through to it. The system prompt
+  // under test is always the last call, whether there were one or two.
+  return CALLS[CALLS.length - 1].system;
 }
 
 const COMPETITORS = /apollo|zoominfo|hunter\.io|sales navigator|clearbit|lusha|seamless/i;

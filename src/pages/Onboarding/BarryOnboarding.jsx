@@ -8,17 +8,9 @@ import TargetingProposal from '../../components/onboarding/TargetingProposal';
 import { buildProposal, hasRetrievalConstraint, retrievalConstraints } from '../../utils/targetingProposal';
 import { readWebsite, acceleratorQuestion } from '../../utils/websiteAccelerator';
 import { logEvent, EVENTS } from '../../services/analytics';
-import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
-import { setActiveIcpProfile } from '../../utils/setActiveIcpProfile';
+import { confirmAndActivateIcp } from '../../utils/confirmAndActivateIcp';
 import { appendTurn } from '../../utils/barryCanonical';
 import './BarryOnboarding.css';
-
-const DEFAULT_WEIGHTS = {
-  industry: 50,
-  location: 25,
-  employeeSize: 15,
-  revenue: 10
-};
 
 /**
  * Build authoritative return greeting for Barry (Phase 2 + 3 requirement)
@@ -493,101 +485,38 @@ const BarryOnboarding = forwardRef(function BarryOnboarding({
     try {
       const user = auth.currentUser;
 
-      // Prepare ICP profile with lookalike strategy support
-      const icpProfile = {
-        industries: extractedICP.industries || [],
-        companySizes: extractedICP.companySizes || [],
-        revenueRanges: [],
-        skipRevenue: true,
-        locations: extractedICP.locations === 'nationwide' ? [] : (extractedICP.locations || []),
-        isNationwide: extractedICP.locations === 'nationwide',
-        targetTitles: extractedICP.targetTitles || [],
-        // NEW: Lookalike strategy fields
-        searchStrategy: extractedICP.searchStrategy || 'industry_only',
-        lookalikeSeed: extractedICP.lookalikeSeed || null,
-        companyKeywords: extractedICP.companyKeywords || [],
-        foundedAgeRange: extractedICP.foundedAgeRange || null,
-        // Standard fields
-        scoringWeights: DEFAULT_WEIGHTS,
-        updatedAt: new Date().toISOString(),
-        source: 'barry_onboarding',
-        barryConfidenceScore: extractedICP.confidenceScore || 0.8,
-        managedByBarry: true
-      };
-
-      // Show confirmation screen before redirect
-      setSavedICP(icpProfile);
-
       // ── The authorized ICP creation/confirmation event ────────────────────
       //
       // Onboarding does not create an ICP because onboarding ran. It creates
       // one because the user has just explicitly confirmed the targeting
-      // definition Barry proposed — this function IS that confirmation. Only
-      // the targeting fields above become ICP criteria; nothing else collected
-      // during onboarding is reinterpreted as ICP intelligence.
+      // definition Barry proposed — this call IS that confirmation. Only the
+      // targeting fields the extractor gathered become ICP criteria; nothing
+      // else collected during onboarding is reinterpreted as ICP intelligence.
       //
-      // The authoritative icpProfiles document is written first. The bridge is
-      // written afterward as a projection carrying that identity.
-      const resolution = await resolveActiveIcp(user.uid);
+      // The write/activate/bridge/search sequence itself lives in
+      // confirmAndActivateIcp — the one authoritative path, also used by
+      // Mission Control Barry's targeting handoff. Do not reintroduce a
+      // second inline copy of it here.
+      const { icpId, icpProfile, canSearch, searchPromise } = await confirmAndActivateIcp(user, extractedICP, 'barry_onboarding');
 
-      if (resolution.status === 'unresolved' && resolution.reason === 'read-failed') {
-        // A transient read failure must not cause a duplicate ICP. It is not
-        // evidence that the user has none.
-        throw new Error('Could not confirm your existing target profile. Please try again.');
-      }
+      // Show confirmation screen before redirect
+      setSavedICP(icpProfile);
 
-      let icpId;
-      if (isResolved(resolution)) {
-        // An ICP already exists and is active — write through to it rather
-        // than creating a second one.
-        icpId = resolution.icpId;
-        await setDoc(
-          doc(db, 'users', user.uid, 'icpProfiles', icpId),
-          { ...resolution.profile, ...icpProfile, isActive: true, status: 'active' },
-          { merge: true }
-        );
+      if (!canSearch) {
+        console.warn('[BarryOnboarding] confirmed ICP carries no retrieval constraint — search not started');
       } else {
-        // 'no-profiles', or ICPs exist but none is active. Either way the user
-        // has explicitly confirmed this definition, so it becomes a new ICP and
-        // that confirmation activates it. No existing candidate is silently
-        // promoted on their behalf.
-        icpId = `icp_${Date.now()}`;
-        await setDoc(doc(db, 'users', user.uid, 'icpProfiles', icpId), {
-          ...icpProfile,
-          name: 'My ICP',
-          isActive: true,
-          status: 'active',
-          messaging: null,
-          messagingProgress: 0,
-          source: 'barry_onboarding_confirmed',
-          createdAt: new Date().toISOString(),
+        logEvent(EVENTS.FIRST_DISCOVERY_STARTED, { constraint_count: retrievalConstraints(icpProfile).length });
+        searchPromise.then(data => {
+          const added = data.companiesAdded || 0;
+          const band = added === 0 ? 'zero' : added <= 3 ? 'low' : 'meaningful';
+          logEvent(EVENTS.FIRST_DISCOVERY_COMPLETED, { outcome: 'success', result_band: band });
+          if (added > 0) {
+            logEvent(EVENTS.FIRST_VALUE_DELIVERED, { intent: 'PROSPECTING', branch: 'in-place', result_band: band });
+          }
+        }).catch(() => {
+          logEvent(EVENTS.FIRST_DISCOVERY_COMPLETED, { outcome: 'error', result_band: 'zero' });
         });
       }
-
-      // The bridge has exactly one writer, on both branches: setActiveIcpProfile.
-      // It re-reads the profile that was just stored and projects the whole of
-      // it, together with the isActive/status pair the resolver requires — so
-      // the projection cannot disagree with the ICP it names, and cannot keep
-      // criteria left over from whichever ICP the bridge held before.
-      //
-      // The write-through branch needs this call as much as the creation branch
-      // does. Confirmation is what makes this definition the active one; an ICP
-      // that was already active stays active, and any second profile still
-      // carrying an active flag is normalized away rather than left to make the
-      // selection ambiguous.
-      await setActiveIcpProfile(user.uid, icpId);
-
-      // Attribution is onboarding's to record, and attribution is all it
-      // records. Merged, and naming no lifecycle field: a whole-document write
-      // here would erase the isActive/status pair the projection above just
-      // established, leaving the bridge held with no isActive and no status —
-      // the state ICPSettings' loadICPProfiles describes, where the canonical
-      // resolver can never see the profile onboarding just confirmed.
-      await setDoc(
-        doc(db, 'users', user.uid, 'companyProfile', 'current'),
-        { icpId, icpIdSource: 'barry_onboarding_confirmed' },
-        { merge: true }
-      );
 
       // Update conversation as completed
       await setDoc(
@@ -600,20 +529,10 @@ const BarryOnboarding = forwardRef(function BarryOnboarding({
         { merge: true }
       );
 
-      // A search may only be called ICP-targeted when at least one retrieval
-      // constraint derived from the ICP actually narrows the result set. The
-      // rule itself now lives in targetingProposal.js, so the floor Barry
-      // proposes against and the floor the search is gated on cannot drift
-      // apart — and the field list behind it is unchanged: targetTitles do not
-      // constrain a company search, revenue is never sent to Apollo, and
-      // lookalikeSeed is received and logged by the query builder but never
-      // becomes a query parameter.
-      const canSearch = hasRetrievalConstraint(icpProfile);
-
       // Mark onboarding complete on the user doc and set Barry's initial
       // execution state so Mission Control can read where Barry is. The
       // search-companies function flips barryState to READY (or ERROR) once
-      // the background search below resolves.
+      // the background search resolves.
       await setDoc(
         doc(db, 'users', user.uid),
         {
@@ -630,38 +549,6 @@ const BarryOnboarding = forwardRef(function BarryOnboarding({
       // Hand the host the exact ICP the user just confirmed, so decisions made
       // on what this search finds are recorded under it.
       emitIcpConfirmed(icpId);
-
-      // Trigger immediate lead search in the background, carrying the identity
-      // of the ICP the user just confirmed.
-      if (canSearch) {
-        logEvent(EVENTS.FIRST_DISCOVERY_STARTED, { constraint_count: retrievalConstraints(icpProfile).length });
-        const authToken = await user.getIdToken();
-        fetch('/.netlify/functions/search-companies', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: user.uid,
-            authToken,
-            companyProfile: icpProfile,
-            icpId
-          })
-        }).then(res => {
-          if (!res.ok) throw new Error(`search failed (${res.status})`);
-          return res.json();
-        }).then(data => {
-          const added = data.companiesAdded || 0;
-          const band = added === 0 ? 'zero' : added <= 3 ? 'low' : 'meaningful';
-          logEvent(EVENTS.FIRST_DISCOVERY_COMPLETED, { outcome: 'success', result_band: band });
-          if (added > 0) {
-            logEvent(EVENTS.FIRST_VALUE_DELIVERED, { intent: 'PROSPECTING', branch: 'in-place', result_band: band });
-          }
-        }).catch(err => {
-          console.error('Background search failed:', err);
-          logEvent(EVENTS.FIRST_DISCOVERY_COMPLETED, { outcome: 'error', result_band: 'zero' });
-        });
-      } else {
-        console.warn('[BarryOnboarding] confirmed ICP carries no retrieval constraint — search not started');
-      }
 
       // Build Barry's "work in progress" message
       const strategyContext = extractedICP.lookalikeSeed?.name

@@ -286,22 +286,25 @@ describe('confirming with more than one profile flagged active', () => {
 // ── Source guard ────────────────────────────────────────────────────────────
 //
 // The behavioural tests cover the path as it exists. This covers the way it
-// decays: the bridge write reverting to a whole-document stamp of the proposal.
+// decays: the bridge write reverting to a whole-document stamp of the
+// proposal. This sequence now lives in confirmAndActivateIcp.js, shared with
+// Mission Control Barry's targeting handoff — the guard follows the code
+// that moved, rather than the call site (handleConfirm) that now just calls it.
 
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const src = readFileSync(
-  resolve(dirname(fileURLToPath(import.meta.url)), '../pages/Onboarding/BarryOnboarding.jsx'),
+  resolve(dirname(fileURLToPath(import.meta.url)), '../utils/confirmAndActivateIcp.js'),
   'utf8'
 );
 const confirmHandler = src.slice(
-  src.indexOf('async function handleConfirm()'),
-  src.indexOf('function handleRefine()')
+  src.indexOf('export async function confirmAndActivateIcp'),
+  src.length
 );
 
-describe("handleConfirm's bridge write", () => {
+describe("confirmAndActivateIcp's bridge write", () => {
   it('merges — a whole-document write erases the lifecycle just projected', () => {
     const at = confirmHandler.indexOf("'companyProfile', 'current'");
     expect(at).toBeGreaterThan(-1);
@@ -325,11 +328,13 @@ describe("handleConfirm's bridge write", () => {
     const calls = [...confirmHandler.matchAll(/^(\s*)await setActiveIcpProfile\(user\.uid, icpId\);$/gm)];
     expect(calls).toHaveLength(1);
 
-    // One call, at the handler's own indentation. Inside the create/write-through
-    // branches it sits two levels deeper — which is where it used to be, leaving
-    // the write-through branch with a bridge nobody re-projected.
-    expect(calls[0][1], 'setActiveIcpProfile is nested inside a branch').toBe('      ');
+    // One call, at the function's own indentation — not nested inside either
+    // the create or write-through branch above it, which would leave the
+    // other branch with a bridge nobody re-projected.
+    expect(calls[0][1], 'setActiveIcpProfile is nested inside a branch').toBe('  ');
 
+    const branchEnd = confirmHandler.indexOf('\n\n', confirmHandler.indexOf('if (isResolved(resolution))'));
+    expect(calls[0].index).toBeGreaterThan(branchEnd);
     expect(calls[0].index).toBeLessThan(confirmHandler.indexOf("'companyProfile', 'current'"));
   });
 });

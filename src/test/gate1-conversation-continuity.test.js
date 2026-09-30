@@ -28,6 +28,10 @@ const code = src => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm
 
 const canonical = read('../utils/barryCanonical.js');
 const onboarding = read('../pages/Onboarding/BarryOnboarding.jsx');
+// The write/activate/bridge/search sequence itself lives in
+// confirmAndActivateIcp.js, shared with Mission Control Barry's targeting
+// handoff — BarryOnboarding.jsx now only calls it.
+const confirmIcp = read('../utils/confirmAndActivateIcp.js');
 const sidecar = read('../components/scout/BarryICPPanel.jsx');
 const workspace = read('../components/dashboard/BarryChatPanel.jsx');
 const server = read('../../netlify/functions/barryMissionChat.js');
@@ -322,11 +326,12 @@ describe('Case E — First Experience ambiguity (Gate 0 holds)', () => {
   });
 
   it('still gates the search on the quality floor', () => {
-    expect(onboarding).toMatch(/const canSearch = hasRetrievalConstraint\(icpProfile\)/);
+    expect(confirmIcp).toMatch(/const canSearch = hasRetrievalConstraint\(icpProfile\)/);
   });
 
   it('confirmation is still the only event that writes an authoritative ICP', () => {
-    expect(onboarding).toMatch(/icpIdSource: 'barry_onboarding_confirmed'/);
+    expect(confirmIcp).toMatch(/icpIdSource: `\$\{source\}_confirmed`/);
+    expect(onboarding).toMatch(/confirmAndActivateIcp\(user, extractedICP, 'barry_onboarding'\)/);
   });
 });
 

@@ -210,11 +210,16 @@ describe('6 — the retirement removed no capability that still had one', () => 
 
   it('the Phase 1B confirmation sequence is untouched', () => {
     const onboarding = read('../pages/Onboarding/BarryOnboarding.jsx');
-    expect(onboarding).toMatch(/const resolution = await resolveActiveIcp\(user\.uid\)/);
-    expect(onboarding).toMatch(/reason === 'read-failed'[\s\S]{0,400}throw new Error/);
-    expect(onboarding).toContain('setActiveIcpProfile(user.uid, icpId)');
-    expect(onboarding).toMatch(/icpId, icpIdSource: 'barry_onboarding_confirmed'/);
-    expect(onboarding).toMatch(/const canSearch = hasRetrievalConstraint\(icpProfile\)/);
+    // The write/activate/bridge/search sequence itself lives in
+    // confirmAndActivateIcp.js, shared with Mission Control Barry's
+    // targeting handoff — BarryOnboarding.jsx now only calls it.
+    const confirmIcp = read('../utils/confirmAndActivateIcp.js');
+    expect(confirmIcp).toMatch(/const resolution = await resolveActiveIcp\(user\.uid\)/);
+    expect(confirmIcp).toMatch(/reason === 'read-failed'[\s\S]{0,400}throw new Error/);
+    expect(confirmIcp).toContain('setActiveIcpProfile(user.uid, icpId)');
+    expect(confirmIcp).toMatch(/icpId, icpIdSource: `\$\{source\}_confirmed`/);
+    expect(confirmIcp).toMatch(/const canSearch = hasRetrievalConstraint\(icpProfile\)/);
+    expect(onboarding).toMatch(/confirmAndActivateIcp\(user, extractedICP, 'barry_onboarding'\)/);
     expect(onboarding).toMatch(/canSearch \? 'SEARCHING' : 'NEEDS_TARGETING'/);
   });
 

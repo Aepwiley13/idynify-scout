@@ -27,6 +27,10 @@ import { hasRetrievalConstraint } from '../utils/targetingProposal.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const onboarding = readFileSync(resolve(here, '../pages/Onboarding/BarryOnboarding.jsx'), 'utf8');
+// The write/activate/bridge/search sequence itself lives in
+// confirmAndActivateIcp.js, shared with Mission Control Barry's targeting
+// handoff — BarryOnboarding.jsx now only calls it.
+const confirmIcp = readFileSync(resolve(here, '../utils/confirmAndActivateIcp.js'), 'utf8');
 const searchFn = readFileSync(resolve(here, '../../netlify/functions/search-companies.js'), 'utf8');
 
 // The predicate used to be an inline expression in BarryOnboarding, and this
@@ -104,19 +108,19 @@ describe('D7 — the gate matches what buildApolloQuery actually constrains on',
 
 describe('D7 — the confirmed identity is what reaches the search', () => {
   it('zero ICP cannot reach search-companies from onboarding at all', () => {
-    // The ICP is created inside handleConfirm before the search block, so the
-    // "zero ICP" case cannot coexist with a search from this path.
-    const confirmAt = onboarding.indexOf('async function handleConfirm()');
-    const icpWriteAt = onboarding.indexOf("'icpProfiles'", confirmAt);
-    const searchAt = onboarding.indexOf("'/.netlify/functions/search-companies'", confirmAt);
+    // The ICP is created inside confirmAndActivateIcp before the search
+    // block, so the "zero ICP" case cannot coexist with a search from this
+    // path, whether reached from onboarding or Mission Control's handoff.
+    const icpWriteAt = confirmIcp.indexOf("'icpProfiles'");
+    const searchAt = confirmIcp.indexOf("'/.netlify/functions/search-companies'");
 
-    expect(icpWriteAt).toBeGreaterThan(confirmAt);
+    expect(icpWriteAt).toBeGreaterThan(-1);
     expect(searchAt).toBeGreaterThan(icpWriteAt);
   });
 
   it('the search body carries the created icpId, not a profile-shaped guess', () => {
-    const searchAt = onboarding.indexOf("'/.netlify/functions/search-companies'");
-    expect(onboarding.slice(searchAt, searchAt + 400)).toMatch(/\bicpId\b/);
+    const searchAt = confirmIcp.indexOf("'/.netlify/functions/search-companies'");
+    expect(confirmIcp.slice(searchAt, searchAt + 400)).toMatch(/\bicpId\b/);
   });
 
   it('search-companies rejects the request if that identity is ever missing', () => {
@@ -127,7 +131,9 @@ describe('D7 — the confirmed identity is what reaches the search', () => {
 describe('the gate the search is wired to is the one tested above', () => {
   it('BarryOnboarding imports the shared predicate rather than restating it', () => {
     expect(onboarding).toContain("from '../../utils/targetingProposal'");
-    expect(onboarding).toMatch(/const canSearch = hasRetrievalConstraint\(icpProfile\)/);
+    // The gate itself is applied inside confirmAndActivateIcp.js now,
+    // shared with Mission Control Barry's targeting handoff.
+    expect(confirmIcp).toMatch(/const canSearch = hasRetrievalConstraint\(icpProfile\)/);
   });
 
   it('and no second copy of the rule survives in the component', () => {

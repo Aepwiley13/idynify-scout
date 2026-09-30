@@ -367,7 +367,7 @@ export const handler = async (event) => {
   }
 };
 
-async function processInitialInput(anthropic, userInput, existingICP) {
+export async function processInitialInput(anthropic, userInput, existingICP) {
   const hasExistingICP = existingICP && existingICP.industries && existingICP.industries.length > 0;
 
   // Extract keywords from user input for later use
@@ -579,7 +579,7 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
   };
 }
 
-async function processFollowup(anthropic, userInput, currentStep, conversationHistory, pendingICP) {
+export async function processFollowup(anthropic, userInput, currentStep, conversationHistory, pendingICP) {
   const historyContext = conversationHistory.map(h =>
     `${h.role === 'barry' ? 'Barry' : 'User'}: ${h.content}`
   ).join('\n');

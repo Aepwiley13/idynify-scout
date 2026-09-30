@@ -181,31 +181,35 @@ describe('4 — no implementation language reaches the user', () => {
 
 describe('5 — the confirmation sequence is unchanged', () => {
   const onboarding = read('../pages/Onboarding/BarryOnboarding.jsx');
+  // The write/activate/bridge/search sequence itself lives in
+  // confirmAndActivateIcp.js, shared with Mission Control Barry's targeting
+  // handoff — BarryOnboarding.jsx now only calls it and reads back canSearch.
+  const confirmIcp = read('../utils/confirmAndActivateIcp.js');
 
   it('still resolves before it writes, and refuses on a failed read', () => {
-    expect(onboarding).toMatch(/const resolution = await resolveActiveIcp\(user\.uid\)/);
-    expect(onboarding).toMatch(/reason === 'read-failed'[\s\S]{0,400}throw new Error/);
+    expect(confirmIcp).toMatch(/const resolution = await resolveActiveIcp\(user\.uid\)/);
+    expect(confirmIcp).toMatch(/reason === 'read-failed'[\s\S]{0,400}throw new Error/);
   });
 
   it('still writes the authoritative profile before the projection', () => {
-    const authoritative = onboarding.indexOf("'icpProfiles', icpId");
-    const projection = onboarding.indexOf("'companyProfile', 'current'", authoritative);
+    const authoritative = confirmIcp.indexOf("'icpProfiles', icpId");
+    const projection = confirmIcp.indexOf("'companyProfile', 'current'", authoritative);
     expect(authoritative).toBeGreaterThan(-1);
     expect(projection).toBeGreaterThan(authoritative);
   });
 
   it('still activates a newly created profile', () => {
-    expect(onboarding).toContain('setActiveIcpProfile(user.uid, icpId)');
+    expect(confirmIcp).toContain('setActiveIcpProfile(user.uid, icpId)');
   });
 
   it('still projects the bridge carrying the identity it just wrote', () => {
-    expect(onboarding).toMatch(/icpId, icpIdSource: 'barry_onboarding_confirmed'/);
+    expect(confirmIcp).toMatch(/icpId, icpIdSource: `\$\{source\}_confirmed`/);
   });
 
   it('still gates the search on the floor, and carries the identity into it', () => {
-    expect(onboarding).toMatch(/const canSearch = hasRetrievalConstraint\(icpProfile\)/);
-    expect(onboarding).toMatch(/if \(canSearch\)[\s\S]{0,600}search-companies/);
-    expect(onboarding).toMatch(/search-companies[\s\S]{0,400}icpId\s*\n/);
+    expect(confirmIcp).toMatch(/const canSearch = hasRetrievalConstraint\(icpProfile\)/);
+    expect(confirmIcp).toMatch(/if \(canSearch\)[\s\S]{0,600}search-companies/);
+    expect(confirmIcp).toMatch(/search-companies[\s\S]{0,400}icpId,?\s*\n/);
   });
 
   it('still reports NEEDS_TARGETING rather than searching unfiltered', () => {

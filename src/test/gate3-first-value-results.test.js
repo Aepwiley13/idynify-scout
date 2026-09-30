@@ -27,6 +27,10 @@ const code = src => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm
 
 const onboarding = read('../pages/Onboarding/BarryOnboarding.jsx');
 const onboardingCode = code(onboarding);
+// The write/activate/bridge/search sequence itself lives in
+// confirmAndActivateIcp.js, shared with Mission Control Barry's targeting
+// handoff — BarryOnboarding.jsx now only calls it.
+const confirmIcpCode = code(read('../utils/confirmAndActivateIcp.js'));
 const workspace = read('../pages/Barry/BarryWorkspace.jsx');
 const workspaceCode = code(workspace);
 const resultsCard = read('../components/onboarding/CompanyResultsCard.jsx');
@@ -229,23 +233,23 @@ describe('R8 — Results card in _feCard system', () => {
 
 describe('R9 — ICP authority sequence preserved', () => {
   it('resolveActiveIcp still called', () => {
-    expect(onboardingCode).toMatch(/resolveActiveIcp\(user\.uid\)/);
+    expect(confirmIcpCode).toMatch(/resolveActiveIcp\(user\.uid\)/);
   });
 
   it('icpProfiles write still present', () => {
-    expect(onboardingCode).toMatch(/'icpProfiles', icpId/);
+    expect(confirmIcpCode).toMatch(/'icpProfiles', icpId/);
   });
 
   it('setActiveIcpProfile still called', () => {
-    expect(onboardingCode).toMatch(/setActiveIcpProfile\(user\.uid, icpId\)/);
+    expect(confirmIcpCode).toMatch(/setActiveIcpProfile\(user\.uid, icpId\)/);
   });
 
   it('icpIdSource attribution preserved', () => {
-    expect(onboardingCode).toMatch(/icpIdSource: 'barry_onboarding_confirmed'/);
+    expect(confirmIcpCode).toMatch(/icpIdSource: `\$\{source\}_confirmed`/);
   });
 
   it('search-companies trigger still present', () => {
-    expect(onboardingCode).toMatch(/search-companies/);
+    expect(confirmIcpCode).toMatch(/search-companies/);
   });
 });
 

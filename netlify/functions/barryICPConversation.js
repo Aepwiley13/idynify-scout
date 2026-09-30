@@ -210,6 +210,41 @@ function extractCompanyKeywords(userInput) {
   return keywords;
 }
 
+// companyKeywords is documented to the model, in every extraction schema
+// below, as "company type keywords" / "stage/type signals (saas, startup,
+// series A, etc.)" — never as a place to carry geography. The structured
+// contract has no field for sub-state geography ("Salt Lake County" has
+// nowhere to go once locations is reduced to the state-level "Utah" the
+// US_STATES whitelist supports), and unlike industries/companySizes/
+// locations, companyKeywords carries no whitelist at all — whatever the
+// model writes reaches Apollo's q_organization_keyword_tags verbatim
+// (search-companies.js buildApolloQuery). Production: a Jordan River
+// confirmation where the user said "headquartered in Salt Lake County"
+// came back with companyKeywords: ["headquarters"], which Apollo then
+// required every result to match — and matched zero, because
+// "headquarters" is not a company-type tag anything is ever categorized
+// under. This is not a new taxonomy — it is a small blocklist of the
+// structural/geographic words that are never a company type, filtered out
+// deterministically so model phrasing cannot reintroduce them. Legitimate
+// type signals beyond SPECIFICITY_TRIGGERS (the model is free to name any
+// company type — "fintech", "e-commerce", etc.) are untouched.
+const GEOGRAPHY_RESIDUE_TERMS = new Set([
+  'headquarters', 'headquartered', 'located', 'based',
+  'county', 'city', 'metro', 'near', 'local',
+]);
+
+/** Drops any companyKeywords entry that is, or contains as a whole word,
+ * a geography/structural term rather than a company-type signal.
+ * Exported for direct unit coverage — see src/test/companyKeywordsGeographyResidue.test.js. */
+export function sanitizeCompanyKeywords(keywords) {
+  if (!Array.isArray(keywords)) return keywords;
+  return keywords.filter(kw => {
+    if (typeof kw !== 'string') return true;
+    const words = kw.toLowerCase().trim().split(/\s+/);
+    return !words.some(w => GEOGRAPHY_RESIDUE_TERMS.has(w));
+  });
+}
+
 export const handler = async (event) => {
   const startTime = Date.now();
 
@@ -528,6 +563,13 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     );
   }
 
+  // Validate companyKeywords — strip geography/structural residue (see
+  // GEOGRAPHY_RESIDUE_TERMS). Never invent a replacement value; an
+  // unsupported concept is dropped, not relocated.
+  if (barryResponse.understood?.companyKeywords) {
+    barryResponse.understood.companyKeywords = sanitizeCompanyKeywords(barryResponse.understood.companyKeywords);
+  }
+
   // Validate locations
   if (barryResponse.understood?.locations && barryResponse.understood.locations !== 'nationwide') {
     barryResponse.understood.locations = barryResponse.understood.locations.filter(loc =>
@@ -730,6 +772,13 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     );
   }
 
+  // Validate companyKeywords — strip geography/structural residue (see
+  // GEOGRAPHY_RESIDUE_TERMS). Never invent a replacement value; an
+  // unsupported concept is dropped, not relocated.
+  if (barryResponse.understood?.companyKeywords) {
+    barryResponse.understood.companyKeywords = sanitizeCompanyKeywords(barryResponse.understood.companyKeywords);
+  }
+
   // Validate locations
   if (barryResponse.understood?.locations && barryResponse.understood.locations !== 'nationwide') {
     barryResponse.understood.locations = barryResponse.understood.locations.filter(loc =>
@@ -862,6 +911,13 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     barryResponse.understood.companySizes = barryResponse.understood.companySizes.filter(size =>
       COMPANY_SIZE_OPTIONS.includes(size)
     );
+  }
+
+  // Validate companyKeywords — strip geography/structural residue (see
+  // GEOGRAPHY_RESIDUE_TERMS). Never invent a replacement value; an
+  // unsupported concept is dropped, not relocated.
+  if (barryResponse.understood?.companyKeywords) {
+    barryResponse.understood.companyKeywords = sanitizeCompanyKeywords(barryResponse.understood.companyKeywords);
   }
 
   // Validate locations

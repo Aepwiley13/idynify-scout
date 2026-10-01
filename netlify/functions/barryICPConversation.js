@@ -231,23 +231,34 @@ function extractCompanyKeywords(userInput) {
 //
 // Some of these words are NOT exclusively geographic, though — "based",
 // "local" and "city" are also legitimate company-type language
-// ("account-based marketing", "local government", "city government"). A
-// flat "any whole word" rule drops those along with the real residue, so
-// the two groups are split: words that are geography/structural whenever
-// they appear at all (no legitimate company-type keyword is ever built
-// from them), and words that are residue only in a location-prepositional
-// phrase ("based IN Utah", "local TO Salt Lake") or standing completely
-// alone — everywhere else (followed by a noun like "government" or
-// "marketing") they are left untouched.
+// ("account-based marketing", "local government", "city government"), and
+// so are "county" and "metro" ("county government", "county hospital",
+// "metro transit" — real organization categories a relationship-
+// intelligence product may target). A flat "any whole word" rule drops
+// those along with the real residue, so the groups are split by the
+// grammatical pattern that actually marks geography:
+//
+//   - ABSOLUTE: no legitimate company-type keyword is ever built from
+//     these at all — dropped wherever they appear.
+//   - LEADING-context (based/local/city): residue only in a location-
+//     prepositional phrase ("based IN Utah", "local TO Salt Lake") or
+//     standing alone — a category noun afterward ("local GOVERNMENT")
+//     is left untouched.
+//   - TRAILING-context (county/metro): a bare place name followed by one
+//     of these is a geographic qualifier ("Salt Lake COUNTY", "Salt Lake
+//     METRO") — residue only when something precedes it (or it stands
+//     alone); as the FIRST word of a category noun phrase ("COUNTY
+//     government", "METRO transit") it is left untouched.
 const ABSOLUTE_RESIDUE_TERMS = new Set([
-  'headquarters', 'headquartered', 'located', 'county', 'metro', 'near',
+  'headquarters', 'headquartered', 'located', 'near',
 ]);
-const CONTEXTUAL_RESIDUE_TERMS = new Set(['based', 'local', 'city']);
+const LEADING_RESIDUE_TERMS = new Set(['based', 'local', 'city']);
+const TRAILING_RESIDUE_TERMS = new Set(['county', 'metro']);
 const LOCATION_PREPOSITIONS = new Set(['in', 'to', 'near']);
 
 /** Drops any companyKeywords entry that is, or contains, geography/
  * structural residue rather than a company-type signal — see
- * ABSOLUTE_RESIDUE_TERMS / CONTEXTUAL_RESIDUE_TERMS above.
+ * ABSOLUTE_RESIDUE_TERMS / LEADING_RESIDUE_TERMS / TRAILING_RESIDUE_TERMS above.
  * Exported for direct unit coverage — see src/test/companyKeywordsGeographyResidue.test.js. */
 export function sanitizeCompanyKeywords(keywords) {
   if (!Array.isArray(keywords)) return keywords;
@@ -255,11 +266,15 @@ export function sanitizeCompanyKeywords(keywords) {
     if (typeof kw !== 'string') return true;
     const words = kw.toLowerCase().trim().split(/\s+/).filter(Boolean);
     if (words.some(w => ABSOLUTE_RESIDUE_TERMS.has(w))) return false;
-    const isContextualResidue = words.some((w, i) =>
-      CONTEXTUAL_RESIDUE_TERMS.has(w) &&
+    const hasLeadingResidue = words.some((w, i) =>
+      LEADING_RESIDUE_TERMS.has(w) &&
       (words.length === 1 || LOCATION_PREPOSITIONS.has(words[i + 1]))
     );
-    return !isContextualResidue;
+    if (hasLeadingResidue) return false;
+    const hasTrailingResidue = words.some((w, i) =>
+      TRAILING_RESIDUE_TERMS.has(w) && (words.length === 1 || i !== 0)
+    );
+    return !hasTrailingResidue;
   });
 }
 

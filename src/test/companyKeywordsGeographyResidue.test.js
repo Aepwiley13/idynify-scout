@@ -102,6 +102,32 @@ describe('sanitizeCompanyKeywords — refined rule: phrase context, not blanket 
   });
 });
 
+// ── Part 1c: pre-PR correction — "county" and "metro" are also legitimate
+//    organization categories ("county government", "county hospital",
+//    "metro transit"), not exclusively a trailing geographic qualifier
+//    ("Salt Lake County", "Salt Lake metro"). Same shape of fix as 1b, this
+//    time on the trailing side: residue only when something precedes the
+//    word (or it stands alone), untouched when it leads a category noun. ──
+
+describe('sanitizeCompanyKeywords — county/metro are a trailing qualifier, not a forbidden word', () => {
+  it('DROP — a place name followed by county/metro is still geography residue', () => {
+    expect(sanitizeCompanyKeywords(['salt lake county'])).toEqual([]);
+    expect(sanitizeCompanyKeywords(['salt lake metro'])).toEqual([]);
+  });
+
+  it('PRESERVE — county/metro leading an organization-category noun survives', () => {
+    const legit = ['county government', 'county hospital', 'metro transit'];
+    expect(sanitizeCompanyKeywords(legit)).toEqual(legit);
+  });
+
+  it('every required Jordan River DROP case still fails closed with the trailing-qualifier rule in place', () => {
+    expect(sanitizeCompanyKeywords(['headquarters'])).toEqual([]);
+    expect(sanitizeCompanyKeywords(['headquartered in salt lake'])).toEqual([]);
+    expect(sanitizeCompanyKeywords(['located in utah'])).toEqual([]);
+    expect(sanitizeCompanyKeywords(['based in salt lake city'])).toEqual([]);
+  });
+});
+
 // ── Part 2: the exact Jordan River case, through extraction AND into the
 //    final Apollo query shape. ──────────────────────────────────────────────
 

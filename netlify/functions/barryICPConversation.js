@@ -210,6 +210,74 @@ function extractCompanyKeywords(userInput) {
   return keywords;
 }
 
+// companyKeywords is documented to the model, in every extraction schema
+// below, as "company type keywords" / "stage/type signals (saas, startup,
+// series A, etc.)" — never as a place to carry geography. The structured
+// contract has no field for sub-state geography ("Salt Lake County" has
+// nowhere to go once locations is reduced to the state-level "Utah" the
+// US_STATES whitelist supports), and unlike industries/companySizes/
+// locations, companyKeywords carries no whitelist at all — whatever the
+// model writes reaches Apollo's q_organization_keyword_tags verbatim
+// (search-companies.js buildApolloQuery). Production: a Jordan River
+// confirmation where the user said "headquartered in Salt Lake County"
+// came back with companyKeywords: ["headquarters"], which Apollo then
+// required every result to match — and matched zero, because
+// "headquarters" is not a company-type tag anything is ever categorized
+// under. This is not a new taxonomy — it is a small blocklist of the
+// structural/geographic words that are never a company type, filtered out
+// deterministically so model phrasing cannot reintroduce them. Legitimate
+// type signals beyond SPECIFICITY_TRIGGERS (the model is free to name any
+// company type — "fintech", "e-commerce", etc.) are untouched.
+//
+// Some of these words are NOT exclusively geographic, though — "based",
+// "local" and "city" are also legitimate company-type language
+// ("account-based marketing", "local government", "city government"), and
+// so are "county" and "metro" ("county government", "county hospital",
+// "metro transit" — real organization categories a relationship-
+// intelligence product may target). A flat "any whole word" rule drops
+// those along with the real residue, so the groups are split by the
+// grammatical pattern that actually marks geography:
+//
+//   - ABSOLUTE: no legitimate company-type keyword is ever built from
+//     these at all — dropped wherever they appear.
+//   - LEADING-context (based/local/city): residue only in a location-
+//     prepositional phrase ("based IN Utah", "local TO Salt Lake") or
+//     standing alone — a category noun afterward ("local GOVERNMENT")
+//     is left untouched.
+//   - TRAILING-context (county/metro): a bare place name followed by one
+//     of these is a geographic qualifier ("Salt Lake COUNTY", "Salt Lake
+//     METRO") — residue only when something precedes it (or it stands
+//     alone); as the FIRST word of a category noun phrase ("COUNTY
+//     government", "METRO transit") it is left untouched.
+const ABSOLUTE_RESIDUE_TERMS = new Set([
+  'headquarters', 'headquartered', 'located', 'near',
+]);
+const LEADING_RESIDUE_TERMS = new Set(['based', 'local', 'city']);
+const TRAILING_RESIDUE_TERMS = new Set(['county', 'metro']);
+const LOCATION_PREPOSITIONS = new Set(['in', 'to', 'near']);
+
+/** Drops any companyKeywords entry that is, or contains, geography/
+ * structural residue rather than a company-type signal — see
+ * ABSOLUTE_RESIDUE_TERMS / LEADING_RESIDUE_TERMS / TRAILING_RESIDUE_TERMS above.
+ * Exported for direct unit coverage — see src/test/companyKeywordsGeographyResidue.test.js. */
+export function sanitizeCompanyKeywords(keywords) {
+  if (!Array.isArray(keywords)) return keywords;
+  return keywords.filter(kw => {
+    if (typeof kw !== 'string') return true;
+    const words = kw.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    if (words.some(w => ABSOLUTE_RESIDUE_TERMS.has(w))) return false;
+    const hasLeadingResidue = words.some((w, i) =>
+      LEADING_RESIDUE_TERMS.has(w) &&
+      (words.length === 1 || LOCATION_PREPOSITIONS.has(words[i + 1]))
+    );
+    if (hasLeadingResidue) return false;
+    const hasTrailingResidue = words.some((w, i) =>
+      TRAILING_RESIDUE_TERMS.has(w) && (words.length === 1 || i !== 0)
+    );
+    return !hasTrailingResidue;
+  });
+}
+
 export const handler = async (event) => {
   const startTime = Date.now();
 
@@ -528,6 +596,13 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     );
   }
 
+  // Validate companyKeywords — strip geography/structural residue (see
+  // GEOGRAPHY_RESIDUE_TERMS). Never invent a replacement value; an
+  // unsupported concept is dropped, not relocated.
+  if (barryResponse.understood?.companyKeywords) {
+    barryResponse.understood.companyKeywords = sanitizeCompanyKeywords(barryResponse.understood.companyKeywords);
+  }
+
   // Validate locations
   if (barryResponse.understood?.locations && barryResponse.understood.locations !== 'nationwide') {
     barryResponse.understood.locations = barryResponse.understood.locations.filter(loc =>
@@ -730,6 +805,13 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     );
   }
 
+  // Validate companyKeywords — strip geography/structural residue (see
+  // GEOGRAPHY_RESIDUE_TERMS). Never invent a replacement value; an
+  // unsupported concept is dropped, not relocated.
+  if (barryResponse.understood?.companyKeywords) {
+    barryResponse.understood.companyKeywords = sanitizeCompanyKeywords(barryResponse.understood.companyKeywords);
+  }
+
   // Validate locations
   if (barryResponse.understood?.locations && barryResponse.understood.locations !== 'nationwide') {
     barryResponse.understood.locations = barryResponse.understood.locations.filter(loc =>
@@ -862,6 +944,13 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     barryResponse.understood.companySizes = barryResponse.understood.companySizes.filter(size =>
       COMPANY_SIZE_OPTIONS.includes(size)
     );
+  }
+
+  // Validate companyKeywords — strip geography/structural residue (see
+  // GEOGRAPHY_RESIDUE_TERMS). Never invent a replacement value; an
+  // unsupported concept is dropped, not relocated.
+  if (barryResponse.understood?.companyKeywords) {
+    barryResponse.understood.companyKeywords = sanitizeCompanyKeywords(barryResponse.understood.companyKeywords);
   }
 
   // Validate locations

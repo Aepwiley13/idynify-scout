@@ -228,20 +228,38 @@ function extractCompanyKeywords(userInput) {
 // deterministically so model phrasing cannot reintroduce them. Legitimate
 // type signals beyond SPECIFICITY_TRIGGERS (the model is free to name any
 // company type — "fintech", "e-commerce", etc.) are untouched.
-const GEOGRAPHY_RESIDUE_TERMS = new Set([
-  'headquarters', 'headquartered', 'located', 'based',
-  'county', 'city', 'metro', 'near', 'local',
+//
+// Some of these words are NOT exclusively geographic, though — "based",
+// "local" and "city" are also legitimate company-type language
+// ("account-based marketing", "local government", "city government"). A
+// flat "any whole word" rule drops those along with the real residue, so
+// the two groups are split: words that are geography/structural whenever
+// they appear at all (no legitimate company-type keyword is ever built
+// from them), and words that are residue only in a location-prepositional
+// phrase ("based IN Utah", "local TO Salt Lake") or standing completely
+// alone — everywhere else (followed by a noun like "government" or
+// "marketing") they are left untouched.
+const ABSOLUTE_RESIDUE_TERMS = new Set([
+  'headquarters', 'headquartered', 'located', 'county', 'metro', 'near',
 ]);
+const CONTEXTUAL_RESIDUE_TERMS = new Set(['based', 'local', 'city']);
+const LOCATION_PREPOSITIONS = new Set(['in', 'to', 'near']);
 
-/** Drops any companyKeywords entry that is, or contains as a whole word,
- * a geography/structural term rather than a company-type signal.
+/** Drops any companyKeywords entry that is, or contains, geography/
+ * structural residue rather than a company-type signal — see
+ * ABSOLUTE_RESIDUE_TERMS / CONTEXTUAL_RESIDUE_TERMS above.
  * Exported for direct unit coverage — see src/test/companyKeywordsGeographyResidue.test.js. */
 export function sanitizeCompanyKeywords(keywords) {
   if (!Array.isArray(keywords)) return keywords;
   return keywords.filter(kw => {
     if (typeof kw !== 'string') return true;
-    const words = kw.toLowerCase().trim().split(/\s+/);
-    return !words.some(w => GEOGRAPHY_RESIDUE_TERMS.has(w));
+    const words = kw.toLowerCase().trim().split(/\s+/).filter(Boolean);
+    if (words.some(w => ABSOLUTE_RESIDUE_TERMS.has(w))) return false;
+    const isContextualResidue = words.some((w, i) =>
+      CONTEXTUAL_RESIDUE_TERMS.has(w) &&
+      (words.length === 1 || LOCATION_PREPOSITIONS.has(words[i + 1]))
+    );
+    return !isContextualResidue;
   });
 }
 

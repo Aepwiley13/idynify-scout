@@ -65,6 +65,43 @@ describe('sanitizeCompanyKeywords — geography/structural residue blocklist', (
   });
 });
 
+// ── Part 1b: pre-merge correction — "based", "local" and "city" are also
+//    legitimate company-type language, not exclusively geography. A flat
+//    "any whole word" rule dropped "account-based marketing", "local
+//    government" and "city government" along with real residue. The refined
+//    rule must still catch every required Jordan River phrase while leaving
+//    these alone. ────────────────────────────────────────────────────────────
+
+describe('sanitizeCompanyKeywords — refined rule: phrase context, not blanket word rejection', () => {
+  it('DROP — still catches every required Jordan River residue phrase', () => {
+    expect(sanitizeCompanyKeywords(['headquarters'])).toEqual([]);
+    expect(sanitizeCompanyKeywords(['headquartered in salt lake'])).toEqual([]);
+    expect(sanitizeCompanyKeywords(['located in utah'])).toEqual([]);
+    expect(sanitizeCompanyKeywords(['based in salt lake city'])).toEqual([]);
+    expect(sanitizeCompanyKeywords(['salt lake county'])).toEqual([]);
+  });
+
+  it('PRESERVE — legitimate company-type phrases built from the same ambiguous words survive', () => {
+    const legit = ['saas', 'fintech', 'e-commerce', 'account-based marketing', 'local government', 'city government'];
+    expect(sanitizeCompanyKeywords(legit)).toEqual(legit);
+  });
+
+  it('a bare ambiguous word with nothing else is still residue, as before', () => {
+    expect(sanitizeCompanyKeywords(['based'])).toEqual([]);
+    expect(sanitizeCompanyKeywords(['local'])).toEqual([]);
+    expect(sanitizeCompanyKeywords(['city'])).toEqual([]);
+  });
+
+  it('"based"/"local" followed by a space instead of a hyphen is still preserved outside a location phrase', () => {
+    expect(sanitizeCompanyKeywords(['account based marketing'])).toEqual(['account based marketing']);
+    expect(sanitizeCompanyKeywords(['local news'])).toEqual(['local news']);
+  });
+
+  it('"local to Salt Lake" is still caught via the location-preposition check', () => {
+    expect(sanitizeCompanyKeywords(['local to salt lake'])).toEqual([]);
+  });
+});
+
 // ── Part 2: the exact Jordan River case, through extraction AND into the
 //    final Apollo query shape. ──────────────────────────────────────────────
 

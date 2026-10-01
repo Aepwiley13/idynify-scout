@@ -170,23 +170,25 @@ describe('BarryICPPanel.handleFindCompanies — companyKeywords sanitized at the
     expect(persisted.companyKeywords).toEqual(searchRequestBody.companyProfile.companyKeywords);
   });
 
-  it('legitimate company-type keywords (including the #678/#679 edge cases) are preserved through this boundary', async () => {
-    const cases = [
-      { existing: [], incoming: ['saas'], expected: ['saas'] },
-      { existing: [], incoming: ['fintech', 'saas'], expected: ['fintech', 'saas'] },
-      { existing: [], incoming: ['local government'], expected: ['local government'] },
-      { existing: [], incoming: ['city government'], expected: ['city government'] },
-      { existing: [], incoming: ['county government'], expected: ['county government'] },
-      { existing: [], incoming: ['county hospital'], expected: ['county hospital'] },
-      { existing: [], incoming: ['metro transit'], expected: ['metro transit'] },
-      { existing: ['headquarters'], incoming: ['saas'], expected: ['saas'] },
-    ];
-
-    for (const { existing, incoming, expected } of cases) {
-      await seedActiveIcp({ companyKeywords: existing });
-      await renderPanelAndFindCompanies({ companyKeywords: incoming });
-      const persisted = STORE.get(`users/u1/icpProfiles/${ICP_ID}`);
-      expect(persisted.companyKeywords).toEqual(expected);
-    }
+  // One case, one test: each gets its own render/interact/Firestore cycle
+  // and its own independent Vitest timeout budget, rather than all 8 full
+  // component cycles sharing one 5000ms budget in a single `it()` — which is
+  // what made this test a timing-flaky CI failure (a Vitest *timeout*, not
+  // an assertion mismatch; see PR #680's CI run). Coverage is unchanged:
+  // every case below is identical to the ones previously run in the loop.
+  it.each([
+    { existing: [], incoming: ['saas'], expected: ['saas'] },
+    { existing: [], incoming: ['fintech', 'saas'], expected: ['fintech', 'saas'] },
+    { existing: [], incoming: ['local government'], expected: ['local government'] },
+    { existing: [], incoming: ['city government'], expected: ['city government'] },
+    { existing: [], incoming: ['county government'], expected: ['county government'] },
+    { existing: [], incoming: ['county hospital'], expected: ['county hospital'] },
+    { existing: [], incoming: ['metro transit'], expected: ['metro transit'] },
+    { existing: ['headquarters'], incoming: ['saas'], expected: ['saas'] },
+  ])('legitimate company-type keywords are preserved through this boundary: existing=$existing incoming=$incoming → $expected', async ({ existing, incoming, expected }) => {
+    await seedActiveIcp({ companyKeywords: existing });
+    await renderPanelAndFindCompanies({ companyKeywords: incoming });
+    const persisted = STORE.get(`users/u1/icpProfiles/${ICP_ID}`);
+    expect(persisted.companyKeywords).toEqual(expected);
   });
 });

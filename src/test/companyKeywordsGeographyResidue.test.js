@@ -16,8 +16,10 @@
  * County" landed as a nonsensical, zero-matching Apollo keyword filter
  * instead of being dropped.
  *
- * These tests assert the fix at the extraction boundary (barryICPConversation
- * .js's sanitizeCompanyKeywords, wired into all three extraction functions)
+ * These tests assert the fix at the extraction boundary — sanitizeCompanyKeywords
+ * (src/utils/companyKeywordsResidue.js, shared with the existing-ICP update
+ * path in src/utils/updateIcpFromChat.js — see that file's own tests),
+ * wired into all three extraction functions in barryICPConversation.js —
  * AND the final effective Apollo query shape produced from that extraction
  * — not just the sanitizer in isolation — per the exact Jordan River
  * production case, plus a legitimate company-type keyword that must
@@ -35,7 +37,7 @@ vi.mock('../../netlify/functions/utils/logApiUsage.js', () => ({
 // ── Part 1: the sanitizer itself — every example term the diagnosis named,
 //    plus phrase form, must be stripped; legitimate type signals survive. ──
 
-import { sanitizeCompanyKeywords } from '../../netlify/functions/barryICPConversation.js';
+import { sanitizeCompanyKeywords } from '../utils/companyKeywordsResidue.js';
 
 describe('sanitizeCompanyKeywords — geography/structural residue blocklist', () => {
   it('strips every geography/structural residue term named in the production diagnosis', () => {

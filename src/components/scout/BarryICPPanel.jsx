@@ -11,6 +11,7 @@ import { BRAND, ASSETS } from '../../theme/tokens';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
 import { appendTurn, loadOrSeedRecentTurns } from '../../utils/barryCanonical';
+import { sanitizeCompanyKeywords } from '../../utils/companyKeywordsResidue';
 
 // ─── BarryAvatar ──────────────────────────────────────────────────────────────
 export function BarryAvatar({ size = 20, style = {} }) {
@@ -196,6 +197,15 @@ export default function BarryICPPanel({ userId, icpProfile, onClose, onSearchCom
         updatedAt: new Date().toISOString(),
         managedByBarry: true,
       };
+      // The conditional spread above omits companyKeywords entirely when
+      // icpParams.companyKeywords is empty, so a stale invalid value already
+      // on resolution.profile (e.g. "headquarters", written before
+      // validation existed) passes through completely untouched — not even
+      // merged, just carried forward as-is. Sanitizing the one final
+      // mergedProfile object here, before it crosses any boundary, means
+      // persistence, the bridge, and the search request below all read the
+      // same already-sanitized value — there is nothing left to drift.
+      mergedProfile.companyKeywords = sanitizeCompanyKeywords(mergedProfile.companyKeywords || []);
       // Authoritative first, projection second.
       await setDoc(
         doc(db, 'users', user.uid, 'icpProfiles', resolution.icpId),

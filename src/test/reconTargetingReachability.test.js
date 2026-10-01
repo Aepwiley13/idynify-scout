@@ -30,7 +30,7 @@ const searchFn = read('../../netlify/functions/search-companies.js');
 
 describe('Which ICP fields become real Apollo constraints', () => {
   it.each([
-    ['industries', { industries: ['Accounting'] }, 'q_organization_keyword_tags'],
+    ['industries', { industries: ['Accounting'] }, 'organization_industry_tag_ids'],
     ['companyKeywords', { companyKeywords: ['saas'] }, 'q_organization_keyword_tags'],
     ['companySizes', { companySizes: ['11-20'] }, 'organization_num_employees_ranges'],
     ['locations', { locations: ['Texas'] }, 'organization_locations'],
@@ -71,18 +71,22 @@ describe('Which ICP fields become real Apollo constraints', () => {
     expect(withRevenue).toEqual(buildApolloQuery({}, null));
   });
 
-  it('industries resolve to Apollo industry tag IDs alongside keyword tags', () => {
+  it('industries resolve to Apollo industry tag IDs, not duplicated into keyword tags', () => {
     const query = buildApolloQuery({ industries: ['Accounting'] }, null);
 
     expect(query.organization_industry_tag_ids).toEqual(['5567cd4773696439b10b0000']);
-    expect(query.q_organization_keyword_tags).toEqual(['accounting']);
+    // Apollo ANDs organization_industry_tag_ids with q_organization_keyword_tags,
+    // so a mapped industry is represented once, structurally — duplicating it
+    // as a free-text keyword too (Wave 2C) is what zeroed out production
+    // results when an industry filter was combined with a location filter.
+    expect(query.q_organization_keyword_tags).toBeUndefined();
   });
 
-  it('ICP aliases resolve to canonical Apollo industry tag IDs', () => {
+  it('ICP aliases resolve to canonical Apollo industry tag IDs, not duplicated into keyword tags', () => {
     const query = buildApolloQuery({ industries: ['Credit Unions'] }, null);
 
     expect(query.organization_industry_tag_ids).toEqual(['5567cd4773696439b10b000a']);
-    expect(query.q_organization_keyword_tags).toEqual(['credit unions']);
+    expect(query.q_organization_keyword_tags).toBeUndefined();
   });
 
   it('avoidIndustries reaches nothing — it is not even read here', () => {

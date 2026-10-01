@@ -165,11 +165,14 @@ describe('updateIcpFromChat — companyKeywords sanitized at the existing-ICP up
     const { buildApolloQuery } = await import('../../netlify/functions/search-companies.js');
     const apolloQuery = buildApolloQuery(persisted);
 
-    // "Banking" reaching q_organization_keyword_tags is buildApolloQuery's
-    // existing, by-design behavior (industries are always folded into the
-    // keyword tags) — explicitly not touched or removed by this fix.
-    expect(apolloQuery.q_organization_keyword_tags).toEqual(['banking']);
-    expect(apolloQuery.q_organization_keyword_tags).not.toContain('headquarters');
+    // "Banking" resolves to an Apollo industry tag ID, so it is represented
+    // structurally via organization_industry_tag_ids and is no longer also
+    // folded into q_organization_keyword_tags (Wave 2C) — that duplication
+    // is what zeroed out production results when an industry filter was
+    // combined with a location filter. companyKeywords sanitization (this
+    // fix) is orthogonal and still holds: "headquarters" cannot appear.
+    expect(apolloQuery.organization_industry_tag_ids).toEqual(['5567cd4773696439b10b000a']);
+    expect(apolloQuery.q_organization_keyword_tags).toBeUndefined();
     expect(apolloQuery.organization_locations).toEqual(['Utah, United States']);
   });
 });

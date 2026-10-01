@@ -28,6 +28,7 @@ import { RECORD_STATUS } from '../../constants/statusModel';
 import { calculateReconConfidence } from '../../utils/reconConfidence';
 import { ARRIVAL_REVIEW_ICP } from '../../utils/firstExperienceMode';
 import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
+import { sanitizeCompanyKeywords } from '../../utils/companyKeywordsResidue';
 import {
   recordPersonDecision, recordPersonSkip,
 } from '../../services/icpRelationshipService';
@@ -1210,7 +1211,11 @@ function BarryNudgeCard({ industry, count, onAccept, onDismiss }) {
 
 // ─── DailyLeads ──────────────────────────────────────────────────────────────
 // ─── ICP Reclarification Modal ────────────────────────────────────────────────
-function IcpReclarificationModal({ userId, icpId, onClose, onSearchComplete, reconConfidence }) {
+// Exported for the companyKeywords sanitization-boundary regression test
+// (src/test/dailyLeadsIcpReclarificationCompanyKeywords.test.jsx), same
+// convention as CompanySwipeCard/PersonSwipeCard/QueueListPanel above. The
+// page still ships this via the default export; nothing else imports it.
+export function IcpReclarificationModal({ userId, icpId, onClose, onSearchComplete, reconConfidence }) {
   const T = useT();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -1294,6 +1299,16 @@ function IcpReclarificationModal({ userId, icpId, onClose, onSearchComplete, rec
         updatedAt: new Date().toISOString(),
         managedByBarry: true,
       };
+      // The conditional spread above omits companyKeywords entirely when
+      // icpParams.companyKeywords is empty, so a stale invalid value already
+      // on resolution.profile (e.g. "headquarters", written before
+      // validation existed) passes through completely untouched — not even
+      // merged, just carried forward as-is. Sanitizing the one final
+      // mergedProfile object here, before it crosses any boundary, means
+      // persistence, the bridge, and the search request below all read the
+      // same already-sanitized value — there is nothing left to drift. Same
+      // boundary fix as BarryICPPanel.handleFindCompanies (#680).
+      mergedProfile.companyKeywords = sanitizeCompanyKeywords(mergedProfile.companyKeywords || []);
       // Authoritative first, then the projection carrying its identity. The
       // refinement used to be written to the bridge only, so the next
       // activation of any ICP silently reverted it.

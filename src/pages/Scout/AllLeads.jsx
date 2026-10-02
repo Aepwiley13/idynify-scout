@@ -34,9 +34,11 @@ import ContactProfile from './ContactProfile';
 import LinkedInLinkSearch from '../../components/scout/LinkedInLinkSearch';
 import FirstTouchModal from '../../components/firstTouch/FirstTouchModal';
 import BulkComposeModal from '../../components/scout/BulkComposeModal';
+import { MAX_BULK_CONTACTS } from '../../utils/cadenceSend';
 import { loadIntoHunter } from '../../utils/loadIntoHunter';
 
-const MAX_CONTACTS = 25;
+// One cap for every bulk send, owned by the compose flow.
+const MAX_CONTACTS = MAX_BULK_CONTACTS;
 
 // ─── Engagement Status Sets ───────────────────────────────────────────────────
 // hunter_status values that indicate a contact has been engaged (Scout → Hunter)
@@ -1220,7 +1222,15 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
   }, [activeFilter]);
   const [searchTerm, setSearchTerm] = useState('');
   const [dataFilter, setDataFilter] = useState(null);
-  const [tagFilter, setTagFilter] = useState(null); // selected tag string or null
+  // Selected tag string or null. Seeded from `?tag=` so a link can open People
+  // already filtered to one group — Scout+ uses it for "View People" after a
+  // CSV import, whose contacts all carry that import's tag. Read from
+  // window.location rather than a router hook: AllLeads mounts under several
+  // shells and this must not require a router to render.
+  const [tagFilter, setTagFilter] = useState(() => {
+    try { return new URLSearchParams(window.location.search).get('tag') || null; }
+    catch { return null; }
+  });
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const tagPickerRef = useRef(null);
   const [sortOrder, setSortOrder] = useState(() => localStorage.getItem('al_sortOrder') || 'newest');
@@ -2434,7 +2444,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
             <button
               onClick={() => selectedIds.size <= MAX_CONTACTS && setShowBulkCompose(true)}
               disabled={selectedIds.size > MAX_CONTACTS}
-              title={selectedIds.size > MAX_CONTACTS ? 'Maximum 25 contacts per bulk send' : ''}
+              title={selectedIds.size > MAX_CONTACTS ? `Maximum ${MAX_CONTACTS} contacts per bulk send` : ''}
               style={{
                 padding: '6px 14px', borderRadius: 8, border: 'none',
                 background: selectedIds.size > MAX_CONTACTS ? T.surface : `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,

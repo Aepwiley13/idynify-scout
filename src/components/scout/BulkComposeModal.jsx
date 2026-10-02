@@ -3,12 +3,12 @@ import { X, Send, ChevronLeft, Loader, AlertTriangle, Mail, Sparkles, Edit3, Pap
 import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
-import { checkGmailConnection } from '../../utils/sendActionResolver';
+import { checkGmailConnection, sendEmailViaGmail, SEND_RESULT } from '../../utils/sendActionResolver';
 import { doc, setDoc, getDoc, deleteDoc, serverTimestamp, collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import BulkSendExecutor from './BulkSendExecutor';
+import { MAX_BULK_CONTACTS, PERSONALIZE_CHUNK, loadAlreadyDelivered } from '../../utils/cadenceSend';
 
-const MAX_CONTACTS = 25;
 const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB — Netlify 6MB payload cap + base64 inflation
 
 function getContactEmail(c) {
@@ -20,7 +20,23 @@ function getContactName(c) {
 }
 
 function getFirstName(c) {
-  return c.firstName || c.name?.split(' ')[0] || '';
+  return c.firstName || c.first_name || c.name?.split(' ')[0] || '';
+}
+
+function toPersonalizeInput(c) {
+  return {
+    contactId: c.id,
+    firstName: c.firstName || c.first_name || c.name?.split(' ')[0] || '',
+    lastName: c.lastName || c.last_name || c.name?.split(' ').slice(1).join(' ') || '',
+    title: c.title || '',
+    company: c.company_name || c.company || '',
+    industry: c.industry || '',
+    job_start_date: c.job_start_date || null,
+    barryContext: c.barryContext || null,
+    relationship_state: c.relationship_state || null,
+    warmth_level: c.warmth_level || null,
+    known_contact: c.known_contact || false,
+  };
 }
 
 function hasPersonalizeTag(text) {
@@ -32,7 +48,7 @@ function replacePersonalizeTags(template, replacement) {
 }
 
 function replaceContactTags(text, contact) {
-  const firstName = contact.firstName || contact.name?.split(' ')[0] || '';
+  const firstName = getFirstName(contact);
   const company = contact.company_name || contact.company || '';
   return text
     .replace(/\{\{first_name\}\}/gi, firstName)
@@ -42,14 +58,14 @@ function replaceContactTags(text, contact) {
 export default function BulkComposeModal({
   contacts: initialContacts, allContacts = [], onClose,
   initialSubject = '', initialBody = '', initialPath = 'write_your_own',
-  initialCc = '', initialPersonalize = true,
+  initialCc = '', initialPersonalize = true, initialCadenceName = '',
 }) {
   const T = useT();
   const [step, setStep] = useState(1);
   const [activePath, setActivePath] = useState(initialPath);
 
   // ─── Cadence name (shared across both paths, user-provided) ───
-  const [cadenceName, setCadenceName] = useState('');
+  const [cadenceName, setCadenceName] = useState(initialCadenceName);
 
   // ─── Selected contacts (mutable via in-modal search) ───
   const [selectedContacts, setSelectedContacts] = useState(initialContacts);
@@ -79,13 +95,14 @@ export default function BulkComposeModal({
   const searchInputRef = useRef(null);
 
   // ─── Path 1 state (Write your own) ───
-  const [subject, setSubject] = useState(initialSubject);
-  const [body, setBody] = useState(initialBody);
+  const [subject, setSubject] = useState(initialPath === 'send_with_attachment' ? '' : initialSubject);
+  const [body, setBody] = useState(initialPath === 'send_with_attachment' ? '' : initialBody);
   const [personalizeWithBarry, setPersonalizeWithBarry] = useState(initialPersonalize);
 
   // ─── Path 2 state (Send with attachment) ───
-  const [p2Subject, setP2Subject] = useState('');
-  const [p2Body, setP2Body] = useState('');
+  // A reused attachment-path cadence pre-fills these, not the Path 1 fields.
+  const [p2Subject, setP2Subject] = useState(initialPath === 'send_with_attachment' ? initialSubject : '');
+  const [p2Body, setP2Body] = useState(initialPath === 'send_with_attachment' ? initialBody : '');
   const [attachment, setAttachment] = useState(null); // { file, base64, filename, size }
   const [attachmentError, setAttachmentError] = useState(null);
   const [cc, setCc] = useState(initialCc);
@@ -121,6 +138,14 @@ export default function BulkComposeModal({
   const [sendStarted, setSendStarted] = useState(false);
   const [sendComplete, setSendComplete] = useState(false);
   const [sendPayload, setSendPayload] = useState(null);
+  const [personalizeProgress, setPersonalizeProgress] = useState(null); // { done, total }
+
+  // ─── Resend guard ───
+  const [alreadySentIds, setAlreadySentIds] = useState(() => new Set());
+  const [includeAlreadySent, setIncludeAlreadySent] = useState(false);
+
+  // ─── Send test ───
+  const [testState, setTestState] = useState(null); // null | 'sending' | { ok, message }
 
   // ─── Draft state ───
   const [draftLoaded, setDraftLoaded] = useState(false);
@@ -195,7 +220,7 @@ export default function BulkComposeModal({
     : [];
 
   function addContact(contact) {
-    if (contacts.length >= MAX_CONTACTS) return;
+    if (contacts.length >= MAX_BULK_CONTACTS) return;
     setSelectedContacts(prev => [...prev, contact]);
     setSearchQuery('');
   }
@@ -257,48 +282,68 @@ export default function BulkComposeModal({
   const handleDragOver = useCallback((e) => { e.preventDefault(); setDragOver(true); }, []);
   const handleDragLeave = useCallback(() => setDragOver(false), []);
 
-  // ─── Preview (Path 1) ───
-  async function handlePreviewPath1() {
-    setLoading(true);
-    try {
-      if (personalizeWithBarry) {
-        const user = getEffectiveUser();
-        const authToken = await user.getIdToken();
+  // ─── Preview ───
+  /**
+   * Barry personalization, PERSONALIZE_CHUNK contacts per request.
+   *
+   * barryBulkPersonalize refuses more than 25 contacts in one call. Rather than
+   * make the user split a 47-person import into two cadences, the modal makes
+   * the calls in sequence and shows one progress count. A chunk that fails
+   * marks only its own contacts as failed; the user can still edit their lines.
+   */
+  async function personalizeAll(sharedBody, mode) {
+    const user = getEffectiveUser();
+    const authToken = await user.getIdToken();
+    const resultsMap = {};
+    setPersonalizeProgress({ done: 0, total: contacts.length });
+    for (let i = 0; i < contacts.length; i += PERSONALIZE_CHUNK) {
+      const chunk = contacts.slice(i, i + PERSONALIZE_CHUNK);
+      try {
         const res = await fetch('/.netlify/functions/barryBulkPersonalize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: user.uid,
             authToken,
-            contacts: contacts.map(c => ({
-              contactId: c.id,
-              firstName: c.firstName || c.name?.split(' ')[0] || '',
-              lastName: c.lastName || c.name?.split(' ').slice(1).join(' ') || '',
-              title: c.title || '',
-              company: c.company_name || c.company || '',
-              industry: c.industry || '',
-              job_start_date: c.job_start_date || null,
-              barryContext: c.barryContext || null,
-              relationship_state: c.relationship_state || null,
-              warmth_level: c.warmth_level || null,
-              known_contact: c.known_contact || false,
-            })),
-            sharedBody: body,
+            ...(mode ? { mode } : {}),
+            contacts: chunk.map(toPersonalizeInput),
+            sharedBody,
           }),
         });
         const data = await res.json();
-        const resultsMap = {};
-        if (data.results) {
-          data.results.forEach(r => { resultsMap[r.contactId] = r; });
-        }
-        setPreviews(contacts.map(c => {
-          const result = resultsMap[c.id];
-          return {
-            contact: c,
-            openingLine: result?.success ? (result.openingLine || '') : '',
-            failed: result ? !result.success : true,
-          };
-        }));
+        (data.results || []).forEach(r => { resultsMap[r.contactId] = r; });
+      } catch (err) {
+        console.warn('[BulkComposeModal] personalization chunk failed', err?.message);
+      }
+      setPersonalizeProgress({ done: Math.min(i + PERSONALIZE_CHUNK, contacts.length), total: contacts.length });
+    }
+    return contacts.map(c => {
+      const result = resultsMap[c.id];
+      return {
+        contact: c,
+        openingLine: result?.success ? (result.openingLine || '') : '',
+        failed: result ? !result.success : true,
+      };
+    });
+  }
+
+  async function handlePreview() {
+    setLoading(true);
+    setTestState(null);
+    try {
+      // Resend guard: who already received a cadence with this name.
+      try {
+        const user = getEffectiveUser();
+        const delivered = await loadAlreadyDelivered(user?.uid, cadenceName);
+        setAlreadySentIds(delivered);
+      } catch (err) {
+        console.warn('[BulkComposeModal] resend check failed — no one excluded', err?.message);
+        setAlreadySentIds(new Set());
+      }
+
+      const wantsPersonalization = isPath2 ? hasPersonalizeTag(p2Body) : personalizeWithBarry;
+      if (wantsPersonalization) {
+        setPreviews(await personalizeAll(isPath2 ? p2Body : body, isPath2 ? 'inline_personalize' : undefined));
       } else {
         setPreviews(contacts.map(c => ({ contact: c, openingLine: '', failed: false })));
       }
@@ -308,68 +353,8 @@ export default function BulkComposeModal({
       setStep(2);
     } finally {
       setLoading(false);
+      setPersonalizeProgress(null);
     }
-  }
-
-  // ─── Preview (Path 2) ───
-  async function handlePreviewPath2() {
-    setLoading(true);
-    try {
-      const hasTag = hasPersonalizeTag(p2Body);
-      if (hasTag) {
-        const user = getEffectiveUser();
-        const authToken = await user.getIdToken();
-        const res = await fetch('/.netlify/functions/barryBulkPersonalize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: user.uid,
-            authToken,
-            mode: 'inline_personalize',
-            contacts: contacts.map(c => ({
-              contactId: c.id,
-              firstName: c.firstName || c.name?.split(' ')[0] || '',
-              lastName: c.lastName || c.name?.split(' ').slice(1).join(' ') || '',
-              title: c.title || '',
-              company: c.company_name || c.company || '',
-              industry: c.industry || '',
-              job_start_date: c.job_start_date || null,
-              barryContext: c.barryContext || null,
-              relationship_state: c.relationship_state || null,
-              warmth_level: c.warmth_level || null,
-              known_contact: c.known_contact || false,
-            })),
-            sharedBody: p2Body,
-          }),
-        });
-        const data = await res.json();
-        const resultsMap = {};
-        if (data.results) {
-          data.results.forEach(r => { resultsMap[r.contactId] = r; });
-        }
-        setPreviews(contacts.map(c => {
-          const result = resultsMap[c.id];
-          return {
-            contact: c,
-            openingLine: result?.success ? (result.openingLine || '') : '',
-            failed: result ? !result.success : true,
-          };
-        }));
-      } else {
-        setPreviews(contacts.map(c => ({ contact: c, openingLine: '', failed: false })));
-      }
-      setStep(2);
-    } catch {
-      setPreviews(contacts.map(c => ({ contact: c, openingLine: '', failed: true })));
-      setStep(2);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function handlePreview() {
-    if (isPath2) handlePreviewPath2();
-    else handlePreviewPath1();
   }
 
   function updateOpeningLine(contactId, newLine) {
@@ -379,43 +364,84 @@ export default function BulkComposeModal({
   }
 
   // ─── Build send payload ───
-  function handleSend() {
-    let payload;
+  /** One recipient's final email — the same function the real send and the test send use. */
+  function buildPayloadItem(p) {
+    // The send pipeline reads `contact.email`; a contact holding only a
+    // work_email used to pass the modal's filter and then fail at send.
+    const contact = { ...p.contact, email: getContactEmail(p.contact) };
     if (isPath2) {
-      const hasTag = hasPersonalizeTag(p2Body);
-      payload = previews
-        .filter(p => getContactEmail(p.contact))
-        .map(p => {
-          let finalBody = p2Body;
-          if (hasTag && p.openingLine) {
-            finalBody = replacePersonalizeTags(finalBody, p.openingLine);
-          }
-          finalBody = replaceContactTags(finalBody, p.contact);
-          const finalSubject = replaceContactTags(p2Subject, p.contact);
-          const item = { contact: p.contact, subject: finalSubject, body: finalBody, cadenceName };
-          if (attachment) {
-            item.attachment = { data: attachment.base64, filename: attachment.filename, mimeType: 'application/pdf' };
-          }
-          if (cc.trim()) item.cc = cc.trim();
-          return item;
-        });
-    } else {
-      payload = previews
-        .filter(p => getContactEmail(p.contact))
-        .map(p => {
-          const greeting = `Hi ${getFirstName(p.contact)},`;
-          const parts = [greeting];
-          if (p.openingLine) parts.push(p.openingLine);
-          parts.push(replaceContactTags(body, p.contact));
-          const finalSubject = replaceContactTags(subject, p.contact);
-          return { contact: p.contact, subject: finalSubject, body: parts.join('\n\n'), cadenceName };
-        });
+      let finalBody = p2Body;
+      if (hasPersonalizeTag(p2Body) && p.openingLine) {
+        finalBody = replacePersonalizeTags(finalBody, p.openingLine);
+      }
+      finalBody = replaceContactTags(finalBody, p.contact);
+      const item = { contact, subject: replaceContactTags(p2Subject, p.contact), body: finalBody, cadenceName };
+      if (attachment) {
+        item.attachment = { data: attachment.base64, filename: attachment.filename, mimeType: 'application/pdf' };
+      }
+      if (cc.trim()) item.cc = cc.trim();
+      return item;
     }
+    const parts = [`Hi ${getFirstName(p.contact)},`];
+    if (p.openingLine) parts.push(p.openingLine);
+    parts.push(replaceContactTags(body, p.contact));
+    return { contact, subject: replaceContactTags(subject, p.contact), body: parts.join('\n\n'), cadenceName };
+  }
+
+  const isExcludedAsAlreadySent = (p) => !includeAlreadySent && alreadySentIds.has(p.contact.id);
+  const sendablePreviews = previews
+    ? previews.filter(p => getContactEmail(p.contact) && !isExcludedAsAlreadySent(p))
+    : [];
+  const alreadySentInList = previews
+    ? previews.filter(p => getContactEmail(p.contact) && alreadySentIds.has(p.contact.id)).length
+    : 0;
+
+  function handleSend() {
+    const payload = sendablePreviews.map(buildPayloadItem);
     setSendPayload(payload);
     setSendStarted(true);
     setStep(3);
     deleteDraft();
   }
+
+  /**
+   * Send the first recipient's real email to the user.
+   *
+   * Same subject, body, personalization, attachment and Gmail account as the
+   * real send, through the same gmail-send-quick function. No contactId and no
+   * cadenceId are passed, so no contact is updated, no tracking pixel is
+   * embedded and nothing is counted. CC is left off so a test never reaches
+   * the CC'd person.
+   */
+  async function handleSendTest() {
+    const user = getEffectiveUser();
+    const sample = sendablePreviews[0];
+    if (!user?.email || !sample) return;
+    setTestState('sending');
+    const item = buildPayloadItem(sample);
+    const res = await sendEmailViaGmail({
+      userId: user.uid,
+      contact: { id: null, email: user.email, firstName: 'Test', lastName: 'Send' },
+      subject: `[TEST] ${item.subject}`,
+      body: item.body,
+      ...(item.attachment ? { attachment: item.attachment } : {}),
+    });
+    if (res?.result === SEND_RESULT.SENT) {
+      setTestState({ ok: true, message: `Test sent to ${user.email} — personalized as ${getContactName(sample.contact)}.` });
+    } else {
+      setTestState({ ok: false, message: `Test failed: ${res?.error || 'unknown error'}` });
+    }
+  }
+
+  /** What this cadence was composed from — stored so it can be reused. */
+  const cadenceMeta = {
+    templateSubject: activeSubject,
+    templateBody: activeBody,
+    path: activePath,
+    personalizedWithBarry: isPath2 ? hasPersonalizeTag(p2Body) : personalizeWithBarry,
+    cc: isPath2 ? cc.trim() : '',
+    hasAttachment: isPath2 && Boolean(attachment),
+  };
 
   // ─── Draft persistence ───
   async function saveDraft() {
@@ -469,9 +495,7 @@ export default function BulkComposeModal({
     onClose();
   }
 
-  const sendableCount = previews
-    ? previews.filter(p => getContactEmail(p.contact)).length
-    : contactsWithEmail.length;
+  const sendableCount = previews ? sendablePreviews.length : contactsWithEmail.length;
 
   // ─── Compose validity ───
   const path1Valid = subject.trim() && body.trim();
@@ -907,7 +931,7 @@ export default function BulkComposeModal({
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <label style={{ ...sectionLabel, marginBottom: 0 }}>Recipients</label>
-                  {contacts.length > 0 && contacts.length < MAX_CONTACTS && contactPool.length > 0 && (
+                  {contacts.length > 0 && contacts.length < MAX_BULK_CONTACTS && contactPool.length > 0 && (
                     <button
                       onClick={() => { setSearchOpen(o => !o); requestAnimationFrame(() => searchInputRef.current?.focus()); }}
                       style={{
@@ -1006,9 +1030,9 @@ export default function BulkComposeModal({
                     </div>
                   ))}
                 </div>
-                {contacts.length >= MAX_CONTACTS && (
+                {contacts.length >= MAX_BULK_CONTACTS && (
                   <div style={{ fontSize: 10, color: BRAND.pink, marginTop: 4 }}>
-                    Maximum {MAX_CONTACTS} contacts per campaign
+                    Maximum {MAX_BULK_CONTACTS} contacts per campaign
                   </div>
                 )}
               </div>
@@ -1039,7 +1063,9 @@ export default function BulkComposeModal({
                 }}
               >
                 {loading ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Mail size={14} />}
-                {loading ? 'Generating...' : (isPath2 ? 'Preview and Send' : 'Preview')}
+                {loading
+                  ? (personalizeProgress ? `Personalizing ${personalizeProgress.done} of ${personalizeProgress.total}…` : 'Generating...')
+                  : (isPath2 ? 'Preview and Send' : 'Preview')}
               </button>
             </div>
           </>
@@ -1061,6 +1087,29 @@ export default function BulkComposeModal({
                 </div>
               )}
 
+              {alreadySentInList > 0 && (
+                <div data-testid="already-sent-banner" style={{
+                  marginBottom: 14, padding: '10px 14px', borderRadius: 10,
+                  background: '#f59e0b14', border: '1px solid #f59e0b55',
+                  display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                  fontSize: 12, color: T.text,
+                }}>
+                  <AlertTriangle size={14} style={{ color: '#f59e0b' }} />
+                  <span style={{ flex: 1, minWidth: 200 }}>
+                    {alreadySentInList} {alreadySentInList === 1 ? 'person has' : 'people have'} already received "{cadenceName.trim()}".{' '}
+                    {includeAlreadySent ? 'They will be sent it again.' : 'They are excluded from this send.'}
+                  </span>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 600 }}>
+                    <input
+                      type="checkbox"
+                      checked={includeAlreadySent}
+                      onChange={e => setIncludeAlreadySent(e.target.checked)}
+                    />
+                    Send to them again
+                  </label>
+                </div>
+              )}
+
               <div style={{ fontSize: 12, color: T.textFaint, marginBottom: 12 }}>
                 Subject: <strong style={{ color: T.text }}>{activeSubject || '(no subject)'}</strong>
               </div>
@@ -1070,6 +1119,7 @@ export default function BulkComposeModal({
                   const email = getContactEmail(p.contact);
                   const name = getContactName(p.contact);
                   const noEmail = !email;
+                  const alreadySent = !noEmail && isExcludedAsAlreadySent(p);
 
                   return (
                     <div
@@ -1091,6 +1141,11 @@ export default function BulkComposeModal({
                         {noEmail && (
                           <span style={{ fontSize: 10, fontWeight: 600, color: BRAND.pink, background: `${BRAND.pink}15`, padding: '3px 8px', borderRadius: 6 }}>
                             Excluded
+                          </span>
+                        )}
+                        {alreadySent && (
+                          <span style={{ fontSize: 10, fontWeight: 600, color: '#b45309', background: '#f59e0b22', padding: '3px 8px', borderRadius: 6 }}>
+                            Already received — excluded
                           </span>
                         )}
                       </div>
@@ -1153,8 +1208,29 @@ export default function BulkComposeModal({
             </div>
 
             <div style={footerStyle}>
+              {testState && testState !== 'sending' && (
+                <span
+                  role="status"
+                  style={{ flex: 1, fontSize: 11, color: testState.ok ? '#16a34a' : BRAND.pink }}
+                >{testState.message}</span>
+              )}
               <button onClick={() => setStep(1)} style={btnSecondary}>
                 <ChevronLeft size={14} /> Edit
+              </button>
+              <button
+                onClick={handleSendTest}
+                disabled={!gmailConnected || sendableCount === 0 || testState === 'sending'}
+                title={gmailConnected ? 'Send the first recipient\'s email to yourself' : 'Connect Gmail to send a test'}
+                style={{
+                  ...btnSecondary,
+                  opacity: (!gmailConnected || sendableCount === 0) ? 0.5 : 1,
+                  cursor: (!gmailConnected || sendableCount === 0) ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {testState === 'sending'
+                  ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                  : <Mail size={14} />}
+                {testState === 'sending' ? 'Sending test…' : 'Send Test to Me'}
               </button>
               <button
                 onClick={handleSend}
@@ -1177,6 +1253,7 @@ export default function BulkComposeModal({
           <div style={bodySection}>
             <BulkSendExecutor
               payload={sendPayload}
+              cadenceMeta={cadenceMeta}
               T={T}
               onAddMoreContacts={handleAddMoreContacts}
               onComplete={() => setSendComplete(true)}

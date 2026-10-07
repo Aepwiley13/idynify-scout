@@ -34,7 +34,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { verifyAuthToken } from './utils/verifyAuthToken.js';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { LEGACY_HAIKU_4_5 } from './utils/models.js';
-import { cleanBarryOpening } from '../../src/utils/emailGreeting.js';
+import { cleanBarryOpening, displayNameCase } from '../../src/utils/emailGreeting.js';
 
 const MODEL = LEGACY_HAIKU_4_5;
 const MAX_CONTACTS = 25;
@@ -119,7 +119,7 @@ function toneDirective(warmthLevel, knownContact) {
 
 /** Build the per-contact prompt. Exported for testing. */
 export function buildPrompt(contact, sharedBody, reconBlock, userContext) {
-  const firstName = clip(contact.firstName, 100);
+  const firstName = clip(displayNameCase(contact.firstName), 100);
   const title = clip(contact.title, 150);
   const company = clip(contact.company, 150);
   const industry = clip(contact.industry, 150);
@@ -206,7 +206,7 @@ export function extractTagContext(sharedBody) {
  * sentence, instead of a standalone opening line. Exported for testing.
  */
 export function buildInlinePersonalizePrompt(contact, sharedBody, tagContext, reconBlock, userContext) {
-  const firstName = clip(contact.firstName, 100);
+  const firstName = clip(displayNameCase(contact.firstName), 100);
   const title = clip(contact.title, 150);
   const company = clip(contact.company, 150);
   const industry = clip(contact.industry, 150);

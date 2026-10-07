@@ -66,4 +66,27 @@ export function cleanBarryOpening(line, firstName = '') {
   return capitalizeFirst(text.trim());
 }
 
-export default { stripLeadingGreeting, cleanBarryOpening };
+/**
+ * Display casing for a recipient's name — presentation only, never written back.
+ *
+ * Imported lists are full of "chelsie hightower" and "MICHAEL", which made
+ * greetings read "Hi chelsie,". A name part that is ENTIRELY lowercase or
+ * ENTIRELY uppercase is title-cased (each word, and after a hyphen or
+ * apostrophe: "o'neill" → "O'Neill", "MARY-JANE" → "Mary-Jane"). Anything with
+ * mixed capitalization was capitalized on purpose — McDonald, LaToya, DeLaCruz,
+ * "van Buren", "de la Cruz" — and is returned exactly as given.
+ */
+export function displayNameCase(value) {
+  const text = String(value ?? '').trim();
+  if (!text || text.includes('@')) return text;
+  const letters = text.replace(/[^\p{L}]/gu, '');
+  if (!letters) return text;
+  const allLower = letters === letters.toLowerCase() && letters !== letters.toUpperCase();
+  const allUpper = letters === letters.toUpperCase() && letters !== letters.toLowerCase();
+  if (!allLower && !allUpper) return text;
+  return text
+    .toLowerCase()
+    .replace(/(^|[\s\-'’])(\p{L})/gu, (_, sep, ch) => sep + ch.toUpperCase());
+}
+
+export default { stripLeadingGreeting, cleanBarryOpening, displayNameCase };

@@ -7,10 +7,10 @@ import { checkGmailConnection, sendEmailViaGmail, SEND_RESULT } from '../../util
 import { doc, setDoc, getDoc, deleteDoc, serverTimestamp, collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import BulkSendExecutor from './BulkSendExecutor';
-import { cleanBarryOpening } from '../../utils/emailGreeting';
+import { cleanBarryOpening, displayNameCase } from '../../utils/emailGreeting';
 import {
   MAX_BULK_CONTACTS, PERSONALIZE_CHUNK, loadAlreadyDelivered,
-  hasPersonalizeTag, firstNameFor, renderCadenceEmail,
+  hasPersonalizeTag, firstNameFor, renderCadenceEmail, displayContactName,
 } from '../../utils/cadenceSend';
 
 const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB — Netlify 6MB payload cap + base64 inflation
@@ -20,14 +20,14 @@ function getContactEmail(c) {
 }
 
 function getContactName(c) {
-  return c.name || [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Unknown';
+  return displayContactName(c) || 'Unknown';
 }
 
 function toPersonalizeInput(c) {
   return {
     contactId: c.id,
     firstName: firstNameFor(c),
-    lastName: c.lastName || c.last_name || c.name?.split(' ').slice(1).join(' ') || '',
+    lastName: displayNameCase(c.lastName || c.last_name || c.name?.split(' ').slice(1).join(' ') || ''),
     title: c.title || '',
     company: c.company_name || c.company || '',
     industry: c.industry || '',

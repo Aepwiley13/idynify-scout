@@ -468,7 +468,7 @@ After you click **Add to Cadence**:
 | Body | Your body text in paragraphs, followed by your Gmail signature (added automatically) |
 | Registration link | The full `https://…` link is present, **clickable** (IDYNIFY now sends it as a link), and opens the registration page. If it isn't clickable, that's FIX FIRST. |
 | Special characters | The subject shows em dashes (—), curly quotes (’ “ ”) and accents (é) exactly as typed. Any `Ã` or `Â` is FIX FIRST. |
-| Greeting | Exactly one greeting ("Hi <first>,"). The recipient's name is not repeated in the next sentence. |
+| Greeting | Exactly one greeting ("Hi <first>,"), with the name capitalized ("Hi Chelsie," not "Hi chelsie," or "Hi CHELSIE,"). Names with intentional casing (McDonald, LaToya) are unchanged. The recipient's name is not repeated in the next sentence. |
 | Formatting | Paragraph breaks preserved; no `{{` tags visible |
 | PDF | Attached, with the correct file name, and it opens |
 | CC | **Not** copied, even if a CC is set. Tests never go to the CC address. |

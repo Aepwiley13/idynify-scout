@@ -27,6 +27,7 @@ import { db } from '../../firebase/config';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { ensureCriteriaVersion } from '../../services/icpRelationshipService';
 import { useT } from '../../theme/ThemeContext';
+import { displayNameCase } from '../../utils/emailGreeting';
 
 export const SEND_DELAY_MS = 1500; // mandatory inter-send delay — do not remove
 
@@ -46,8 +47,7 @@ const STATUS_CONFIG = {
 };
 
 function getContactName(contact) {
-  return contact.name
-    || [contact.firstName, contact.lastName].filter(Boolean).join(' ')
+  return displayNameCase(contact.name || [contact.firstName, contact.lastName].filter(Boolean).join(' '))
     || contact.email
     || 'Unknown';
 }

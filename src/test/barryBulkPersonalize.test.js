@@ -316,3 +316,13 @@ describe('opening line never repeats the greeting or the name (People Pitch fix)
   });
 });
 
+describe('recipient name casing in the prompt', () => {
+  it('title-cases an all-lowercase first name and keeps intentional casing', async () => {
+    await handler(makeEvent({ contacts: [makeContact(1, { firstName: 'chelsie' }), makeContact(2, { firstName: 'LaToya' })] }));
+    const prompts = mockCreate.mock.calls.map(([p]) => p.messages[0].content);
+    expect(prompts[0]).toContain('First name: Chelsie');
+    expect(prompts[0]).toContain('"Hi Chelsie,"');
+    expect(prompts[1]).toContain('First name: LaToya');
+  });
+});
+

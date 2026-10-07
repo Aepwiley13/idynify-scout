@@ -7,7 +7,7 @@
 
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { stripLeadingGreeting, cleanBarryOpening } from './emailGreeting.js';
+import { stripLeadingGreeting, cleanBarryOpening, displayNameCase } from './emailGreeting.js';
 
 /**
  * Recipients per send. The send loop is sequential with a 1.5s gap, so 100 is
@@ -143,7 +143,8 @@ export function hasPersonalizeTag(text) {
  */
 export function firstNameFor(contact = {}) {
   const first = contact.firstName || contact.first_name || (contact.name || '').trim().split(/\s+/)[0] || '';
-  return first.includes('@') ? '' : first;
+  // "chelsie" → "Chelsie"; intentional casing (McDonald, LaToya) is kept.
+  return first.includes('@') ? '' : displayNameCase(first);
 }
 
 export function greetingFor(contact = {}) {
@@ -186,3 +187,10 @@ export function renderCadenceEmail({ subject, body, contact, openingLine = '', p
   parts.push(replaceContactTags(stripLeadingGreeting(body), contact));
   return { subject: renderedSubject, body: parts.join('\n\n'), inline };
 }
+
+/** A recipient's full name for display: "chelsie hightower" → "Chelsie Hightower". */
+export function displayContactName(contact = {}) {
+  const raw = contact.name || [contact.firstName || contact.first_name, contact.lastName || contact.last_name].filter(Boolean).join(' ');
+  return displayNameCase(raw);
+}
+

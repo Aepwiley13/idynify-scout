@@ -87,6 +87,13 @@ export function prepareAttachment(attachment) {
  * split on whole characters and kept under the 75-character word limit.
  * Pure-ASCII values are returned unchanged. Exported for testing.
  */
+/**
+ * Version of the raw-message format this function builds. Returned with every
+ * successful send, so a Send Test can prove it was handled by a deploy that
+ * RFC 2047-encodes the subject. Absent in responses from older deploys.
+ */
+export const EMAIL_FORMAT_VERSION = 'rfc2047-1';
+
 export function encodeHeaderValue(value) {
   const text = String(value ?? '').replace(/[\r\n]+/g, ' ');
   if (/^[\x20-\x7E]*$/.test(text)) return text;
@@ -524,6 +531,8 @@ export const handler = async (event) => {
         gmailMessageId,
         gmailThreadId,
         sentAt,
+        // Lets a caller confirm which email-building code handled the send.
+        emailFormat: EMAIL_FORMAT_VERSION,
         message: 'Email sent successfully via Gmail'
       })
     };

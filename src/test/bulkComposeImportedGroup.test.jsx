@@ -64,7 +64,7 @@ let fetchBodies;
 beforeEach(() => {
   executorProps.current = null;
   mockSendEmailViaGmail.mockReset();
-  mockSendEmailViaGmail.mockResolvedValue({ result: 'sent' });
+  mockSendEmailViaGmail.mockResolvedValue({ result: 'sent', emailFormat: 'rfc2047-1' });
   mockLoadAlreadyDelivered.mockReset();
   mockLoadAlreadyDelivered.mockResolvedValue(new Set(['c0']));
   fetchBodies = [];
@@ -73,7 +73,7 @@ beforeEach(() => {
     fetchBodies.push(body);
     return {
       json: async () => ({
-        results: body.contacts.map(c => ({ contactId: c.contactId, success: true, openingLine: `Line for ${c.firstName}` })),
+        results: body.contacts.map(c => ({ contactId: c.contactId, success: true, openingLine: `Context for ${c.contactId}.` })),
       }),
     };
   });
@@ -123,7 +123,7 @@ describe('BulkComposeModal — imported group', { timeout: 20000 }, () => {
     expect(args.contact).toMatchObject({ id: null, email: 'me@idynify.com' });
     expect(args.cadenceId).toBeUndefined();
     expect(args.subject).toBe("[TEST] You're invited, Person1");  // c0 is excluded; c1 is the first recipient
-    expect(args.body).toBe('Hi Person1,\n\nLine for Person1\n\nJoin us at Beyond Words.');
+    expect(args.body).toBe('Hi Person1,\n\nContext for c1.\n\nJoin us at Beyond Words.');
   });
 
   it('hands the send loop every sendable person and the reusable template', async () => {

@@ -34,7 +34,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { verifyAuthToken } from './utils/verifyAuthToken.js';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { LEGACY_HAIKU_4_5 } from './utils/models.js';
-import { cleanBarryOpening, displayNameCase } from '../../src/utils/emailGreeting.js';
+import { finalizeBarryOpening, displayNameCase } from '../../src/utils/emailGreeting.js';
 
 const MODEL = LEGACY_HAIKU_4_5;
 const MAX_CONTACTS = 25;
@@ -171,9 +171,10 @@ RULES:
 2. The greeting and the recipient's name are already handled. Do NOT greet ("Hi", "Hey", "Hello", "Dear"…) and do NOT use the recipient's name anywhere in your sentence.
 3. The invitation or ask comes immediately after your sentence in the shared body. Do NOT make the ask yourself, and do not mention the event, date, place, link or any other detail from the shared body.
 4. ${specificityRule}
-5. It must read naturally between "Hi ${firstName || '{first name}'}," and the first line of the shared body.
-6. No subject line, no sign-off.
-7. ${toneDirective(warmthLevel, knownContact)}
+5. If you know little about this person, write a safe, general relevance sentence such as "I wanted to make sure this was on your radar." Never fall back to repeating the invitation.
+6. It must read naturally between "Hi ${firstName || '{first name}'}," and the first line of the shared body.
+7. No subject line, no sign-off.
+8. ${toneDirective(warmthLevel, knownContact)}
 
 Return ONLY the sentence. No quotes around it, no labels, no explanation.`;
 }
@@ -306,7 +307,7 @@ async function generateForContact(anthropic, contact, sharedBody, reconBlock, us
     const cleaned = cleanOpeningLine(response.content?.[0]?.text);
     const openingLine = mode === MODES.INLINE_PERSONALIZE
       ? cleaned
-      : (cleaned ? cleanBarryOpening(cleaned, contact.firstName) || null : null);
+      : (cleaned ? finalizeBarryOpening(cleaned, { firstName: displayNameCase(contact.firstName), body: sharedBody }) || null : null);
     if (!openingLine) throw new Error('Model returned an empty opening line');
 
     // _usage is internal telemetry only. It is summed by the handler and

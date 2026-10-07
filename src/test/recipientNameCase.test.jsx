@@ -98,7 +98,7 @@ describe('compose: preview, Barry context, test send and real send', { timeout: 
   beforeEach(() => {
     executorProps.current = null;
     mockSendEmailViaGmail.mockReset();
-    mockSendEmailViaGmail.mockResolvedValue({ result: 'sent' });
+    mockSendEmailViaGmail.mockResolvedValue({ result: 'sent', emailFormat: 'rfc2047-1' });
     fetchBodies = [];
     globalThis.fetch = vi.fn(async (_url, init) => {
       const body = JSON.parse(init.body);

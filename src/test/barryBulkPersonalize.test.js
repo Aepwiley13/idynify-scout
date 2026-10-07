@@ -46,9 +46,10 @@ import {
 function echoCompanyResponse({ messages }) {
   const prompt = messages[0].content;
   const company = prompt.match(/^Company: (.+)$/m)?.[1] || 'your team';
-  const firstName = prompt.match(/^First name: (.+)$/m)?.[1] || 'there';
   return Promise.resolve({
-    content: [{ text: `Saw what ${firstName} is building at ${company}. Impressive trajectory. Felt worth reaching out.` }],
+    // The recipient's name is never part of a valid opening line (it is
+    // replaced by the fallback), so the echo uses the company only.
+    content: [{ text: `Saw what the team at ${company} is building. Impressive trajectory. Felt worth reaching out.` }],
   });
 }
 

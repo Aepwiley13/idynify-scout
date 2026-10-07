@@ -48,7 +48,7 @@ const EXPECTED = `Hi Michael,\n\n${CLEAN}\n\n${BODY}`;
 beforeEach(() => {
   executorProps.current = null;
   mockSendEmailViaGmail.mockReset();
-  mockSendEmailViaGmail.mockResolvedValue({ result: 'sent' });
+  mockSendEmailViaGmail.mockResolvedValue({ result: 'sent', emailFormat: 'rfc2047-1' });
   globalThis.fetch = vi.fn(async (_url, init) => {
     const body = JSON.parse(init.body);
     return { json: async () => ({ results: body.contacts.map(c => ({ contactId: c.contactId, success: true, openingLine: `Hey Michael, ${CLEAN}` })) }) };

@@ -7,7 +7,7 @@ import { checkGmailConnection, sendEmailViaGmail, SEND_RESULT } from '../../util
 import { doc, setDoc, getDoc, deleteDoc, serverTimestamp, collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import BulkSendExecutor from './BulkSendExecutor';
-import { cleanBarryOpening, displayNameCase } from '../../utils/emailGreeting';
+import { finalizeBarryOpening, displayNameCase, EMAIL_RENDER_VERSION } from '../../utils/emailGreeting';
 import {
   MAX_BULK_CONTACTS, PERSONALIZE_CHUNK, loadAlreadyDelivered,
   hasPersonalizeTag, firstNameFor, renderCadenceEmail, displayContactName,
@@ -312,7 +312,7 @@ export default function BulkComposeModal({
       const raw = result?.success ? (result.openingLine || '') : '';
       return {
         contact: c,
-        openingLine: mode ? raw : cleanBarryOpening(raw, firstNameFor(c)),
+        openingLine: mode ? raw : finalizeBarryOpening(raw, { firstName: firstNameFor(c), body: sharedBody }),
         failed: result ? !result.success : true,
       };
     });
@@ -410,7 +410,13 @@ export default function BulkComposeModal({
       ...(item.attachment ? { attachment: item.attachment } : {}),
     });
     if (res?.result === SEND_RESULT.SENT) {
-      setTestState({ ok: true, message: `Test sent to ${user.email} — personalized as ${getContactName(sample.contact)}.` });
+      // The server reports which message format built the email. An older
+      // deploy (no subject encoding fix) reports nothing — say so plainly,
+      // because that email's subject will be garbled for every recipient.
+      const versions = `app ${EMAIL_RENDER_VERSION} · server ${res.emailFormat || 'OUTDATED'}`;
+      setTestState(res.emailFormat
+        ? { ok: true, message: `Test sent to ${user.email} — personalized as ${getContactName(sample.contact)}. (${versions})` }
+        : { ok: false, message: `Test sent to ${user.email}, but the email server that sent it is outdated and does not encode the subject correctly. Do not send — use the deploy preview and hard-refresh. (${versions})` });
     } else {
       setTestState({ ok: false, message: `Test failed: ${res?.error || 'unknown error'}` });
     }

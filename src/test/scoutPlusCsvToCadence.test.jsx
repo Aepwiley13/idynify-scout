@@ -29,14 +29,18 @@ vi.mock('../pages/Scout/CompanySearch', () => ({ default: () => <div>company sea
 const IMPORTED = [
   { id: 'n1', name: 'Ana New', email: 'ana@x.com', _uploadType: 'leads' },
   { id: 'n2', name: 'Ben New', email: 'ben@x.com', _uploadType: 'leads' },
-  { id: 'e1', name: 'Existing Erin', email: 'erin@x.com', _uploadType: 'leads' },
+  { id: 'e1', name: 'Existing Erin', email: 'erin@x.com', _uploadType: 'leads', _archived: true },
   { id: 'n3', name: 'No Email Ned', email: null, _uploadType: 'leads' },
+  {
+    id: 'c1', name: 'Conflict Cal', email: 'cal.old@x.com', _uploadType: 'leads',
+    _emailConflict: { signal: 'linkedin_url', signalLabel: 'LinkedIn URL', csvEmail: 'cal.new@x.com', storedEmail: 'cal.old@x.com' },
+  },
 ];
 const RESULT = {
   batchId: 'csv_1',
   tag: 'CSV Import - Beyond Words - 2026-10-02',
-  created: IMPORTED.filter(c => c.id !== 'e1'),
-  updated: IMPORTED.filter(c => c.id === 'e1'),
+  created: IMPORTED.filter(c => !['e1', 'c1'].includes(c.id)),
+  updated: IMPORTED.filter(c => ['e1', 'c1'].includes(c.id)),
   failed: [],
 };
 
@@ -76,7 +80,7 @@ async function importThroughScoutPlus() {
   fireEvent.click(screen.getByRole('button', { name: /Upload CSV/ }));
   expect(screen.getByText('CSV upload flow')).toBeInTheDocument();
   fireEvent.click(screen.getByText('finish import'));
-  await screen.findByText('4 contacts imported successfully');
+  await screen.findByText('5 contacts imported successfully');
 }
 
 beforeEach(() => {
@@ -105,8 +109,10 @@ describe('Scout+ CSV import → People → Cadence', () => {
 
   it('shows the import group and the two next steps', async () => {
     await importThroughScoutPlus();
-    expect(screen.getByTestId('import-summary')).toHaveTextContent('3 new · 1 already in IDYNIFY');
+    expect(screen.getByTestId('import-summary')).toHaveTextContent('3 new · 2 already in IDYNIFY');
     expect(screen.getByTestId('import-summary')).toHaveTextContent(RESULT.tag);
+    expect(screen.getByTestId('import-email-conflicts')).toHaveTextContent("1 email conflict — kept their IDYNIFY email and won't be added to a cadence");
+    expect(screen.getByTestId('import-archived')).toHaveTextContent("1 is archived — shown in this import's People view, still archived");
     expect(screen.getByRole('button', { name: /View People/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Add to Cadence/ })).toBeInTheDocument();
   });
@@ -131,11 +137,15 @@ describe('Scout+ CSV import → People → Cadence', () => {
       expect.stringContaining('People Pitch Invite'),
     ]);
     expect(screen.getByText(/1 imported contact has no email/)).toBeInTheDocument();
+    expect(screen.getByTestId('picker-email-conflicts')).toHaveTextContent(
+      'Conflict Cal: CSV cal.new@x.com · IDYNIFY cal.old@x.com (matched by LinkedIn URL)',
+    );
 
     fireEvent.click(options[0]);
     expect(screen.getByTestId('compose')).toBeInTheDocument();
     const p = composeProps.current;
-    expect(p.contacts.map(c => c.id)).toEqual(['n1', 'n2', 'e1']); // existing contact included, no-email excluded
+    // Existing (even archived) contact included; no-email and email-conflict contacts held back.
+    expect(p.contacts.map(c => c.id)).toEqual(['n1', 'n2', 'e1']);
     expect(p.initialCadenceName).toBe('Beyond Words Invitation');
     expect(p.initialSubject).toBe('Join us, {{first_name}}');
     expect(p.initialBody).toBe('Beyond Words is on Friday.');

@@ -36,13 +36,16 @@ import { createWebAdapter, mergeIdentifiers } from './contactIdentityService';
 import { ensureCompanyForContact, NAME_SOURCE } from './companyIdentityService';
 import { IdentityConflictError } from '../utils/identityResolution';
 import { buildUserAddedContact } from '../schemas/userAddedContact';
-import { buildImportTag, ROW_STATUS, toIdentityCandidate } from '../utils/csvContactImport';
+import { buildImportTag, ROW_STATUS, toIdentityCandidate, isHiddenFromPeople } from '../utils/csvContactImport';
 
 /** Resolution outcome for a READY row, set by previewCsvImport. */
 export const PREVIEW_OUTCOME = Object.freeze({
   NEW: 'new',               // will be created
   REVIEW: 'review',         // will be created, flagged as a possible duplicate (name + company)
   EXISTING: 'existing',     // already in IDYNIFY — identifiers merged, included in the group
+  EMAIL_CONFLICT: 'email_conflict', // already in IDYNIFY, matched by phone/LinkedIn/Apollo, but the CSV
+                                    // email differs from the stored one — imported into the group with
+                                    // the stored email untouched, and NOT handed to a cadence
   CONFLICT: 'conflict',     // two existing records share an identifier — not imported
   DUPLICATE: 'duplicate',   // resolves to the same existing contact as an earlier row
   LOOKUP_FAILED: 'lookup_failed', // could not check for duplicates — not imported (fails closed)
@@ -50,8 +53,47 @@ export const PREVIEW_OUTCOME = Object.freeze({
 
 /** Outcomes that will be written by commitCsvImport. */
 export const IMPORTABLE_OUTCOMES = Object.freeze([
-  PREVIEW_OUTCOME.NEW, PREVIEW_OUTCOME.REVIEW, PREVIEW_OUTCOME.EXISTING,
+  PREVIEW_OUTCOME.NEW, PREVIEW_OUTCOME.REVIEW, PREVIEW_OUTCOME.EXISTING, PREVIEW_OUTCOME.EMAIL_CONFLICT,
 ]);
+
+/** Outcomes that merge onto an existing contact rather than create one. */
+const MATCHED_OUTCOMES = Object.freeze([PREVIEW_OUTCOME.EXISTING, PREVIEW_OUTCOME.EMAIL_CONFLICT]);
+
+const SIGNAL_LABELS = Object.freeze({
+  linkedin_url: 'LinkedIn URL',
+  phone: 'phone',
+  apollo_person_id: 'Apollo ID',
+  firestore_id: 'contact ID',
+});
+
+const normEmail = (v) => (typeof v === 'string' ? v.trim().toLowerCase() : '') || null;
+
+/** The address IDYNIFY would send to for an existing contact. */
+function storedEmailOf(existing) {
+  return normEmail(existing?.email) || normEmail(existing?.work_email) || normEmail(existing?.email_normalized);
+}
+
+/**
+ * An existing contact matched on something OTHER than email, whose stored
+ * email differs from the one in the CSV.
+ *
+ * The merge rules never overwrite an email, so a cadence would go to the
+ * stored address — not the one in the file the user is looking at. Which is
+ * right is a question only the user can answer, so this is surfaced, the
+ * stored email is left alone, and the contact is kept out of the cadence
+ * hand-off until someone resolves it in People.
+ *
+ * @returns {null | { signal: string, signalLabel: string, csvEmail: string, storedEmail: string }}
+ */
+export function detectEmailConflict(row, decision) {
+  if (decision?.action !== 'merge') return null;
+  const signal = decision.resolution?.signal;
+  if (!signal || signal === 'email') return null;
+  const csvEmail = normEmail(row.contact?.email);
+  const storedEmail = storedEmailOf(decision.existing);
+  if (!csvEmail || !storedEmail || csvEmail === storedEmail) return null;
+  return { signal, signalLabel: SIGNAL_LABELS[signal] ?? signal, csvEmail, storedEmail };
+}
 
 /** Firestore allows 500 writes per batch; stay well under it. */
 export const CREATE_BATCH_SIZE = 400;
@@ -95,9 +137,19 @@ export async function previewCsvImport(userId, rows, { onProgress } = {}) {
         adapter,
       });
       let outcome = PREVIEW_OUTCOME.NEW;
-      if (decision.action === 'merge') outcome = PREVIEW_OUTCOME.EXISTING;
+      const emailConflict = detectEmailConflict(row, decision);
+      if (emailConflict) outcome = PREVIEW_OUTCOME.EMAIL_CONFLICT;
+      else if (decision.action === 'merge') outcome = PREVIEW_OUTCOME.EXISTING;
       else if (decision.resolution?.requiresReview) outcome = PREVIEW_OUTCOME.REVIEW;
-      out = { ...row, outcome, decision };
+      out = {
+        ...row,
+        outcome,
+        decision,
+        ...(emailConflict ? {
+          emailConflict,
+          reason: `${row.contact.name}: matched by ${emailConflict.signalLabel}. CSV email ${emailConflict.csvEmail} ≠ IDYNIFY email ${emailConflict.storedEmail}. Imported without changing the email; not added to cadences until resolved in People`,
+        } : {}),
+      };
     } catch (err) {
       if (err instanceof IdentityConflictError) {
         out = {
@@ -124,7 +176,7 @@ export async function previewCsvImport(userId, rows, { onProgress } = {}) {
   // counting both would report one person as two.
   const claimed = new Map();
   for (const r of resolved) {
-    if (r.outcome !== PREVIEW_OUTCOME.EXISTING) continue;
+    if (!MATCHED_OUTCOMES.includes(r.outcome)) continue;
     const id = r.decision.contactId;
     if (claimed.has(id)) {
       r.outcome = PREVIEW_OUTCOME.DUPLICATE;
@@ -170,7 +222,10 @@ function csvNote(content, batchId, iso) {
  *   batchId: string,
  *   tag: string,
  *   created: object[],   new contacts, as written, each with `id`
- *   updated: object[],   existing contacts now in the group, each with `id`
+ *   updated: object[],   existing contacts now in the group, each with `id`.
+ *                        `_emailConflict` marks one whose CSV email differs
+ *                        from the stored one; `_archived` marks one hidden
+ *                        from the standard People view.
  *   failed: Array<{rowNumber: number, reason: string}>,
  * }>}
  */
@@ -223,10 +278,15 @@ export async function commitCsvImport(userId, previewRows, {
   };
 
   // ── Existing contacts: merge identifiers, join the group ──────────────────
-  for (const row of importable.filter((r) => r.outcome === PREVIEW_OUTCOME.EXISTING)) {
+  for (const row of importable.filter((r) => MATCHED_OUTCOMES.includes(r.outcome))) {
     try {
       const { contactId, existing } = row.decision;
       const candidate = { ...toIdentityCandidate(row.contact) };
+      // An email conflict never touches the stored address: not `email`, and
+      // not `email_normalized` either — mergeIdentifiers rewrites the
+      // normalized form for any email it is given, which would leave the
+      // record's email and its normalized form naming two different people.
+      if (row.emailConflict) candidate.email = null;
       // Fill a missing company the same way Add Manually would; never replace one.
       if (!existing?.company_id && (row.contact.company || row.contact.email)) {
         const companyId = await companyFor(row.contact);
@@ -257,6 +317,9 @@ export async function commitCsvImport(userId, previewRows, {
         id: contactId,
         tags: existingTags.includes(tag) ? existingTags : [...existingTags, tag],
         _rowNumber: row.rowNumber,
+        // In-session flags for the success screen and the cadence hand-off.
+        ...(row.emailConflict ? { _emailConflict: row.emailConflict } : {}),
+        ...(isHiddenFromPeople(existing) ? { _archived: true } : {}),
       });
     } catch (err) {
       console.error('[csv-import] merge failed for row', row.rowNumber, err);
@@ -267,7 +330,7 @@ export async function commitCsvImport(userId, previewRows, {
 
   // ── New contacts: build, then commit in chunks ────────────────────────────
   const pending = [];
-  for (const row of importable.filter((r) => r.outcome !== PREVIEW_OUTCOME.EXISTING)) {
+  for (const row of importable.filter((r) => !MATCHED_OUTCOMES.includes(r.outcome))) {
     const c = row.contact;
     const companyId = (c.company || c.email) ? await companyFor(c) : null;
     const extra = {

@@ -95,4 +95,24 @@ describe('CSVUpload — contact preview', () => {
     expect(items.every(i => i._uploadType === 'leads')).toBe(true);
     expect(result.tag).toBe('CSV Import - bw - 2026-10-02');
   });
+
+  it('shows an email conflict before import, with both addresses, and counts it as existing', async () => {
+    mockPreview.mockImplementation(async (_uid, rows) => rows.map(r => {
+      if (r.status !== ROW_STATUS.READY) return r;
+      if (r.contact.email === 'erin@x.com') {
+        return {
+          ...r, outcome: PREVIEW_OUTCOME.EMAIL_CONFLICT, decision: {},
+          emailConflict: { signal: 'phone', signalLabel: 'phone', csvEmail: 'erin@x.com', storedEmail: 'erin.old@x.com' },
+          reason: 'Erin Existing: matched by phone. CSV email erin@x.com ≠ IDYNIFY email erin.old@x.com. Imported without changing the email; not added to cadences until resolved in People',
+        };
+      }
+      return { ...r, outcome: PREVIEW_OUTCOME.NEW, decision: {} };
+    }));
+    await upload();
+    expect(screen.getByTestId('email-conflict-banner')).toHaveTextContent('1 email conflict');
+    expect(screen.getByTestId('csv-attention')).toHaveTextContent('Row 3: Erin Existing: matched by phone. CSV email erin@x.com ≠ IDYNIFY email erin.old@x.com');
+    expect(screen.getByTestId('tile-ready')).toHaveTextContent('1 new · 1 already in IDYNIFY');
+    expect(screen.getByText('Email conflict')).toBeInTheDocument();
+  });
 });
+

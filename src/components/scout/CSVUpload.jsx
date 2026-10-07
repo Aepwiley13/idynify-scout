@@ -159,6 +159,9 @@ function attentionItems(rows) {
       items.push({ rowNumber: r.rowNumber, kind: r.outcome, text: r.reason });
       continue;
     }
+    if (r.outcome === PREVIEW_OUTCOME.EMAIL_CONFLICT) {
+      items.push({ rowNumber: r.rowNumber, kind: 'email_conflict', text: r.reason });
+    }
     if (r.outcome === PREVIEW_OUTCOME.REVIEW) {
       items.push({ rowNumber: r.rowNumber, kind: 'review', text: `${r.contact.name}: same name and company as an existing contact — imported and flagged for review` });
     }
@@ -266,7 +269,10 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
   const fileCounts = summarizeRows(rows);
   const outcome = summarizePreview(rows);
   const readyNew = outcome[PREVIEW_OUTCOME.NEW] + outcome[PREVIEW_OUTCOME.REVIEW];
-  const readyExisting = outcome[PREVIEW_OUTCOME.EXISTING];
+  const emailConflicts = outcome[PREVIEW_OUTCOME.EMAIL_CONFLICT];
+  // Email-conflict contacts are existing people: they join the group, with
+  // their stored email untouched, but are not handed to a cadence.
+  const readyExisting = outcome[PREVIEW_OUTCOME.EXISTING] + emailConflicts;
   const readyTotal = readyNew + readyExisting;
   const possibleDuplicates = outcome[PREVIEW_OUTCOME.REVIEW]
     + fileCounts[ROW_STATUS.DUPLICATE_IN_FILE] + outcome[PREVIEW_OUTCOME.DUPLICATE];
@@ -343,6 +349,18 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
             <StatTile testId="tile-missing" tone="gray" label="Missing required information" value={missing} sub="Not imported" />
           </div>
 
+          {emailConflicts > 0 && (
+            <div data-testid="email-conflict-banner" className="bg-amber-50 rounded-lg p-3 border border-amber-300 text-sm text-amber-900 flex gap-2" role="alert">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span>
+                <strong>{emailConflicts} email conflict{emailConflicts !== 1 ? 's' : ''}.</strong>{' '}
+                {emailConflicts === 1 ? 'This person matches' : 'These people match'} an existing contact by phone or LinkedIn, but the CSV email is different.
+                The IDYNIFY email is kept, and they will <strong>not</strong> be added to a cadence until you check the email in People.
+                Details are listed below.
+              </span>
+            </div>
+          )}
+
           {overLimit > 0 && (
             <div className="bg-amber-50 rounded-lg p-3 border border-amber-300 text-sm text-amber-900 flex gap-2" role="alert">
               <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
@@ -366,7 +384,7 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
               <ul className="text-sm space-y-1 max-h-40 overflow-y-auto" data-testid="csv-attention">
                 {attention.map((a, i) => (
                   <li key={`${a.rowNumber}-${i}`} className="flex gap-2 text-gray-700">
-                    {a.kind === 'review' || a.kind === ROW_STATUS.DUPLICATE_IN_FILE || a.kind === PREVIEW_OUTCOME.DUPLICATE
+                    {a.kind === 'review' || a.kind === 'email_conflict' || a.kind === ROW_STATUS.DUPLICATE_IN_FILE || a.kind === PREVIEW_OUTCOME.DUPLICATE
                       ? <Copy className="w-4 h-4 text-amber-600 flex-shrink-0" />
                       : a.kind === 'warning'
                         ? <Info className="w-4 h-4 text-gray-500 flex-shrink-0" />
@@ -386,6 +404,9 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
                   <div key={r.rowNumber} className="bg-white rounded-lg p-3 border border-gray-200">
                     <p className="font-semibold text-gray-900">
                       {r.contact.name}
+                      {r.outcome === PREVIEW_OUTCOME.EMAIL_CONFLICT && (
+                        <span className="ml-2 text-xs font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded">Email conflict</span>
+                      )}
                       {r.outcome === PREVIEW_OUTCOME.EXISTING && (
                         <span className="ml-2 text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded">Already in IDYNIFY</span>
                       )}

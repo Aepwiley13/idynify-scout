@@ -951,7 +951,6 @@ export default function CadenceDetail() {
           // recipient's rendered email, greeting and opening line included.
           initialSubject={template.subject}
           initialBody={template.body}
-          initialPath={template.path}
           initialCc={template.cc}
           initialPersonalize={template.personalize}
           // Adding people keeps the name, so the resend guard excludes anyone

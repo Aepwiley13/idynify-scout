@@ -24,6 +24,7 @@
 
 import Papa from 'papaparse';
 import { extractIdentifiers } from './identityNormalization.js';
+import { hasArchiveSignal } from '../constants/statusModel.js';
 
 /** Hard cap on rows per import. Rows past it are reported, never discarded quietly. */
 export const MAX_IMPORT_ROWS = 500;
@@ -351,4 +352,18 @@ export function toIdentityCandidate(contact) {
     company_name: contact.company || null,
     source: 'csv_import',
   };
+}
+
+/**
+ * Is this contact hidden from the standard People view?
+ *
+ * The same two signals People filters on: the contact itself is archived, or
+ * its company was archived (companyArchiveService cascades `company_archived`
+ * onto every contact at that company). An import can still match such a
+ * contact — identity does not care about archive state — and People shows it
+ * only inside that import's own tag view, so the group count reconciles. It is
+ * never reactivated.
+ */
+export function isHiddenFromPeople(contact) {
+  return hasArchiveSignal(contact) || contact?.company_archived === true;
 }

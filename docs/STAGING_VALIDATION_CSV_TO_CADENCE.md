@@ -1,6 +1,6 @@
 # Staging validation: CSV → People → Cadence
 
-**Status: NOT YET RUN on staging.** The session that built this feature had no staging URL, no Firebase credentials, no connected Gmail account and no Contact Hub export. Nothing below is a staging result. This document has three parts:
+**Status: NOT YET RUN on staging.** P1–P4 below were fixed in code on 2026-10-07; they still need confirming on staging. The session that built this feature had no staging URL, no Firebase credentials, no connected Gmail account and no Contact Hub export. Nothing below is a staging result. This document has three parts:
 
 1. **Pre-flight findings.** Issues found by reading the code each test exercises, plus a local run of the real parser on a fixture. Each one is a prediction to confirm or rule out on staging.
 2. **Runbook.** Exact steps and what to inspect, per test.
@@ -14,10 +14,10 @@ Fixture: `docs/staging/csv-edge-cases.csv`. Replace `REPLACE+csvNN@REPLACE.com` 
 
 | # | Severity if confirmed | Test | Finding |
 |---|---|---|---|
-| P1 | **Bug: possible wrong recipient** | 3, 9 | An existing contact matched by **phone or LinkedIn**, whose IDYNIFY email differs from the CSV email, keeps the IDYNIFY email. The merge never overwrites. The cadence is sent to that IDYNIFY address, and the preview doesn't show the difference. Matches by email are not affected. |
-| P2 | **Bug: People count mismatch** | 4 | The resolver can match an **archived** contact. That contact gets tagged, is counted as "already in IDYNIFY" and is sent the cadence, but People hides archived contacts. "View People" will then show fewer people than "N imported". |
-| P3 | **Blocker for the flyer send** | 7 | A reused cadence that was written without an attachment pre-fills the **"Write your own"** path. Attaching the flyer means switching to **"Send with attachment"**, which has separate, empty subject and body fields: the reused message has to be pasted again. That path also has no "Hi {first}," greeting and no Barry toggle; personalization there only happens where the body contains `{{personalize}}`. |
-| P4 | Minor UX | 6 | A row with an email but no name is saved with the email as its name, so the greeting reads "Hi replace+csv07@…,". |
+| P1 | **Fixed** (was: wrong recipient) | 3, 9 | A phone, LinkedIn or Apollo match whose stored email differs from the CSV email is now flagged as an **Email conflict** in the preview (banner, row reason, badge) and on the success screen. The stored email and `email_normalized` are left unchanged. The person joins the import group but is **held back from Add to Cadence**, and the picker lists them with both addresses. |
+| P2 | **Fixed** (was: People count mismatch) | 4 | Matched contacts that are archived, or whose company is archived, show in **this import's tag view only**, under a banner saying how many are archived. They stay archived and are hidden again when the tag filter is cleared. The success screen reports "N are archived". |
+| P3 | **Fixed** (was: blocker for the flyer send) | 7 | There is now **one message**. The PDF and CC are optional additions to it, so attaching the flyer keeps the reused subject and body, the "Hi {first}," greeting and the Barry toggle. A body containing `{{personalize}}` still gets Barry's text in place, with no added greeting. The test send and the real send render through the same function. |
+| P4 | **Fixed** | 6 | An email-only contact is greeted "Hi,", and `{{first_name}}` is left empty for them. |
 | P5 | Minor (data) | 1 | The CSV **Tags** column is not imported. The preview lists it under "Columns not imported". Contact Hub tags are lost; only the import tag is applied. |
 | P6 | Expected — not a bug | 3 | Existing matched contacts keep their original `source`/`addedFrom`; that's the non-destructive rule. They get the import tag, `identity_sources` gains `csv_import`, and `last_import_batch_id` is set. Only **new** contacts get `source: csv_import` and `addedFrom: csv`. Test 3's expectation should be read that way. |
 | P7 | Minor | 8 | A test send writes one `email_logs` entry (`contactId: null`, no `cadenceId`, `source: quick_engage`). It touches no contact, timeline or cadence. |
@@ -71,16 +71,18 @@ docs with import_batch_id = new
 On **Fay Existing**, confirm that `name`, `title` and `source` are unchanged, the tag was added, and `identity_sources` includes `csv_import`.
 
 ### Test 4: People group
+Also check: if the batch matched an archived contact, it appears here under the amber "Includes N archived contacts" banner and disappears when the tag filter is cleared.
 Click **View People**. The URL should be `/command-center?tab=people&tag=…`. The count shown should equal "N contacts imported"; if it doesn't, check P2. Check that company, email and phone display.
 
 ### Test 5: Add to Cadence
+To test P1, include one row whose phone or LinkedIn matches an existing contact but whose email is different. Check that the preview shows "Email conflict" with both addresses, and that the picker lists that person as "not included".
 Click Add to Cadence and choose `STAGING - Beyond Words Test` (send it once to yourself first if it doesn't exist yet). Check that the name, subject and body are pre-filled and the header shows "N contacts".
 
 ### Test 6: Personalization
 Click Preview. Check every card's greeting and opening line against that card's contact. Spot-check five. For more than 25 people, the button shows "Personalizing X of N…".
 
 ### Test 7: Attachment
-Switch to Send with attachment (see P3), attach the flyer PDF, and confirm it appears in the review cards ("PDF attached: <file>").
+Reuse the cadence, then attach the flyer PDF in the same compose screen; there is no mode switch any more. Check that the subject and body are unchanged and Personalize with Barry is still on. On the review cards, check "Hi {first}," plus Barry's line, and "PDF attached: <file>" on every card.
 
 ### Test 8: Send Test
 Click **Send Test to Me**. In Gmail, check the From account, the `[TEST]` subject, body, personalization, links, formatting and attachment. In Firestore, check:

@@ -93,6 +93,9 @@ export default function ScoutPlus() {
     }
   };
 
+  const emailConflictCount = importResult ? addedItems.filter(c => c._emailConflict).length : 0;
+  const archivedCount = importResult ? addedItems.filter(c => c._archived).length : 0;
+
   const handleAddMore = () => {
     setAddedItems([]);
     setLastUploadType(null);
@@ -273,6 +276,17 @@ export default function ScoutPlus() {
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: T.statBg, border: `1px solid ${T.border}`, color: T.text, fontWeight: 600, fontSize: 12 }}>
                   <Tag className="w-3.5 h-3.5" />{importResult.tag}
                 </span>
+                {emailConflictCount > 0 && (
+                  <span data-testid="import-email-conflicts" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#b45309' }}>
+                    <AlertTriangle className="w-4 h-4" />
+                    {emailConflictCount} email conflict{emailConflictCount !== 1 ? 's' : ''} — kept their IDYNIFY email and won't be added to a cadence until checked in People
+                  </span>
+                )}
+                {archivedCount > 0 && (
+                  <span data-testid="import-archived">
+                    {archivedCount} {archivedCount === 1 ? 'is' : 'are'} archived — shown in this import's People view, still archived
+                  </span>
+                )}
                 {importResult.failed.length > 0 && (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#dc2626' }}>
                     <AlertTriangle className="w-4 h-4" />

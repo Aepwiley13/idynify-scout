@@ -21,7 +21,7 @@ vi.mock('../firebase/config', () => ({ db: {} }));
 
 import {
   sortCadencesByRecency, cadenceTemplate, distinctCadencesForReuse, loadAlreadyDelivered,
-  MAX_BULK_CONTACTS, PERSONALIZE_CHUNK,
+  MAX_BULK_CONTACTS, PERSONALIZE_CHUNK, renderCadenceEmail, greetingFor, firstNameFor,
 } from '../utils/cadenceSend';
 
 const ts = (iso) => ({ toMillis: () => new Date(iso).getTime(), toDate: () => new Date(iso) });
@@ -123,3 +123,36 @@ describe('send limits', () => {
     expect(PERSONALIZE_CHUNK).toBe(25);
   });
 });
+
+describe('renderCadenceEmail — the one message model', () => {
+  const ana = { name: 'Ana Lopez', first_name: 'Ana', company_name: 'Acme' };
+
+  it('greeting mode: Hi {first}, + Barry line + body, tags filled', () => {
+    expect(renderCadenceEmail({
+      subject: 'Invite for {{first_name}}', body: 'See you, {{company}}.', contact: ana, openingLine: 'Loved your talk.',
+    })).toEqual({ subject: 'Invite for Ana', body: 'Hi Ana,\n\nLoved your talk.\n\nSee you, Acme.', inline: false });
+  });
+
+  it('greeting mode without personalization drops the opening line', () => {
+    expect(renderCadenceEmail({ subject: 'S', body: 'B', contact: ana, openingLine: 'x', personalize: false }).body)
+      .toBe('Hi Ana,\n\nB');
+  });
+
+  it('inline mode fills {{personalize}} in place, with no added greeting', () => {
+    expect(renderCadenceEmail({ subject: 'S', body: 'Dear {{first_name}}, {{personalize}}', contact: ana, openingLine: 'great work.' }).body)
+      .toBe('Dear Ana, great work.');
+  });
+
+  it('never sends a literal {{personalize}} when Barry failed for a contact', () => {
+    expect(renderCadenceEmail({ subject: 'S', body: 'Hello. {{personalize}} Bye.', contact: ana, openingLine: '' }).body)
+      .toBe('Hello.  Bye.');
+  });
+
+  it('does not use an email address as a first name', () => {
+    const emailOnly = { name: 'sam@x.com', email: 'sam@x.com' };
+    expect(firstNameFor(emailOnly)).toBe('');
+    expect(greetingFor(emailOnly)).toBe('Hi,');
+    expect(greetingFor({ name: 'Sam Ray' })).toBe('Hi Sam,');
+  });
+});
+

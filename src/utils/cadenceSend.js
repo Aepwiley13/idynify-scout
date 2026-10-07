@@ -111,3 +111,74 @@ export function distinctCadencesForReuse(cadences = []) {
   }
   return [...byName.values()];
 }
+
+// ─── Message rendering ──────────────────────────────────────────────────────
+//
+// ONE message model. There used to be two compose modes with separate subject
+// and body state — "Write your own" (greeting + Barry opening line + body) and
+// "Send with attachment" ({{personalize}} filled inline) — and switching to the
+// second to attach a PDF threw away the message the user had just reused. Now
+// an attachment is just an addition to the message, and which personalization
+// style applies is decided by the body itself:
+//
+//   body contains {{personalize}}  → Barry fills the tag in place; the body
+//                                    controls its own greeting
+//   otherwise                      → "Hi {first}," + Barry's opening line (when
+//                                    personalizing) + body
+//
+// The preview, the test send and the real send all render through this, so
+// what the user reviews is what is sent.
+
+const PERSONALIZE_TAG = /\{\{personalize\}\}/gi;
+
+export function hasPersonalizeTag(text) {
+  return /\{\{personalize\}\}/i.test(text || '');
+}
+
+/**
+ * A contact's first name for greetings and {{first_name}}. Empty when the only
+ * "name" on file is an email address — a CSV row with an email and no name is
+ * stored that way, and "Hi sam@acme.com," is worse than "Hi,".
+ */
+export function firstNameFor(contact = {}) {
+  const first = contact.firstName || contact.first_name || (contact.name || '').trim().split(/\s+/)[0] || '';
+  return first.includes('@') ? '' : first;
+}
+
+export function greetingFor(contact = {}) {
+  const first = firstNameFor(contact);
+  return first ? `Hi ${first},` : 'Hi,';
+}
+
+export function replaceContactTags(text, contact = {}) {
+  const company = contact.company_name || contact.company || '';
+  return String(text || '')
+    .replace(/\{\{first_name\}\}/gi, firstNameFor(contact))
+    .replace(/\{\{company\}\}/gi, company);
+}
+
+/**
+ * Render one recipient's email.
+ *
+ * @param {object} args
+ * @param {string} args.subject      the shared subject (may contain tags)
+ * @param {string} args.body         the shared body (may contain tags)
+ * @param {object} args.contact
+ * @param {string} [args.openingLine] Barry's text for this contact
+ * @param {boolean} [args.personalize] greeting mode: include the opening line
+ * @returns {{ subject: string, body: string, inline: boolean }}
+ */
+export function renderCadenceEmail({ subject, body, contact, openingLine = '', personalize = true }) {
+  const inline = hasPersonalizeTag(body);
+  const renderedSubject = replaceContactTags(subject, contact);
+  if (inline) {
+    // A failed personalization leaves the tag empty rather than sending the
+    // literal "{{personalize}}" to a real person.
+    const filled = String(body || '').replace(PERSONALIZE_TAG, openingLine || '');
+    return { subject: renderedSubject, body: replaceContactTags(filled, contact), inline };
+  }
+  const parts = [greetingFor(contact)];
+  if (personalize && openingLine) parts.push(openingLine);
+  parts.push(replaceContactTags(body, contact));
+  return { subject: renderedSubject, body: parts.join('\n\n'), inline };
+}

@@ -283,3 +283,69 @@ describe('commitCsvImport — people already in IDYNIFY', () => {
     expect(store.updates.some(u => u.id === 'x1' || u.id === 'x2')).toBe(false);
   });
 });
+
+describe('email conflicts — matched by phone or LinkedIn, CSV email differs', () => {
+  const STORED = {
+    name: 'Aaron Wiley', email: 'old@acme.com', email_normalized: 'old@acme.com',
+    phone: '801-555-1234', phone_normalized: '8015551234',
+    linkedin_url: 'https://www.linkedin.com/in/aaronwiley', linkedin_url_normalized: 'linkedin.com/in/aaronwiley',
+    tags: [], is_archived: false,
+  };
+  beforeEach(() => { store.contacts.set('aaron', { ...STORED }); });
+
+  it('flags a phone match whose CSV email differs, naming both addresses', async () => {
+    const [row] = await previewCsvImport(UID, rowsFrom('Name,Email,Phone\nAaron Wiley,new@acme.com,(801) 555-1234\n'));
+    expect(row.outcome).toBe(PREVIEW_OUTCOME.EMAIL_CONFLICT);
+    expect(row.emailConflict).toEqual({
+      signal: 'phone', signalLabel: 'phone', csvEmail: 'new@acme.com', storedEmail: 'old@acme.com',
+    });
+    expect(row.reason).toMatch(/matched by phone.*new@acme\.com.*old@acme\.com/);
+  });
+
+  it('flags a LinkedIn match whose CSV email differs', async () => {
+    const [row] = await previewCsvImport(UID, rowsFrom('Name,Email,LinkedIn\nAaron Wiley,new@acme.com,linkedin.com/in/aaronwiley/\n'));
+    expect(row.outcome).toBe(PREVIEW_OUTCOME.EMAIL_CONFLICT);
+    expect(row.emailConflict.signalLabel).toBe('LinkedIn URL');
+  });
+
+  it('is not a conflict when the emails agree, or when the CSV row has no email', async () => {
+    const [sameEmail] = await previewCsvImport(UID, rowsFrom('Name,Email,Phone\nAaron Wiley,OLD@acme.com,801-555-1234\n'));
+    expect(sameEmail.outcome).toBe(PREVIEW_OUTCOME.EXISTING); // matched by email
+    const [noEmail] = await previewCsvImport(UID, rowsFrom('Name,Phone\nAaron W,801-555-1234\n'));
+    expect(noEmail.outcome).toBe(PREVIEW_OUTCOME.EXISTING);   // matched by phone, nothing to disagree with
+  });
+
+  it('imports the person into the group without touching the stored email, and marks them', async () => {
+    const { result } = await previewAndCommit('Name,Email,Phone,Title\nA. Wiley,new@acme.com,801-555-1234,CEO\n');
+    const aaron = store.contacts.get('aaron');
+    expect(aaron.email).toBe('old@acme.com');
+    expect(aaron.email_normalized).toBe('old@acme.com');
+    expect(aaron.tags).toEqual([result.tag]);
+    expect(result.created).toHaveLength(0);
+    expect(result.updated).toHaveLength(1);
+    expect(result.updated[0]).toMatchObject({
+      id: 'aaron', email: 'old@acme.com',
+      _emailConflict: { csvEmail: 'new@acme.com', storedEmail: 'old@acme.com', signal: 'phone' },
+    });
+  });
+});
+
+describe('archived matches', () => {
+  it('marks an existing contact hidden from People as archived in the result — without reactivating it', async () => {
+    store.contacts.set('arch', {
+      name: 'Arch', email: 'arch@x.com', email_normalized: 'arch@x.com', is_archived: true, record_status: 'archived',
+    });
+    store.contacts.set('coarch', {
+      name: 'Coco', email: 'coco@x.com', email_normalized: 'coco@x.com', is_archived: false, company_archived: true,
+    });
+    const { result } = await previewAndCommit('Name,Email\nArch,arch@x.com\nCoco,coco@x.com\nNew,new@x.com\n');
+    const byId = Object.fromEntries(result.updated.map(c => [c.id, c]));
+    expect(byId.arch._archived).toBe(true);
+    expect(byId.coarch._archived).toBe(true);
+    expect(store.contacts.get('arch').is_archived).toBe(true);
+    expect(store.contacts.get('arch').record_status).toBe('archived');
+    expect(store.contacts.get('coarch').company_archived).toBe(true);
+    expect(result.created[0]._archived).toBeUndefined();
+  });
+});
+

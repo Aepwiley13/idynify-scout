@@ -59,10 +59,15 @@ export default function CadencePickerModal({ contacts = [], onClose }) {
     return () => { cancelled = true; };
   }, []);
 
-  const withEmail = contacts.filter(hasEmail);
+  // A contact whose CSV email conflicts with its stored one is held back: the
+  // send would go to the stored address, and only the user can say which is
+  // right. They resolve it in People and send from there.
+  const emailConflicts = contacts.filter((c) => c._emailConflict);
+  const eligible = contacts.filter((c) => !c._emailConflict);
+  const withEmail = eligible.filter(hasEmail);
   const recipients = withEmail.slice(0, MAX_BULK_CONTACTS);
   const overCap = withEmail.length - recipients.length;
-  const noEmail = contacts.length - withEmail.length;
+  const noEmail = eligible.length - withEmail.length;
 
   if (compose) {
     const tpl = compose.cadence ? cadenceTemplate(compose.cadence) : null;
@@ -73,7 +78,6 @@ export default function CadencePickerModal({ contacts = [], onClose }) {
         initialCadenceName={compose.cadence?.name || ''}
         initialSubject={tpl?.subject || ''}
         initialBody={tpl?.body || ''}
-        initialPath={tpl?.path || 'write_your_own'}
         initialCc={tpl?.cc || ''}
         initialPersonalize={tpl ? tpl.personalize : true}
       />
@@ -119,6 +123,26 @@ export default function CadencePickerModal({ contacts = [], onClose }) {
         </div>
 
         <div style={{ padding: 20, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {emailConflicts.length > 0 && (
+            <div data-testid="picker-email-conflicts" style={{
+              padding: '10px 14px', borderRadius: 10, fontSize: 12, color: T.text,
+              background: '#f59e0b14', border: '1px solid #f59e0b55', display: 'flex', gap: 8,
+            }}>
+              <AlertTriangle size={14} style={{ color: '#f59e0b', flexShrink: 0, marginTop: 1 }} />
+              <span>
+                {emailConflicts.length} contact{emailConflicts.length !== 1 ? 's are' : ' is'} not included — the email in your CSV differs from the one in IDYNIFY:
+                <ul style={{ margin: '6px 0 0', paddingLeft: 18 }}>
+                  {emailConflicts.map((c) => (
+                    <li key={c.id}>
+                      {c.name}: CSV {c._emailConflict.csvEmail} · IDYNIFY {c._emailConflict.storedEmail} (matched by {c._emailConflict.signalLabel})
+                    </li>
+                  ))}
+                </ul>
+                Check the email in People, then send to them from there.
+              </span>
+            </div>
+          )}
+
           {(noEmail > 0 || overCap > 0) && (
             <div style={{
               padding: '10px 14px', borderRadius: 10, fontSize: 12, color: T.text,

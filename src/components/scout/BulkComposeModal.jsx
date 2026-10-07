@@ -479,9 +479,21 @@ export default function BulkComposeModal({
   const sendableCount = previews ? sendablePreviews.length : contactsWithEmail.length;
 
   // ─── Compose validity ───
-  const composeValid = Boolean(
-    cadenceName.trim() && subject.trim() && body.trim() && (!needsGmail || gmailConnected),
-  );
+  // Every reason Preview is unavailable, in the words shown to the user. The
+  // button is disabled exactly when this list is non-empty (or a preview is
+  // already generating) — never silently. Barry, attachments, CC and template
+  // tags are optional and never block it on their own.
+  const previewBlockers = [];
+  if (!cadenceName.trim()) previewBlockers.push('Cadence name is required');
+  if (!subject.trim()) previewBlockers.push('Subject is required');
+  if (!body.trim()) previewBlockers.push('Email body is required');
+  if (contacts.length === 0) previewBlockers.push('Add at least one recipient');
+  if (needsGmail && !gmailConnected) {
+    previewBlockers.push(gmailChecking
+      ? 'Checking Gmail connection…'
+      : 'Connect Gmail to send an attachment or CC');
+  }
+  const composeValid = previewBlockers.length === 0;
 
   // ─── Styles ───
   const overlay = {
@@ -940,14 +952,25 @@ export default function BulkComposeModal({
             </div>
 
             <div style={footerStyle}>
+              {!composeValid && (
+                <div
+                  role="status"
+                  data-testid="preview-blockers"
+                  style={{ flex: 1, fontSize: 12, color: BRAND.pink, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}
+                >
+                  <AlertTriangle size={13} style={{ flexShrink: 0 }} />
+                  {previewBlockers.join(' · ')}
+                </div>
+              )}
               <button onClick={handleClose} style={btnSecondary}>Cancel</button>
               <button
                 onClick={handlePreview}
-                disabled={!composeValid || loading || contacts.length === 0}
+                disabled={!composeValid || loading}
+                title={composeValid ? undefined : previewBlockers.join('\n')}
                 style={{
                   ...btnPrimary,
-                  opacity: (!composeValid || loading || contacts.length === 0) ? 0.5 : 1,
-                  cursor: (!composeValid || loading || contacts.length === 0) ? 'not-allowed' : 'pointer',
+                  opacity: (!composeValid || loading) ? 0.5 : 1,
+                  cursor: (!composeValid || loading) ? 'not-allowed' : 'pointer',
                 }}
               >
                 {loading ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Mail size={14} />}

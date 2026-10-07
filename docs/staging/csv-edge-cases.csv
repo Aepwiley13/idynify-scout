@@ -1,0 +1,10 @@
+First Name,Last Name,Email,Phone,Organization,Title,State,Notes,Tags
+Ada,Testone,REPLACE+csv01@REPLACE.com,801-555-0101,Utah Arts Council,Director,UT,Primary test contact,VIP
+Ben,Testtwo,REPLACE+csv02@REPLACE.com,801-555-0102,"Acme, Inc.",VP Partnerships,UT,"Quoted comma in org",Sponsor
+Cara,Testthree,REPLACE+csv03@REPLACE.com,,Beyond Words Foundation,,,,
+Dan,Badmail,not-an-email,801-555-0104,Invalid Email Org,Manager,UT,Should be rejected,
+,,,801-555-0105,No Identity Org,,,Should be missing required info,
+Ada,Dupe,REPLACE+CSV01@REPLACE.com,,Utah Arts Council,,UT,Duplicate of row 2 (email case differs),
+,,REPLACE+csv07@REPLACE.com,,,,,Email only - no name,
+Eve,Quotes,REPLACE+csv08@REPLACE.com,801-555-0108,"The ""Big"" Gallery",Curator,UT,"Notes with ""quotes"", and a comma",
+Fay,Existing,REPLACE+csv09@REPLACE.com,801-555-0109,Existing Org,Board Member,UT,Pre-create this person via Add Manually first,

@@ -20,7 +20,7 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Send, CheckCircle2, XCircle, Mail, Clock, Loader, RotateCcw, AlertTriangle, UserPlus,
 } from 'lucide-react';
-import { collection, addDoc, doc, updateDoc, getDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc, getDoc, serverTimestamp, arrayUnion, increment } from 'firebase/firestore';
 import { executeSendAction, CHANNELS, SEND_RESULT } from '../../utils/sendActionResolver';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { db } from '../../firebase/config';
@@ -52,7 +52,25 @@ function getContactName(contact) {
     || 'Unknown';
 }
 
-export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts, onComplete }) {
+/**
+ * The un-personalized message a cadence was composed from, stored on the
+ * cadence doc so it can be sent again to new people. `subject`/`body` on the
+ * doc are the FIRST RECIPIENT's rendered email (greeting and Barry's opening
+ * line included), which is the wrong thing to reuse; these are the template.
+ */
+function templateFields(meta) {
+  if (!meta) return {};
+  return {
+    templateSubject: meta.templateSubject ?? null,
+    templateBody: meta.templateBody ?? null,
+    path: meta.path ?? null,
+    personalizedWithBarry: meta.personalizedWithBarry ?? null,
+    cc: meta.cc || null,
+    hasAttachment: Boolean(meta.hasAttachment),
+  };
+}
+
+export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts, onComplete, cadenceMeta = null }) {
   const TContext = useT();
   const T = TProp || TContext;
   // contactId → { status, reason }
@@ -91,6 +109,9 @@ export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts,
         gmailMessageId: res?.gmailMessageId || null,
         gmailThreadId: res?.gmailThreadId || null,
       };
+      if (res?.result === SEND_RESULT.SENT || res?.result === SEND_RESULT.OPENED) {
+        recordDelivery(contact.id, res.result);
+      }
       switch (res?.result) {
         case SEND_RESULT.SENT:
           setContactStatus(contact.id, 'sent', null, sendMeta);
@@ -109,6 +130,32 @@ export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts,
       }
     } catch (err) {
       setContactStatus(contact.id, 'failed', err?.message || 'Send failed');
+    }
+  }
+
+  /**
+   * Record one delivery on the cadence doc AS IT HAPPENS.
+   *
+   * The completion write below only runs if the tab stays open to the end. A
+   * send interrupted at contact 30 of 47 used to leave a doc that said nothing
+   * had been sent: sentCount 0, every contact 'pending'. That under-reports
+   * what went out and — worse — lets the next send to the same list email
+   * those 30 people again. `deliveredContactIds` is an atomic arrayUnion, so it
+   * needs no read and cannot clobber the open-tracking writes to `contacts`.
+   * Non-blocking: a failure here never fails the send.
+   */
+  function recordDelivery(contactId, result) {
+    const userId = getEffectiveUser()?.uid;
+    const cadenceId = cadenceIdRef.current;
+    if (!userId || !cadenceId) return;
+    try {
+      updateDoc(doc(db, 'users', userId, 'cadences', cadenceId), {
+        deliveredContactIds: arrayUnion(contactId),
+        ...(result === SEND_RESULT.SENT ? { sentCount: increment(1) } : { nativeHandoffCount: increment(1) }),
+        lastSentAt: serverTimestamp(),
+      }).catch((err) => console.warn('[BulkSendExecutor] delivery record failed', err?.message));
+    } catch (err) {
+      console.warn('[BulkSendExecutor] delivery record failed', err?.message);
     }
   }
 
@@ -197,6 +244,8 @@ export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts,
             status: 'active',
             subject: items[0].subject || '',
             body: items[0].body || '',
+            ...templateFields(cadenceMeta),
+            deliveredContactIds: [],
             contactCount: items.length,
             contacts: items.map(buildContactEntry),
             sentCount: 0,
@@ -306,6 +355,10 @@ export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts,
             status: 'completed',
             subject: items[0].subject || '',
             body: items[0].body || '',
+            ...templateFields(cadenceMeta),
+            deliveredContactIds: items
+              .filter((p) => ['sent', 'opened'].includes(finalById[p.contact.id]?.status))
+              .map((p) => p.contact.id),
             contactCount: items.length,
             contacts: items.map((p) => ({ ...buildContactEntry(p), ...finalById[p.contact.id] })),
             sentCount: counts.sent,

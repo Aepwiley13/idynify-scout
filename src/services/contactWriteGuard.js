@@ -47,6 +47,11 @@ import { createStatusFields, RECORD_STATUS, RELATIONSHIP_STATUS, STAGE } from '.
  * @param {string} [options.recordStatus]
  * @param {string} [options.relationshipStatus]
  * @param {string} [options.stage]
+ * @param {object} [options.adapter]    A shared resolver adapter
+ *                                      (`createWebAdapter(userId)`). A bulk
+ *                                      caller builds ONE and passes it to every
+ *                                      call, so the fallback scan window loads
+ *                                      once per import instead of once per row.
  *
  * @returns {Promise<{
  *   action: 'merge'|'create',
@@ -66,8 +71,9 @@ export async function prepareContactWrite(userId, candidate, {
   recordStatus = RECORD_STATUS.ACTIVE,
   relationshipStatus = RELATIONSHIP_STATUS.NEW,
   stage = STAGE.SCOUT,
+  adapter = null,
 } = {}) {
-  const resolution = await resolveContact(userId, candidate, { source });
+  const resolution = await resolveContact(userId, candidate, { source, adapter });
 
   if (resolution.outcome === RESOLUTION.MATCHED && resolution.contactId) {
     return {

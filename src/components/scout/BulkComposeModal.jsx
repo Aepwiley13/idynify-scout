@@ -3,12 +3,15 @@ import { X, Send, ChevronLeft, Loader, AlertTriangle, Mail, Sparkles, Edit3, Pap
 import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
-import { checkGmailConnection } from '../../utils/sendActionResolver';
+import { checkGmailConnection, sendEmailViaGmail, SEND_RESULT } from '../../utils/sendActionResolver';
 import { doc, setDoc, getDoc, deleteDoc, serverTimestamp, collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import BulkSendExecutor from './BulkSendExecutor';
+import {
+  MAX_BULK_CONTACTS, PERSONALIZE_CHUNK, loadAlreadyDelivered,
+  hasPersonalizeTag, replaceContactTags, greetingFor, firstNameFor, renderCadenceEmail,
+} from '../../utils/cadenceSend';
 
-const MAX_CONTACTS = 25;
 const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB — Netlify 6MB payload cap + base64 inflation
 
 function getContactEmail(c) {
@@ -19,37 +22,32 @@ function getContactName(c) {
   return c.name || [c.firstName, c.lastName].filter(Boolean).join(' ') || 'Unknown';
 }
 
-function getFirstName(c) {
-  return c.firstName || c.name?.split(' ')[0] || '';
-}
-
-function hasPersonalizeTag(text) {
-  return /\{\{personalize\}\}/i.test(text);
-}
-
-function replacePersonalizeTags(template, replacement) {
-  return template.replace(/\{\{personalize\}\}/gi, replacement);
-}
-
-function replaceContactTags(text, contact) {
-  const firstName = contact.firstName || contact.name?.split(' ')[0] || '';
-  const company = contact.company_name || contact.company || '';
-  return text
-    .replace(/\{\{first_name\}\}/gi, firstName)
-    .replace(/\{\{company\}\}/gi, company);
+function toPersonalizeInput(c) {
+  return {
+    contactId: c.id,
+    firstName: firstNameFor(c),
+    lastName: c.lastName || c.last_name || c.name?.split(' ').slice(1).join(' ') || '',
+    title: c.title || '',
+    company: c.company_name || c.company || '',
+    industry: c.industry || '',
+    job_start_date: c.job_start_date || null,
+    barryContext: c.barryContext || null,
+    relationship_state: c.relationship_state || null,
+    warmth_level: c.warmth_level || null,
+    known_contact: c.known_contact || false,
+  };
 }
 
 export default function BulkComposeModal({
   contacts: initialContacts, allContacts = [], onClose,
-  initialSubject = '', initialBody = '', initialPath = 'write_your_own',
-  initialCc = '', initialPersonalize = true,
+  initialSubject = '', initialBody = '',
+  initialCc = '', initialPersonalize = true, initialCadenceName = '',
 }) {
   const T = useT();
   const [step, setStep] = useState(1);
-  const [activePath, setActivePath] = useState(initialPath);
 
   // ─── Cadence name (shared across both paths, user-provided) ───
-  const [cadenceName, setCadenceName] = useState('');
+  const [cadenceName, setCadenceName] = useState(initialCadenceName);
 
   // ─── Selected contacts (mutable via in-modal search) ───
   const [selectedContacts, setSelectedContacts] = useState(initialContacts);
@@ -78,21 +76,23 @@ export default function BulkComposeModal({
   const [searchOpen, setSearchOpen] = useState(false);
   const searchInputRef = useRef(null);
 
-  // ─── Path 1 state (Write your own) ───
+  // ─── The message ───
+  // One subject and one body, whatever else is attached. (There used to be a
+  // second, separate message for "Send with attachment"; switching to it to
+  // attach a flyer discarded the message being reused.) `initialPath` from
+  // older callers is no longer needed: a body containing {{personalize}}
+  // renders the way that path did. See renderCadenceEmail.
   const [subject, setSubject] = useState(initialSubject);
   const [body, setBody] = useState(initialBody);
   const [personalizeWithBarry, setPersonalizeWithBarry] = useState(initialPersonalize);
 
-  // ─── Path 2 state (Send with attachment) ───
-  const [p2Subject, setP2Subject] = useState('');
-  const [p2Body, setP2Body] = useState('');
+  // ─── Optional additions ───
   const [attachment, setAttachment] = useState(null); // { file, base64, filename, size }
   const [attachmentError, setAttachmentError] = useState(null);
   const [cc, setCc] = useState(initialCc);
   const fileInputRef = useRef(null);
   const dropZoneRef = useRef(null);
   const [dragOver, setDragOver] = useState(false);
-  const p2BodyRef = useRef(null);
   const bodyRef = useRef(null);
 
   // ─── Gmail connection status ───
@@ -121,6 +121,14 @@ export default function BulkComposeModal({
   const [sendStarted, setSendStarted] = useState(false);
   const [sendComplete, setSendComplete] = useState(false);
   const [sendPayload, setSendPayload] = useState(null);
+  const [personalizeProgress, setPersonalizeProgress] = useState(null); // { done, total }
+
+  // ─── Resend guard ───
+  const [alreadySentIds, setAlreadySentIds] = useState(() => new Set());
+  const [includeAlreadySent, setIncludeAlreadySent] = useState(false);
+
+  // ─── Send test ───
+  const [testState, setTestState] = useState(null); // null | 'sending' | { ok, message }
 
   // ─── Draft state ───
   const [draftLoaded, setDraftLoaded] = useState(false);
@@ -152,11 +160,13 @@ export default function BulkComposeModal({
   function resumeDraft() {
     if (!pendingDraft) return;
     const d = pendingDraft;
-    setActivePath(d.activePath || 'write_your_own');
-    if (d.subject) setSubject(d.subject);
-    if (d.body) setBody(d.body);
-    if (d.p2Subject) setP2Subject(d.p2Subject);
-    if (d.p2Body) setP2Body(d.p2Body);
+    // Drafts saved before the single message model kept the attachment-path
+    // message in p2Subject/p2Body.
+    const legacyP2 = d.activePath === 'send_with_attachment';
+    const draftSubject = legacyP2 ? (d.p2Subject || d.subject) : d.subject;
+    const draftBody = legacyP2 ? (d.p2Body || d.body) : d.body;
+    if (draftSubject) setSubject(draftSubject);
+    if (draftBody) setBody(draftBody);
     if (d.cc) setCc(d.cc);
     if (typeof d.personalizeWithBarry === 'boolean') setPersonalizeWithBarry(d.personalizeWithBarry);
     setPendingDraft(null);
@@ -171,9 +181,11 @@ export default function BulkComposeModal({
   const contactsWithEmail = contacts.filter(c => getContactEmail(c));
   const contactsWithoutEmail = contacts.filter(c => !getContactEmail(c));
 
-  const isPath2 = activePath === 'send_with_attachment';
-  const activeSubject = isPath2 ? p2Subject : subject;
-  const activeBody = isPath2 ? p2Body : body;
+  // {{personalize}} in the body → Barry fills it in place, no auto greeting.
+  const inlinePersonalize = hasPersonalizeTag(body);
+  // Gmail is required to send attachments and CC (the native mail-app
+  // fallback can carry neither).
+  const needsGmail = Boolean(attachment) || Boolean(cc.trim());
 
   // ─── In-modal search: filter allContacts by query, exclude already selected ───
   const selectedIdSet = new Set(contacts.map(c => c.id));
@@ -195,7 +207,7 @@ export default function BulkComposeModal({
     : [];
 
   function addContact(contact) {
-    if (contacts.length >= MAX_CONTACTS) return;
+    if (contacts.length >= MAX_BULK_CONTACTS) return;
     setSelectedContacts(prev => [...prev, contact]);
     setSearchQuery('');
   }
@@ -219,7 +231,7 @@ export default function BulkComposeModal({
   }
 
   function insertPersonalizeTag() {
-    insertTag('{{personalize}}', p2BodyRef, p2Body, setP2Body);
+    insertTag('{{personalize}}', bodyRef, body, setBody);
   }
 
   // ─── PDF upload handling ───
@@ -257,48 +269,68 @@ export default function BulkComposeModal({
   const handleDragOver = useCallback((e) => { e.preventDefault(); setDragOver(true); }, []);
   const handleDragLeave = useCallback(() => setDragOver(false), []);
 
-  // ─── Preview (Path 1) ───
-  async function handlePreviewPath1() {
-    setLoading(true);
-    try {
-      if (personalizeWithBarry) {
-        const user = getEffectiveUser();
-        const authToken = await user.getIdToken();
+  // ─── Preview ───
+  /**
+   * Barry personalization, PERSONALIZE_CHUNK contacts per request.
+   *
+   * barryBulkPersonalize refuses more than 25 contacts in one call. Rather than
+   * make the user split a 47-person import into two cadences, the modal makes
+   * the calls in sequence and shows one progress count. A chunk that fails
+   * marks only its own contacts as failed; the user can still edit their lines.
+   */
+  async function personalizeAll(sharedBody, mode) {
+    const user = getEffectiveUser();
+    const authToken = await user.getIdToken();
+    const resultsMap = {};
+    setPersonalizeProgress({ done: 0, total: contacts.length });
+    for (let i = 0; i < contacts.length; i += PERSONALIZE_CHUNK) {
+      const chunk = contacts.slice(i, i + PERSONALIZE_CHUNK);
+      try {
         const res = await fetch('/.netlify/functions/barryBulkPersonalize', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: user.uid,
             authToken,
-            contacts: contacts.map(c => ({
-              contactId: c.id,
-              firstName: c.firstName || c.name?.split(' ')[0] || '',
-              lastName: c.lastName || c.name?.split(' ').slice(1).join(' ') || '',
-              title: c.title || '',
-              company: c.company_name || c.company || '',
-              industry: c.industry || '',
-              job_start_date: c.job_start_date || null,
-              barryContext: c.barryContext || null,
-              relationship_state: c.relationship_state || null,
-              warmth_level: c.warmth_level || null,
-              known_contact: c.known_contact || false,
-            })),
-            sharedBody: body,
+            ...(mode ? { mode } : {}),
+            contacts: chunk.map(toPersonalizeInput),
+            sharedBody,
           }),
         });
         const data = await res.json();
-        const resultsMap = {};
-        if (data.results) {
-          data.results.forEach(r => { resultsMap[r.contactId] = r; });
-        }
-        setPreviews(contacts.map(c => {
-          const result = resultsMap[c.id];
-          return {
-            contact: c,
-            openingLine: result?.success ? (result.openingLine || '') : '',
-            failed: result ? !result.success : true,
-          };
-        }));
+        (data.results || []).forEach(r => { resultsMap[r.contactId] = r; });
+      } catch (err) {
+        console.warn('[BulkComposeModal] personalization chunk failed', err?.message);
+      }
+      setPersonalizeProgress({ done: Math.min(i + PERSONALIZE_CHUNK, contacts.length), total: contacts.length });
+    }
+    return contacts.map(c => {
+      const result = resultsMap[c.id];
+      return {
+        contact: c,
+        openingLine: result?.success ? (result.openingLine || '') : '',
+        failed: result ? !result.success : true,
+      };
+    });
+  }
+
+  async function handlePreview() {
+    setLoading(true);
+    setTestState(null);
+    try {
+      // Resend guard: who already received a cadence with this name.
+      try {
+        const user = getEffectiveUser();
+        const delivered = await loadAlreadyDelivered(user?.uid, cadenceName);
+        setAlreadySentIds(delivered);
+      } catch (err) {
+        console.warn('[BulkComposeModal] resend check failed — no one excluded', err?.message);
+        setAlreadySentIds(new Set());
+      }
+
+      const wantsPersonalization = inlinePersonalize || personalizeWithBarry;
+      if (wantsPersonalization) {
+        setPreviews(await personalizeAll(body, inlinePersonalize ? 'inline_personalize' : undefined));
       } else {
         setPreviews(contacts.map(c => ({ contact: c, openingLine: '', failed: false })));
       }
@@ -308,68 +340,8 @@ export default function BulkComposeModal({
       setStep(2);
     } finally {
       setLoading(false);
+      setPersonalizeProgress(null);
     }
-  }
-
-  // ─── Preview (Path 2) ───
-  async function handlePreviewPath2() {
-    setLoading(true);
-    try {
-      const hasTag = hasPersonalizeTag(p2Body);
-      if (hasTag) {
-        const user = getEffectiveUser();
-        const authToken = await user.getIdToken();
-        const res = await fetch('/.netlify/functions/barryBulkPersonalize', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: user.uid,
-            authToken,
-            mode: 'inline_personalize',
-            contacts: contacts.map(c => ({
-              contactId: c.id,
-              firstName: c.firstName || c.name?.split(' ')[0] || '',
-              lastName: c.lastName || c.name?.split(' ').slice(1).join(' ') || '',
-              title: c.title || '',
-              company: c.company_name || c.company || '',
-              industry: c.industry || '',
-              job_start_date: c.job_start_date || null,
-              barryContext: c.barryContext || null,
-              relationship_state: c.relationship_state || null,
-              warmth_level: c.warmth_level || null,
-              known_contact: c.known_contact || false,
-            })),
-            sharedBody: p2Body,
-          }),
-        });
-        const data = await res.json();
-        const resultsMap = {};
-        if (data.results) {
-          data.results.forEach(r => { resultsMap[r.contactId] = r; });
-        }
-        setPreviews(contacts.map(c => {
-          const result = resultsMap[c.id];
-          return {
-            contact: c,
-            openingLine: result?.success ? (result.openingLine || '') : '',
-            failed: result ? !result.success : true,
-          };
-        }));
-      } else {
-        setPreviews(contacts.map(c => ({ contact: c, openingLine: '', failed: false })));
-      }
-      setStep(2);
-    } catch {
-      setPreviews(contacts.map(c => ({ contact: c, openingLine: '', failed: true })));
-      setStep(2);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function handlePreview() {
-    if (isPath2) handlePreviewPath2();
-    else handlePreviewPath1();
   }
 
   function updateOpeningLine(contactId, newLine) {
@@ -379,43 +351,77 @@ export default function BulkComposeModal({
   }
 
   // ─── Build send payload ───
-  function handleSend() {
-    let payload;
-    if (isPath2) {
-      const hasTag = hasPersonalizeTag(p2Body);
-      payload = previews
-        .filter(p => getContactEmail(p.contact))
-        .map(p => {
-          let finalBody = p2Body;
-          if (hasTag && p.openingLine) {
-            finalBody = replacePersonalizeTags(finalBody, p.openingLine);
-          }
-          finalBody = replaceContactTags(finalBody, p.contact);
-          const finalSubject = replaceContactTags(p2Subject, p.contact);
-          const item = { contact: p.contact, subject: finalSubject, body: finalBody, cadenceName };
-          if (attachment) {
-            item.attachment = { data: attachment.base64, filename: attachment.filename, mimeType: 'application/pdf' };
-          }
-          if (cc.trim()) item.cc = cc.trim();
-          return item;
-        });
-    } else {
-      payload = previews
-        .filter(p => getContactEmail(p.contact))
-        .map(p => {
-          const greeting = `Hi ${getFirstName(p.contact)},`;
-          const parts = [greeting];
-          if (p.openingLine) parts.push(p.openingLine);
-          parts.push(replaceContactTags(body, p.contact));
-          const finalSubject = replaceContactTags(subject, p.contact);
-          return { contact: p.contact, subject: finalSubject, body: parts.join('\n\n'), cadenceName };
-        });
+  /** One recipient's final email — the same function the real send and the test send use. */
+  function buildPayloadItem(p) {
+    // The send pipeline reads `contact.email`; a contact holding only a
+    // work_email used to pass the modal's filter and then fail at send.
+    const contact = { ...p.contact, email: getContactEmail(p.contact) };
+    const rendered = renderCadenceEmail({
+      subject, body, contact: p.contact, openingLine: p.openingLine, personalize: personalizeWithBarry,
+    });
+    const item = { contact, subject: rendered.subject, body: rendered.body, cadenceName };
+    if (attachment) {
+      item.attachment = { data: attachment.base64, filename: attachment.filename, mimeType: 'application/pdf' };
     }
+    if (cc.trim()) item.cc = cc.trim();
+    return item;
+  }
+
+  const isExcludedAsAlreadySent = (p) => !includeAlreadySent && alreadySentIds.has(p.contact.id);
+  const sendablePreviews = previews
+    ? previews.filter(p => getContactEmail(p.contact) && !isExcludedAsAlreadySent(p))
+    : [];
+  const alreadySentInList = previews
+    ? previews.filter(p => getContactEmail(p.contact) && alreadySentIds.has(p.contact.id)).length
+    : 0;
+
+  function handleSend() {
+    const payload = sendablePreviews.map(buildPayloadItem);
     setSendPayload(payload);
     setSendStarted(true);
     setStep(3);
     deleteDraft();
   }
+
+  /**
+   * Send the first recipient's real email to the user.
+   *
+   * Same subject, body, personalization, attachment and Gmail account as the
+   * real send, through the same gmail-send-quick function. No contactId and no
+   * cadenceId are passed, so no contact is updated, no tracking pixel is
+   * embedded and nothing is counted. CC is left off so a test never reaches
+   * the CC'd person.
+   */
+  async function handleSendTest() {
+    const user = getEffectiveUser();
+    const sample = sendablePreviews[0];
+    if (!user?.email || !sample) return;
+    setTestState('sending');
+    const item = buildPayloadItem(sample);
+    const res = await sendEmailViaGmail({
+      userId: user.uid,
+      contact: { id: null, email: user.email, firstName: 'Test', lastName: 'Send' },
+      subject: `[TEST] ${item.subject}`,
+      body: item.body,
+      ...(item.attachment ? { attachment: item.attachment } : {}),
+    });
+    if (res?.result === SEND_RESULT.SENT) {
+      setTestState({ ok: true, message: `Test sent to ${user.email} — personalized as ${getContactName(sample.contact)}.` });
+    } else {
+      setTestState({ ok: false, message: `Test failed: ${res?.error || 'unknown error'}` });
+    }
+  }
+
+  /** What this cadence was composed from — stored so it can be reused. */
+  const cadenceMeta = {
+    templateSubject: subject,
+    templateBody: body,
+    // Kept for readers of older docs; the message itself no longer depends on it.
+    path: attachment ? 'send_with_attachment' : 'write_your_own',
+    personalizedWithBarry: inlinePersonalize || personalizeWithBarry,
+    cc: cc.trim(),
+    hasAttachment: Boolean(attachment),
+  };
 
   // ─── Draft persistence ───
   async function saveDraft() {
@@ -424,11 +430,8 @@ export default function BulkComposeModal({
       if (!user) return;
       const draftRef = doc(db, 'users', user.uid, 'campaignDrafts', 'latest');
       await setDoc(draftRef, {
-        activePath,
         subject,
         body,
-        p2Subject,
-        p2Body,
         cc,
         personalizeWithBarry,
         contactIds: contacts.map(c => c.id),
@@ -463,20 +466,18 @@ export default function BulkComposeModal({
     if (step === 3 && sendStarted && !sendComplete) {
       if (!window.confirm('Sends in progress — closing will not cancel emails already sent.')) return;
     }
-    if (step < 3 && (subject || body || p2Subject || p2Body)) {
+    if (step < 3 && (subject || body)) {
       saveDraft();
     }
     onClose();
   }
 
-  const sendableCount = previews
-    ? previews.filter(p => getContactEmail(p.contact)).length
-    : contactsWithEmail.length;
+  const sendableCount = previews ? sendablePreviews.length : contactsWithEmail.length;
 
   // ─── Compose validity ───
-  const path1Valid = subject.trim() && body.trim();
-  const path2Valid = p2Body.trim() && gmailConnected;
-  const composeValid = cadenceName.trim() && (isPath2 ? path2Valid : path1Valid);
+  const composeValid = Boolean(
+    cadenceName.trim() && subject.trim() && body.trim() && (!needsGmail || gmailConnected),
+  );
 
   // ─── Styles ───
   const overlay = {
@@ -537,31 +538,24 @@ export default function BulkComposeModal({
 
   const sectionLabel = { display: 'block', fontSize: 12, fontWeight: 600, color: T.textMuted, marginBottom: 6 };
 
-  function pathCardStyle(active) {
-    return {
-      flex: 1, padding: '14px 16px', borderRadius: 12, cursor: 'pointer',
-      border: `2px solid ${active ? BRAND.pink : T.border}`,
-      background: active ? `${BRAND.pink}08` : T.surface,
-      transition: 'all 0.15s',
-    };
-  }
+  const tagButtonStyle = {
+    padding: '4px 10px', borderRadius: 6, border: `1px solid ${BRAND.cyan}40`,
+    background: `${BRAND.cyan}08`, color: BRAND.cyan,
+    fontSize: 11, fontWeight: 600, cursor: 'pointer',
+    display: 'flex', alignItems: 'center', gap: 4,
+  };
 
   const stepLabels = ['Compose', 'Preview', 'Sending'];
 
   // ─── Render helpers for preview ───
   function renderPreviewBody(p) {
-    if (isPath2) {
-      const hasTag = hasPersonalizeTag(p2Body);
-      let displayBody = p2Body;
-      if (hasTag && p.openingLine) {
-        displayBody = replacePersonalizeTags(displayBody, p.openingLine);
-      }
-      displayBody = replaceContactTags(displayBody, p.contact);
-      return <div style={{ whiteSpace: 'pre-wrap', color: T.textMuted }}>{displayBody}</div>;
+    if (inlinePersonalize) {
+      const { body: rendered } = renderCadenceEmail({ subject, body, contact: p.contact, openingLine: p.openingLine });
+      return <div style={{ whiteSpace: 'pre-wrap', color: T.textMuted }}>{rendered}</div>;
     }
     return (
       <>
-        <div style={{ fontWeight: 600, marginBottom: 6 }}>Hi {getFirstName(p.contact)},</div>
+        <div style={{ fontWeight: 600, marginBottom: 6 }}>{greetingFor(p.contact)}</div>
         {personalizeWithBarry && p.openingLine !== undefined && (
           <div style={{ marginBottom: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
@@ -653,25 +647,7 @@ export default function BulkComposeModal({
                 </div>
               )}
 
-              {/* ─── Path Selector ─── */}
-              <div style={{ display: 'flex', gap: 10, marginBottom: 20 }}>
-                <div style={pathCardStyle(activePath === 'write_your_own')} onClick={() => setActivePath('write_your_own')}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <Mail size={16} style={{ color: activePath === 'write_your_own' ? BRAND.pink : T.textFaint }} />
-                    <span style={{ fontSize: 13, fontWeight: 700, color: activePath === 'write_your_own' ? BRAND.pink : T.text }}>Write your own</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: T.textFaint }}>Compose email with Barry opening lines</div>
-                </div>
-                <div style={pathCardStyle(activePath === 'send_with_attachment')} onClick={() => setActivePath('send_with_attachment')}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <Paperclip size={16} style={{ color: activePath === 'send_with_attachment' ? BRAND.pink : T.textFaint }} />
-                    <span style={{ fontSize: 13, fontWeight: 700, color: activePath === 'send_with_attachment' ? BRAND.pink : T.text }}>Send with attachment</span>
-                  </div>
-                  <div style={{ fontSize: 11, color: T.textFaint }}>Message + PDF + inline personalization</div>
-                </div>
-              </div>
-
-              {/* ─── Cadence Name (shared, required, first field) ─── */}
+              {/* ─── Cadence Name (required, first field) ─── */}
               <label style={sectionLabel}>Cadence Name</label>
               <input
                 value={cadenceName}
@@ -680,219 +656,143 @@ export default function BulkComposeModal({
                 style={{ ...inputStyle, marginBottom: 18 }}
               />
 
-              {/* ─── Path 1: Write your own ─── */}
-              {activePath === 'write_your_own' && (
-                <>
-                  <label style={sectionLabel}>Subject</label>
-                  <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Email subject line" style={inputStyle} />
+              {needsGmail && !gmailChecking && !gmailConnected && (
+                <div style={{
+                  marginBottom: 16, padding: '12px 14px', borderRadius: 10,
+                  background: `${BRAND.pink}10`, border: `1px solid ${BRAND.pink}30`,
+                  display: 'flex', alignItems: 'center', gap: 8,
+                  fontSize: 12, color: BRAND.pink, lineHeight: 1.5,
+                }}>
+                  <AlertTriangle size={14} style={{ flexShrink: 0 }} />
+                  Gmail connection required to send attachments or CC. Connect Gmail in Settings.
+                </div>
+              )}
 
-                  <label style={{ ...sectionLabel, marginTop: 18 }}>Email Body</label>
-                  <div style={{ fontSize: 11, color: T.textFaint, marginBottom: 6, lineHeight: 1.5 }}>
-                    Type your message. Use the buttons below to insert template tags that auto-fill for each contact.
-                  </div>
-                  <textarea
-                    ref={bodyRef}
-                    value={body} onChange={e => setBody(e.target.value)}
-                    placeholder="Write the shared email body that all contacts will receive..."
-                    rows={8} style={{ ...inputStyle, resize: 'vertical', minHeight: 120, fontFamily: 'inherit' }}
-                  />
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                    <button
-                      onClick={() => insertTag('{{first_name}}', bodyRef, body, setBody)}
-                      style={{
-                        padding: '4px 10px', borderRadius: 6, border: `1px solid ${BRAND.cyan}40`,
-                        background: `${BRAND.cyan}08`, color: BRAND.cyan,
-                        fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', gap: 4,
-                      }}
-                    >
-                      <Plus size={10} />First Name
-                    </button>
-                    <button
-                      onClick={() => insertTag('{{company}}', bodyRef, body, setBody)}
-                      style={{
-                        padding: '4px 10px', borderRadius: 6, border: `1px solid ${BRAND.cyan}40`,
-                        background: `${BRAND.cyan}08`, color: BRAND.cyan,
-                        fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                        display: 'flex', alignItems: 'center', gap: 4,
-                      }}
-                    >
-                      <Plus size={10} />Company
-                    </button>
-                  </div>
+              {/* ─── Message ─── */}
+              <label style={sectionLabel}>Subject</label>
+              <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Email subject line" style={inputStyle} />
 
+              <label style={{ ...sectionLabel, marginTop: 18 }}>Email Body</label>
+              <div style={{ fontSize: 11, color: T.textFaint, marginBottom: 6, lineHeight: 1.5 }}>
+                Each email starts with "Hi {'{first name}'}," and Barry's opening line, then this body. To write your own greeting instead, place {'{personalize}'} where Barry should add a personal line.
+              </div>
+              <textarea
+                ref={bodyRef}
+                aria-label="Email Body"
+                value={body} onChange={e => setBody(e.target.value)}
+                placeholder="Write the shared email body that all contacts will receive..."
+                rows={8} style={{ ...inputStyle, resize: 'vertical', minHeight: 120, fontFamily: 'inherit' }}
+              />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                <button onClick={() => insertTag('{{first_name}}', bodyRef, body, setBody)} style={tagButtonStyle}>
+                  <Plus size={10} />First Name
+                </button>
+                <button onClick={() => insertTag('{{company}}', bodyRef, body, setBody)} style={tagButtonStyle}>
+                  <Plus size={10} />Company
+                </button>
+                <button onClick={insertPersonalizeTag} style={tagButtonStyle}>
+                  <Plus size={10} />Personalize
+                </button>
+              </div>
+
+              {inlinePersonalize ? (
+                <div data-testid="inline-personalize-note" style={{
+                  marginTop: 18, display: 'flex', alignItems: 'center', gap: 8,
+                  padding: '12px 14px', borderRadius: 10,
+                  background: `${BRAND.cyan}10`, border: `1px solid ${BRAND.cyan}40`,
+                  fontSize: 12, color: T.text,
+                }}>
+                  <Sparkles size={16} style={{ color: BRAND.cyan, flexShrink: 0 }} />
+                  {'{personalize}'} detected — Barry writes that part for each contact, and no automatic greeting is added.
+                </div>
+              ) : (
+                <div style={{
+                  marginTop: 18, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 14px', borderRadius: 10,
+                  background: personalizeWithBarry ? `${BRAND.cyan}10` : T.surface,
+                  border: `1px solid ${personalizeWithBarry ? `${BRAND.cyan}40` : T.border}`,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <Sparkles size={16} style={{ color: BRAND.cyan }} />
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Personalize with Barry</div>
+                      <div style={{ fontSize: 11, color: T.textFaint }}>Barry generates a unique opening line per contact</div>
+                    </div>
+                  </div>
+                  <button
+                    aria-label="Personalize with Barry"
+                    aria-pressed={personalizeWithBarry}
+                    onClick={() => setPersonalizeWithBarry(p => !p)}
+                    style={{
+                      width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
+                      background: personalizeWithBarry ? BRAND.cyan : T.border,
+                      position: 'relative', transition: 'background 0.2s',
+                    }}
+                  >
+                    <div style={{
+                      width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                      position: 'absolute', top: 3,
+                      left: personalizeWithBarry ? 23 : 3, transition: 'left 0.2s',
+                    }} />
+                  </button>
+                </div>
+              )}
+
+              {/* Attachment (optional — added to the same message) */}
+              <div style={{ marginTop: 18 }}>
+                <label style={sectionLabel}>Attachment (optional, PDF only, max 4MB)</label>
+                {!attachment ? (
+                  <div
+                    ref={dropZoneRef}
+                    onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave}
+                    onClick={() => fileInputRef.current?.click()}
+                    style={{
+                      border: `2px dashed ${dragOver ? BRAND.cyan : T.border}`,
+                      borderRadius: 10, padding: '20px 16px',
+                      textAlign: 'center', cursor: 'pointer',
+                      background: dragOver ? `${BRAND.cyan}06` : T.surface,
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <Upload size={20} style={{ color: T.textFaint, marginBottom: 6 }} />
+                    <div style={{ fontSize: 13, color: T.textMuted }}>Drop a PDF here or click to browse</div>
+                    <input ref={fileInputRef} data-testid="attachment-input" type="file" accept=".pdf,application/pdf" onChange={handleFileSelect} style={{ display: 'none' }} />
+                  </div>
+                ) : (
                   <div style={{
-                    marginTop: 18, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '12px 14px', borderRadius: 10,
-                    background: personalizeWithBarry ? `${BRAND.cyan}10` : T.surface,
-                    border: `1px solid ${personalizeWithBarry ? `${BRAND.cyan}40` : T.border}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '10px 14px', borderRadius: 10,
+                    background: T.surface, border: `1px solid ${T.border}`,
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <Sparkles size={16} style={{ color: BRAND.cyan }} />
+                      <FileText size={16} style={{ color: BRAND.pink }} />
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>Personalize with Barry</div>
-                        <div style={{ fontSize: 11, color: T.textFaint }}>Barry generates a unique opening line per contact</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{attachment.filename}</div>
+                        <div style={{ fontSize: 11, color: T.textFaint }}>{(attachment.size / 1024).toFixed(0)} KB</div>
                       </div>
                     </div>
                     <button
-                      onClick={() => setPersonalizeWithBarry(p => !p)}
-                      style={{
-                        width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
-                        background: personalizeWithBarry ? BRAND.cyan : T.border,
-                        position: 'relative', transition: 'background 0.2s',
-                      }}
-                    >
-                      <div style={{
-                        width: 18, height: 18, borderRadius: '50%', background: '#fff',
-                        position: 'absolute', top: 3,
-                        left: personalizeWithBarry ? 23 : 3, transition: 'left 0.2s',
-                      }} />
-                    </button>
+                      onClick={() => setAttachment(null)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textFaint, padding: 4, display: 'flex' }}
+                    ><X size={14} /></button>
                   </div>
-                </>
-              )}
-
-              {/* ─── Path 2: Send with attachment ─── */}
-              {activePath === 'send_with_attachment' && (
-                <>
-                  {!gmailChecking && !gmailConnected && (
-                    <div style={{
-                      marginBottom: 16, padding: '12px 14px', borderRadius: 10,
-                      background: `${BRAND.pink}10`, border: `1px solid ${BRAND.pink}30`,
-                      display: 'flex', alignItems: 'center', gap: 8,
-                      fontSize: 12, color: BRAND.pink, lineHeight: 1.5,
-                    }}>
-                      <AlertTriangle size={14} style={{ flexShrink: 0 }} />
-                      Gmail connection required to send attachments. Connect Gmail in Settings.
-                    </div>
-                  )}
-
-                  {/* Section A — Message */}
-                  <label style={sectionLabel}>Subject (optional)</label>
-                  <input value={p2Subject} onChange={e => setP2Subject(e.target.value)} placeholder="Email subject line" style={inputStyle} />
-
-                  <div style={{ marginTop: 18 }}>
-                    <label style={sectionLabel}>Message</label>
-                    <div style={{ fontSize: 11, color: T.textFaint, marginBottom: 6, lineHeight: 1.5 }}>
-                      Type your message. Use the buttons below to insert template tags — <code style={{ background: `${BRAND.cyan}15`, padding: '1px 5px', borderRadius: 4, fontSize: 11 }}>{'{{first_name}}'}</code> and <code style={{ background: `${BRAND.cyan}15`, padding: '1px 5px', borderRadius: 4, fontSize: 11 }}>{'{{company}}'}</code> auto-fill per contact. <code style={{ background: `${BRAND.cyan}15`, padding: '1px 5px', borderRadius: 4, fontSize: 11 }}>{'{{personalize}}'}</code> lets Barry generate something unique for each person.
-                    </div>
-                    <div style={{
-                      fontSize: 11, color: T.textFaint, fontStyle: 'italic', marginBottom: 8,
-                      padding: '6px 10px', borderRadius: 6, background: T.surface, border: `1px solid ${T.border}`,
-                    }}>
-                      Example: "Hi {'{{personalize}}'}, I wanted to reach out because..."
-                    </div>
-                    <textarea
-                      ref={p2BodyRef}
-                      value={p2Body} onChange={e => setP2Body(e.target.value)}
-                      placeholder="Write your message..."
-                      rows={6} style={{ ...inputStyle, resize: 'vertical', minHeight: 100, fontFamily: 'inherit' }}
-                    />
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                      <button
-                        onClick={insertPersonalizeTag}
-                        style={{
-                          padding: '4px 10px', borderRadius: 6, border: `1px solid ${BRAND.cyan}40`,
-                          background: `${BRAND.cyan}08`, color: BRAND.cyan,
-                          fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', gap: 4,
-                        }}
-                      >
-                        <Plus size={10} />Personalize
-                      </button>
-                      <button
-                        onClick={() => insertTag('{{first_name}}', p2BodyRef, p2Body, setP2Body)}
-                        style={{
-                          padding: '4px 10px', borderRadius: 6, border: `1px solid ${BRAND.cyan}40`,
-                          background: `${BRAND.cyan}08`, color: BRAND.cyan,
-                          fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', gap: 4,
-                        }}
-                      >
-                        <Plus size={10} />First Name
-                      </button>
-                      <button
-                        onClick={() => insertTag('{{company}}', p2BodyRef, p2Body, setP2Body)}
-                        style={{
-                          padding: '4px 10px', borderRadius: 6, border: `1px solid ${BRAND.cyan}40`,
-                          background: `${BRAND.cyan}08`, color: BRAND.cyan,
-                          fontSize: 11, fontWeight: 600, cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', gap: 4,
-                        }}
-                      >
-                        <Plus size={10} />Company
-                      </button>
-                      {hasPersonalizeTag(p2Body) && (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <Sparkles size={12} style={{ color: BRAND.cyan }} />
-                          <span style={{ fontSize: 11, color: BRAND.cyan, fontWeight: 600 }}>
-                            {'{{personalize}}'} detected — Barry will generate contact-specific text
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ fontSize: 11, color: T.textFaint, marginTop: 6 }}>
-                      Tip: use one {'{{personalize}}'} tag per message for best results.
-                    </div>
+                )}
+                {attachmentError && (
+                  <div style={{ marginTop: 6, fontSize: 12, color: BRAND.pink, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <AlertTriangle size={12} />{attachmentError}
                   </div>
+                )}
+              </div>
 
-                  {/* Section B — Attachment */}
-                  <div style={{ marginTop: 18 }}>
-                    <label style={sectionLabel}>Attachment (optional, PDF only, max 4MB)</label>
-                    {!attachment ? (
-                      <div
-                        ref={dropZoneRef}
-                        onDrop={handleDrop} onDragOver={handleDragOver} onDragLeave={handleDragLeave}
-                        onClick={() => fileInputRef.current?.click()}
-                        style={{
-                          border: `2px dashed ${dragOver ? BRAND.cyan : T.border}`,
-                          borderRadius: 10, padding: '20px 16px',
-                          textAlign: 'center', cursor: 'pointer',
-                          background: dragOver ? `${BRAND.cyan}06` : T.surface,
-                          transition: 'all 0.15s',
-                        }}
-                      >
-                        <Upload size={20} style={{ color: T.textFaint, marginBottom: 6 }} />
-                        <div style={{ fontSize: 13, color: T.textMuted }}>Drop a PDF here or click to browse</div>
-                        <input ref={fileInputRef} type="file" accept=".pdf,application/pdf" onChange={handleFileSelect} style={{ display: 'none' }} />
-                      </div>
-                    ) : (
-                      <div style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        padding: '10px 14px', borderRadius: 10,
-                        background: T.surface, border: `1px solid ${T.border}`,
-                      }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <FileText size={16} style={{ color: BRAND.pink }} />
-                          <div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: T.text }}>{attachment.filename}</div>
-                            <div style={{ fontSize: 11, color: T.textFaint }}>{(attachment.size / 1024).toFixed(0)} KB</div>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => setAttachment(null)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textFaint, padding: 4, display: 'flex' }}
-                        ><X size={14} /></button>
-                      </div>
-                    )}
-                    {attachmentError && (
-                      <div style={{ marginTop: 6, fontSize: 12, color: BRAND.pink, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <AlertTriangle size={12} />{attachmentError}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Section C — CC */}
-                  <div style={{ marginTop: 18 }}>
-                    <label style={sectionLabel}>CC (optional)</label>
-                    <input
-                      value={cc} onChange={e => setCc(e.target.value)}
-                      placeholder="cc@example.com"
-                      type="email" style={inputStyle}
-                    />
-                  </div>
-                </>
-              )}
+              {/* CC (optional) */}
+              <div style={{ marginTop: 18 }}>
+                <label style={sectionLabel}>CC (optional)</label>
+                <input
+                  value={cc} onChange={e => setCc(e.target.value)}
+                  placeholder="cc@example.com"
+                  type="email" style={inputStyle}
+                />
+              </div>
 
               {/* ─── Recipients with search ─── */}
               <div style={{ marginTop: 18 }}>
@@ -907,7 +807,7 @@ export default function BulkComposeModal({
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                   <label style={{ ...sectionLabel, marginBottom: 0 }}>Recipients</label>
-                  {contacts.length > 0 && contacts.length < MAX_CONTACTS && contactPool.length > 0 && (
+                  {contacts.length > 0 && contacts.length < MAX_BULK_CONTACTS && contactPool.length > 0 && (
                     <button
                       onClick={() => { setSearchOpen(o => !o); requestAnimationFrame(() => searchInputRef.current?.focus()); }}
                       style={{
@@ -1006,9 +906,9 @@ export default function BulkComposeModal({
                     </div>
                   ))}
                 </div>
-                {contacts.length >= MAX_CONTACTS && (
+                {contacts.length >= MAX_BULK_CONTACTS && (
                   <div style={{ fontSize: 10, color: BRAND.pink, marginTop: 4 }}>
-                    Maximum {MAX_CONTACTS} contacts per campaign
+                    Maximum {MAX_BULK_CONTACTS} contacts per campaign
                   </div>
                 )}
               </div>
@@ -1039,7 +939,9 @@ export default function BulkComposeModal({
                 }}
               >
                 {loading ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Mail size={14} />}
-                {loading ? 'Generating...' : (isPath2 ? 'Preview and Send' : 'Preview')}
+                {loading
+                  ? (personalizeProgress ? `Personalizing ${personalizeProgress.done} of ${personalizeProgress.total}…` : 'Generating...')
+                  : 'Preview'}
               </button>
             </div>
           </>
@@ -1061,8 +963,31 @@ export default function BulkComposeModal({
                 </div>
               )}
 
+              {alreadySentInList > 0 && (
+                <div data-testid="already-sent-banner" style={{
+                  marginBottom: 14, padding: '10px 14px', borderRadius: 10,
+                  background: '#f59e0b14', border: '1px solid #f59e0b55',
+                  display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                  fontSize: 12, color: T.text,
+                }}>
+                  <AlertTriangle size={14} style={{ color: '#f59e0b' }} />
+                  <span style={{ flex: 1, minWidth: 200 }}>
+                    {alreadySentInList} {alreadySentInList === 1 ? 'person has' : 'people have'} already received "{cadenceName.trim()}".{' '}
+                    {includeAlreadySent ? 'They will be sent it again.' : 'They are excluded from this send.'}
+                  </span>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 600 }}>
+                    <input
+                      type="checkbox"
+                      checked={includeAlreadySent}
+                      onChange={e => setIncludeAlreadySent(e.target.checked)}
+                    />
+                    Send to them again
+                  </label>
+                </div>
+              )}
+
               <div style={{ fontSize: 12, color: T.textFaint, marginBottom: 12 }}>
-                Subject: <strong style={{ color: T.text }}>{activeSubject || '(no subject)'}</strong>
+                Subject: <strong style={{ color: T.text }}>{subject || '(no subject)'}</strong>
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1070,6 +995,7 @@ export default function BulkComposeModal({
                   const email = getContactEmail(p.contact);
                   const name = getContactName(p.contact);
                   const noEmail = !email;
+                  const alreadySent = !noEmail && isExcludedAsAlreadySent(p);
 
                   return (
                     <div
@@ -1093,6 +1019,11 @@ export default function BulkComposeModal({
                             Excluded
                           </span>
                         )}
+                        {alreadySent && (
+                          <span style={{ fontSize: 10, fontWeight: 600, color: '#b45309', background: '#f59e0b22', padding: '3px 8px', borderRadius: 6 }}>
+                            Already received — excluded
+                          </span>
+                        )}
                       </div>
 
                       {!noEmail && (
@@ -1102,7 +1033,7 @@ export default function BulkComposeModal({
                             border: `1px solid ${T.border}`, fontSize: 13, color: T.text,
                             lineHeight: 1.5,
                           }}>
-                            {isPath2 && hasPersonalizeTag(p2Body) && p.openingLine !== undefined && (
+                            {inlinePersonalize && p.openingLine !== undefined && (
                               <div style={{ marginBottom: 8 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                                   <Sparkles size={11} style={{ color: BRAND.cyan }} />
@@ -1129,8 +1060,8 @@ export default function BulkComposeModal({
                             {renderPreviewBody(p)}
                           </div>
 
-                          {/* Attachment & CC info (Path 2 only) */}
-                          {isPath2 && (attachment || cc.trim()) && (
+                          {/* Attachment & CC — the same on every recipient's email */}
+                          {(attachment || cc.trim()) && (
                             <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
                               {attachment && (
                                 <div style={{ fontSize: 11, color: T.textFaint, display: 'flex', alignItems: 'center', gap: 5 }}>
@@ -1153,8 +1084,29 @@ export default function BulkComposeModal({
             </div>
 
             <div style={footerStyle}>
+              {testState && testState !== 'sending' && (
+                <span
+                  role="status"
+                  style={{ flex: 1, fontSize: 11, color: testState.ok ? '#16a34a' : BRAND.pink }}
+                >{testState.message}</span>
+              )}
               <button onClick={() => setStep(1)} style={btnSecondary}>
                 <ChevronLeft size={14} /> Edit
+              </button>
+              <button
+                onClick={handleSendTest}
+                disabled={!gmailConnected || sendableCount === 0 || testState === 'sending'}
+                title={gmailConnected ? 'Send the first recipient\'s email to yourself' : 'Connect Gmail to send a test'}
+                style={{
+                  ...btnSecondary,
+                  opacity: (!gmailConnected || sendableCount === 0) ? 0.5 : 1,
+                  cursor: (!gmailConnected || sendableCount === 0) ? 'not-allowed' : 'pointer',
+                }}
+              >
+                {testState === 'sending'
+                  ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} />
+                  : <Mail size={14} />}
+                {testState === 'sending' ? 'Sending test…' : 'Send Test to Me'}
               </button>
               <button
                 onClick={handleSend}
@@ -1177,6 +1129,7 @@ export default function BulkComposeModal({
           <div style={bodySection}>
             <BulkSendExecutor
               payload={sendPayload}
+              cadenceMeta={cadenceMeta}
               T={T}
               onAddMoreContacts={handleAddMoreContacts}
               onComplete={() => setSendComplete(true)}

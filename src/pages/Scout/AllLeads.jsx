@@ -34,9 +34,23 @@ import ContactProfile from './ContactProfile';
 import LinkedInLinkSearch from '../../components/scout/LinkedInLinkSearch';
 import FirstTouchModal from '../../components/firstTouch/FirstTouchModal';
 import BulkComposeModal from '../../components/scout/BulkComposeModal';
+import { MAX_BULK_CONTACTS } from '../../utils/cadenceSend';
+import { isHiddenFromPeople } from '../../utils/csvContactImport';
 import { loadIntoHunter } from '../../utils/loadIntoHunter';
 
-const MAX_CONTACTS = 25;
+/** `?tag=` from the current URL, or null. No router hook: AllLeads mounts under several shells. */
+function readUrlTag() {
+  try { return new URLSearchParams(window.location.search).get('tag') || null; }
+  catch { return null; }
+}
+
+/** Does this contact belong to the import group the view was opened for? */
+function isImportMember(contact, importTag) {
+  return Boolean(importTag) && Array.isArray(contact.tags) && contact.tags.includes(importTag);
+}
+
+// One cap for every bulk send, owned by the compose flow.
+const MAX_CONTACTS = MAX_BULK_CONTACTS;
 
 // ─── Engagement Status Sets ───────────────────────────────────────────────────
 // hunter_status values that indicate a contact has been engaged (Scout → Hunter)
@@ -1220,7 +1234,18 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
   }, [activeFilter]);
   const [searchTerm, setSearchTerm] = useState('');
   const [dataFilter, setDataFilter] = useState(null);
-  const [tagFilter, setTagFilter] = useState(null); // selected tag string or null
+  // Selected tag string or null. Seeded from `?tag=` so a link can open People
+  // already filtered to one group — Scout+ uses it for "View People" after a
+  // CSV import, whose contacts all carry that import's tag. Read from
+  // window.location rather than a router hook: AllLeads mounts under several
+  // shells and this must not require a router to render.
+  const [tagFilter, setTagFilter] = useState(readUrlTag);
+  // The group this view was opened for, fixed at mount. An import can match
+  // contacts that are archived (or whose company is), which every People view
+  // hides. Inside that import's own tag view — and only there — they are
+  // listed, so "N contacts imported" and the people shown reconcile. They are
+  // not reactivated; clearing the tag filter hides them again.
+  const [importTag] = useState(readUrlTag);
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
   const tagPickerRef = useRef(null);
   const [sortOrder, setSortOrder] = useState(() => localStorage.getItem('al_sortOrder') || 'newest');
@@ -1405,14 +1430,17 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
           // missed and which therefore used to show up as a live lead.
           const isArchived = hasArchiveSignal(c);
           if (mode === 'fallback') return isArchived; // FallBack: only archived/lost people
-          if (isArchived) return false;
+          if (isArchived) return mode === 'people' && isImportMember(c, importTag);
           const isEngaged = ENGAGED_HUNTER_STATUSES.has(c.hunter_status) || ENGAGED_CONTACT_STATUSES.has(c.contact_status);
           if (mode === 'scout') return !isEngaged;
           if (mode === 'hunter') return isEngaged;
           if (mode === 'sniper') return resolveContactStage(c) === 'sniper'; // Sniper: stage-based
           if (mode === 'basecamp') return resolveContactStage(c) === 'basecamp'; // Basecamp: stage-based
           return true; // 'people' — show all
-        });
+        })
+        .map(c => (mode === 'people' && isImportMember(c, importTag) && isHiddenFromPeople(c)
+          ? { ...c, _importArchived: true }
+          : c));
       setContacts(contactsList);
       setLoading(false);
     } catch (error) {
@@ -1604,8 +1632,12 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
     return addedDate >= weekAgo;
   };
 
-  // Exclude contacts whose parent company has been archived
-  let filtered = contacts.filter(c => !c.company_archived);
+  // Exclude contacts whose parent company has been archived. Archived members
+  // of the import this view was opened for show only while its tag is selected.
+  let filtered = contacts.filter(c => (c._importArchived ? tagFilter === importTag : !c.company_archived));
+  const importArchivedShown = tagFilter && tagFilter === importTag
+    ? contacts.filter(c => c._importArchived).length
+    : 0;
 
   // Action-oriented lens filter
   // Skip tab filter when searching so users can always find any contact
@@ -2143,6 +2175,19 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
         ><Download size={12} />Export CSV</button>
       </div>
 
+      {importArchivedShown > 0 && (
+        <div data-testid="import-archived-banner" style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '10px 22px',
+          background: '#f59e0b14', borderBottom: '1px solid #f59e0b55',
+          fontSize: 12, color: T.text,
+        }}>
+          <AlertTriangle size={14} style={{ color: '#f59e0b' }} />
+          Includes {importArchivedShown} archived contact{importArchivedShown !== 1 ? 's' : ''} from this import.
+          {importArchivedShown === 1 ? ' It appears' : ' They appear'} only in this import's view and {importArchivedShown === 1 ? 'stays' : 'stay'} archived.
+        </div>
+      )}
+
       {/* ── Bulk selection banner ── */}
       {bulkMode && selectedIds.size === 0 && (
         <div style={{
@@ -2434,7 +2479,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
             <button
               onClick={() => selectedIds.size <= MAX_CONTACTS && setShowBulkCompose(true)}
               disabled={selectedIds.size > MAX_CONTACTS}
-              title={selectedIds.size > MAX_CONTACTS ? 'Maximum 25 contacts per bulk send' : ''}
+              title={selectedIds.size > MAX_CONTACTS ? `Maximum ${MAX_CONTACTS} contacts per bulk send` : ''}
               style={{
                 padding: '6px 14px', borderRadius: 8, border: 'none',
                 background: selectedIds.size > MAX_CONTACTS ? T.surface : `linear-gradient(135deg,${BRAND.pink},${BRAND.cyan})`,

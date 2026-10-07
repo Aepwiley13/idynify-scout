@@ -44,10 +44,12 @@ vi.mock('firebase/firestore', () => ({
   getDoc: vi.fn(async () => ({ exists: () => true, data: () => ({ contacts: [] }) })),
   updateDoc: vi.fn(async () => {}),
   increment: vi.fn((n) => ({ __inc: n })),
+  arrayUnion: vi.fn((...v) => ({ __arrayUnion: v })),
   serverTimestamp: vi.fn(() => ({ __ts: true })),
 }));
 vi.mock('../../src/firebase/config', () => ({ db: {} }));
 
+import { addDoc, updateDoc } from 'firebase/firestore';
 import BulkSendExecutor, { SEND_DELAY_MS } from '../components/scout/BulkSendExecutor';
 
 const T = {
@@ -214,5 +216,52 @@ describe('BulkSendExecutor send loop', () => {
     render(<BulkSendExecutor payload={[]} T={T} />);
     expect(screen.getByText('No contacts to send to.')).toBeInTheDocument();
     expect(mockExecuteSendAction).not.toHaveBeenCalled();
+  });
+});
+
+describe('BulkSendExecutor — cadence record survives an interrupted send', () => {
+  beforeEach(() => {
+    addDoc.mockClear();
+    updateDoc.mockClear();
+  });
+
+  it('records each delivery on the cadence doc as it happens, not only at completion', async () => {
+    mockExecuteSendAction
+      .mockResolvedValueOnce({ result: 'sent' })
+      .mockResolvedValueOnce({ result: 'failed', error: 'x' })
+      .mockResolvedValueOnce({ result: 'opened' });
+    render(<BulkSendExecutor payload={[makeItem(1), makeItem(2), makeItem(3)]} T={T} />);
+    await flush();
+
+    // After the FIRST send — long before any completion write — c1 is recorded.
+    const first = updateDoc.mock.calls.map(([, data]) => data).find(d => d.deliveredContactIds);
+    expect(first).toEqual(expect.objectContaining({
+      deliveredContactIds: { __arrayUnion: ['c1'] },
+      sentCount: { __inc: 1 },
+    }));
+
+    await advance(SEND_DELAY_MS * 2);
+    const deliveries = updateDoc.mock.calls.map(([, d]) => d).filter(d => d.deliveredContactIds);
+    expect(deliveries.map(d => d.deliveredContactIds.__arrayUnion[0])).toEqual(['c1', 'c3']); // failed c2 not recorded
+    expect(deliveries[1]).toEqual(expect.objectContaining({ nativeHandoffCount: { __inc: 1 } }));
+  });
+
+  it('stores the reusable template on the cadence doc', async () => {
+    const meta = {
+      templateSubject: 'Hi {{first_name}}', templateBody: 'Body', path: 'write_your_own',
+      personalizedWithBarry: true, cc: '', hasAttachment: false,
+    };
+    render(<BulkSendExecutor payload={[{ ...makeItem(1), cadenceName: 'Beyond Words' }]} T={T} cadenceMeta={meta} />);
+    await flush();
+    const [, doc] = addDoc.mock.calls[0];
+    expect(doc).toEqual(expect.objectContaining({
+      name: 'Beyond Words',
+      status: 'active',
+      templateSubject: 'Hi {{first_name}}',
+      templateBody: 'Body',
+      path: 'write_your_own',
+      personalizedWithBarry: true,
+      deliveredContactIds: [],
+    }));
   });
 });

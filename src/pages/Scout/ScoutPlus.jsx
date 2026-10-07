@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { openContact, ENTRY_POINTS, DISPLAY_MODES } from '../../utils/navigation';
-import { UserPlus, Upload, Camera, CheckCircle, Eye, PlusCircle, Linkedin, ArrowLeft, Building2, Search } from 'lucide-react';
+import { UserPlus, Upload, Camera, CheckCircle, Eye, PlusCircle, Linkedin, ArrowLeft, Building2, Search, RefreshCw, Tag, AlertTriangle } from 'lucide-react';
 import ManualContactForm from '../../components/scout/ManualContactForm';
 import CSVUpload from '../../components/scout/CSVUpload';
 import BusinessCardCapture from '../../components/scout/BusinessCardCapture';
 import LinkedInLinkSearch from '../../components/scout/LinkedInLinkSearch';
 import CompanySearch from './CompanySearch';
+import CadencePickerModal from '../../components/cadences/CadencePickerModal';
 import { useT } from '../../theme/ThemeContext';
 
 export default function ScoutPlus() {
@@ -19,12 +20,15 @@ export default function ScoutPlus() {
   const [currentView, setCurrentView] = useState(initialView); // 'menu', 'manual', 'csv', 'business-card', 'linkedin-link', 'company-search', 'success'
   const [addedItems, setAddedItems] = useState([]);
   const [lastUploadType, setLastUploadType] = useState(null); // 'leads' or 'companies'
+  // CSV contact imports only: { batchId, tag, created, updated, failed }
+  const [importResult, setImportResult] = useState(null);
+  const [showCadencePicker, setShowCadencePicker] = useState(false);
 
   const handleBack = () => {
     setCurrentView('menu');
   };
 
-  const handleContactAdded = (items) => {
+  const handleContactAdded = (items, csvImportResult = null) => {
     // Detect upload type from the _uploadType flag set by CSVUpload
     const isCompanyUpload = items.length > 0 && items[0]?._uploadType === 'companies';
     // Auto-navigate to the contact profile when a single LinkedIn contact is saved
@@ -34,6 +38,7 @@ export default function ScoutPlus() {
     }
     setAddedItems(items);
     setLastUploadType(isCompanyUpload ? 'companies' : 'leads');
+    setImportResult(csvImportResult);
     setCurrentView('success');
   };
 
@@ -66,8 +71,20 @@ export default function ScoutPlus() {
     });
   };
 
+  /**
+   * People, filtered to this import's tag. /command-center is People's real
+   * route (/people redirects there); AllLeads reads `tag` from the URL into its
+   * existing tag filter.
+   */
+  const viewImportedPeople = () => {
+    const params = new URLSearchParams({ tab: 'people', tag: importResult.tag });
+    navigate(`/command-center?${params.toString()}`);
+  };
+
   const handleViewResults = () => {
-    if (lastUploadType === 'companies') {
+    if (importResult?.tag) {
+      viewImportedPeople();
+    } else if (lastUploadType === 'companies') {
       navigate('/scout', { state: { activeTab: 'saved-companies' } });
     } else if (addedItems.length === 1 && addedItems[0]?.id) {
       openSavedContact(addedItems[0].id);
@@ -76,9 +93,14 @@ export default function ScoutPlus() {
     }
   };
 
+  const emailConflictCount = importResult ? addedItems.filter(c => c._emailConflict).length : 0;
+  const archivedCount = importResult ? addedItems.filter(c => c._archived).length : 0;
+
   const handleAddMore = () => {
     setAddedItems([]);
     setLastUploadType(null);
+    setImportResult(null);
+    setShowCadencePicker(false);
     setCurrentView('menu');
   };
 
@@ -105,7 +127,7 @@ export default function ScoutPlus() {
             {currentView === 'business-card' && 'Scan Business Card'}
             {currentView === 'linkedin-link' && 'LinkedIn Link'}
             {currentView === 'company-search' && 'Company Search'}
-            {currentView === 'success' && (lastUploadType === 'companies' ? 'Companies Added Successfully!' : 'Contact Added Successfully!')}
+            {currentView === 'success' && (importResult ? 'Import Complete' : lastUploadType === 'companies' ? 'Companies Added Successfully!' : 'Contact Added Successfully!')}
           </h2>
         </div>
       </div>
@@ -168,26 +190,28 @@ export default function ScoutPlus() {
               </div>
             </button>
 
-            {/* Coming soon group — kept below the working options so the live
-                add paths are the first thing a user reaches. */}
-            <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 12 }}>
-              Coming soon
-            </div>
-
-            {/* CSV Upload — Coming Soon */}
-            <div
-              style={{ width: '100%', background: T.cardBg, border: `2px solid ${T.border}`, borderRadius: 14, padding: 24, textAlign: 'left', opacity: 0.55, cursor: 'default', position: 'relative' }}
+            {/* CSV Upload */}
+            <button
+              onClick={() => setCurrentView('csv')}
+              style={{ width: '100%', background: T.cardBg, border: `2px solid ${T.border}`, borderRadius: 14, padding: 24, textAlign: 'left', cursor: 'pointer', transition: 'border-color 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = '#16a34a'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = T.border}
             >
-              <div style={{ position: 'absolute', top: 12, right: 14, background: '#f59e0b', color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6, letterSpacing: 0.5 }}>COMING SOON</div>
               <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
                 <div style={{ width: 48, height: 48, background: '#dcfce7', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                   <Upload className="w-6 h-6 text-green-600" />
                 </div>
                 <div>
                   <h3 style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 4 }}>Upload CSV</h3>
-                  <p style={{ fontSize: 13, color: T.textMuted, margin: 0 }}>Import contacts from a spreadsheet. Available soon.</p>
+                  <p style={{ fontSize: 13, color: T.textMuted, margin: 0 }}>Import a list of people from a spreadsheet, then add them to a cadence.</p>
                 </div>
               </div>
+            </button>
+
+            {/* Coming soon group — kept below the working options so the live
+                add paths are the first thing a user reaches. */}
+            <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 12 }}>
+              Coming soon
             </div>
 
             {/* Business Card Capture — Coming Soon */}
@@ -239,11 +263,40 @@ export default function ScoutPlus() {
 
             {/* Success Message */}
             <h3 style={{ fontSize: 20, fontWeight: 700, color: T.text, marginBottom: 8 }}>
-              {lastUploadType === 'companies'
+              {importResult ? `${addedItems.length} contact${addedItems.length !== 1 ? 's' : ''} imported successfully` : lastUploadType === 'companies'
                 ? (addedItems.length === 1 ? 'Company Added!' : `${addedItems.length} Companies Added!`)
                 : (addedItems.length === 1 ? 'Contact Added!' : `${addedItems.length} Contacts Added!`)}
             </h3>
-            <p style={{ color: T.textMuted, marginBottom: 32, fontSize: 13 }}>
+            {importResult && (
+              <div data-testid="import-summary" style={{ marginBottom: 20, fontSize: 13, color: T.textMuted, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+                <span>
+                  {importResult.created.length} new
+                  {importResult.updated.length > 0 && ` · ${importResult.updated.length} already in IDYNIFY (updated, not duplicated)`}
+                </span>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 999, background: T.statBg, border: `1px solid ${T.border}`, color: T.text, fontWeight: 600, fontSize: 12 }}>
+                  <Tag className="w-3.5 h-3.5" />{importResult.tag}
+                </span>
+                {emailConflictCount > 0 && (
+                  <span data-testid="import-email-conflicts" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#b45309' }}>
+                    <AlertTriangle className="w-4 h-4" />
+                    {emailConflictCount} email conflict{emailConflictCount !== 1 ? 's' : ''} — kept their IDYNIFY email and won't be added to a cadence until checked in People
+                  </span>
+                )}
+                {archivedCount > 0 && (
+                  <span data-testid="import-archived">
+                    {archivedCount} {archivedCount === 1 ? 'is' : 'are'} archived — shown in this import's People view, still archived
+                  </span>
+                )}
+                {importResult.failed.length > 0 && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#dc2626' }}>
+                    <AlertTriangle className="w-4 h-4" />
+                    {importResult.failed.length} row{importResult.failed.length !== 1 ? 's' : ''} could not be saved
+                    (row{importResult.failed.length !== 1 ? 's' : ''} {importResult.failed.map(f => f.rowNumber).join(', ')})
+                  </span>
+                )}
+              </div>
+            )}
+            <p style={{ color: T.textMuted, marginBottom: 32, fontSize: 13, display: importResult ? 'none' : undefined }}>
               {lastUploadType === 'companies'
                 ? (addedItems.length === 1
                     ? 'Your company has been saved to Saved Companies.'
@@ -278,6 +331,34 @@ export default function ScoutPlus() {
             </div>
 
             {/* Action Buttons */}
+            {importResult ? (
+              <>
+                <div style={{ fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 12 }}>What would you like to do next?</div>
+                <div style={{ display: 'flex', gap: 12 }}>
+                  <button
+                    onClick={viewImportedPeople}
+                    style={{ flex: 1, padding: '12px 24px', borderRadius: 12, background: T.surface, border: `2px solid ${T.border}`, color: T.text, fontWeight: 600, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                  >
+                    <Eye className="w-5 h-5" />
+                    View People
+                  </button>
+                  <button
+                    onClick={() => setShowCadencePicker(true)}
+                    style={{ flex: 1, padding: '12px 24px', borderRadius: 12, background: '#2563eb', color: '#fff', fontWeight: 600, fontSize: 14, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}
+                  >
+                    <RefreshCw className="w-5 h-5" />
+                    Add to Cadence
+                  </button>
+                </div>
+                <button
+                  onClick={handleAddMore}
+                  style={{ marginTop: 14, background: 'none', border: 'none', color: T.textMuted, fontSize: 13, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  Add more contacts
+                </button>
+              </>
+            ) : (
             <div style={{ display: 'flex', gap: 12 }}>
               <button
                 onClick={handleViewResults}
@@ -296,6 +377,14 @@ export default function ScoutPlus() {
                 Add More
               </button>
             </div>
+            )}
+
+            {showCadencePicker && (
+              <CadencePickerModal
+                contacts={addedItems}
+                onClose={() => setShowCadencePicker(false)}
+              />
+            )}
           </div>
         )}
       </div>

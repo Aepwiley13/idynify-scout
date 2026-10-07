@@ -255,7 +255,11 @@ describe('prompt construction', () => {
     expect(prompt).toContain('Slow onboarding');
     expect(prompt).toContain('Direct');
     expect(prompt).toContain('Shared body here.');
-    expect(prompt).toContain('2-3 sentences maximum');
+    // One sentence; the system owns the greeting and the name (People Pitch duplicate-greeting fix).
+    expect(prompt).toContain('Exactly ONE short sentence');
+    expect(prompt).toContain('do NOT use the recipient\'s name anywhere');
+    expect(prompt).toContain('Do NOT greet');
+    expect(prompt).toContain('"Hi Name1,"');
     expect(prompt).toContain('No subject line');
   });
 
@@ -289,3 +293,26 @@ describe('helpers', () => {
     expect(cleanOpeningLine(null)).toBeNull();
   });
 });
+
+describe('opening line never repeats the greeting or the name (People Pitch fix)', () => {
+  it.each([
+    'Hi Name1, I thought you would appreciate this given your work.',
+    'Hey Name1 — I thought you would appreciate this given your work.',
+    'Name1, I thought you would appreciate this given your work.',
+  ])('strips a model-written greeting/name: %s', async (modelText) => {
+    mockCreate.mockImplementation(() => Promise.resolve({ content: [{ text: modelText }] }));
+    const res = await handler(makeEvent({ contacts: [makeContact(1)] }));
+    const [r] = JSON.parse(res.body).results;
+    expect(r.success).toBe(true);
+    expect(r.openingLine).toBe('I thought you would appreciate this given your work.');
+  });
+
+  it('leaves inline {{personalize}} text exactly as the model wrote it', async () => {
+    mockCreate.mockImplementation(() => Promise.resolve({ content: [{ text: 'Name1, great work lately' }] }));
+    const res = await handler(makeEvent({
+      contacts: [makeContact(1)], mode: 'inline_personalize', sharedBody: 'Hello {{personalize}}. More text.',
+    }));
+    expect(JSON.parse(res.body).results[0].openingLine).toBe('Name1, great work lately');
+  });
+});
+

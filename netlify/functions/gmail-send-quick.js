@@ -1,3 +1,4 @@
+/* global Buffer */
 /**
  * GMAIL SEND QUICK
  *
@@ -75,10 +76,59 @@ export function prepareAttachment(attachment) {
   return { part: { data: normalized, filename: sanitizeFilename(filename), mimeType: 'application/pdf' } };
 }
 
+/**
+ * RFC 2047 encoding for a header value.
+ *
+ * Header lines in the raw RFC 2822 message must be 7-bit ASCII. The subject
+ * used to be written raw, so "tomorrow — People Pitch" went out as the em
+ * dash's three UTF-8 bytes in an undeclared header; Gmail read them as Latin-1
+ * and the recipient saw "tomorrow Ã¢Â€Â” People Pitch". Any value containing a
+ * non-ASCII character is now sent as one or more =?UTF-8?B?…?= encoded words,
+ * split on whole characters and kept under the 75-character word limit.
+ * Pure-ASCII values are returned unchanged. Exported for testing.
+ */
+export function encodeHeaderValue(value) {
+  const text = String(value ?? '').replace(/[\r\n]+/g, ' ');
+  if (/^[\x20-\x7E]*$/.test(text)) return text;
+  const words = [];
+  let chunk = '';
+  let bytes = 0;
+  for (const ch of text) {
+    const size = Buffer.byteLength(ch, 'utf8');
+    if (chunk && bytes + size > 45) { words.push(chunk); chunk = ''; bytes = 0; }
+    chunk += ch;
+    bytes += size;
+  }
+  if (chunk) words.push(chunk);
+  return words.map((w) => `=?UTF-8?B?${Buffer.from(w, 'utf8').toString('base64')}?=`).join(' ');
+}
+
+/** `Name <email>` with the display name encoded when it is not plain ASCII. Exported for testing. */
+export function formatAddress(name, email) {
+  if (!name || name === email) return email;
+  const display = /^[\x20-\x7E]*$/.test(name) ? name : encodeHeaderValue(name);
+  return `${display} <${email}>`;
+}
+
+/**
+ * Bare http(s) URLs become links, so a registration link is clickable in every
+ * mail client rather than only in those that auto-link. Bodies that already
+ * contain an <a> tag are left as written. Trailing punctuation stays outside
+ * the link.
+ */
+function linkify(html) {
+  if (/<a\s/i.test(html)) return html;
+  return html.replace(/\bhttps?:\/\/[^\s<>"']+/g, (match) => {
+    const url = match.replace(/[.,;:!?)\]’”]+$/, '');
+    const tail = match.slice(url.length);
+    return `<a href="${url}">${url}</a>${tail}`;
+  });
+}
+
 function toHtml(text) {
   return text
     .split(/\n\n+/)
-    .map(para => '<p>' + para.replace(/\n/g, '<br>') + '</p>')
+    .map(para => '<p>' + linkify(para).replace(/\n/g, '<br>') + '</p>')
     .join('');
 }
 
@@ -104,13 +154,13 @@ export function buildTrackingPixel({ baseUrl, userId, contactId, cadenceId, mess
  * Exported for testing.
  */
 export function buildRawEmail({ toEmail, recipientName, subject, bodyText, ccHeader, attachment, trackingPixel, signatureHtml }) {
-  const lines = [`To: ${recipientName} <${toEmail}>`];
+  const lines = [`To: ${formatAddress(recipientName, toEmail)}`];
   if (ccHeader) lines.push(`Cc: ${ccHeader}`);
   const htmlBody = appendSignatureHtml(toHtml(bodyText), signatureHtml || '') + (trackingPixel || '');
 
   if (!attachment) {
     lines.push(
-      `Subject: ${subject}`,
+      `Subject: ${encodeHeaderValue(subject)}`,
       'Content-Type: text/html; charset=utf-8',
       'MIME-Version: 1.0',
       '',
@@ -124,7 +174,7 @@ export function buildRawEmail({ toEmail, recipientName, subject, bodyText, ccHea
   const wrappedData = attachment.data.replace(/(.{76})/g, '$1\n');
 
   lines.push(
-    `Subject: ${subject}`,
+    `Subject: ${encodeHeaderValue(subject)}`,
     'MIME-Version: 1.0',
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
     '',
@@ -134,9 +184,12 @@ export function buildRawEmail({ toEmail, recipientName, subject, bodyText, ccHea
     htmlBody,
     '',
     `--${boundary}`,
-    `Content-Type: ${attachment.mimeType}; name="${attachment.filename}"`,
+    `Content-Type: ${attachment.mimeType}; name="${encodeHeaderValue(attachment.filename)}"`,
     'Content-Transfer-Encoding: base64',
-    `Content-Disposition: attachment; filename="${attachment.filename}"`,
+    /^[\x20-\x7E]*$/.test(attachment.filename)
+      ? `Content-Disposition: attachment; filename="${attachment.filename}"`
+      // RFC 2231 for a non-ASCII file name ("Café flyer.pdf").
+      : `Content-Disposition: attachment; filename*=UTF-8''${encodeURIComponent(attachment.filename)}`,
     '',
     wrappedData,
     `--${boundary}--`,
@@ -370,7 +423,7 @@ export const handler = async (event) => {
     // Create email in RFC 2822 format (multipart/mixed when a PDF is attached)
     const recipientName = toName || toEmail;
     const ccHeader = ccList.length > 0
-      ? ccList.map(r => r.name && r.name !== r.email ? `${r.name} <${r.email}>` : r.email).join(', ')
+      ? ccList.map(r => formatAddress(r.name, r.email)).join(', ')
       : null;
     const email = buildRawEmail({
       toEmail,

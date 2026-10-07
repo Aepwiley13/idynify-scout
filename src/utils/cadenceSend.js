@@ -7,6 +7,7 @@
 
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { stripLeadingGreeting, cleanBarryOpening } from './emailGreeting.js';
 
 /**
  * Recipients per send. The send loop is sequential with a 1.5s gap, so 100 is
@@ -177,8 +178,11 @@ export function renderCadenceEmail({ subject, body, contact, openingLine = '', p
     const filled = String(body || '').replace(PERSONALIZE_TAG, openingLine || '');
     return { subject: renderedSubject, body: replaceContactTags(filled, contact), inline };
   }
+  // One greeting layer: ours. Barry's line and the shared body each lose any
+  // greeting or leading name of their own (see emailGreeting.js).
   const parts = [greetingFor(contact)];
-  if (personalize && openingLine) parts.push(openingLine);
-  parts.push(replaceContactTags(body, contact));
+  const opening = personalize ? cleanBarryOpening(openingLine, firstNameFor(contact)) : '';
+  if (opening) parts.push(opening);
+  parts.push(replaceContactTags(stripLeadingGreeting(body), contact));
   return { subject: renderedSubject, body: parts.join('\n\n'), inline };
 }

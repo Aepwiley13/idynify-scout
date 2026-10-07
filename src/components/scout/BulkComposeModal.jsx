@@ -7,9 +7,10 @@ import { checkGmailConnection, sendEmailViaGmail, SEND_RESULT } from '../../util
 import { doc, setDoc, getDoc, deleteDoc, serverTimestamp, collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import BulkSendExecutor from './BulkSendExecutor';
+import { cleanBarryOpening } from '../../utils/emailGreeting';
 import {
   MAX_BULK_CONTACTS, PERSONALIZE_CHUNK, loadAlreadyDelivered,
-  hasPersonalizeTag, replaceContactTags, greetingFor, firstNameFor, renderCadenceEmail,
+  hasPersonalizeTag, firstNameFor, renderCadenceEmail,
 } from '../../utils/cadenceSend';
 
 const MAX_FILE_SIZE = 4 * 1024 * 1024; // 4MB — Netlify 6MB payload cap + base64 inflation
@@ -306,9 +307,12 @@ export default function BulkComposeModal({
     }
     return contacts.map(c => {
       const result = resultsMap[c.id];
+      // Opening-line mode: strip any greeting or leading name Barry added —
+      // "Hi {first}," is ours (emailGreeting.js). Inline text is left as is.
+      const raw = result?.success ? (result.openingLine || '') : '';
       return {
         contact: c,
-        openingLine: result?.success ? (result.openingLine || '') : '',
+        openingLine: mode ? raw : cleanBarryOpening(raw, firstNameFor(c)),
         failed: result ? !result.success : true,
       };
     });
@@ -548,19 +552,21 @@ export default function BulkComposeModal({
   const stepLabels = ['Compose', 'Preview', 'Sending'];
 
   // ─── Render helpers for preview ───
+  /**
+   * A preview card shows the email EXACTLY as it will be sent — the same
+   * buildPayloadItem → renderCadenceEmail call the test send and the real send
+   * make. Barry's line stays editable above it; the rendered text below is the
+   * truth, so the preview cannot look right while Gmail gets something else.
+   */
   function renderPreviewBody(p) {
-    if (inlinePersonalize) {
-      const { body: rendered } = renderCadenceEmail({ subject, body, contact: p.contact, openingLine: p.openingLine });
-      return <div style={{ whiteSpace: 'pre-wrap', color: T.textMuted }}>{rendered}</div>;
-    }
+    const item = buildPayloadItem(p);
     return (
       <>
-        <div style={{ fontWeight: 600, marginBottom: 6 }}>{greetingFor(p.contact)}</div>
-        {personalizeWithBarry && p.openingLine !== undefined && (
-          <div style={{ marginBottom: 8 }}>
+        {!inlinePersonalize && personalizeWithBarry && p.openingLine !== undefined && (
+          <div style={{ marginBottom: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
               <Sparkles size={11} style={{ color: BRAND.cyan }} />
-              <span style={{ fontSize: 10, fontWeight: 600, color: BRAND.cyan }}>Barry's opening</span>
+              <span style={{ fontSize: 10, fontWeight: 600, color: BRAND.cyan }}>Barry's opening (edit)</span>
               <button
                 onClick={() => { document.getElementById(`opening-${p.contact.id}`)?.focus(); }}
                 style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textFaint, padding: 0, display: 'flex' }}
@@ -580,7 +586,13 @@ export default function BulkComposeModal({
             />
           </div>
         )}
-        <div style={{ whiteSpace: 'pre-wrap', color: T.textMuted }}>{replaceContactTags(body, p.contact)}</div>
+        <div data-testid={`rendered-${p.contact.id}`}>
+          <div style={{ fontSize: 10, fontWeight: 600, color: T.textFaint, marginBottom: 4 }}>EXACTLY AS SENT</div>
+          <div data-testid={`rendered-subject-${p.contact.id}`} style={{ fontSize: 12, color: T.textMuted, marginBottom: 6 }}>
+            Subject: <strong style={{ color: T.text }}>{item.subject}</strong>
+          </div>
+          <div data-testid={`rendered-body-${p.contact.id}`} style={{ whiteSpace: 'pre-wrap', color: T.text }}>{item.body}</div>
+        </div>
       </>
     );
   }

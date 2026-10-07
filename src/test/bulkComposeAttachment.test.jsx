@@ -110,7 +110,9 @@ describe('reused cadence + attachment', { timeout: 20000 }, () => {
     expect(fetchBodies).toHaveLength(1);
     expect(fetchBodies[0].mode).toBeUndefined(); // opening-line mode, as before
     expect(fetchBodies[0].sharedBody).toBe(BODY);
-    expect(screen.getByText('Hi Ana,')).toBeInTheDocument();
+    // The card shows the exact rendered email (same path as the send).
+    expect(screen.getByTestId('rendered-body-c1').textContent)
+      .toBe('Hi Ana,\n\nLine for Ana\n\nJoin us at Beyond Words with Acme.');
     expect(screen.getAllByText(/PDF attached: Beyond Words Flyer.pdf/)).toHaveLength(2);
   });
 

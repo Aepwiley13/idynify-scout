@@ -34,6 +34,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { verifyAuthToken } from './utils/verifyAuthToken.js';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { LEGACY_HAIKU_4_5 } from './utils/models.js';
+import { cleanBarryOpening } from '../../src/utils/emailGreeting.js';
 
 const MODEL = LEGACY_HAIKU_4_5;
 const MAX_CONTACTS = 25;
@@ -150,7 +151,12 @@ export function buildPrompt(contact, sharedBody, reconBlock, userContext) {
     ? 'Reference something specific about this contact — their role, company, industry, or timing signal (e.g. recently started a new role). Pick the strongest single angle; do not cram in every field.'
     : 'Very little is known about this contact. Write a warm, genuine, generic opening line. Do NOT invent details about their role or company — no guessing, no placeholders.';
 
-  return `You are Barry, an expert B2B outreach copywriter. Write ONLY a personalized opening line for an email. It will be placed directly before a shared email body that every recipient receives — it is not a full email.
+  return `You are Barry, an expert outreach copywriter. Write ONLY a one-sentence personalized opening line for an email.
+
+HOW THE EMAIL IS ASSEMBLED (you write part 2 only):
+1. Greeting — already written by the system: "Hi ${firstName || '{first name}'},"
+2. YOUR SENTENCE — why this message is relevant to this particular person.
+3. The shared email body below — the actual message, invitation and details.
 
 CONTACT:
 ${contactLines.length > 0 ? contactLines.join('\n') : 'No details available.'}
@@ -161,13 +167,15 @@ ${clip(sharedBody, 2000)}
 """
 
 RULES:
-1. 2-3 sentences maximum. No subject line. No greeting ("Hi ..."), no sign-off — just the opening line itself.
-2. ${specificityRule}
-3. Do not repeat or paraphrase anything already in the shared body — your line sets it up.
-4. It must read naturally when placed immediately before the shared body.
-5. ${toneDirective(warmthLevel, knownContact)}
+1. Exactly ONE short sentence (under 30 words): a relationship or context line about why this person would care.
+2. The greeting and the recipient's name are already handled. Do NOT greet ("Hi", "Hey", "Hello", "Dear"…) and do NOT use the recipient's name anywhere in your sentence.
+3. The invitation or ask comes immediately after your sentence in the shared body. Do NOT make the ask yourself, and do not mention the event, date, place, link or any other detail from the shared body.
+4. ${specificityRule}
+5. It must read naturally between "Hi ${firstName || '{first name}'}," and the first line of the shared body.
+6. No subject line, no sign-off.
+7. ${toneDirective(warmthLevel, knownContact)}
 
-Return ONLY the opening line text. No quotes around it, no labels, no explanation.`;
+Return ONLY the sentence. No quotes around it, no labels, no explanation.`;
 }
 
 /**
@@ -292,7 +300,13 @@ async function generateForContact(anthropic, contact, sharedBody, reconBlock, us
       { signal: controller.signal }
     );
 
-    const openingLine = cleanOpeningLine(response.content?.[0]?.text);
+    // In opening-line mode the system already writes "Hi {first},", so a
+    // greeting or leading name from the model is removed here (the browser
+    // applies the same rule again at render). Inline text is left as written.
+    const cleaned = cleanOpeningLine(response.content?.[0]?.text);
+    const openingLine = mode === MODES.INLINE_PERSONALIZE
+      ? cleaned
+      : (cleaned ? cleanBarryOpening(cleaned, contact.firstName) || null : null);
     if (!openingLine) throw new Error('Model returned an empty opening line');
 
     // _usage is internal telemetry only. It is summed by the handler and

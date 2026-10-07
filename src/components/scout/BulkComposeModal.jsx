@@ -704,7 +704,7 @@ export default function BulkComposeModal({
 
               <label style={{ ...sectionLabel, marginTop: 18 }}>Email Body</label>
               <div style={{ fontSize: 11, color: T.textFaint, marginBottom: 6, lineHeight: 1.5 }}>
-                Each email starts with "Hi {'{first name}'}," and Barry's opening line, then this body. To write your own greeting instead, place {'{personalize}'} where Barry should add a personal line.
+                Each email starts with "Hi {'{{first name}}'}," (added automatically — don't type a greeting) and Barry's opening line, then this body. Place {'{{personalize}}'} in the body if you want Barry's line somewhere else.
               </div>
               <textarea
                 ref={bodyRef}
@@ -733,7 +733,7 @@ export default function BulkComposeModal({
                   fontSize: 12, color: T.text,
                 }}>
                   <Sparkles size={16} style={{ color: BRAND.cyan, flexShrink: 0 }} />
-                  {'{personalize}'} detected — Barry writes that part for each contact, and no automatic greeting is added.
+                  {'{{personalize}}'} detected — Barry writes that part for each contact. The "Hi {'{{first name}}'}," greeting is still added automatically.
                 </div>
               ) : (
                 <div style={{

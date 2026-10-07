@@ -138,14 +138,14 @@ describe('renderCadenceEmail — the one message model', () => {
       .toBe('Hi Ana,\n\nB');
   });
 
-  it('inline mode fills {{personalize}} in place, with no added greeting', () => {
+  it('inline mode fills {{personalize}} in place; the system greeting replaces the body’s own', () => {
     expect(renderCadenceEmail({ subject: 'S', body: 'Dear {{first_name}}, {{personalize}}', contact: ana, openingLine: 'great work.' }).body)
-      .toBe('Dear Ana, great work.');
+      .toBe('Hi Ana,\n\nGreat work.');
   });
 
   it('never sends a literal {{personalize}} when Barry failed for a contact', () => {
     expect(renderCadenceEmail({ subject: 'S', body: 'Hello. {{personalize}} Bye.', contact: ana, openingLine: '' }).body)
-      .toBe('Hello.  Bye.');
+      .toBe('Hi Ana,\n\nHello.  Bye.');
   });
 
   it('does not use an email address as a first name', () => {

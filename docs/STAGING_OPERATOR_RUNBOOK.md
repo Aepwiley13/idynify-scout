@@ -456,7 +456,7 @@ After you click **Add to Cadence**:
 
 **Before testing a fix, make sure you're running the fixed code:**
 - The address bar must show the deploy preview (`deploy-preview-<PR number>--idynify.netlify.app`), not the production site. Hard-refresh first: Cmd+Shift+R on Mac, Ctrl+Shift+R on Windows.
-- After Send Test, the result line must end with `(app render-3 · server rfc2047-1)` or a later version. If it says **server OUTDATED**, the email was built by an old deploy, so stop.
+- After Send Test, the result line must end with `(app render-4 · server rfc2047-1)` or a later version. If it says **server OUTDATED**, the email was built by an old deploy, so stop.
 
 **How:** on the Preview screen (Step 2 of 3), click **Send Test to Me**. The test is the **first recipient's** real email ("personalized as <name>"). It's sent through the same Gmail connection, with the same subject, body, Barry line and PDF as the real send.
 

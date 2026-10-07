@@ -20,11 +20,18 @@ const GREETING_WORDS = '(?:hi|hey|hello|hiya|howdy|dear|greetings|good\\s+(?:mor
 
 // What may follow the greeting word: a name, a {{first_name}} tag, or a
 // generic addressee ("there", "all", "everyone", "team", "friends").
-const ADDRESSEE = '(?:\\{\\{\\s*first_name\\s*\\}\\}|there|all|everyone|team|friends?|folks|[A-Z\\u00C0-\\u024F][\\w\\u00C0-\\u024F\'’.-]*)';
+const ADDRESSEE = '(?:\\{\\{\\s*(?:first_name|last_name)\\s*\\}\\}|there|all|everyone|team|friends?|folks|[A-Z\\u00C0-\\u024F][\\w\\u00C0-\\u024F\'’.-]*)';
 
-// "Hi Michael," / "Hey {{first_name}} —" / "Hello!" / "Dear Michael:" at the very start.
+// Whitespace plus the invisible characters text picks up when pasted from a
+// doc or an email (zero-width space/joiners, word joiner, BOM). JavaScript's
+// \\s does not match the zero-width ones, so "\u200BHey Michael," used to slip
+// past every greeting rule and reach the recipient.
+const LEAD = '^[\\s\\u200B-\\u200D\\u2060\\uFEFF]*';
+
+// "Hi Michael," / "Hey {{first_name}} —" / "Hello!" / "Dear Michael:" /
+// "Hey there Michael," / "Hi {{first_name}} {{last_name}}," at the very start.
 const LEADING_GREETING = new RegExp(
-  `^\\s*${GREETING_WORDS}(?:\\s+${ADDRESSEE})?\\s*(?:[,!:;]|\\s[—–-])\\s*`,
+  `${LEAD}${GREETING_WORDS}(?:\\s+${ADDRESSEE}){0,3}\\s*(?:[,!:;]|\\s[—–-])\\s*`,
   'i',
 );
 
@@ -46,7 +53,7 @@ export function stripLeadingGreeting(body, firstName = '') {
   // Michael, …" loses both.
   const first = String(firstName ?? '').trim();
   const names = ['\\{\\{\\s*first_name\\s*\\}\\}', first ? escapeRegExp(first) : null].filter(Boolean).join('|');
-  const leadingName = new RegExp(`^\\s*(?:${names})\\s*(?:[,!:;]|\\s[—–-])\\s*`, 'i');
+  const leadingName = new RegExp(`${LEAD}(?:${names})\\s*(?:[,!:;]|\\s[—–-])\\s*`, 'i');
   let stripped = text;
   for (let i = 0; i < 4; i += 1) {
     const next = stripped.replace(LEADING_GREETING, '').replace(leadingName, '');
@@ -58,6 +65,37 @@ export function stripLeadingGreeting(body, firstName = '') {
 }
 
 /**
+ * The opening section of the shared body: strip a leading greeting or address
+ * from each of its first `maxParagraphs` paragraphs that have content.
+ *
+ * Catches a greeting that is not on the very first line — e.g. a body reused
+ * from an older cadence, whose saved text was the first recipient's email:
+ * "Michael, I'm reaching out…\n\nHey Michael, I'm hoping…". A paragraph that
+ * was only a greeting ("Hi Michael,") is dropped. Paragraph breaks and the
+ * rest of the body are left exactly as written.
+ */
+export function stripOpeningGreetings(body, firstName = '', maxParagraphs = 2) {
+  const text = String(body ?? '');
+  const breakAt = /\n[^\S\n]*\n\s*/g;
+  let pos = 0;
+  let out = '';
+  let kept = 0;
+  while (kept < maxParagraphs && pos < text.length) {
+    breakAt.lastIndex = pos;
+    const m = breakAt.exec(text);
+    const end = m ? m.index : text.length;
+    const next = m ? m.index + m[0].length : text.length;
+    const para = stripLeadingGreeting(text.slice(pos, end), firstName);
+    if (para.replace(new RegExp(LEAD), '').trim()) {
+      out += para.replace(new RegExp(LEAD), '') + text.slice(end, next);
+      kept += 1;
+    }
+    pos = next;
+  }
+  return out + text.slice(pos);
+}
+
+/**
  * Clean Barry's opening line so it never repeats the greeting or the name:
  *   "Hey Michael, I thought…"  → "I thought…"
  *   "Michael, I wanted…"       → "I wanted…"
@@ -66,12 +104,16 @@ export function stripLeadingGreeting(body, firstName = '') {
  * duplicates "Hi Michael,".
  */
 export function cleanBarryOpening(line, firstName = '') {
-  let text = String(line ?? '').trim();
+  let text = String(line ?? '').replace(new RegExp(LEAD), '').trim();
   if (!text) return '';
-  text = text.replace(LEADING_GREETING, '');
+  for (let i = 0; i < 3; i += 1) {
+    const next = text.replace(LEADING_GREETING, '');
+    if (next === text) break;
+    text = next;
+  }
   const first = String(firstName ?? '').trim();
   if (first) {
-    const leadingName = new RegExp(`^\\s*${escapeRegExp(first)}\\s*(?:[,!:;]|\\s[—–-])\\s*`, 'i');
+    const leadingName = new RegExp(`${LEAD}${escapeRegExp(first)}\\s*(?:[,!:;]|\\s[—–-])\\s*`, 'i');
     text = text.replace(leadingName, '');
   }
   return capitalizeFirst(text.trim());
@@ -105,7 +147,7 @@ export function displayNameCase(value) {
  * next to the server's own version, so a tester can see which code built and
  * sent the email.
  */
-export const EMAIL_RENDER_VERSION = 'render-3';
+export const EMAIL_RENDER_VERSION = 'render-4';
 
 /** Used when Barry's line is unusable (empty, all greeting, names the recipient, or restates the body). */
 export const BARRY_FALLBACK_OPENING = 'I wanted to make sure this was on your radar.';
@@ -162,7 +204,25 @@ export function finalizeBarryOpening(line, { firstName = '', body = '' } = {}) {
   return text;
 }
 
+/**
+ * Barry's inline text for a {{personalize}} slot: no greeting, no address by
+ * name. (It is a fragment, so the restatement fallback does not apply.)
+ */
+export function finalizeInlinePersonalization(text, firstName = '') {
+  let out = cleanBarryOpening(text, firstName);
+  const first = String(firstName ?? '').trim();
+  if (out && first) {
+    const name = escapeRegExp(first);
+    out = out
+      .replace(new RegExp(`\\s*,\\s*${name}\\s*(?=[.!?]?$)`, 'i'), '')
+      .replace(new RegExp(`,\\s*${name}\\s*,`, 'gi'), ',')
+      .trim();
+  }
+  return out;
+}
+
 export default {
-  stripLeadingGreeting, cleanBarryOpening, displayNameCase, finalizeBarryOpening,
+  stripLeadingGreeting, stripOpeningGreetings, cleanBarryOpening, displayNameCase,
+  finalizeBarryOpening, finalizeInlinePersonalization,
   EMAIL_RENDER_VERSION, BARRY_FALLBACK_OPENING,
 };

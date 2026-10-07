@@ -7,7 +7,7 @@
 
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { stripLeadingGreeting, finalizeBarryOpening, displayNameCase } from './emailGreeting.js';
+import { stripOpeningGreetings, finalizeBarryOpening, finalizeInlinePersonalization, displayNameCase } from './emailGreeting.js';
 
 /**
  * Recipients per send. The send loop is sequential with a 1.5s gap, so 100 is
@@ -173,21 +173,33 @@ export function replaceContactTags(text, contact = {}) {
 export function renderCadenceEmail({ subject, body, contact, openingLine = '', personalize = true }) {
   const inline = hasPersonalizeTag(body);
   const renderedSubject = replaceContactTags(subject, contact);
+  const first = firstNameFor(contact);
+
+  // ONE opening structure, whatever was typed or generated:
+  //   "Hi {First}," — the only greeting, always the system's
+  //   [Barry's one context sentence]            (opening-line mode, Barry on)
+  //   the shared body, its opening paragraphs stripped of any greeting/address
+  // A {{personalize}} body follows the same rule; Barry's text goes in the tag.
+  const sharedBody = stripOpeningGreetings(body, first);
+  const parts = [greetingFor(contact)];
+
   if (inline) {
     // A failed personalization leaves the tag empty rather than sending the
     // literal "{{personalize}}" to a real person.
-    const filled = String(body || '').replace(PERSONALIZE_TAG, openingLine || '');
-    return { subject: renderedSubject, body: replaceContactTags(filled, contact), inline };
+    const fill = finalizeInlinePersonalization(openingLine, first);
+    const filled = capitalizeLead(sharedBody.replace(PERSONALIZE_TAG, fill).replace(/^[ \t]+/, ''));
+    parts.push(replaceContactTags(filled, contact));
+    return { subject: renderedSubject, body: parts.join('\n\n'), inline };
   }
-  // One greeting layer: ours. Barry's line and the shared body each lose any
-  // greeting or leading name of their own (see emailGreeting.js).
-  const first = firstNameFor(contact);
-  const sharedBody = stripLeadingGreeting(body, first);
-  const parts = [greetingFor(contact)];
+
   const opening = personalize ? finalizeBarryOpening(openingLine, { firstName: first, body: sharedBody }) : '';
   if (opening) parts.push(opening);
   parts.push(replaceContactTags(sharedBody, contact));
   return { subject: renderedSubject, body: parts.join('\n\n'), inline };
+}
+
+function capitalizeLead(text) {
+  return text.replace(/^(\s*)(\p{Ll})/u, (_, ws, ch) => ws + ch.toUpperCase());
 }
 
 /** A recipient's full name for display: "chelsie hightower" → "Chelsie Hightower". */

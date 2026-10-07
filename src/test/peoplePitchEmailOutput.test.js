@@ -174,11 +174,11 @@ describe('one greeting layer', () => {
     expect(stripLeadingGreeting('Dear friends of the arts are welcome.')).toBe('Dear friends of the arts are welcome.');
   });
 
-  it('{{personalize}} mode is unchanged — the body owns its greeting there', () => {
+  it('{{personalize}} mode also gets exactly one (system) greeting', () => {
     const { body } = renderCadenceEmail({
       subject: 'S', body: 'Hey {{first_name}}, {{personalize}} See you.', contact: MICHAEL, openingLine: 'great work.',
     });
-    expect(body).toBe('Hey Michael, great work. See you.');
+    expect(body).toBe('Hi Michael,\n\nGreat work. See you.');
   });
 });
 

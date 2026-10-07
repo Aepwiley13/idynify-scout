@@ -142,7 +142,7 @@ describe('reused cadence + attachment', { timeout: 20000 }, () => {
     });
   });
 
-  it('keeps explicit {{personalize}} behavior: Barry fills the tag in place, no added greeting', async () => {
+  it('keeps explicit {{personalize}} behavior: Barry fills the tag in place, under the one system greeting', async () => {
     renderReused({ initialBody: 'Dear friend — {{personalize}} The flyer is attached.' });
     await attachFlyer();
     expect(screen.getByTestId('inline-personalize-note')).toBeInTheDocument();
@@ -152,7 +152,7 @@ describe('reused cadence + attachment', { timeout: 20000 }, () => {
 
     expect(fetchBodies[0].mode).toBe('inline_personalize');
     const [first] = executorProps.current.payload;
-    expect(first.body).toBe('Dear friend — Context for c1. The flyer is attached.');
+    expect(first.body).toBe('Hi Ana,\n\nContext for c1. The flyer is attached.');
     expect(first.attachment.filename).toBe('Beyond Words Flyer.pdf');
   });
 

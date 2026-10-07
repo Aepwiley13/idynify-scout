@@ -1,5 +1,7 @@
 # Staging validation: CSV → People → Cadence
 
+> **Operators: use `docs/STAGING_OPERATOR_RUNBOOK.md`.** That is the step-by-step test with PASS/FAIL criteria. This file is the engineering background: the pre-flight findings and how they were fixed.
+
 **Status: NOT YET RUN on staging.** P1–P4 below were fixed in code on 2026-10-07; they still need confirming on staging. The session that built this feature had no staging URL, no Firebase credentials, no connected Gmail account and no Contact Hub export. Nothing below is a staging result. This document has three parts:
 
 1. **Pre-flight findings.** Issues found by reading the code each test exercises, plus a local run of the real parser on a fixture. Each one is a prediction to confirm or rule out on staging.

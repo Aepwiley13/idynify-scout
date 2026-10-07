@@ -1,0 +1,10 @@
+First Name,Last Name,Email,Phone,Organization,Title,State,LinkedIn URL,Notes
+New,One,YOU+new1@YOURDOMAIN.com,801-555-0101,Staging Test Org,Director,UT,,Controlled recipient
+Reply,Tester,REPLY.TESTER@OTHERDOMAIN.com,801-555-0102,"Acme, Inc.",VP Partnerships,UT,,Separate mailbox - used for the reply test
+Existing,Test,YOU+existing@YOURDOMAIN.com,,Staging Test Org,Intern,UT,,Already in IDYNIFY (matched by email)
+LinkedIn,Test,YOU+linkedin@YOURDOMAIN.com,,Staging Test Org,,UT,https://www.linkedin.com/in/idynify-staging-linkedin-test,Already in IDYNIFY (matched by LinkedIn)
+Conflict,Test,YOU+conflict-new@YOURDOMAIN.com,801-555-0199,Staging Test Org,,UT,,Matched by phone - email differs - must be held back
+Archive,Test,YOU+archived@YOURDOMAIN.com,,Staging Test Org,,UT,,Archived contact - must stay eligible
+New,Again,YOU+NEW1@YOURDOMAIN.com,,Staging Test Org,,UT,,Duplicate of row 2 - must be skipped
+Bad,Email,not-an-email,801-555-0104,Staging Test Org,,UT,,Invalid email - must be rejected
+,,,801-555-0105,Staging Test Org,,UT,,No name or email - must be rejected

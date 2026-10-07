@@ -46,9 +46,10 @@ import {
 function echoCompanyResponse({ messages }) {
   const prompt = messages[0].content;
   const company = prompt.match(/^Company: (.+)$/m)?.[1] || 'your team';
-  const firstName = prompt.match(/^First name: (.+)$/m)?.[1] || 'there';
   return Promise.resolve({
-    content: [{ text: `Saw what ${firstName} is building at ${company}. Impressive trajectory. Felt worth reaching out.` }],
+    // The recipient's name is never part of a valid opening line (it is
+    // replaced by the fallback), so the echo uses the company only.
+    content: [{ text: `Saw what the team at ${company} is building. Impressive trajectory. Felt worth reaching out.` }],
   });
 }
 
@@ -255,7 +256,11 @@ describe('prompt construction', () => {
     expect(prompt).toContain('Slow onboarding');
     expect(prompt).toContain('Direct');
     expect(prompt).toContain('Shared body here.');
-    expect(prompt).toContain('2-3 sentences maximum');
+    // One sentence; the system owns the greeting and the name (People Pitch duplicate-greeting fix).
+    expect(prompt).toContain('Exactly ONE short sentence');
+    expect(prompt).toContain('do NOT use the recipient\'s name anywhere');
+    expect(prompt).toContain('Do NOT greet');
+    expect(prompt).toContain('"Hi Name1,"');
     expect(prompt).toContain('No subject line');
   });
 
@@ -289,3 +294,36 @@ describe('helpers', () => {
     expect(cleanOpeningLine(null)).toBeNull();
   });
 });
+
+describe('opening line never repeats the greeting or the name (People Pitch fix)', () => {
+  it.each([
+    'Hi Name1, I thought you would appreciate this given your work.',
+    'Hey Name1 — I thought you would appreciate this given your work.',
+    'Name1, I thought you would appreciate this given your work.',
+  ])('strips a model-written greeting/name: %s', async (modelText) => {
+    mockCreate.mockImplementation(() => Promise.resolve({ content: [{ text: modelText }] }));
+    const res = await handler(makeEvent({ contacts: [makeContact(1)] }));
+    const [r] = JSON.parse(res.body).results;
+    expect(r.success).toBe(true);
+    expect(r.openingLine).toBe('I thought you would appreciate this given your work.');
+  });
+
+  it('leaves inline {{personalize}} text exactly as the model wrote it', async () => {
+    mockCreate.mockImplementation(() => Promise.resolve({ content: [{ text: 'Name1, great work lately' }] }));
+    const res = await handler(makeEvent({
+      contacts: [makeContact(1)], mode: 'inline_personalize', sharedBody: 'Hello {{personalize}}. More text.',
+    }));
+    expect(JSON.parse(res.body).results[0].openingLine).toBe('Name1, great work lately');
+  });
+});
+
+describe('recipient name casing in the prompt', () => {
+  it('title-cases an all-lowercase first name and keeps intentional casing', async () => {
+    await handler(makeEvent({ contacts: [makeContact(1, { firstName: 'chelsie' }), makeContact(2, { firstName: 'LaToya' })] }));
+    const prompts = mockCreate.mock.calls.map(([p]) => p.messages[0].content);
+    expect(prompts[0]).toContain('First name: Chelsie');
+    expect(prompts[0]).toContain('"Hi Chelsie,"');
+    expect(prompts[1]).toContain('First name: LaToya');
+  });
+});
+

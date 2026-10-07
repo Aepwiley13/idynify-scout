@@ -7,6 +7,7 @@
 
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import { stripLeadingGreeting, finalizeBarryOpening, displayNameCase } from './emailGreeting.js';
 
 /**
  * Recipients per send. The send loop is sequential with a 1.5s gap, so 100 is
@@ -142,7 +143,8 @@ export function hasPersonalizeTag(text) {
  */
 export function firstNameFor(contact = {}) {
   const first = contact.firstName || contact.first_name || (contact.name || '').trim().split(/\s+/)[0] || '';
-  return first.includes('@') ? '' : first;
+  // "chelsie" → "Chelsie"; intentional casing (McDonald, LaToya) is kept.
+  return first.includes('@') ? '' : displayNameCase(first);
 }
 
 export function greetingFor(contact = {}) {
@@ -177,8 +179,20 @@ export function renderCadenceEmail({ subject, body, contact, openingLine = '', p
     const filled = String(body || '').replace(PERSONALIZE_TAG, openingLine || '');
     return { subject: renderedSubject, body: replaceContactTags(filled, contact), inline };
   }
+  // One greeting layer: ours. Barry's line and the shared body each lose any
+  // greeting or leading name of their own (see emailGreeting.js).
+  const first = firstNameFor(contact);
+  const sharedBody = stripLeadingGreeting(body, first);
   const parts = [greetingFor(contact)];
-  if (personalize && openingLine) parts.push(openingLine);
-  parts.push(replaceContactTags(body, contact));
+  const opening = personalize ? finalizeBarryOpening(openingLine, { firstName: first, body: sharedBody }) : '';
+  if (opening) parts.push(opening);
+  parts.push(replaceContactTags(sharedBody, contact));
   return { subject: renderedSubject, body: parts.join('\n\n'), inline };
 }
+
+/** A recipient's full name for display: "chelsie hightower" → "Chelsie Hightower". */
+export function displayContactName(contact = {}) {
+  const raw = contact.name || [contact.firstName || contact.first_name, contact.lastName || contact.last_name].filter(Boolean).join(' ');
+  return displayNameCase(raw);
+}
+

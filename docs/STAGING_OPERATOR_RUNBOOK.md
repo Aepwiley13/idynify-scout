@@ -438,7 +438,11 @@ After you click **Add to Cadence**:
 - **Subject** and **Email Body** = exactly your S6 text (template tags like `{{first_name}}` stay as tags here).
 - **Personalize with Barry** toggle = on.
 - **Recipient count** in the header = M from Section 6.
-- **How the greeting works:** each email will be *"Hi <first name>,"* + Barry's opening line + your body. If your body contains `{{personalize}}`, Barry writes that spot instead, no greeting is added, and a note *"{{personalize}} detected…"* replaces the toggle.
+- **How the greeting works:** each email is *"Hi <first name>,"* + **one** Barry sentence + your body. The system owns the greeting:
+  - Barry's sentence never starts with a greeting or the recipient's name; any such start is removed.
+  - A greeting you type at the start of your body ("Hey {{first_name}}, …") is removed, so **don't write your own greeting**.
+  - Each preview card shows the email **exactly as sent**.
+  - If your body contains `{{personalize}}`, Barry writes that spot instead, no greeting is added, and a note *"{{personalize}} detected…"* replaces the toggle.
 
 **After attaching (Step 11), check:**
 - The **flyer name and size** are shown.
@@ -449,6 +453,10 @@ After you click **Add to Cadence**:
 ---
 
 ## 8. Send Test
+
+**Before testing a fix, make sure you're running the fixed code:**
+- The address bar must show the deploy preview (`deploy-preview-<PR number>--idynify.netlify.app`), not the production site. Hard-refresh first: Cmd+Shift+R on Mac, Ctrl+Shift+R on Windows.
+- After Send Test, the result line must end with `(app render-3 · server rfc2047-1)` or a later version. If it says **server OUTDATED**, the email was built by an old deploy, so stop.
 
 **How:** on the Preview screen (Step 2 of 3), click **Send Test to Me**. The test is the **first recipient's** real email ("personalized as <name>"). It's sent through the same Gmail connection, with the same subject, body, Barry line and PDF as the real send.
 
@@ -462,7 +470,9 @@ After you click **Add to Cadence**:
 | Greeting | "Hi <first recipient's first name>," |
 | Barry personalization | The same opening line shown on that person's preview card |
 | Body | Your body text in paragraphs, followed by your Gmail signature (added automatically) |
-| Registration link | The full `https://…` link is present and opens the registration page. *IDYNIFY sends the link as plain text inside the email; Gmail normally makes it clickable. If it isn't clickable, record it. For an invite, treat that as FIX FIRST.* |
+| Registration link | The full `https://…` link is present, **clickable** (IDYNIFY now sends it as a link), and opens the registration page. If it isn't clickable, that's FIX FIRST. |
+| Special characters | The subject shows em dashes (—), curly quotes (’ “ ”) and accents (é) exactly as typed. Any `Ã` or `Â` is FIX FIRST. |
+| Greeting | Exactly one greeting ("Hi <first>,"), with the name capitalized ("Hi Chelsie," not "Hi chelsie," or "Hi CHELSIE,"). Names with intentional casing (McDonald, LaToya) are unchanged. The recipient's name is not repeated in the next sentence. |
 | Formatting | Paragraph breaks preserved; no `{{` tags visible |
 | PDF | Attached, with the correct file name, and it opens |
 | CC | **Not** copied, even if a CC is set. Tests never go to the CC address. |

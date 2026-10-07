@@ -176,4 +176,22 @@ describe('reused cadence + attachment', { timeout: 20000 }, () => {
     expect(executorProps.current.payload[0].body).toBe('Hi,\n\nBody');
     expect(executorProps.current.payload[0].subject).toBe('Hello ');
   });
+
+  it('sends to archived contacts like any other recipient (no archive-based exclusion)', async () => {
+    render(
+      <BulkComposeModal
+        contacts={[
+          { id: 'a1', name: 'Arch One', first_name: 'Arch', email: 'arch@x.com', is_archived: true, _archived: true },
+          { id: 'a2', name: 'Coco Two', first_name: 'Coco', email: 'coco@x.com', company_archived: true, _archived: true },
+        ]}
+        onClose={() => {}}
+        initialCadenceName="X" initialSubject="S" initialBody="B" initialPersonalize={false}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^Preview$/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Send to 2 contacts/ }));
+    await waitFor(() => expect(executorProps.current).not.toBeNull());
+    expect(executorProps.current.payload.map(p => p.contact.id)).toEqual(['a1', 'a2']);
+  });
 });
+

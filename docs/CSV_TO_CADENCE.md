@@ -75,6 +75,8 @@ A cadence is still a one-time bulk send recorded as one `users/{uid}/cadences` d
 
 An import can match a contact that's archived, or whose company is archived. That person is tagged and counted, and the success screen says "N are archived". People shows them only in that import's tag view, under a banner, and they stay archived; they are not reactivated.
 
+**They stay eligible for Add to Cadence.** The uploaded list is an intentional choice of audience, so there is no archive-based exclusion. Sending to them doesn't reactivate them either, because engagement promotion skips archived records. Only email conflicts are held back.
+
 ### Resend protection
 
 On Preview, compose loads every cadence doc with the same **name**. Anyone recorded as delivered on any of them is excluded from this send. "Delivered" means:

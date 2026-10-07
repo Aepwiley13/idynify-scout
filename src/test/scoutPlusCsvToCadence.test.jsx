@@ -160,4 +160,13 @@ describe('Scout+ CSV import → People → Cadence', () => {
     expect(composeProps.current.initialCadenceName).toBe('');
     expect(composeProps.current.initialBody).toBe('');
   });
+
+  it('keeps archived import members eligible for the cadence — the uploaded list is the audience', async () => {
+    await importThroughScoutPlus();
+    fireEvent.click(screen.getByRole('button', { name: /Add to Cadence/ }));
+    fireEvent.click((await screen.findAllByTestId('cadence-option'))[0]);
+    const sent = composeProps.current.contacts;
+    expect(sent.find(c => c.id === 'e1')).toMatchObject({ _archived: true });
+  });
 });
+

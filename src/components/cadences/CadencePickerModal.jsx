@@ -62,6 +62,10 @@ export default function CadencePickerModal({ contacts = [], onClose }) {
   // A contact whose CSV email conflicts with its stored one is held back: the
   // send would go to the stored address, and only the user can say which is
   // right. They resolve it in People and send from there.
+  //
+  // Archived contacts are NOT held back. An uploaded list is a deliberate
+  // choice of audience, so a person on it is sendable whatever their archive
+  // state (the send does not reactivate them). Do not add an archive filter.
   const emailConflicts = contacts.filter((c) => c._emailConflict);
   const eligible = contacts.filter((c) => !c._emailConflict);
   const withEmail = eligible.filter(hasEmail);

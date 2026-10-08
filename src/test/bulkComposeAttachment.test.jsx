@@ -22,7 +22,7 @@ vi.mock('../utils/sendActionResolver', () => ({
 }));
 vi.mock('../utils/cadenceSend', async (importOriginal) => ({
   ...(await importOriginal()),
-  loadAlreadyDelivered: vi.fn(async () => new Set()),
+  loadDeliveryHistory: vi.fn(async () => new Map()),
 }));
 vi.mock('../context/ImpersonationContext', () => ({
   getEffectiveUser: () => ({ uid: 'u1', email: 'me@idynify.com', getIdToken: async () => 'tok' }),

@@ -17,7 +17,7 @@ How a user uploads a CSV of people and sends them a cadence. This builds on the 
 4. **Success screen.** It shows "N contacts imported successfully" with **[View People]** and **[Add to Cadence]**.
    - **View People** opens `/command-center?tab=people&tag=<tag>`, with the People tag filter already set to this import.
 5. **Add to Cadence → choose cadence.** The picker lists each existing cadence name once, using its most recent send, plus **Create new cadence**. The imported people who have an email are passed straight into the existing compose flow. Nobody has to be re-selected.
-6. **Compose → Preview.** Barry personalizes as before, in batches of 25. People who already received this cadence are excluded (see below).
+6. **Compose → Preview.** Barry personalizes as before, in batches of 25. If some people already received this cadence, you choose **Exclude previous recipients** (the default) or **Include them again** (see below).
 7. **Send Test to Me**, then **Send to N contacts**.
 8. The send appears in Cadences. It stays visible even if the tab closes mid-send.
 
@@ -98,13 +98,21 @@ An import can match a contact that's archived, or whose company is archived. Tha
 
 **They stay eligible for Add to Cadence.** The uploaded list is an intentional choice of audience, so there is no archive-based exclusion. Sending to them doesn't reactivate them either, because engagement promotion skips archived records. Only email conflicts are held back.
 
-### Resend protection
+### Sending a cadence again (previous recipients)
 
-On Preview, compose loads every cadence doc with the same **name**. Anyone recorded as delivered on any of them is excluded from this send. "Delivered" means:
+Re-sending the same cadence is supported, for example an invite on Oct 1, a reminder on Oct 7 and a "last chance" email. You don't need to rename or duplicate it: reuse the cadence and send.
+
+On Preview, compose loads every cadence doc with the same **name** (`loadDeliveryHistory`). Someone counts as having received it when an earlier send has:
 - a `contacts[]` row with status `sent` or `opened` (handed off to the mail app), or
-- an id in `deliveredContactIds`.
+- their id in `deliveredContactIds`.
 
-A banner shows how many people were excluded, with a **Send to them again** checkbox to include them. The check is per cadence name; sending a different cadence to the same person is allowed.
+If any selected people already received it, a banner says **"N people already received this cadence."** It offers an explicit choice, shown before anything is sent:
+- **Exclude previous recipients** (the default). They're left out of this send.
+- **Include them again.** They're sent this cadence again.
+
+Each card shows **"Previously sent Oct 1 — excluded"** or **"— sending again"**, and the Send button count follows the choice. The check is per cadence name: sending a different cadence to the same person is never affected.
+
+**History is never overwritten.** Every send creates its own cadence doc. That doc records `resendPreviousRecipients`, `resentContactIds` and `resend: true` on each re-sent contact row. The contact's activity log and timeline get a new entry for each email. On a cadence's page, anyone who has received a cadence with this name more than once shows every date, e.g. **Sent Oct 1 · Sent Oct 7**.
 
 ### Interrupted sends
 

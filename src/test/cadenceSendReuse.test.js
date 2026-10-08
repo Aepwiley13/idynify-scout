@@ -22,6 +22,7 @@ vi.mock('../firebase/config', () => ({ db: {} }));
 import {
   sortCadencesByRecency, cadenceTemplate, distinctCadencesForReuse, loadAlreadyDelivered,
   MAX_BULK_CONTACTS, PERSONALIZE_CHUNK, renderCadenceEmail, greetingFor, firstNameFor,
+  loadDeliveryHistory, formatSendDate,
 } from '../utils/cadenceSend';
 
 const ts = (iso) => ({ toMillis: () => new Date(iso).getTime(), toDate: () => new Date(iso) });
@@ -114,6 +115,34 @@ describe('loadAlreadyDelivered — resend protection', () => {
   it('checks nothing without a cadence name', async () => {
     expect((await loadAlreadyDelivered('u1', '  ')).size).toBe(0);
     expect(mockGetDocs).not.toHaveBeenCalled();
+  });
+});
+
+describe('loadDeliveryHistory — re-sending the same cadence', () => {
+  beforeEach(() => mockGetDocs.mockReset());
+  const oct = (day) => ({ toMillis: () => new Date(2026, 9, day, 12).getTime() }); // local noon: Oct N in any zone
+
+  it('keeps every delivery per person, oldest first — a re-send never overwrites the earlier one', async () => {
+    mockGetDocs.mockResolvedValue({
+      docs: [
+        // The reminder (Oct 7) is returned first; history is still in date order.
+        { id: 'reminder', data: () => ({ lastSentAt: oct(7), contacts: [{ contactId: 'a', status: 'sent' }, { contactId: 'c', status: 'sent' }] }) },
+        { id: 'invite', data: () => ({ completedAt: oct(1), contacts: [{ contactId: 'a', status: 'opened' }, { contactId: 'b', status: 'sent' }, { contactId: 'x', status: 'failed' }] }) },
+      ],
+    });
+    const history = await loadDeliveryHistory('u1', 'People Pitch');
+    expect(history.get('a').map(d => d.cadenceId)).toEqual(['invite', 'reminder']);
+    expect(history.get('a').map(d => formatSendDate(d.at))).toEqual(['Oct 1', 'Oct 7']);
+    expect(history.get('b')).toHaveLength(1);
+    expect(history.has('x')).toBe(false);
+    expect([...(await loadAlreadyDelivered('u1', 'People Pitch'))].sort()).toEqual(['a', 'b', 'c']);
+  });
+
+  it('counts one send once even when a person is in both deliveredContactIds and the rows', async () => {
+    mockGetDocs.mockResolvedValue({
+      docs: [{ id: 's1', data: () => ({ createdAt: oct(2), deliveredContactIds: ['a'], contacts: [{ contactId: 'a', status: 'sent' }] }) }],
+    });
+    expect((await loadDeliveryHistory('u1', 'P')).get('a')).toHaveLength(1);
   });
 });
 

@@ -7,7 +7,8 @@
 
 import { collection, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import { stripOpeningGreetings, finalizeBarryOpening, finalizeInlinePersonalization, displayNameCase } from './emailGreeting.js';
+import { stripOpeningGreetings, finalizeBarryOpening, finalizeInlinePersonalization } from './emailGreeting.js';
+import { contactFirstName, contactDisplayName } from './contactDisplayName.js';
 
 /**
  * Recipients per send. The send loop is sequential with a 1.5s gap, so 100 is
@@ -142,9 +143,9 @@ export function hasPersonalizeTag(text) {
  * stored that way, and "Hi sam@acme.com," is worse than "Hi,".
  */
 export function firstNameFor(contact = {}) {
-  const first = contact.firstName || contact.first_name || (contact.name || '').trim().split(/\s+/)[0] || '';
   // "chelsie" → "Chelsie"; intentional casing (McDonald, LaToya) is kept.
-  return first.includes('@') ? '' : displayNameCase(first);
+  // A last-name-only contact has no first name, so it gets "Hi," too.
+  return contactFirstName(contact);
 }
 
 export function greetingFor(contact = {}) {
@@ -202,9 +203,11 @@ function capitalizeLead(text) {
   return text.replace(/^(\s*)(\p{Ll})/u, (_, ws, ch) => ws + ch.toUpperCase());
 }
 
-/** A recipient's full name for display: "chelsie hightower" → "Chelsie Hightower". */
+/**
+ * A recipient's label: "chelsie hightower" → "Chelsie Hightower"; no name →
+ * their email, never a name guessed from it. See utils/contactDisplayName.js.
+ */
 export function displayContactName(contact = {}) {
-  const raw = contact.name || [contact.firstName || contact.first_name, contact.lastName || contact.last_name].filter(Boolean).join(' ');
-  return displayNameCase(raw);
+  return contactDisplayName(contact);
 }
 

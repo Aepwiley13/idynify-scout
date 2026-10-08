@@ -25,6 +25,7 @@
 import Papa from 'papaparse';
 import { extractIdentifiers } from './identityNormalization.js';
 import { hasArchiveSignal } from '../constants/statusModel.js';
+import { missingNameFields } from './contactDisplayName.js';
 
 /** Hard cap on rows per import. Rows past it are reported, never discarded quietly. */
 export const MAX_IMPORT_ROWS = 500;
@@ -57,6 +58,7 @@ export const HEADER_ALIASES = Object.freeze({
   'fname': 'first_name',
   'firstname': 'first_name',
   'given name': 'first_name',
+  'forename': 'first_name',
   'last name': 'last_name',
   'last': 'last_name',
   'lname': 'last_name',
@@ -79,6 +81,9 @@ export const HEADER_ALIASES = Object.freeze({
   'cell phone': 'phone',
   'work phone': 'phone',
   'direct phone': 'phone',
+  'mobile number': 'phone',
+  'cell number': 'phone',
+  'telephone': 'phone',
   // Company
   'company': 'company',
   'company name': 'company',
@@ -87,17 +92,20 @@ export const HEADER_ALIASES = Object.freeze({
   'account name': 'company',
   'account': 'company',
   'employer': 'company',
+  'organization name': 'company',
   // Title
   'title': 'title',
   'job title': 'title',
   'position': 'title',
   'role': 'title',
+  'job role': 'title',
   // LinkedIn
   'linkedin': 'linkedin_url',
   'linkedin url': 'linkedin_url',
   'linkedin profile': 'linkedin_url',
   'linkedin profile url': 'linkedin_url',
   'person linkedin url': 'linkedin_url',
+  'linkedin link': 'linkedin_url',
   // Industry
   'industry': 'industry',
   'vertical': 'industry',
@@ -221,6 +229,10 @@ export function normalizeRow(raw, mappedHeaders) {
   // structured signal, and keeping both lets the record carry first/last.
   if (out.first_name) {
     out.name = [out.first_name, out.last_name].filter(Boolean).join(' ');
+  } else if (out.last_name && !out.name) {
+    // Last name only: it is a real name part, so it is the record's name.
+    // It is never used as a first name (no "Hi Lopez,").
+    out.name = out.last_name;
   } else if (out.name && !out.last_name) {
     // Derive first/last from a full name so the record carries both forms,
     // as the People schema does. Only the first token is the first name.
@@ -283,8 +295,15 @@ export function classifyRows(parsedRows, mappedHeaders, { maxRows = MAX_IMPORT_R
       delete contact.linkedin_url;
     }
 
-    // A person with an email but no name still needs something to be called.
-    // The address is the honest choice: it is what the user gave us.
+    // Incomplete is not invalid: a row with a good email and no (or half a)
+    // name imports and can be sent to. The preview lists what is missing.
+    const missing = missingNameFields(contact);
+
+    // A person with an email but no name still needs a stored label, as every
+    // People surface reads `name`. It stays the address the user gave — never
+    // a name guessed from it — and the display and greeting helpers
+    // (utils/contactDisplayName.js) treat a name containing "@" as no name:
+    // the label reads as the email, the greeting is "Hi,".
     if (!contact.name) contact.name = contact.email;
 
     const keys = identityKeys(contact);
@@ -299,8 +318,13 @@ export function classifyRows(parsedRows, mappedHeaders, { maxRows = MAX_IMPORT_R
 
     keys.forEach((k) => seen.set(k, rowNumber));
     readyCount += 1;
-    return row(ROW_STATUS.READY);
+    return row(ROW_STATUS.READY, null, { missing });
   });
+}
+
+/** Rows that will import but have an incomplete name (needs enrichment, not invalid). */
+export function incompleteRows(rows) {
+  return rows.filter((r) => r.status === ROW_STATUS.READY && r.missing?.length > 0);
 }
 
 /** Counts per status, for the preview summary. */

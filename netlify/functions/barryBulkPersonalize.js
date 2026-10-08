@@ -35,6 +35,7 @@ import { verifyAuthToken } from './utils/verifyAuthToken.js';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 import { finalizeBarryOpening, displayNameCase } from '../../src/utils/emailGreeting.js';
+import { cleanNamePart } from '../../src/utils/contactDisplayName.js';
 
 const MODEL = LEGACY_HAIKU_4_5;
 const MAX_CONTACTS = 25;
@@ -119,7 +120,7 @@ function toneDirective(warmthLevel, knownContact) {
 
 /** Build the per-contact prompt. Exported for testing. */
 export function buildPrompt(contact, sharedBody, reconBlock, userContext) {
-  const firstName = clip(displayNameCase(contact.firstName), 100);
+  const firstName = clip(displayNameCase(cleanNamePart(contact.firstName)), 100);
   const title = clip(contact.title, 150);
   const company = clip(contact.company, 150);
   const industry = clip(contact.industry, 150);
@@ -154,7 +155,7 @@ export function buildPrompt(contact, sharedBody, reconBlock, userContext) {
   return `You are Barry, an expert outreach copywriter. Write ONLY a one-sentence personalized opening line for an email.
 
 HOW THE EMAIL IS ASSEMBLED (you write part 2 only):
-1. Greeting — already written by the system: "Hi ${firstName || '{first name}'},"
+1. Greeting — already written by the system: "${firstName ? `Hi ${firstName},` : 'Hi,'}"${firstName ? '' : ' (no first name is on file — do not guess one)'}
 2. YOUR SENTENCE — why this message is relevant to this particular person.
 3. The shared email body below — the actual message, invitation and details.
 
@@ -172,7 +173,7 @@ RULES:
 3. The invitation or ask comes immediately after your sentence in the shared body. Do NOT make the ask yourself, and do not mention the event, date, place, link or any other detail from the shared body.
 4. ${specificityRule}
 5. If you know little about this person, write a safe, general relevance sentence such as "I wanted to make sure this was on your radar." Never fall back to repeating the invitation.
-6. It must read naturally between "Hi ${firstName || '{first name}'}," and the first line of the shared body.
+6. It must read naturally between "${firstName ? `Hi ${firstName},` : 'Hi,'}" and the first line of the shared body.${firstName ? '' : ' The recipient\'s name is unknown: never invent one or derive one from an email address.'}
 7. No subject line, no sign-off.
 8. ${toneDirective(warmthLevel, knownContact)}
 
@@ -207,7 +208,7 @@ export function extractTagContext(sharedBody) {
  * sentence, instead of a standalone opening line. Exported for testing.
  */
 export function buildInlinePersonalizePrompt(contact, sharedBody, tagContext, reconBlock, userContext) {
-  const firstName = clip(displayNameCase(contact.firstName), 100);
+  const firstName = clip(displayNameCase(cleanNamePart(contact.firstName)), 100);
   const title = clip(contact.title, 150);
   const company = clip(contact.company, 150);
   const industry = clip(contact.industry, 150);
@@ -307,7 +308,7 @@ async function generateForContact(anthropic, contact, sharedBody, reconBlock, us
     const cleaned = cleanOpeningLine(response.content?.[0]?.text);
     const openingLine = mode === MODES.INLINE_PERSONALIZE
       ? cleaned
-      : (cleaned ? finalizeBarryOpening(cleaned, { firstName: displayNameCase(contact.firstName), body: sharedBody }) || null : null);
+      : (cleaned ? finalizeBarryOpening(cleaned, { firstName: displayNameCase(cleanNamePart(contact.firstName)), body: sharedBody }) || null : null);
     if (!openingLine) throw new Error('Model returned an empty opening line');
 
     // _usage is internal telemetry only. It is summed by the handler and

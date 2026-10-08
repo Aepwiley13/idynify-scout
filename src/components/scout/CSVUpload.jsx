@@ -1,13 +1,16 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Papa from 'papaparse';
 import { db } from '../../firebase/config';
 import { collection, writeBatch, doc } from 'firebase/firestore';
-import { Upload, AlertTriangle, CheckCircle, Users, Building2, Loader, Copy, XCircle, Info } from 'lucide-react';
+import { Upload, AlertTriangle, CheckCircle, Users, Building2, Loader, Copy, XCircle, Info, FileText, X, UserX } from 'lucide-react';
+import { useT } from '../../theme/ThemeContext';
+import { BRAND, STATUS } from '../../theme/tokens';
+import { contactDisplayName } from '../../utils/contactDisplayName';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { createCompanyRecord } from '../../schemas/companySchema';
 import { resolveCompany } from '../../services/companyIdentityService';
 import {
-  parseContactCsv, classifyRows, summarizeRows, defaultImportName, buildImportTag,
+  parseContactCsv, classifyRows, summarizeRows, incompleteRows, defaultImportName, buildImportTag,
   ROW_STATUS, MAX_IMPORT_ROWS,
 } from '../../utils/csvContactImport';
 import {
@@ -28,61 +31,35 @@ import {
  *   importResult  contacts only: { batchId, tag, created, updated, failed }
  */
 export default function CSVUpload({ onContactsAdded, onCancel }) {
+  const T = useT();
   const [uploadType, setUploadType] = useState(null); // 'leads' | 'companies'
 
   if (!uploadType) {
     return (
-      <div className="space-y-6">
-        <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
-          <h3 className="font-semibold text-gray-900 mb-1">What are you uploading?</h3>
-          <p className="text-sm text-gray-600">Choose the type of list so we can validate and store it correctly.</p>
-        </div>
+      <div style={stack(24)}>
+        <Panel>
+          <h3 style={heading(T)}>What are you uploading?</h3>
+          <p style={muted(T)}>Choose the type of list so we can validate and store it correctly.</p>
+        </Panel>
 
-        <div className="space-y-3">
-          <button
+        <div style={stack(12)}>
+          <TypeOption
+            accent={BRAND.pink}
+            icon={<Users size={20} />}
+            title="Lead / Contact List"
+            text={'People with names, emails, titles, companies. Supports "First Name + Last Name" or "Full Name". Rows with only an email are welcome too.'}
             onClick={() => setUploadType('leads')}
-            className="w-full bg-white hover:bg-blue-50 border-2 border-gray-200 hover:border-blue-400 rounded-xl p-5 text-left transition-all group"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-blue-200 transition-colors">
-                <Users className="w-5 h-5 text-blue-600" />
-              </div>
-              <div className="flex-1">
-                <h4 className="text-base font-bold text-gray-900 mb-0.5">Lead / Contact List</h4>
-                <p className="text-sm text-gray-600">
-                  People with names, emails, titles, companies. Supports "First Name + Last Name" or "Full Name".
-                </p>
-              </div>
-            </div>
-          </button>
-
-          <button
+          />
+          <TypeOption
+            accent={BRAND.cyan}
+            icon={<Building2 size={20} />}
+            title="Company List"
+            text="Companies only — no individual contacts. Great for target account lists."
             onClick={() => setUploadType('companies')}
-            className="w-full bg-white hover:bg-cyan-50 border-2 border-gray-200 hover:border-cyan-400 rounded-xl p-5 text-left transition-all group"
-          >
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 bg-cyan-100 rounded-lg flex items-center justify-center flex-shrink-0 group-hover:bg-cyan-200 transition-colors">
-                <Building2 className="w-5 h-5 text-cyan-600" />
-              </div>
-              <div className="flex-1">
-                <h4 className="text-base font-bold text-gray-900 mb-0.5">Company List</h4>
-                <p className="text-sm text-gray-600">
-                  Companies only — no individual contacts. Great for target account lists.
-                </p>
-              </div>
-            </div>
-          </button>
+          />
         </div>
 
-        <div>
-          <button
-            type="button"
-            onClick={onCancel}
-            className="w-full px-6 py-3 rounded-xl bg-white border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-all"
-          >
-            Cancel
-          </button>
-        </div>
+        <SecondaryButton onClick={onCancel}>Cancel</SecondaryButton>
       </div>
     );
   }
@@ -94,43 +71,245 @@ export default function CSVUpload({ onContactsAdded, onCancel }) {
     : <ContactCsvImport onContactsAdded={onContactsAdded} onCancel={onCancel} onChangeType={changeType} />;
 }
 
-function TypeHeader({ title, subtitle, onChangeType }) {
+// ─── Shared pieces (theme tokens only — same palette as the rest of Scout+) ──
+
+const stack = (gap) => ({ display: 'flex', flexDirection: 'column', gap });
+const heading = (T, size = 15) => ({ fontSize: size, fontWeight: 700, color: T.text, margin: '0 0 4px' });
+const muted = (T, size = 13) => ({ fontSize: size, color: T.textMuted, margin: 0 });
+const tint = (color, alpha = '14') => `${color}${alpha}`;
+
+function Panel({ children, style, testId, tone }) {
+  const T = useT();
+  const toneColor = tone ? STATUS[tone] : null;
   return (
-    <div className="flex items-center justify-between bg-gray-50 rounded-xl p-4 border border-gray-200">
-      <div>
-        <h3 className="font-semibold text-gray-900 mb-1">{title}</h3>
-        <p className="text-sm text-gray-600">{subtitle}</p>
-      </div>
-      <button
-        onClick={onChangeType}
-        className="text-sm text-blue-600 hover:text-blue-700 font-semibold whitespace-nowrap ml-4"
-      >
-        Change Type
-      </button>
+    <div
+      data-testid={testId}
+      style={{
+        background: toneColor ? tint(toneColor) : T.cardBg,
+        border: `1px solid ${toneColor ? tint(toneColor, '55') : T.border}`,
+        borderRadius: 14, padding: 16, color: T.text, ...style,
+      }}
+    >
+      {children}
     </div>
   );
 }
 
-function FilePicker({ onFile, id }) {
+function TypeOption({ accent, icon, title, text, onClick }) {
+  const T = useT();
+  const [hover, setHover] = useState(false);
   return (
-    <div className="border-2 border-dashed border-gray-300 rounded-xl p-12 text-center hover:border-blue-400 transition-colors">
-      <Upload className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-      <h3 className="text-lg font-semibold text-gray-900 mb-2">Upload CSV File</h3>
-      <p className="text-sm text-gray-600 mb-4">Click to browse for your CSV file</p>
-      <input
-        type="file"
-        accept=".csv,text/csv"
-        onChange={(e) => { const f = e.target.files?.[0]; if (f) onFile(f); e.target.value = ''; }}
-        className="hidden"
-        id={id}
-        data-testid={id}
-      />
-      <label
-        htmlFor={id}
-        className="inline-block px-6 py-3 bg-blue-600 text-white font-semibold rounded-xl cursor-pointer hover:bg-blue-700 transition-all"
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onFocus={() => setHover(true)}
+      onBlur={() => setHover(false)}
+      style={{
+        width: '100%', textAlign: 'left', cursor: 'pointer', padding: 20, borderRadius: 14,
+        background: hover ? tint(accent, '10') : T.cardBg,
+        border: `2px solid ${hover ? accent : T.border}`, transition: 'border-color 0.15s, background 0.15s',
+        display: 'flex', gap: 16, alignItems: 'flex-start', color: T.text,
+      }}
+    >
+      <span style={{ width: 40, height: 40, borderRadius: 10, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: tint(accent, '22'), color: accent }}>
+        {icon}
+      </span>
+      <span style={{ flex: 1 }}>
+        <span style={{ display: 'block', fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 2 }}>{title}</span>
+        <span style={{ display: 'block', fontSize: 13, color: T.textMuted }}>{text}</span>
+      </span>
+    </button>
+  );
+}
+
+function SecondaryButton({ children, style, ...props }) {
+  const T = useT();
+  return (
+    <button
+      type="button"
+      {...props}
+      style={{
+        flex: 1, padding: '12px 24px', borderRadius: 12, fontWeight: 600, fontSize: 14,
+        background: 'transparent', border: `1px solid ${T.border2 || T.border}`, color: T.text,
+        cursor: props.disabled ? 'not-allowed' : 'pointer', opacity: props.disabled ? 0.5 : 1, ...style,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function PrimaryButton({ children, style, ...props }) {
+  return (
+    <button
+      type="button"
+      {...props}
+      style={{
+        flex: 1, padding: '12px 24px', borderRadius: 12, fontWeight: 700, fontSize: 14, border: 'none',
+        background: BRAND.pink, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+        cursor: props.disabled ? 'not-allowed' : 'pointer', opacity: props.disabled ? 0.45 : 1, ...style,
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function LinkButton({ children, ...props }) {
+  return (
+    <button
+      type="button"
+      {...props}
+      style={{ background: 'none', border: 'none', padding: 0, color: BRAND.pink, fontWeight: 600, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function TypeHeader({ title, subtitle, onChangeType }) {
+  const T = useT();
+  return (
+    <Panel style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+      <div>
+        <h3 style={heading(T)}>{title}</h3>
+        <p style={muted(T)}>{subtitle}</p>
+      </div>
+      <LinkButton onClick={onChangeType}>Change Type</LinkButton>
+    </Panel>
+  );
+}
+
+function Guidelines({ items }) {
+  const T = useT();
+  return (
+    <Panel>
+      <h3 style={heading(T, 14)}>CSV Upload Guidelines</h3>
+      <ul style={{ ...muted(T), listStyle: 'none', padding: 0, margin: '6px 0 0', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {items.map((item, i) => (
+          <li key={i} style={{ display: 'flex', gap: 8 }}>
+            <span style={{ color: BRAND.cyan }}>•</span><span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+}
+
+function ErrorBanner({ children }) {
+  return (
+    <Panel tone="red" style={{ display: 'flex', gap: 8, fontSize: 13 }}>
+      <span role="alert" style={{ display: 'flex', gap: 8 }}>
+        <AlertTriangle size={18} style={{ color: STATUS.red, flexShrink: 0 }} />
+        <span>{children}</span>
+      </span>
+    </Panel>
+  );
+}
+
+const isCsvFile = (file) => Boolean(file) && /\.csv$/i.test(file.name || '');
+
+/**
+ * Pick a CSV by clicking (or Enter/Space), or by dropping it anywhere on the
+ * zone. Both routes hand the File to the same `onFile` — one parse path.
+ * A non-CSV is rejected here, with its name, before anything is read.
+ */
+function FilePicker({ onFile, id }) {
+  const T = useT();
+  const inputRef = useRef(null);
+  const [dragging, setDragging] = useState(false);
+  const [rejected, setRejected] = useState(null);
+  const depth = useRef(0); // dragenter/leave fire for children too
+
+  const accept = (file) => {
+    if (!file) return;
+    if (!isCsvFile(file)) {
+      setRejected(`"${file.name}" is not a CSV file. Choose a .csv file — in Excel or Google Sheets use File → Download / Save As → CSV.`);
+      return;
+    }
+    setRejected(null);
+    onFile(file);
+  };
+
+  const hasFiles = (e) => Array.from(e.dataTransfer?.types || []).includes('Files');
+
+  return (
+    <div style={stack(12)}>
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label="Upload CSV file: drop a file here or press Enter to browse"
+        data-testid={`${id}-dropzone`}
+        data-dragging={dragging ? 'true' : 'false'}
+        onClick={() => inputRef.current?.click()}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); inputRef.current?.click(); } }}
+        onDragEnter={(e) => { if (!hasFiles(e)) return; e.preventDefault(); depth.current += 1; setDragging(true); }}
+        onDragOver={(e) => { if (!hasFiles(e)) return; e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; }}
+        onDragLeave={() => { depth.current = Math.max(0, depth.current - 1); if (depth.current === 0) setDragging(false); }}
+        onDrop={(e) => {
+          e.preventDefault();
+          depth.current = 0;
+          setDragging(false);
+          const files = Array.from(e.dataTransfer?.files || []);
+          if (files.length > 1) { setRejected('Drop one CSV file at a time.'); return; }
+          accept(files[0]);
+        }}
+        style={{
+          border: `2px dashed ${dragging ? BRAND.pink : (T.border2 || T.border)}`,
+          background: dragging ? T.accentBg || tint(BRAND.pink) : T.surface || 'transparent',
+          borderRadius: 14, padding: '44px 24px', textAlign: 'center', cursor: 'pointer',
+          transition: 'border-color 0.15s, background 0.15s', outlineColor: BRAND.pink,
+        }}
       >
-        Choose File
-      </label>
+        <Upload size={44} style={{ color: dragging ? BRAND.pink : T.textFaint, margin: '0 auto 14px', display: 'block' }} />
+        <h3 style={{ ...heading(T, 17), marginBottom: 6 }}>{dragging ? 'Drop your CSV to upload' : 'Drag & drop your CSV here'}</h3>
+        <p style={{ ...muted(T), marginBottom: 16 }}>or</p>
+        <span style={{ display: 'inline-block', padding: '10px 22px', borderRadius: 12, background: BRAND.pink, color: '#fff', fontWeight: 700, fontSize: 14 }}>
+          Browse files
+        </span>
+        <p style={{ ...muted(T, 12), color: T.textFaint, marginTop: 12 }}>.csv files only</p>
+        <input
+          ref={inputRef}
+          type="file"
+          accept=".csv,text/csv"
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => { accept(e.target.files?.[0]); e.target.value = ''; }}
+          style={{ display: 'none' }}
+          id={id}
+          data-testid={id}
+          tabIndex={-1}
+        />
+      </div>
+      {rejected && <ErrorBanner>{rejected}</ErrorBanner>}
+    </div>
+  );
+}
+
+/** The chosen file, with Replace / Remove. */
+function FileBar({ file, detail, onReplace, onRemove, disabled }) {
+  const T = useT();
+  return (
+    <div
+      data-testid="csv-file-bar"
+      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 12, background: T.surface || T.cardBg, border: `1px solid ${T.border}` }}
+    >
+      <FileText size={20} style={{ color: BRAND.cyan, flexShrink: 0 }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontWeight: 600, color: T.text, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
+        {detail && <div style={{ ...muted(T, 12) }}>{detail}</div>}
+      </div>
+      <LinkButton onClick={onReplace} disabled={disabled}>Replace file</LinkButton>
+      <button
+        type="button"
+        onClick={onRemove}
+        disabled={disabled}
+        aria-label="Remove file"
+        style={{ background: 'none', border: 'none', color: T.textMuted, cursor: 'pointer', display: 'flex', padding: 4 }}
+      >
+        <X size={16} />
+      </button>
     </div>
   );
 }
@@ -163,7 +342,7 @@ function attentionItems(rows) {
       items.push({ rowNumber: r.rowNumber, kind: 'email_conflict', text: r.reason });
     }
     if (r.outcome === PREVIEW_OUTCOME.REVIEW) {
-      items.push({ rowNumber: r.rowNumber, kind: 'review', text: `${r.contact.name}: same name and company as an existing contact — imported and flagged for review` });
+      items.push({ rowNumber: r.rowNumber, kind: 'review', text: `${contactDisplayName(r.contact)}: same name and company as an existing contact — imported and flagged for review` });
     }
     for (const w of r.warnings ?? []) items.push({ rowNumber: r.rowNumber, kind: 'warning', text: w });
   }
@@ -171,22 +350,24 @@ function attentionItems(rows) {
 }
 
 function StatTile({ label, value, sub, tone, testId }) {
-  const tones = {
-    green: 'bg-green-50 border-green-300 text-green-800',
-    amber: 'bg-amber-50 border-amber-300 text-amber-800',
-    red: 'bg-red-50 border-red-300 text-red-800',
-    gray: 'bg-gray-50 border-gray-300 text-gray-700',
-  };
+  const T = useT();
+  const color = tone === 'gray' ? T.textMuted : tone === 'cyan' ? BRAND.cyan : STATUS[tone];
   return (
-    <div className={`rounded-lg p-4 border ${tones[tone]}`} data-testid={testId}>
-      <div className="text-xs font-semibold uppercase tracking-wide mb-1">{label}</div>
-      <div className="text-2xl font-bold">{value}</div>
-      {sub && <div className="text-xs mt-1 opacity-80">{sub}</div>}
+    <div
+      data-testid={testId}
+      style={{ borderRadius: 12, padding: 14, background: tone === 'gray' ? T.statBg || T.surface : tint(color), border: `1px solid ${tone === 'gray' ? T.border : tint(color, '55')}` }}
+    >
+      <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.6, textTransform: 'uppercase', color, marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 800, color: T.text }}>{value}</div>
+      {sub && <div style={{ ...muted(T, 12), marginTop: 4 }}>{sub}</div>}
     </div>
   );
 }
 
+const NEW_OUTCOMES = [PREVIEW_OUTCOME.NEW, PREVIEW_OUTCOME.REVIEW];
+
 function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
+  const T = useT();
   // select → checking → preview → importing
   const [stage, setStage] = useState('select');
   const [file, setFile] = useState(null);
@@ -195,6 +376,7 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
   const [progress, setProgress] = useState(null); // { done, total, label }
   const [error, setError] = useState(null);
   const [importName, setImportName] = useState('');
+  const replaceRef = useRef(null);
 
   const reset = () => {
     setStage('select'); setFile(null); setParsed(null); setRows([]);
@@ -203,8 +385,8 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
 
   async function handleFile(selected) {
     setError(null);
-    if (!/\.csv$/i.test(selected.name)) {
-      setError('Please choose a .csv file.');
+    if (!isCsvFile(selected)) {
+      setError(`"${selected?.name}" is not a CSV file. Please choose a .csv file.`);
       return;
     }
     const user = getEffectiveUser();
@@ -220,6 +402,7 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
       setParsed(result);
       if (result.fatal) {
         setError(result.fatal);
+        setFile(null);
         setStage('select');
         return;
       }
@@ -233,6 +416,7 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
     } catch (err) {
       console.error('[CSVUpload] could not read file', err);
       setError('Could not read this file. Check that it is a CSV export and try again.');
+      setFile(null);
       setStage('select');
     } finally {
       setProgress(null);
@@ -280,12 +464,15 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
     + outcome[PREVIEW_OUTCOME.CONFLICT] + outcome[PREVIEW_OUTCOME.LOOKUP_FAILED];
   const missing = fileCounts[ROW_STATUS.MISSING];
   const overLimit = fileCounts[ROW_STATUS.OVER_LIMIT];
+  // New contacts whose name is incomplete: imported and sendable, just thin.
+  // (A row that matched an existing contact keeps that contact's name.)
+  const incomplete = incompleteRows(rows).filter((r) => NEW_OUTCOMES.includes(r.outcome));
   const attention = attentionItems(rows);
   const sample = rows.filter((r) => IMPORTABLE_OUTCOMES.includes(r.outcome)).slice(0, 3);
   const busy = stage === 'checking' || stage === 'importing';
 
   return (
-    <div className="space-y-6">
+    <div style={stack(20)}>
       <TypeHeader
         title="Lead / Contact Upload"
         subtitle="Required: a Name (or First + Last Name) or an Email."
@@ -293,53 +480,64 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
       />
 
       {stage === 'select' && (
-        <div className="bg-green-50 rounded-xl p-4 border border-green-200">
-          <h3 className="font-semibold text-gray-900 mb-2">CSV Upload Guidelines</h3>
-          <ul className="text-sm text-gray-700 space-y-1">
-            <li>• <strong>Required:</strong> Name, Full Name, or First + Last Name — or an Email</li>
-            <li>• <strong>Optional:</strong> Email, Phone, Company, Title, LinkedIn, Industry / Vertical, State, Location, Notes</li>
-            <li>• <strong>Up to {MAX_IMPORT_ROWS} contacts</strong> per upload</li>
-            <li>• Columns can be in any order; common header names are recognized automatically</li>
-            <li>• People already in IDYNIFY are updated, never duplicated</li>
-          </ul>
-        </div>
+        <Guidelines
+          items={[
+            <><strong style={{ color: T.text }}>Required:</strong> Name, Full Name, or First + Last Name — or an Email</>,
+            <><strong style={{ color: T.text }}>Optional:</strong> Email, Phone, Company, Title, LinkedIn, Industry / Vertical, State, Location, Notes</>,
+            <>Rows with only an email are imported and marked <strong style={{ color: T.text }}>Needs name</strong> — they greet as "Hi,"</>,
+            <><strong style={{ color: T.text }}>Up to {MAX_IMPORT_ROWS} contacts</strong> per upload</>,
+            <>Columns can be in any order; common header names are recognized automatically</>,
+            <>People already in IDYNIFY are updated, never duplicated</>,
+          ]}
+        />
       )}
 
-      {error && (
-        <div className="bg-red-50 rounded-xl p-4 border border-red-200 text-sm text-red-800 flex gap-2" role="alert">
-          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+      {error && <ErrorBanner>{error}</ErrorBanner>}
 
       {stage === 'select' && <FilePicker onFile={handleFile} id="csv-upload" />}
 
+      {file && stage !== 'select' && (
+        <>
+          <FileBar
+            file={file}
+            detail={stage === 'preview' ? `${rows.length} row${rows.length !== 1 ? 's' : ''} in file` : 'Reading…'}
+            onReplace={() => replaceRef.current?.click()}
+            onRemove={reset}
+            disabled={busy}
+          />
+          <input
+            ref={replaceRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            data-testid="csv-replace-input"
+            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) handleFile(f); }}
+          />
+        </>
+      )}
+
       {busy && (
-        <div className="bg-gray-50 rounded-xl p-8 border border-gray-200 text-center" data-testid="csv-progress">
-          <Loader className="w-8 h-8 text-blue-600 mx-auto mb-3 animate-spin" />
-          <p className="font-semibold text-gray-900">{progress?.label || (stage === 'importing' ? 'Importing' : 'Reading file')}…</p>
+        <Panel testId="csv-progress" style={{ textAlign: 'center', padding: 32 }}>
+          <Loader size={30} className="animate-spin" style={{ color: BRAND.pink, margin: '0 auto 12px', display: 'block' }} />
+          <p style={{ fontWeight: 600, color: T.text, margin: 0 }}>{progress?.label || (stage === 'importing' ? 'Importing' : 'Reading file')}…</p>
           {progress?.total > 0 && (
-            <p className="text-sm text-gray-600 mt-1">{progress.done} of {progress.total}</p>
+            <p style={{ ...muted(T), marginTop: 4 }}>{progress.done} of {progress.total}</p>
           )}
-        </div>
+        </Panel>
       )}
 
       {stage === 'preview' && (
-        <div className="bg-gray-50 rounded-xl p-6 border border-gray-200 space-y-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">Preview: {file?.name}</h3>
-              <p className="text-sm text-gray-600">{rows.length} row{rows.length !== 1 ? 's' : ''} in file</p>
-            </div>
-            <button onClick={reset} className="text-sm text-blue-600 hover:text-blue-700 font-semibold">
-              Change File
-            </button>
-          </div>
+        <Panel style={{ ...stack(18), padding: 20 }}>
+          <h3 style={{ ...heading(T, 17), margin: 0 }}>Preview: {file?.name}</h3>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12 }}>
             <StatTile
               testId="tile-ready" tone="green" label="Ready to import" value={readyTotal}
               sub={readyExisting > 0 ? `${readyNew} new · ${readyExisting} already in IDYNIFY (updated, not duplicated)` : `${readyNew} new`}
+            />
+            <StatTile
+              testId="tile-incomplete" tone="cyan" label="Incomplete profiles" value={incomplete.length}
+              sub="Imported — valid email, name missing. Add it later in People."
             />
             <StatTile
               testId="tile-duplicates" tone="amber" label="Possible duplicates" value={possibleDuplicates}
@@ -350,46 +548,67 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
           </div>
 
           {emailConflicts > 0 && (
-            <div data-testid="email-conflict-banner" className="bg-amber-50 rounded-lg p-3 border border-amber-300 text-sm text-amber-900 flex gap-2" role="alert">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <span>
+            <Panel tone="amber" testId="email-conflict-banner" style={{ display: 'flex', gap: 8, fontSize: 13, padding: 12 }}>
+              <AlertTriangle size={16} style={{ color: STATUS.amber, flexShrink: 0, marginTop: 2 }} />
+              <span role="alert">
                 <strong>{emailConflicts} email conflict{emailConflicts !== 1 ? 's' : ''}.</strong>{' '}
                 {emailConflicts === 1 ? 'This person matches' : 'These people match'} an existing contact by phone or LinkedIn, but the CSV email is different.
                 The IDYNIFY email is kept, and they will <strong>not</strong> be added to a cadence until you check the email in People.
                 Details are listed below.
               </span>
-            </div>
+            </Panel>
           )}
 
           {overLimit > 0 && (
-            <div className="bg-amber-50 rounded-lg p-3 border border-amber-300 text-sm text-amber-900 flex gap-2" role="alert">
-              <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <span>
+            <Panel tone="amber" style={{ display: 'flex', gap: 8, fontSize: 13, padding: 12 }}>
+              <AlertTriangle size={16} style={{ color: STATUS.amber, flexShrink: 0, marginTop: 2 }} />
+              <span role="alert">
                 {overLimit} row{overLimit !== 1 ? 's are' : ' is'} over the {MAX_IMPORT_ROWS}-contact limit and will not be imported.
                 Split the file and upload the rest separately.
               </span>
-            </div>
+            </Panel>
           )}
 
           {parsed?.ignoredHeaders?.length > 0 && (
-            <div className="text-xs text-gray-600 flex gap-2">
-              <Info className="w-4 h-4 flex-shrink-0" />
+            <div style={{ ...muted(T, 12), display: 'flex', gap: 8 }}>
+              <Info size={16} style={{ flexShrink: 0 }} />
               <span>Columns not imported (no matching contact field): {parsed.ignoredHeaders.join(', ')}</span>
             </div>
           )}
 
           {attention.length > 0 && (
-            <div className="bg-white rounded-lg p-4 border border-gray-200">
-              <h4 className="font-semibold text-gray-900 mb-2 text-sm">Rows needing attention ({attention.length})</h4>
-              <ul className="text-sm space-y-1 max-h-40 overflow-y-auto" data-testid="csv-attention">
+            <div style={{ background: T.surface || T.cardBg, borderRadius: 12, padding: 14, border: `1px solid ${T.border}` }}>
+              <h4 style={heading(T, 13)}>Rows needing attention ({attention.length})</h4>
+              <ul data-testid="csv-attention" style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 13, maxHeight: 160, overflowY: 'auto', ...stack(4) }}>
                 {attention.map((a, i) => (
-                  <li key={`${a.rowNumber}-${i}`} className="flex gap-2 text-gray-700">
+                  <li key={`${a.rowNumber}-${i}`} style={{ display: 'flex', gap: 8, color: T.textMuted }}>
                     {a.kind === 'review' || a.kind === 'email_conflict' || a.kind === ROW_STATUS.DUPLICATE_IN_FILE || a.kind === PREVIEW_OUTCOME.DUPLICATE
-                      ? <Copy className="w-4 h-4 text-amber-600 flex-shrink-0" />
+                      ? <Copy size={16} style={{ color: STATUS.amber, flexShrink: 0 }} />
                       : a.kind === 'warning'
-                        ? <Info className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                        : <XCircle className="w-4 h-4 text-red-600 flex-shrink-0" />}
-                    <span><strong>Row {a.rowNumber}:</strong> {a.text}</span>
+                        ? <Info size={16} style={{ color: T.textFaint, flexShrink: 0 }} />
+                        : <XCircle size={16} style={{ color: STATUS.red, flexShrink: 0 }} />}
+                    <span><strong style={{ color: T.text }}>Row {a.rowNumber}:</strong> {a.text}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {incomplete.length > 0 && (
+            <div style={{ background: T.surface || T.cardBg, borderRadius: 12, padding: 14, border: `1px solid ${T.border}` }}>
+              <h4 style={heading(T, 13)}>Incomplete profiles — will import ({incomplete.length})</h4>
+              <p style={{ ...muted(T, 12), marginBottom: 8 }}>
+                Valid contacts with part of the name missing. They can be added to a cadence now; the greeting uses the first name when there is one and "Hi," otherwise.
+              </p>
+              <ul data-testid="csv-incomplete" style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 13, maxHeight: 160, overflowY: 'auto', ...stack(6) }}>
+                {incomplete.map((r) => (
+                  <li key={r.rowNumber} data-testid={`csv-incomplete-row-${r.rowNumber}`} style={{ display: 'flex', gap: 8, color: T.textMuted }}>
+                    <UserX size={16} style={{ color: BRAND.cyan, flexShrink: 0, marginTop: 1 }} />
+                    <span>
+                      <strong style={{ color: T.text }}>Row {r.rowNumber}: {contactDisplayName(r.contact, { email: false })}</strong>
+                      {r.contact.email && <> · {r.contact.email}</>}
+                      <span style={{ display: 'block', fontSize: 12, color: T.textFaint }}>Missing: {r.missing.join(', ')}</span>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -398,20 +617,17 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
 
           {sample.length > 0 && (
             <div>
-              <h4 className="font-semibold text-gray-900 mb-2 text-sm">Sample ({sample.length} of {readyTotal})</h4>
-              <div className="space-y-2">
+              <h4 style={heading(T, 13)}>Sample ({sample.length} of {readyTotal})</h4>
+              <div style={stack(8)}>
                 {sample.map((r) => (
-                  <div key={r.rowNumber} className="bg-white rounded-lg p-3 border border-gray-200">
-                    <p className="font-semibold text-gray-900">
-                      {r.contact.name}
-                      {r.outcome === PREVIEW_OUTCOME.EMAIL_CONFLICT && (
-                        <span className="ml-2 text-xs font-medium text-amber-800 bg-amber-50 px-2 py-0.5 rounded">Email conflict</span>
-                      )}
-                      {r.outcome === PREVIEW_OUTCOME.EXISTING && (
-                        <span className="ml-2 text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded">Already in IDYNIFY</span>
-                      )}
+                  <div key={r.rowNumber} style={{ background: T.surface || T.cardBg, borderRadius: 10, padding: 12, border: `1px solid ${T.border}` }}>
+                    <p style={{ fontWeight: 600, color: T.text, margin: 0, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      {contactDisplayName(r.contact, { email: false })}
+                      {r.outcome === PREVIEW_OUTCOME.EMAIL_CONFLICT && <Badge color={STATUS.amber}>Email conflict</Badge>}
+                      {r.outcome === PREVIEW_OUTCOME.EXISTING && <Badge color={BRAND.cyan}>Already in IDYNIFY</Badge>}
+                      {NEW_OUTCOMES.includes(r.outcome) && r.missing?.length > 0 && <Badge color={BRAND.cyan}>Incomplete profile</Badge>}
                     </p>
-                    <p className="text-sm text-gray-600">
+                    <p style={{ ...muted(T), marginTop: 2 }}>
                       {[r.contact.title, r.contact.company, r.contact.email].filter(Boolean).join(' · ')}
                     </p>
                   </div>
@@ -421,44 +637,40 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
           )}
 
           <div>
-            <label htmlFor="csv-import-name" className="block text-sm font-semibold text-gray-900 mb-1">Name this import</label>
+            <label htmlFor="csv-import-name" style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, marginBottom: 6 }}>Name this import</label>
             <input
               id="csv-import-name"
               type="text"
               value={importName}
               onChange={(e) => setImportName(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-gray-300 text-sm"
               maxLength={80}
+              style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: `1px solid ${T.border2 || T.border}`, background: T.input || T.surface, color: T.text, fontSize: 14, boxSizing: 'border-box' }}
             />
-            <p className="text-xs text-gray-600 mt-1">
-              Every imported contact is tagged <strong>{buildImportTag(importName || defaultImportName(file?.name))}</strong> so you can find this group in People.
+            <p style={{ ...muted(T, 12), marginTop: 6 }}>
+              Every imported contact is tagged <strong style={{ color: T.text }}>{buildImportTag(importName || defaultImportName(file?.name))}</strong> so you can find this group in People.
             </p>
           </div>
-        </div>
+        </Panel>
       )}
 
-      <div className="flex gap-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={busy}
-          className="flex-1 px-6 py-3 rounded-xl bg-white border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Cancel
-        </button>
+      <div style={{ display: 'flex', gap: 12 }}>
+        <SecondaryButton onClick={onCancel} disabled={busy}>Cancel</SecondaryButton>
         {stage === 'preview' && (
-          <button
-            type="button"
-            onClick={handleImport}
-            disabled={readyTotal === 0}
-            className="flex-1 px-6 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center justify-center gap-2"
-          >
-            <CheckCircle className="w-5 h-5" />
+          <PrimaryButton onClick={handleImport} disabled={readyTotal === 0}>
+            <CheckCircle size={18} />
             Import {readyTotal} contact{readyTotal !== 1 ? 's' : ''}
-          </button>
+          </PrimaryButton>
         )}
       </div>
     </div>
+  );
+}
+
+function Badge({ color, children }) {
+  return (
+    <span style={{ fontSize: 11, fontWeight: 600, color, background: tint(color, '1f'), border: `1px solid ${tint(color, '55')}`, padding: '1px 8px', borderRadius: 999 }}>
+      {children}
+    </span>
   );
 }
 
@@ -489,14 +701,18 @@ const COMPANY_HEADER_MAP = {
 };
 
 function CompanyCsvUpload({ onContactsAdded, onCancel, onChangeType }) {
+  const T = useT();
   const [file, setFile] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const replaceRef = useRef(null);
   const [preview, setPreview] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [validationErrors, setValidationErrors] = useState([]);
 
   async function handleFile(selected) {
-    if (!/\.csv$/i.test(selected.name)) {
-      alert('Please upload a CSV file');
+    setNotice(null);
+    if (!isCsvFile(selected)) {
+      setNotice(`"${selected?.name}" is not a CSV file. Please choose a .csv file.`);
       return;
     }
     setFile(selected);
@@ -535,7 +751,7 @@ function CompanyCsvUpload({ onContactsAdded, onCancel, onChangeType }) {
     if (!preview || preview.valid === 0) return;
     const user = getEffectiveUser();
     if (!user) {
-      alert('You must be logged in to upload');
+      setNotice('You must be logged in to upload.');
       return;
     }
     setUploading(true);
@@ -583,111 +799,94 @@ function CompanyCsvUpload({ onContactsAdded, onCancel, onChangeType }) {
       onContactsAdded(addedItems);
     } catch (error) {
       console.error('Error uploading CSV:', error);
-      alert('Failed to upload. Please try again.');
+      setNotice('Failed to upload. Please try again.');
       setUploading(false);
     }
   };
 
-  const resetFile = () => { setFile(null); setPreview(null); setValidationErrors([]); };
+  const resetFile = () => { setFile(null); setPreview(null); setValidationErrors([]); setNotice(null); };
 
   return (
-    <div className="space-y-6">
+    <div style={stack(20)}>
       <TypeHeader
         title="Company List Upload"
         subtitle="Upload a CSV of companies. Required: Company Name."
         onChangeType={onChangeType}
       />
 
-      <div className="bg-green-50 rounded-xl p-4 border border-green-200">
-        <h3 className="font-semibold text-gray-900 mb-2">CSV Upload Guidelines</h3>
-        <ul className="text-sm text-gray-700 space-y-1">
-          <li>• <strong>Required column:</strong> Company Name (or "Account Name")</li>
-          <li>• <strong>Optional columns:</strong> Website, Industry, LinkedIn, State</li>
-          <li>• <strong>Max {COMPANY_UPLOAD_LIMIT} companies</strong> per upload</li>
-          <li>• Headers will be auto-mapped (flexible format)</li>
-        </ul>
-      </div>
+      <Guidelines
+        items={[
+          <><strong style={{ color: T.text }}>Required column:</strong> Company Name (or "Account Name")</>,
+          <><strong style={{ color: T.text }}>Optional columns:</strong> Website, Industry, LinkedIn, State</>,
+          <><strong style={{ color: T.text }}>Max {COMPANY_UPLOAD_LIMIT} companies</strong> per upload</>,
+          <>Headers will be auto-mapped (flexible format)</>,
+        ]}
+      />
+
+      {notice && <ErrorBanner>{notice}</ErrorBanner>}
 
       {!file ? (
         <FilePicker onFile={handleFile} id="csv-company-upload" />
       ) : (
-        <div className="bg-gray-50 rounded-xl p-6 border border-gray-200">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">Preview: {file.name}</h3>
-              <p className="text-sm text-gray-600">{preview?.total ?? 0} rows in file</p>
-            </div>
-            <button onClick={resetFile} className="text-sm text-blue-600 hover:text-blue-700 font-semibold">
-              Change File
-            </button>
-          </div>
+        <Panel style={{ ...stack(16), padding: 20 }}>
+          <FileBar
+            file={file}
+            detail={`${preview?.total ?? 0} rows in file`}
+            onReplace={() => replaceRef.current?.click()}
+            onRemove={resetFile}
+            disabled={uploading}
+          />
+          <input
+            ref={replaceRef}
+            type="file"
+            accept=".csv,text/csv"
+            style={{ display: 'none' }}
+            onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) handleFile(f); }}
+          />
+          <h3 style={{ ...heading(T, 17), margin: 0 }}>Preview: {file.name}</h3>
 
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="bg-green-100 rounded-lg p-4 border border-green-300">
-              <div className="flex items-center gap-2 mb-1">
-                <CheckCircle className="w-5 h-5 text-green-600" />
-                <span className="font-semibold text-green-900">Valid Companies</span>
-              </div>
-              <p className="text-2xl font-bold text-green-700">{preview?.valid || 0}</p>
-            </div>
-            <div className="bg-red-100 rounded-lg p-4 border border-red-300">
-              <div className="flex items-center gap-2 mb-1">
-                <AlertTriangle className="w-5 h-5 text-red-600" />
-                <span className="font-semibold text-red-900">Errors</span>
-              </div>
-              <p className="text-2xl font-bold text-red-700">{validationErrors.length}</p>
-            </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+            <StatTile tone="green" label="Valid Companies" value={preview?.valid || 0} />
+            <StatTile tone="red" label="Errors" value={validationErrors.length} />
           </div>
 
           {validationErrors.length > 0 && (
-            <div className="bg-red-50 rounded-lg p-4 border border-red-200 mb-4">
-              <h4 className="font-semibold text-red-900 mb-2">Validation Errors</h4>
-              <ul className="text-sm text-red-700 space-y-1 max-h-32 overflow-y-auto">
+            <Panel tone="red" style={{ padding: 14 }}>
+              <h4 style={heading(T, 13)}>Validation Errors</h4>
+              <ul style={{ ...muted(T), listStyle: 'none', padding: 0, margin: 0, maxHeight: 128, overflowY: 'auto', ...stack(4) }}>
                 {validationErrors.map((error, index) => <li key={index}>{error}</li>)}
               </ul>
-            </div>
+            </Panel>
           )}
 
           {preview?.items?.length > 0 && (
             <div>
-              <h4 className="font-semibold text-gray-900 mb-2">
+              <h4 style={heading(T, 13)}>
                 Sample Companies ({Math.min(3, preview.items.length)} of {preview.valid})
               </h4>
-              <div className="space-y-2">
+              <div style={stack(8)}>
                 {preview.items.slice(0, 3).map((item, index) => (
-                  <div key={index} className="bg-white rounded-lg p-3 border border-gray-200">
-                    <p className="font-semibold text-gray-900">{item.name}</p>
-                    {item.industry && <p className="text-sm text-gray-600">{item.industry}</p>}
-                    {item.website_url && <p className="text-sm text-gray-600">{item.website_url}</p>}
+                  <div key={index} style={{ background: T.surface || T.cardBg, borderRadius: 10, padding: 12, border: `1px solid ${T.border}` }}>
+                    <p style={{ fontWeight: 600, color: T.text, margin: 0 }}>{item.name}</p>
+                    {item.industry && <p style={muted(T)}>{item.industry}</p>}
+                    {item.website_url && <p style={muted(T)}>{item.website_url}</p>}
                   </div>
                 ))}
               </div>
             </div>
           )}
-        </div>
+        </Panel>
       )}
 
-      <div className="flex gap-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={uploading}
-          className="flex-1 px-6 py-3 rounded-xl bg-white border border-gray-300 text-gray-700 font-semibold hover:bg-gray-50 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          onClick={handleUpload}
-          disabled={!preview || preview.valid === 0 || uploading}
-          className="flex-1 px-6 py-3 rounded-xl bg-green-600 text-white font-semibold hover:bg-green-700 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-md flex items-center justify-center gap-2"
-        >
+      <div style={{ display: 'flex', gap: 12 }}>
+        <SecondaryButton onClick={onCancel} disabled={uploading}>Cancel</SecondaryButton>
+        <PrimaryButton onClick={handleUpload} disabled={!preview || preview.valid === 0 || uploading}>
           {uploading ? (
-            <><Loader className="w-5 h-5 animate-spin" />Uploading...</>
+            <><Loader size={18} className="animate-spin" />Uploading...</>
           ) : (
-            <><Upload className="w-5 h-5" />Upload {preview?.valid || 0} Companies</>
+            <><Upload size={18} />Upload {preview?.valid || 0} Companies</>
           )}
-        </button>
+        </PrimaryButton>
       </div>
     </div>
   );

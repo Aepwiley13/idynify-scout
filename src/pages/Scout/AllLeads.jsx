@@ -37,6 +37,7 @@ import BulkComposeModal from '../../components/scout/BulkComposeModal';
 import { MAX_BULK_CONTACTS } from '../../utils/cadenceSend';
 import { isHiddenFromPeople } from '../../utils/csvContactImport';
 import { loadIntoHunter } from '../../utils/loadIntoHunter';
+import { needsName } from '../../utils/contactDisplayName';
 
 /** `?tag=` from the current URL, or null. No router hook: AllLeads mounts under several shells. */
 function readUrlTag() {
@@ -1665,6 +1666,8 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
   if (dataFilter === 'has-email') filtered = filtered.filter(c => !!(c.email || c.work_email));
   else if (dataFilter === 'needs-email') filtered = filtered.filter(c => !(c.email || c.work_email));
   else if (dataFilter === 'needs-phone') filtered = filtered.filter(c => !(c.phone_mobile || c.phone_direct || c.phone));
+  // No usable name (e.g. an email-only CSV row) — computed, never stored.
+  else if (dataFilter === 'needs-name') filtered = filtered.filter(c => needsName(c));
 
   // Industry filter
   if (industryFilter) {
@@ -2100,13 +2103,13 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
             style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '5px 11px', minHeight: 44, borderRadius: 20, border: `1px solid ${dataFilter ? T.accentBdr : T.border}`, background: dataFilter ? T.accentBg : 'transparent', color: dataFilter ? BRAND.pink : T.textFaint, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap' }}
           >
             <MoreHorizontal size={10} />
-            {dataFilter ? (dataFilter === 'has-email' ? 'Has Email' : dataFilter === 'needs-email' ? 'Needs Email' : 'Needs Phone') : 'More'}
+            {dataFilter ? (dataFilter === 'has-email' ? 'Has Email' : dataFilter === 'needs-email' ? 'Needs Email' : dataFilter === 'needs-name' ? 'Needs Name' : 'Needs Phone') : 'More'}
             {dataFilter && <X size={9} style={{ marginLeft: 2 }} onClick={e => { e.stopPropagation(); setDataFilter(null); setMoreFiltersOpen(false); }} />}
           </button>
           {moreFiltersOpen && (
             <div style={{ position: 'absolute', top: 'calc(100% + 6px)', right: 0, minWidth: 160, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 11, padding: 5, zIndex: 50, boxShadow: `0 8px 28px ${T.isDark ? '#00000080' : '#0000001a'}`, display: 'flex', flexDirection: 'column', gap: 1 }}>
               <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.2, color: T.textFaint, textTransform: 'uppercase', padding: '4px 9px 6px' }}>Data Quality</div>
-              {[['Has Email', 'has-email'], ['Needs Email', 'needs-email'], ['Needs Phone', 'needs-phone']].map(([label, id]) => (
+              {[['Has Email', 'has-email'], ['Needs Email', 'needs-email'], ['Needs Phone', 'needs-phone'], ['Needs Name', 'needs-name']].map(([label, id]) => (
                 <button
                   key={id}
                   onClick={() => { setDataFilter(d => d === id ? null : id); setMoreFiltersOpen(false); }}

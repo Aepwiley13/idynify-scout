@@ -4,13 +4,14 @@ How a user uploads a CSV of people and sends them a cadence. This builds on the 
 
 ## The workflow
 
-1. **Scout+ → Upload CSV → Lead / Contact List → choose a file.**
+1. **Scout+ → Upload CSV → Lead / Contact List → drop a file on the upload zone, or Browse.** Both go through the same parse path. The zone is keyboard-focusable (Enter/Space opens the file picker). A non-CSV file is rejected by name before anything is read. After choosing, the file name is shown with **Replace file** and **Remove**. The Import button appears only once a valid file has been checked.
 2. **Preview.** No writes happen yet. Every row is classified, and every row that won't import is listed by spreadsheet row number with the reason.
    - **Ready to import:** new contacts, plus people already in IDYNIFY. Existing people are updated, never duplicated.
    - **Email conflict:** an existing person matched by phone, LinkedIn or Apollo ID whose stored email differs from the CSV email. They join the group with the stored email unchanged, both addresses are shown, and they are **not** passed to Add to Cadence.
    - **Possible duplicates:** repeats within the file (skipped), the same existing person reached by two rows (skipped), and name + company matches (imported, flagged `identity_review_required`).
    - **Invalid rows:** bad email; a row with more cells than the header (usually an unquoted comma); an identity conflict (two existing contacts share an email, LinkedIn URL or phone); a failed duplicate lookup. None of these import.
    - **Missing required information:** no name and no email.
+   - **Incomplete profiles (imported):** a valid email with no name, or only a first or last name. These are not invalid. They import, can be added to a cadence straight away, and are listed as e.g. `Unknown contact · person@example.com — Missing: first name, last name`.
    - Columns that match no contact field are listed as "not imported".
 3. **Name this import → Import N contacts.** Every contact in the group, new or existing, gets the tag `CSV Import - <name> - <YYYY-MM-DD>`.
 4. **Success screen.** It shows "N contacts imported successfully" with **[View People]** and **[Add to Cadence]**.
@@ -54,7 +55,27 @@ How a user uploads a CSV of people and sends them a cadence. This builds on the 
 
   A note that's already on the record is not added again.
 - **Failure is per row.** One bad row can't abort the file. New contacts are committed in chunks of 400, and any rows that fail to save are reported by row number.
+- **Missing names.** An email-only row is stored with `name` = the email address, as before, so every People surface still has a label. No human name is ever derived from an address. All display goes through `src/utils/contactDisplayName.js`: a `name` containing `@` counts as no name, and the label is first + last → first → last → email (or "Unknown contact" where the email is shown beside it). The greeting is "Hi {First}," or "Hi,". A last-name-only contact also gets "Hi,". Barry's prompt says "Hi," and is told not to guess a name. In People, **More → Needs Name** lists contacts with no usable name. It is computed and never stored, and it never blocks a send.
 - **Limit:** 500 contacts per file (`MAX_IMPORT_ROWS`). Rows past the limit are listed, not dropped silently.
+
+### Recognized headers
+
+Matching is case-insensitive, and `_` and `-` count as spaces. Any header not listed here is shown in the preview as "Columns not imported" (for example Website or Favorite Color).
+
+| Field | Headers |
+|---|---|
+| first name | First Name, First, FName, FirstName, Given Name, Forename |
+| last name | Last Name, Last, LName, LastName, Surname, Family Name |
+| full name | Name, Full Name, Contact Name, Contact |
+| email | Email, Email Address, E-mail, Work Email, Business Email, Primary Email |
+| phone | Phone, Phone Number, Mobile, Mobile Phone, Mobile Number, Cell, Cell Phone, Cell Number, Work Phone, Direct Phone, Telephone |
+| company | Company, Company Name, Organization / Organisation, Organization Name, Account, Account Name, Employer |
+| title | Title, Job Title, Position, Role, Job Role |
+| LinkedIn | LinkedIn, LinkedIn URL, LinkedIn Profile, LinkedIn Profile URL, Person LinkedIn URL, LinkedIn Link |
+| industry | Industry, Vertical, Sector |
+| state | State, State/Province, Province, Region |
+| location | Location, City |
+| notes | Notes, Note, Comments, Comment |
 
 ## Cadences
 

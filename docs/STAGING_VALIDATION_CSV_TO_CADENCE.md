@@ -100,7 +100,7 @@ Click Send. Watch `cadences/{id}` update `sentCount` and `deliveredContactIds` l
 Reply from one recipient. Wait at least 10 minutes, then open Cadence Detail and record where the reply shows (P10).
 
 ### Test 11: Resend protection
-Run the same cadence with the same people. The banner should say "N … already received", the button should show the reduced count, and the checkbox should restore it. Then pick a different cadence for the same people: it should not exclude anyone.
+Run the same cadence with the same people. The banner should say "N … already received", the button should show the reduced count, and **Include them again** should restore it. Then pick a different cadence for the same people: it should not exclude anyone.
 
 ### Test 12: Interrupted send
 Send to 3 or more controlled recipients and close the tab after the first "Sent". Check that the cadence still appears in the list with status Active, and turns **Interrupted** after 30 minutes with no activity. Re-run the same cadence: recipients already sent to should be excluded.

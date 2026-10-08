@@ -11,7 +11,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 
 const mockSendEmailViaGmail = vi.hoisted(() => vi.fn());
-const mockLoadAlreadyDelivered = vi.hoisted(() => vi.fn());
+const mockLoadDeliveryHistory = vi.hoisted(() => vi.fn());
 const executorProps = vi.hoisted(() => ({ current: null }));
 
 vi.mock('../utils/sendActionResolver', () => ({
@@ -22,7 +22,7 @@ vi.mock('../utils/sendActionResolver', () => ({
 
 vi.mock('../utils/cadenceSend', async (importOriginal) => ({
   ...(await importOriginal()),
-  loadAlreadyDelivered: mockLoadAlreadyDelivered,
+  loadDeliveryHistory: mockLoadDeliveryHistory,
 }));
 
 vi.mock('../context/ImpersonationContext', () => ({
@@ -65,8 +65,9 @@ beforeEach(() => {
   executorProps.current = null;
   mockSendEmailViaGmail.mockReset();
   mockSendEmailViaGmail.mockResolvedValue({ result: 'sent', emailFormat: 'rfc2047-1' });
-  mockLoadAlreadyDelivered.mockReset();
-  mockLoadAlreadyDelivered.mockResolvedValue(new Set(['c0']));
+  mockLoadDeliveryHistory.mockReset();
+  // c0 received this cadence on Oct 1 (local noon, so the date is stable in any time zone).
+  mockLoadDeliveryHistory.mockResolvedValue(new Map([['c0', [{ cadenceId: 'old', at: new Date(2026, 9, 1, 12).getTime() }]]]));
   fetchBodies = [];
   globalThis.fetch = vi.fn(async (_url, init) => {
     const body = JSON.parse(init.body);
@@ -95,7 +96,7 @@ async function goToPreview() {
   renderModal();
   expect(screen.getByText(/30 contacts/)).toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: /^Preview$/ }));
-  await screen.findByText(/already received "Beyond Words Invitation"/);
+  await screen.findByText('1 person already received this cadence.');
 }
 
 describe('BulkComposeModal — imported group', { timeout: 20000 }, () => {
@@ -105,12 +106,49 @@ describe('BulkComposeModal — imported group', { timeout: 20000 }, () => {
     expect(fetchBodies[0].sharedBody).toBe('Join us at Beyond Words.');
   });
 
-  it('excludes people who already received this cadence, unless the user opts back in', async () => {
+  it('asks explicitly: exclude previous recipients (default) or include them again', async () => {
     await goToPreview();
-    expect(mockLoadAlreadyDelivered).toHaveBeenCalledWith('u1', 'Beyond Words Invitation');
+    expect(mockLoadDeliveryHistory).toHaveBeenCalledWith('u1', 'Beyond Words Invitation');
+    const exclude = screen.getByRole('radio', { name: 'Exclude previous recipients' });
+    const include = screen.getByRole('radio', { name: 'Include them again' });
+    expect(exclude).toHaveAttribute('aria-checked', 'true');
+    expect(include).toHaveAttribute('aria-checked', 'false');
+    expect(screen.getByTestId('already-sent-banner')).toHaveTextContent('They are excluded from this send.');
+    expect(screen.getByTestId('previously-sent-c0')).toHaveTextContent('Previously sent Oct 1 — excluded');
     expect(screen.getByRole('button', { name: /Send to 29 contacts/ })).toBeInTheDocument();
-    fireEvent.click(screen.getByLabelText(/Send to them again/));
+
+    fireEvent.click(include);
+    expect(include).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByTestId('already-sent-banner')).toHaveTextContent('They will be sent it again');
+    expect(screen.getByTestId('previously-sent-c0')).toHaveTextContent('Previously sent Oct 1 — sending again');
     expect(screen.getByRole('button', { name: /Send to 30 contacts/ })).toBeInTheDocument();
+
+    fireEvent.click(exclude);
+    expect(screen.getByRole('button', { name: /Send to 29 contacts/ })).toBeInTheDocument();
+  });
+
+  it('re-sends the same cadence, unchanged, as a new send that records the decision', async () => {
+    await goToPreview();
+    fireEvent.click(screen.getByRole('radio', { name: 'Include them again' }));
+    fireEvent.click(screen.getByRole('button', { name: /Send to 30 contacts/ }));
+    await waitFor(() => expect(executorProps.current).not.toBeNull());
+
+    const { payload, cadenceMeta } = executorProps.current;
+    expect(payload).toHaveLength(30);
+    expect(payload[0].contact.id).toBe('c0');
+    expect(payload[0].body).toBe('Hi Person0,\n\nContext for c0.\n\nJoin us at Beyond Words.');
+    expect(cadenceMeta).toMatchObject({
+      resendPreviousRecipients: true,
+      resentContactIds: ['c0'],
+      templateBody: 'Join us at Beyond Words.',
+    });
+  });
+
+  it('records that no one was re-sent when previous recipients are excluded', async () => {
+    await goToPreview();
+    fireEvent.click(screen.getByRole('button', { name: /Send to 29 contacts/ }));
+    await waitFor(() => expect(executorProps.current).not.toBeNull());
+    expect(executorProps.current.cadenceMeta).toMatchObject({ resendPreviousRecipients: false, resentContactIds: [] });
   });
 
   it('sends a real test of the first email to the user, without touching a contact or cadence', async () => {
@@ -144,7 +182,7 @@ describe('BulkComposeModal — imported group', { timeout: 20000 }, () => {
   });
 
   it('sends to a contact that only has a work_email', async () => {
-    mockLoadAlreadyDelivered.mockResolvedValue(new Set());
+    mockLoadDeliveryHistory.mockResolvedValue(new Map());
     render(
       <BulkComposeModal
         contacts={[{ id: 'w1', name: 'Wendy Work', work_email: 'wendy@corp.com' }]}

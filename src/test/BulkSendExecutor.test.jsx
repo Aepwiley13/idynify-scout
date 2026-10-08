@@ -264,4 +264,18 @@ describe('BulkSendExecutor — cadence record survives an interrupted send', () 
       deliveredContactIds: [],
     }));
   });
+
+  it('a re-send is its own cadence doc that records who was sent it again', async () => {
+    const meta = {
+      templateSubject: 'S', templateBody: 'Body', resendPreviousRecipients: true, resentContactIds: ['c1'],
+    };
+    render(<BulkSendExecutor payload={[{ ...makeItem(1), cadenceName: 'People Pitch' }, makeItem(2)]} T={T} cadenceMeta={meta} />);
+    await flush();
+    expect(addDoc).toHaveBeenCalledTimes(1); // a new doc, never an update of the earlier send
+    const [, doc] = addDoc.mock.calls[0];
+    expect(doc).toEqual(expect.objectContaining({
+      name: 'People Pitch', resendPreviousRecipients: true, resentContactIds: ['c1'],
+    }));
+    expect(doc.contacts.map(c => [c.contactId, c.resend])).toEqual([['c1', true], ['c2', false]]);
+  });
 });

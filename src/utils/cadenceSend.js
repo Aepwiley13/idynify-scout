@@ -20,28 +20,51 @@ export const MAX_BULK_CONTACTS = 100;
 export const PERSONALIZE_CHUNK = 25;
 
 /**
- * People who already received the cadence named `cadenceName`, from every
- * cadence doc with that name.
+ * Every delivery of the cadence named `cadenceName`, per person, across all
+ * of its sends.
  *
  * Each send writes its own cadence doc, so "this cadence" is identified by its
- * name — which is what the user picks when they reuse one. A contact counts as
- * delivered when its row says sent/opened, or when the send loop recorded it
- * in `deliveredContactIds` (which survives a send interrupted before its
- * completion write). One equality query; no composite index needed.
+ * name — which is what the user picks when they reuse one. Sending it again
+ * adds a doc; nothing earlier is overwritten, so a person's history is one
+ * entry per send that reached them:
+ *
+ *   Map { contactId → [{ cadenceId, at }, …] }   oldest first; `at` in ms (0 if unknown)
+ *
+ * A contact counts as delivered when its row says sent/opened, or when the
+ * send loop recorded it in `deliveredContactIds` (which survives a send
+ * interrupted before its completion write). One equality query; no composite
+ * index needed.
  */
-export async function loadAlreadyDelivered(userId, cadenceName) {
+export async function loadDeliveryHistory(userId, cadenceName) {
   const name = (cadenceName || '').trim();
-  if (!userId || !name) return new Set();
+  const history = new Map();
+  if (!userId || !name) return history;
   const snap = await getDocs(query(collection(db, 'users', userId, 'cadences'), where('name', '==', name)));
-  const ids = new Set();
   snap.docs.forEach((d) => {
     const c = d.data();
-    (c.deliveredContactIds || []).forEach((id) => ids.add(id));
+    const at = millis(c.lastSentAt) || millis(c.completedAt) || millis(c.createdAt);
+    const ids = new Set(c.deliveredContactIds || []);
     (c.contacts || []).forEach((ct) => {
       if (ct?.contactId && (ct.status === 'sent' || ct.status === 'opened')) ids.add(ct.contactId);
     });
+    ids.forEach((id) => {
+      if (!history.has(id)) history.set(id, []);
+      history.get(id).push({ cadenceId: d.id, at });
+    });
   });
-  return ids;
+  history.forEach((sends) => sends.sort((a, b) => a.at - b.at));
+  return history;
+}
+
+/** People who already received the cadence named `cadenceName` (any of its sends). */
+export async function loadAlreadyDelivered(userId, cadenceName) {
+  return new Set((await loadDeliveryHistory(userId, cadenceName)).keys());
+}
+
+/** "Oct 1" — the date shown for one delivery in a person's cadence history. */
+export function formatSendDate(ms) {
+  if (!ms) return 'earlier';
+  return new Date(ms).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 /**

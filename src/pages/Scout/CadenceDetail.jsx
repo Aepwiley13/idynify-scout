@@ -11,7 +11,7 @@ import {
   Search, SlidersHorizontal, Download, ChevronDown, ChevronUp,
   Archive, Settings, MessageCircleReply, Info,
 } from 'lucide-react';
-import { cadenceTemplate } from '../../utils/cadenceSend';
+import { cadenceTemplate, loadDeliveryHistory, formatSendDate } from '../../utils/cadenceSend';
 import BulkComposeModal from '../../components/scout/BulkComposeModal';
 
 const AVATAR_COLORS = [
@@ -106,6 +106,8 @@ export default function CadenceDetail() {
   const { cadenceId } = useParams();
   const user = useActiveUser();
   const [cadence, setCadence] = useState(null);
+  // contactId → every delivery of a cadence with this name (all sends, oldest first)
+  const [sendHistory, setSendHistory] = useState(() => new Map());
   const [loading, setLoading] = useState(true);
   const [bodyExpanded, setBodyExpanded] = useState(false);
   const [composeMode, setComposeMode] = useState(null);
@@ -140,6 +142,17 @@ export default function CadenceDetail() {
       setLoading(false);
     }
   }, [user?.uid, cadenceId]);
+
+  // A cadence sent again is a new send doc with the same name. Load them all
+  // so each person shows every date they were sent it.
+  useEffect(() => {
+    if (!user?.uid || !cadence?.name) return;
+    let cancelled = false;
+    loadDeliveryHistory(user.uid, cadence.name)
+      .then((h) => { if (!cancelled) setSendHistory(h); })
+      .catch((err) => console.warn('[CadenceDetail] send history unavailable', err?.message));
+    return () => { cancelled = true; };
+  }, [user?.uid, cadence?.name]);
 
   const checkReplies = useCallback(async () => {
     if (!user?.uid || !cadenceId || checkingReplies) return;
@@ -798,6 +811,11 @@ export default function CadenceDetail() {
                             {ct.company && (
                               <div style={{ fontSize: 11, color: T.textFaint, marginTop: 1 }}>
                                 {ct.company}
+                              </div>
+                            )}
+                            {sendHistory.get(ct.contactId)?.length > 1 && (
+                              <div data-testid={`send-history-${ct.contactId}`} style={{ fontSize: 11, color: T.textMuted, marginTop: 2 }}>
+                                {sendHistory.get(ct.contactId).map((d) => `Sent ${formatSendDate(d.at)}`).join(' · ')}
                               </div>
                             )}
                           </div>

@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { X, Send, ChevronLeft, Loader, AlertTriangle, Mail, Sparkles, Edit3, Paperclip, FileText, Upload, Users, Search, Plus, Trash2 } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
-import { BRAND } from '../../theme/tokens';
+import { BRAND, STATUS } from '../../theme/tokens';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { checkGmailConnection, sendEmailViaGmail, SEND_RESULT } from '../../utils/sendActionResolver';
 import { doc, setDoc, getDoc, deleteDoc, serverTimestamp, collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
@@ -10,7 +10,7 @@ import BulkSendExecutor from './BulkSendExecutor';
 import { finalizeBarryOpening, displayNameCase, EMAIL_RENDER_VERSION } from '../../utils/emailGreeting';
 import { nameParts } from '../../utils/contactDisplayName';
 import {
-  MAX_BULK_CONTACTS, PERSONALIZE_CHUNK, loadAlreadyDelivered,
+  MAX_BULK_CONTACTS, PERSONALIZE_CHUNK, loadDeliveryHistory, formatSendDate,
   hasPersonalizeTag, firstNameFor, renderCadenceEmail, displayContactName,
 } from '../../utils/cadenceSend';
 
@@ -125,8 +125,11 @@ export default function BulkComposeModal({
   const [sendPayload, setSendPayload] = useState(null);
   const [personalizeProgress, setPersonalizeProgress] = useState(null); // { done, total }
 
-  // ─── Resend guard ───
-  const [alreadySentIds, setAlreadySentIds] = useState(() => new Set());
+  // ─── Previous recipients of this cadence ───
+  // contactId → [{ cadenceId, at }] for every earlier send with this name.
+  // They are excluded by default; "Include them again" re-sends to them, and
+  // the new send is its own delivery (nothing earlier is overwritten).
+  const [deliveryHistory, setDeliveryHistory] = useState(() => new Map());
   const [includeAlreadySent, setIncludeAlreadySent] = useState(false);
 
   // ─── Send test ───
@@ -323,14 +326,13 @@ export default function BulkComposeModal({
     setLoading(true);
     setTestState(null);
     try {
-      // Resend guard: who already received a cadence with this name.
+      // Who already received a cadence with this name, and when.
       try {
         const user = getEffectiveUser();
-        const delivered = await loadAlreadyDelivered(user?.uid, cadenceName);
-        setAlreadySentIds(delivered);
+        setDeliveryHistory(await loadDeliveryHistory(user?.uid, cadenceName));
       } catch (err) {
         console.warn('[BulkComposeModal] resend check failed — no one excluded', err?.message);
-        setAlreadySentIds(new Set());
+        setDeliveryHistory(new Map());
       }
 
       const wantsPersonalization = inlinePersonalize || personalizeWithBarry;
@@ -372,12 +374,12 @@ export default function BulkComposeModal({
     return item;
   }
 
-  const isExcludedAsAlreadySent = (p) => !includeAlreadySent && alreadySentIds.has(p.contact.id);
+  const isExcludedAsAlreadySent = (p) => !includeAlreadySent && deliveryHistory.has(p.contact.id);
   const sendablePreviews = previews
     ? previews.filter(p => getContactEmail(p.contact) && !isExcludedAsAlreadySent(p))
     : [];
   const alreadySentInList = previews
-    ? previews.filter(p => getContactEmail(p.contact) && alreadySentIds.has(p.contact.id)).length
+    ? previews.filter(p => getContactEmail(p.contact) && deliveryHistory.has(p.contact.id)).length
     : 0;
 
   function handleSend() {
@@ -432,6 +434,11 @@ export default function BulkComposeModal({
     personalizedWithBarry: inlinePersonalize || personalizeWithBarry,
     cc: cc.trim(),
     hasAttachment: Boolean(attachment),
+    // The resend decision, made explicitly before send and kept on the record.
+    resendPreviousRecipients: includeAlreadySent,
+    resentContactIds: includeAlreadySent && previews
+      ? previews.filter(p => getContactEmail(p.contact) && deliveryHistory.has(p.contact.id)).map(p => p.contact.id)
+      : [],
   };
 
   // ─── Draft persistence ───
@@ -1007,24 +1014,44 @@ export default function BulkComposeModal({
 
               {alreadySentInList > 0 && (
                 <div data-testid="already-sent-banner" style={{
-                  marginBottom: 14, padding: '10px 14px', borderRadius: 10,
-                  background: '#f59e0b14', border: '1px solid #f59e0b55',
-                  display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                  marginBottom: 14, padding: '12px 14px', borderRadius: 10,
+                  background: `${STATUS.amber}14`, border: `1px solid ${STATUS.amber}55`,
                   fontSize: 12, color: T.text,
                 }}>
-                  <AlertTriangle size={14} style={{ color: '#f59e0b' }} />
-                  <span style={{ flex: 1, minWidth: 200 }}>
-                    {alreadySentInList} {alreadySentInList === 1 ? 'person has' : 'people have'} already received "{cadenceName.trim()}".{' '}
-                    {includeAlreadySent ? 'They will be sent it again.' : 'They are excluded from this send.'}
-                  </span>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontWeight: 600 }}>
-                    <input
-                      type="checkbox"
-                      checked={includeAlreadySent}
-                      onChange={e => setIncludeAlreadySent(e.target.checked)}
-                    />
-                    Send to them again
-                  </label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <AlertTriangle size={14} style={{ color: STATUS.amber, flexShrink: 0 }} />
+                    <strong>
+                      {alreadySentInList} {alreadySentInList === 1 ? 'person' : 'people'} already received this cadence.
+                    </strong>
+                  </div>
+                  <div style={{ color: T.textMuted, marginBottom: 10 }}>
+                    Choose whether this send of "{cadenceName.trim()}" goes to them again — for a reminder or a follow-up.
+                    {' '}{includeAlreadySent
+                      ? `They will be sent it again; their earlier ${alreadySentInList === 1 ? 'delivery stays' : 'deliveries stay'} in the history.`
+                      : 'They are excluded from this send.'}
+                  </div>
+                  <div role="radiogroup" aria-label="Previous recipients" style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {[[false, 'Exclude previous recipients'], [true, 'Include them again']].map(([value, label]) => {
+                      const selected = includeAlreadySent === value;
+                      return (
+                        <button
+                          key={label}
+                          type="button"
+                          role="radio"
+                          aria-checked={selected}
+                          onClick={() => setIncludeAlreadySent(value)}
+                          style={{
+                            padding: '7px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                            border: `1px solid ${selected ? BRAND.pink : T.border}`,
+                            background: selected ? `${BRAND.pink}18` : 'transparent',
+                            color: selected ? BRAND.pink : T.text,
+                          }}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               )}
 
@@ -1038,6 +1065,7 @@ export default function BulkComposeModal({
                   const name = getContactName(p.contact);
                   const noEmail = !email;
                   const alreadySent = !noEmail && isExcludedAsAlreadySent(p);
+                  const previousSends = !noEmail ? deliveryHistory.get(p.contact.id) : null;
 
                   return (
                     <div
@@ -1061,9 +1089,13 @@ export default function BulkComposeModal({
                             Excluded
                           </span>
                         )}
-                        {alreadySent && (
-                          <span style={{ fontSize: 10, fontWeight: 600, color: '#b45309', background: '#f59e0b22', padding: '3px 8px', borderRadius: 6 }}>
-                            Already received — excluded
+                        {previousSends?.length > 0 && (
+                          <span
+                            data-testid={`previously-sent-${p.contact.id}`}
+                            style={{ fontSize: 10, fontWeight: 600, color: STATUS.amber, background: `${STATUS.amber}22`, padding: '3px 8px', borderRadius: 6 }}
+                          >
+                            Previously sent {previousSends.map(d => formatSendDate(d.at)).join(', ')}
+                            {alreadySent ? ' — excluded' : ' — sending again'}
                           </span>
                         )}
                       </div>

@@ -65,6 +65,10 @@ function templateFields(meta) {
     personalizedWithBarry: meta.personalizedWithBarry ?? null,
     cc: meta.cc || null,
     hasAttachment: Boolean(meta.hasAttachment),
+    // Sending a cadence again is a new send with its own doc; these record
+    // that the user chose to include people who had already received it.
+    resendPreviousRecipients: Boolean(meta.resendPreviousRecipients),
+    resentContactIds: meta.resentContactIds || [],
   };
 }
 
@@ -181,6 +185,8 @@ export default function BulkSendExecutor({ payload, T: TProp, onAddMoreContacts,
     return {
       contactId: p.contact.id,
       name: getContactName(p.contact),
+      // Already received an earlier send of this cadence; included on purpose.
+      resend: Boolean(cadenceMeta?.resentContactIds?.includes(p.contact.id)),
       email: p.contact.email || p.contact.work_email || '',
       status: 'pending',
       reason: null,

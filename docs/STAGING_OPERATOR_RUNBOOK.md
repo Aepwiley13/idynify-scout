@@ -318,12 +318,12 @@ Use **Scout+ → Add Manually** for S1–S5. For any field not listed, leave it 
   2. Expect "**0 new · 6 already in IDYNIFY**" and 1 email conflict. Click **Import 6 contacts**.
   3. Click **Add to Cadence** → **STAGING - Beyond Words Test** → **Preview**.
 - **EXPECTED:**
-  - A banner: *"5 people have already received "STAGING - Beyond Words Test". They are excluded from this send."*
+  - A banner: *"5 people already received this cadence."* It reads *"They are excluded from this send."*, with **Exclude previous recipients** selected.
   - Each card shows **"Already received — excluded"**.
   - The send button reads **"Send to 0 contacts"** and is disabled.
 - **PASS:**
   - As above.
-  - Then tick **Send to them again**: the button becomes **"Send to 5 contacts"**. **Do not click it.** Untick the box.
+  - Then choose **Include them again**: the button becomes **"Send to 5 contacts"**. **Do not click it.** Choose **Exclude previous recipients** again.
   - Then close Compose, click **Add to Cadence** → **Create new cadence**, type the name `STAGING - Different Cadence` and a subject/body, then click **Preview**: **no** banner, and **"Send to 5 contacts"** is enabled. **Do not send.** Close.
 - **FAIL:** Already-sent people aren't excluded by default, the override doesn't work, or a different cadence is wrongly blocked.
 
@@ -541,8 +541,8 @@ After you click **Add to Cadence**:
 - **What counts as the same cadence:** the **same cadence name**. It's case-sensitive and ignores spaces at the start and end. Choosing the cadence in the picker always uses the exact name.
 - **When it's checked:** on **Preview**.
 - **Who is excluded:** anyone who was delivered **any** earlier send with that name. That covers people shown as sent, or opened in the mail app, and people recorded as delivered in a send that was interrupted.
-- **Warning:** an amber banner, *"N people have already received "<name>". They are excluded from this send."*, plus **"Already received — excluded"** on each of those cards. The send button counts only the rest.
-- **"Send to them again":** ticking it includes them; the button count goes back up and the banner says *"They will be sent it again."* Unticking restores the exclusion.
+- **Warning:** an amber banner, *"N people already received this cadence."*, with **Exclude previous recipients** selected. Each of those cards says **"Previously sent <date> — excluded"**. The send button counts only the rest.
+- **"Include them again":** choosing it includes them. The button count goes back up, the cards say **"— sending again"**, and the banner says *"They will be sent it again"*. **Exclude previous recipients** restores the exclusion.
 - **A different cadence** (a different name) is **not** blocked, even for the same people.
 - **Not covered:** a send that finished seconds before the tab closed may, rarely, not have recorded its last recipient.
 

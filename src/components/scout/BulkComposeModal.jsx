@@ -8,6 +8,7 @@ import { doc, setDoc, getDoc, deleteDoc, serverTimestamp, collection, getDocs, q
 import { db } from '../../firebase/config';
 import BulkSendExecutor from './BulkSendExecutor';
 import { finalizeBarryOpening, displayNameCase, EMAIL_RENDER_VERSION } from '../../utils/emailGreeting';
+import { nameParts } from '../../utils/contactDisplayName';
 import {
   MAX_BULK_CONTACTS, PERSONALIZE_CHUNK, loadAlreadyDelivered,
   hasPersonalizeTag, firstNameFor, renderCadenceEmail, displayContactName,
@@ -20,14 +21,14 @@ function getContactEmail(c) {
 }
 
 function getContactName(c) {
-  return displayContactName(c) || 'Unknown';
+  return displayContactName(c);
 }
 
 function toPersonalizeInput(c) {
   return {
     contactId: c.id,
     firstName: firstNameFor(c),
-    lastName: displayNameCase(c.lastName || c.last_name || c.name?.split(' ').slice(1).join(' ') || ''),
+    lastName: displayNameCase(nameParts(c).last),
     title: c.title || '',
     company: c.company_name || c.company || '',
     industry: c.industry || '',

@@ -9,6 +9,8 @@ import LinkedInLinkSearch from '../../components/scout/LinkedInLinkSearch';
 import CompanySearch from './CompanySearch';
 import CadencePickerModal from '../../components/cadences/CadencePickerModal';
 import { useT } from '../../theme/ThemeContext';
+import { BRAND, STATUS } from '../../theme/tokens';
+import { contactDisplayName, nameParts } from '../../utils/contactDisplayName';
 
 export default function ScoutPlus() {
   const navigate = useNavigate();
@@ -256,8 +258,8 @@ export default function ScoutPlus() {
           <div style={{ padding: '32px 0', textAlign: 'center' }}>
             {/* Success Icon */}
             <div style={{ marginBottom: 24, display: 'flex', justifyContent: 'center' }}>
-              <div style={{ width: 80, height: 80, background: '#dcfce7', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <CheckCircle className="w-12 h-12 text-green-600" />
+              <div style={{ width: 80, height: 80, background: `${STATUS.green}1f`, border: `1px solid ${STATUS.green}55`, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <CheckCircle size={44} style={{ color: STATUS.green }} />
               </div>
             </div>
 
@@ -277,7 +279,7 @@ export default function ScoutPlus() {
                   <Tag className="w-3.5 h-3.5" />{importResult.tag}
                 </span>
                 {emailConflictCount > 0 && (
-                  <span data-testid="import-email-conflicts" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#b45309' }}>
+                  <span data-testid="import-email-conflicts" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: STATUS.amber }}>
                     <AlertTriangle className="w-4 h-4" />
                     {emailConflictCount} email conflict{emailConflictCount !== 1 ? 's' : ''} — kept their IDYNIFY email and won't be added to a cadence until checked in People
                   </span>
@@ -288,7 +290,7 @@ export default function ScoutPlus() {
                   </span>
                 )}
                 {importResult.failed.length > 0 && (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: '#dc2626' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: STATUS.red }}>
                     <AlertTriangle className="w-4 h-4" />
                     {importResult.failed.length} row{importResult.failed.length !== 1 ? 's' : ''} could not be saved
                     (row{importResult.failed.length !== 1 ? 's' : ''} {importResult.failed.map(f => f.rowNumber).join(', ')})
@@ -313,13 +315,13 @@ export default function ScoutPlus() {
                   key={index}
                   style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 0', borderBottom: index < addedItems.length - 1 ? `1px solid ${T.border}` : 'none' }}
                 >
-                  <div style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, background: lastUploadType === 'companies' ? '#cffafe' : '#dbeafe', color: lastUploadType === 'companies' ? '#0891b2' : '#2563eb', flexShrink: 0 }}>
+                  <div style={{ width: 40, height: 40, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, background: lastUploadType === 'companies' ? `${BRAND.cyan}22` : `${BRAND.pink}22`, color: lastUploadType === 'companies' ? BRAND.cyan : BRAND.pink, flexShrink: 0 }}>
                     {lastUploadType === 'companies'
                       ? <Building2 className="w-5 h-5" />
-                      : (item.name ? item.name.charAt(0).toUpperCase() : '?')}
+                      : (nameParts(item).name ? contactDisplayName(item).charAt(0).toUpperCase() : '?')}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{item.name}</p>
+                    <p style={{ fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>{lastUploadType === 'companies' ? item.name : contactDisplayName(item)}</p>
                     <p style={{ fontSize: 12, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', margin: 0 }}>
                       {lastUploadType === 'companies'
                         ? (item.industry || item.website_url || 'Company')

@@ -41,12 +41,14 @@
  * "wrong password" so the form cannot be used to discover which addresses have
  * accounts. We must not un-merge it in the copy.
  */
+const CREDENTIALS_MESSAGE = 'Email or password is incorrect.';
+
 const USER_FIXABLE = new Map([
-  ['auth/invalid-credential', 'That email and password don’t match an account.'],
-  ['auth/invalid-login-credentials', 'That email and password don’t match an account.'],
-  ['auth/wrong-password', 'That email and password don’t match an account.'],
-  ['auth/user-not-found', 'That email and password don’t match an account.'],
-  ['auth/invalid-email', 'That doesn’t look like a valid email address.'],
+  ['auth/invalid-credential', CREDENTIALS_MESSAGE],
+  ['auth/invalid-login-credentials', CREDENTIALS_MESSAGE],
+  ['auth/wrong-password', CREDENTIALS_MESSAGE],
+  ['auth/user-not-found', CREDENTIALS_MESSAGE],
+  ['auth/invalid-email', 'Please enter a valid email address.'],
   ['auth/missing-password', 'Enter your password.'],
   ['auth/too-many-requests', 'Too many attempts. Wait a few minutes and try again.'],
   ['auth/network-request-failed', 'Connection problem — check your network and try again.'],
@@ -74,8 +76,8 @@ const OPERATOR_FIXABLE = new Set([
 ]);
 
 const CONFIG_FAULT_MESSAGE =
-  'Sign-in is misconfigured for this site — this is not your password. ' +
-  'Please report the code below.';
+  'There’s a problem with IDYNIFY’s login setup. This is not an issue with ' +
+  'your password. Please try again shortly or contact support.';
 
 /**
  * A short, comparable fingerprint of the API key actually in use.

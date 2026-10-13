@@ -19,7 +19,7 @@ describe('describeAuthError — the regression that caused the 2026-09-22 lockou
     for (const code of ['auth/invalid-api-key', 'auth/configuration-not-found', 'auth/operation-not-allowed']) {
       const { message, isConfigFault } = describeAuthError({ code }, auth);
       expect(isConfigFault).toBe(true);
-      expect(message).toMatch(/not your password/i);
+      expect(message).toMatch(/not an issue with your password/i);
     }
   });
 
@@ -37,6 +37,17 @@ describe('describeAuthError — the regression that caused the 2026-09-22 lockou
     const a = describeAuthError({ code: 'auth/invalid-credential' }, auth);
     const b = describeAuthError({ code: 'auth/invalid-credential' }, other);
     expect(a.technical).not.toBe(b.technical);
+  });
+});
+
+describe('describeAuthError — the three states the login screen must tell apart', () => {
+  it('uses the agreed copy for malformed email, bad credentials and a setup fault', () => {
+    expect(describeAuthError({ code: 'auth/invalid-email' }, auth).message)
+      .toBe('Please enter a valid email address.');
+    expect(describeAuthError({ code: 'auth/invalid-credential' }, auth).message)
+      .toBe('Email or password is incorrect.');
+    expect(describeAuthError({ code: 'auth/invalid-api-key' }, auth).message)
+      .toBe('There’s a problem with IDYNIFY’s login setup. This is not an issue with your password. Please try again shortly or contact support.');
   });
 });
 

@@ -355,6 +355,36 @@
   line-height: 1.5;
 }
 
+/* A message with secondary detail under it, rather than beside it. */
+.auth-alert--stacked {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.auth-alert-details {
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--auth-muted);
+}
+
+.auth-alert-details summary {
+  width: fit-content;
+  cursor: pointer;
+}
+
+.auth-alert-details summary:focus-visible {
+  outline: 2px solid var(--auth-indigo);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.auth-alert-details code {
+  display: block;
+  margin-top: 4px;
+  font: 400 11.5px ui-monospace, SFMono-Regular, Menlo, monospace;
+  word-break: break-all;
+}
+
 .auth-alert a,
 .auth-alert button.auth-link-inline {
   color: var(--auth-error);

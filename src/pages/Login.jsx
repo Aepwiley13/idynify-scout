@@ -12,6 +12,27 @@ import BrandMark from '../components/auth/BrandMark';
 import { AUTH_ASSETS } from '../theme/tokens';
 
 /**
+ * The form-level error. The sentence is for the person signing in and gets the
+ * full width; the code · project · key line is for whoever is debugging, so it
+ * sits under it, collapsed, where it does not compete with the sentence. It is
+ * kept in production on purpose: the 2026-09-22 lockout happened there, and the
+ * key fingerprint is what would have found it.
+ */
+function SignInError({ message, technical }) {
+  return (
+    <div className="auth-alert auth-alert--stacked" role="alert" aria-live="polite">
+      <span>{message}</span>
+      {technical && (
+        <details className="auth-alert-details">
+          <summary>Technical details</summary>
+          <code>{technical}</code>
+        </details>
+      )}
+    </div>
+  );
+}
+
+/**
  * Sign in — the quiet variant of the authentication experience.
  *
  * The MFA branch below is UNCHANGED LOGIC, re-skinned. `resolveMfaSignIn`,
@@ -117,25 +138,7 @@ export default function Login() {
             autoFocus
           />
 
-          {error && (
-            <div className="auth-alert" role="alert" aria-live="polite">
-              <span>{error}</span>
-              {diag && (
-                <span
-                  style={{
-                    display: 'block',
-                    marginTop: 6,
-                    fontSize: 11,
-                    opacity: 0.75,
-                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                    wordBreak: 'break-all',
-                  }}
-                >
-                  {diag}
-                </span>
-              )}
-            </div>
-          )}
+          {error && <SignInError message={error} technical={diag} />}
 
           <div className="auth-cta-dock">
             <button type="submit" className="auth-cta" disabled={loading || mfaCode.length !== 6}>
@@ -189,25 +192,7 @@ export default function Login() {
             placeholder="Enter your password"
           />
 
-          {error && (
-            <div className="auth-alert" role="alert" aria-live="polite">
-              <span>{error}</span>
-              {diag && (
-                <span
-                  style={{
-                    display: 'block',
-                    marginTop: 6,
-                    fontSize: 11,
-                    opacity: 0.75,
-                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                    wordBreak: 'break-all',
-                  }}
-                >
-                  {diag}
-                </span>
-              )}
-            </div>
-          )}
+          {error && <SignInError message={error} technical={diag} />}
 
           <div className="auth-cta-dock">
             <button type="submit" className="auth-cta" disabled={loading}>

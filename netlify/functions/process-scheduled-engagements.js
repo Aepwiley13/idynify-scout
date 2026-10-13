@@ -27,6 +27,7 @@ import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
 import { writeTimelineEvent, ACTORS } from './utils/timelineWrite.js';
 import { alertOps } from './utils/alertOps.js';
 import { engagementPromotionPatch } from './utils/engagementPromotion.js';
+import { buildPlainTextEmail } from './utils/emailHeaders.js';
 
 // Initialize Firebase Admin (singleton guard)
 if (getApps().length === 0) {
@@ -215,15 +216,9 @@ async function sendScheduledEmail(userId, docRef, eng, results) {
 
   // Build email RFC 2822
   const toName = [contact.firstName, contact.lastName].filter(Boolean).join(' ') || contact.email;
-  const emailLines = [
-    `To: ${toName} <${contact.email}>`,
-    `Subject: ${subject || '(no subject)'}`,
-    'Content-Type: text/plain; charset=utf-8',
-    'MIME-Version: 1.0',
-    '',
-    body || ''
-  ];
-  const emailRaw = emailLines.join('\n');
+  const emailRaw = buildPlainTextEmail({
+    toName, toEmail: contact.email, subject: subject || '(no subject)', body: body || '',
+  });
   const encodedEmail = Buffer.from(emailRaw)
     .toString('base64')
     .replace(/\+/g, '-')
@@ -461,15 +456,10 @@ async function sendScheduledWave(userId, waveRef, wave, results) {
         contact.email;
 
       // Build RFC 2822 email
-      const emailLines = [
-        `To: ${displayName} <${contact.email}>`,
-        `Subject: ${waveSubject}`,
-        'Content-Type: text/plain; charset=utf-8',
-        'MIME-Version: 1.0',
-        '',
-        bodyWithSignature
-      ];
-      const encodedEmail = Buffer.from(emailLines.join('\n'))
+      const emailRaw = buildPlainTextEmail({
+        toName: displayName, toEmail: contact.email, subject: waveSubject, body: bodyWithSignature,
+      });
+      const encodedEmail = Buffer.from(emailRaw)
         .toString('base64')
         .replace(/\+/g, '-')
         .replace(/\//g, '_')

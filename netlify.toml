@@ -1,5 +1,11 @@
 [build]
-  command = "npm run build"
+  # The key check runs BEFORE the build. It asks Google which project owns
+  # VITE_FIREBASE_API_KEY and stops the deploy if that is not the project the
+  # rest of the config names — the 2026-09-22 outage, which no existing gate
+  # could see, because every variable was present and only their relationship
+  # was wrong. It fails the build only on a definitive answer; if Google cannot
+  # be reached it warns and continues. See scripts/firebaseKeyProject.mjs.
+  command = "npm run check:firebase-key && npm run build"
   publish = "dist"
 
 [build.environment]

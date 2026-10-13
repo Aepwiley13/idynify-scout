@@ -6,7 +6,7 @@ import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
 import { auth, db } from '../../firebase/config';
 import {
   collection, query, where, getDocs, getDoc, doc,
-  updateDoc, setDoc, addDoc, serverTimestamp,
+  setDoc, addDoc,
 } from 'firebase/firestore';
 import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
 import { calculateICPScore, DEFAULT_WEIGHTS, generateMatchReasons } from '../../utils/icpScoring';
@@ -14,6 +14,7 @@ import { ARRIVAL_REVIEW_ICP } from '../../utils/firstExperienceMode';
 import { resolveActiveIcp, isResolved, explainUnresolved } from '../../utils/resolveActiveIcp';
 import { retrievalConstraints } from '../../utils/targetingProposal';
 import { getDisplayIndustry } from '../../utils/companyDisplay';
+import { DECISION_SURFACE, approveCompany } from '../../services/companyDecision';
 import FitBadge from '../../components/mission-control/FitBadge';
 import useOnboardingState from '../../hooks/useOnboardingState';
 import AnimatedCounter from '../../components/AnimatedCounter';
@@ -929,9 +930,13 @@ export default function MissionControlDashboardV2() {
     const userId = activeUserId || auth.currentUser?.uid;
     if (!userId) return;
     try {
-      await updateDoc(doc(db, 'users', userId, 'companies', company.id), {
-        status: 'accepted',
-        approvedAt: serverTimestamp(),
+      // The canonical company decision path. The surface ICP is the one this
+      // page resolved and filtered its list by; with none, nothing is guessed.
+      await approveCompany({
+        user: { uid: userId, getIdToken: () => auth.currentUser.getIdToken() },
+        company,
+        surface: DECISION_SURFACE.MISSION_CONTROL,
+        surfaceIcpId: activeIcpProfile?.id ?? null,
       });
     } catch (err) {
       console.error('Failed to approve company:', err);

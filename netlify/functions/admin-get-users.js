@@ -5,6 +5,8 @@
  * Requires admin authentication.
  */
 
+import { requireProjectId } from './utils/firebaseEnv.js';
+
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return {
@@ -26,7 +28,7 @@ export const handler = async (event) => {
       throw new Error('Firebase API key not configured');
     }
 
-    const projectId = process.env.FIREBASE_PROJECT_ID || 'idynify-mission-control';
+    const projectId = requireProjectId();
     const adminUserIds = (process.env.ADMIN_USER_IDS || '').split(',').map(id => id.trim()).filter(Boolean);
 
     // Verify Firebase Auth token

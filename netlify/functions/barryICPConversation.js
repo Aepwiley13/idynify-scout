@@ -3,6 +3,7 @@ import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { LEGACY_SONNET_4_5 } from './utils/models.js';
 import { APOLLO_INDUSTRIES, COMPANY_SIZE_OPTIONS, US_STATES } from '../../src/constants/targetingCanon.js';
+import { sanitizeCompanyKeywords } from '../../src/utils/companyKeywordsResidue.js';
 
 // The supported targeting vocabulary. These lists used to live inline here, in
 // three separate arrays, while `src/constants` carried its own copies of two of
@@ -210,6 +211,12 @@ function extractCompanyKeywords(userInput) {
   return keywords;
 }
 
+// companyKeywords validation (sanitizeCompanyKeywords) now lives in
+// src/utils/companyKeywordsResidue.js, imported above — shared verbatim
+// with src/utils/updateIcpFromChat.js's existing-ICP update path, so the
+// two runtimes cannot drift back into disagreement. See that file for the
+// full rationale and the ABSOLUTE/LEADING/TRAILING residue-term design.
+
 export const handler = async (event) => {
   const startTime = Date.now();
 
@@ -367,7 +374,7 @@ export const handler = async (event) => {
   }
 };
 
-async function processInitialInput(anthropic, userInput, existingICP) {
+export async function processInitialInput(anthropic, userInput, existingICP) {
   const hasExistingICP = existingICP && existingICP.industries && existingICP.industries.length > 0;
 
   // Extract keywords from user input for later use
@@ -528,6 +535,13 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     );
   }
 
+  // Validate companyKeywords — strip geography/structural residue (see
+  // GEOGRAPHY_RESIDUE_TERMS). Never invent a replacement value; an
+  // unsupported concept is dropped, not relocated.
+  if (barryResponse.understood?.companyKeywords) {
+    barryResponse.understood.companyKeywords = sanitizeCompanyKeywords(barryResponse.understood.companyKeywords);
+  }
+
   // Validate locations
   if (barryResponse.understood?.locations && barryResponse.understood.locations !== 'nationwide') {
     barryResponse.understood.locations = barryResponse.understood.locations.filter(loc =>
@@ -579,7 +593,7 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
   };
 }
 
-async function processFollowup(anthropic, userInput, currentStep, conversationHistory, pendingICP) {
+export async function processFollowup(anthropic, userInput, currentStep, conversationHistory, pendingICP) {
   const historyContext = conversationHistory.map(h =>
     `${h.role === 'barry' ? 'Barry' : 'User'}: ${h.content}`
   ).join('\n');
@@ -730,6 +744,13 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     );
   }
 
+  // Validate companyKeywords — strip geography/structural residue (see
+  // GEOGRAPHY_RESIDUE_TERMS). Never invent a replacement value; an
+  // unsupported concept is dropped, not relocated.
+  if (barryResponse.understood?.companyKeywords) {
+    barryResponse.understood.companyKeywords = sanitizeCompanyKeywords(barryResponse.understood.companyKeywords);
+  }
+
   // Validate locations
   if (barryResponse.understood?.locations && barryResponse.understood.locations !== 'nationwide') {
     barryResponse.understood.locations = barryResponse.understood.locations.filter(loc =>
@@ -862,6 +883,13 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     barryResponse.understood.companySizes = barryResponse.understood.companySizes.filter(size =>
       COMPANY_SIZE_OPTIONS.includes(size)
     );
+  }
+
+  // Validate companyKeywords — strip geography/structural residue (see
+  // GEOGRAPHY_RESIDUE_TERMS). Never invent a replacement value; an
+  // unsupported concept is dropped, not relocated.
+  if (barryResponse.understood?.companyKeywords) {
+    barryResponse.understood.companyKeywords = sanitizeCompanyKeywords(barryResponse.understood.companyKeywords);
   }
 
   // Validate locations

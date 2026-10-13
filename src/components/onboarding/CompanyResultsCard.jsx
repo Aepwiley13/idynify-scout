@@ -1,12 +1,18 @@
 import { useState } from 'react';
-import { auth, db } from '../../firebase/config';
-import { doc, updateDoc } from 'firebase/firestore';
+import { auth } from '../../firebase/config';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { DECISION_SURFACE, approveCompany, skipCompany } from '../../services/companyDecision';
 import { useT } from '../../theme/ThemeContext';
 import { getDisplayIndustry } from '../../utils/companyDisplay';
 import './CompanyResultsCard.css';
 
-export default function CompanyResultsCard({ companies, totalCount, onAccept }) {
+/**
+ * `icpId` is the exact ICP the user confirmed in this conversation — the
+ * surface ICP the decisions here are recorded under. Null when no confirmation
+ * is in hand, in which case the canonical path records the discovery ICP as
+ * provenance only, or nothing — never a guess.
+ */
+export default function CompanyResultsCard({ companies, totalCount, onAccept, icpId = null }) {
   const T = useT();
   const [decisions, setDecisions] = useState({});
 
@@ -14,13 +20,14 @@ export default function CompanyResultsCard({ companies, totalCount, onAccept }) 
     const user = getEffectiveUser() || auth.currentUser;
     if (!user) return;
     try {
-      const companyRef = doc(db, 'users', user.uid, 'companies', company.id);
-      await updateDoc(companyRef, {
-        status: 'accepted',
-        swipedAt: new Date().toISOString(),
-        swipeDirection: 'right',
-        swipe_source: 'barry_first_value',
+      const result = await approveCompany({
+        user,
+        company,
+        surface: DECISION_SURFACE.BARRY_FIRST_VALUE,
+        surfaceIcpId: icpId,
       });
+      // A second tap while the first was writing: that one decision stands.
+      if (!result.recorded) return;
       setDecisions(prev => ({ ...prev, [company.id]: 'accepted' }));
       if (onAccept) onAccept(company);
     } catch (err) {
@@ -30,6 +37,12 @@ export default function CompanyResultsCard({ companies, totalCount, onAccept }) 
 
   function handleSkip(company) {
     setDecisions(prev => ({ ...prev, [company.id]: 'skipped' }));
+    // Skip is "not now", not a rejection: the canonical skip. The card has
+    // already moved on, as it always did; the write follows it.
+    const user = getEffectiveUser() || auth.currentUser;
+    if (!user) return;
+    skipCompany({ userId: user.uid, company, surfaceIcpId: icpId })
+      .catch(err => console.error('[CompanyResultsCard] skip failed:', err.message));
   }
 
   const sizeLabel = (company) => {

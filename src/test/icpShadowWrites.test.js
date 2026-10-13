@@ -298,14 +298,18 @@ describe('T-12 — nothing reads what the shadow writes', () => {
    * here is a conversation about where its ICP came from, which is the whole
    * point of the guarantee. It is not a list of readers; see the next two tests.
    *
-   *   DailyLeads      company decisions, and the two person paths that carry
-   *                   ICP context (auto-discovery, People tab)
+   *   companyDecision  the canonical company decision path (D3): every
+   *                   surface's approve / reject / skip, and the persona
+   *                   auto-discovery an approve fires. Replaces the surface-level
+   *                   company writer that lived in DailyLeads; not a parallel one.
+   *   DailyLeads      the People tab person decisions, which carry ICP context
    *   BulkSendExecutor  stamps the ICP an engagement was sent under, and mints
    *                   the criteria version that stamp points at
    */
   const AUTHORISED_WRITERS = [
     'components/scout/BulkSendExecutor.jsx',
     'pages/Scout/DailyLeads.jsx',
+    'services/companyDecision.js',
   ];
 
   it('only authorised write paths import the relationship service', () => {
@@ -338,7 +342,9 @@ describe('T-12 — nothing reads what the shadow writes', () => {
 });
 
 describe('T-8 — legacy first, shadow second', () => {
-  const src = stripComments(readFileSync(resolve(SRC, 'pages/Scout/DailyLeads.jsx'), 'utf8'));
+  // The company decision write lives in the canonical decision path, which
+  // DailyLeads and every other decision surface call.
+  const src = stripComments(readFileSync(resolve(SRC, 'services/companyDecision.js'), 'utf8'));
 
   it('the shadow write happens after the legacy write, inside the same try', () => {
     const legacy = src.indexOf('await updateDoc(companyRef, {');

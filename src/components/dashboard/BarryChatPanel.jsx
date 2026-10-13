@@ -29,6 +29,7 @@ import MessageAngleBlock from '../shared/MessageAngleBlock';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { useShell } from '../../context/ShellContext';
 import { appendTurn, loadOrSeedRecentTurns } from '../../utils/barryCanonical';
+import { confirmAndActivateIcp, effectiveTargeting, formatCompanySizeRange } from '../../utils/confirmAndActivateIcp';
 import { BRAND, STATUS } from '../../theme/tokens';
 
 const DEFAULT_TOKENS = {
@@ -356,6 +357,11 @@ export default function BarryChatPanel({
   const [pendingIcpChange, setPendingIcpChange] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
   const [pendingPipelineAction, setPendingPipelineAction] = useState(null);
+  // Targeting extraction handoff (no saved ICP, confident PROSPECTING) — the
+  // existing create-from-scratch extractor's own understood/pendingICP shape,
+  // carried forward turn to turn exactly as BarryOnboarding/BarryICPPanel
+  // already do. Cleared once confirmed or abandoned.
+  const [pendingTargetingExtraction, setPendingTargetingExtraction] = useState(null);
   const [briefLoading, setBriefLoading] = useState(true);
 
   const threadRef = useRef(null);
@@ -817,6 +823,40 @@ export default function BarryChatPanel({
     }
   }
 
+  // ── Targeting extraction confirmation ───────────────────────────────────────
+  //
+  // The one authoritative confirm/persist/search sequence, shared with
+  // BarryOnboarding — see src/utils/confirmAndActivateIcp.js. Confirmation is
+  // a button click, exactly as BarryICPPanel/BarryOnboarding already require;
+  // it is never inferred from typed text.
+  async function confirmTargetingExtraction(icp) {
+    setSending(true);
+    try {
+      const user = getEffectiveUser();
+      if (!user) return;
+
+      const { canSearch } = await confirmAndActivateIcp(user, icp, 'mission_control');
+      const resultText = canSearch
+        ? "Got it — I'm searching for them now. New matches will show up in Scout shortly."
+        : "Got it — I've saved that, but I need a bit more (industry, size, or location) before I can search.";
+
+      setMessages(prev => [...prev, {
+        role: 'assistant', content: resultText, has_message_angles: false, angles: []
+      }]);
+      appendTurn(db, user.uid, { role: 'assistant', content: resultText, surface: 'workspace' })
+        .catch(err => console.warn('[BarryChatPanel] canonical append failed:', err.message));
+    } catch (err) {
+      console.error('[BarryChatPanel] confirmTargetingExtraction failed:', err);
+      setMessages(prev => [...prev, {
+        role: 'assistant', content: "Couldn't save that targeting — try again in a moment.",
+        has_message_angles: false, angles: []
+      }]);
+    } finally {
+      setPendingTargetingExtraction(null);
+      setSending(false);
+    }
+  }
+
   // ── Pipeline action execution ──────────────────────────────────────────────
 
   async function executePipelineAction(pipelineAction) {
@@ -1002,7 +1042,14 @@ export default function BarryChatPanel({
           contextStack,
           // Where the user is standing when they ask. Sent with every message
           // so Barry's answer tracks the screen, not just the conversation.
-          navigationContext
+          navigationContext,
+          // Continuing a targeting extraction started on a prior turn — the
+          // existing extractor's own accumulator shape, carried forward
+          // exactly as BarryOnboarding/BarryICPPanel already do.
+          ...(pendingTargetingExtraction ? {
+            pendingICP: pendingTargetingExtraction.icp,
+            icpExtractionStep: pendingTargetingExtraction.step,
+          } : {})
         })
       });
 
@@ -1013,6 +1060,28 @@ export default function BarryChatPanel({
         if (data.barry_mode && data.barry_mode !== mode) {
           setMode(data.barry_mode);
         }
+
+        // ── Targeting extraction handoff — no saved ICP, confident PROSPECTING ──
+        if (data.pendingICP) {
+          setPendingTargetingExtraction({ icp: data.pendingICP, step: data.icpExtractionStep });
+
+          if (data.readyToConfirm) {
+            setMessages(prev => [...prev, {
+              role: 'targeting_confirm',
+              responseText: data.response_text,
+              icp: data.pendingICP,
+            }]);
+          } else {
+            setMessages(prev => [...prev, {
+              role: 'assistant', content: data.response_text, has_message_angles: false, angles: []
+            }]);
+          }
+          setConversationHistory(data.updatedHistory || []);
+          return;
+        }
+        // A normal (non-extraction) response clears any stale extraction state
+        // — e.g. the user abandoned it mid-conversation for something else.
+        if (pendingTargetingExtraction) setPendingTargetingExtraction(null);
 
         // LLM-detected ICP change intent — trigger add/replace confirmation flow
         if (data.intent === 'ICP_CHANGE' && data.new_target && contextStack?.icpProfile) {
@@ -1460,6 +1529,72 @@ export default function BarryChatPanel({
                             <button
                               onClick={() => {
                                 setPendingPipelineAction(null);
+                                setMessages(prev => [...prev, {
+                                  role: 'assistant',
+                                  content: 'Got it — skipped for now.',
+                                  has_message_angles: false,
+                                  angles: []
+                                }]);
+                              }}
+                              className="px-3 py-1.5 rounded-lg text-xs font-mono transition-all"
+                              style={{ background: T.surface2, border: `1px solid ${T.border2}`, color: T.textMuted }}
+                            >
+                              Not yet
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  // ── Targeting confirmation bubble ──
+                  if (msg.role === 'targeting_confirm') {
+                    // The authoritative facts of what Confirm will execute —
+                    // built from the same structured object confirmAndActivateIcp
+                    // persists (effectiveTargeting), not regenerated from prose.
+                    // mappingExplanation above is Barry's conversational lead-in;
+                    // this block is what the user is actually agreeing to.
+                    const { company, people } = effectiveTargeting(msg.icp || {});
+                    const geography = company.isNationwide
+                      ? 'Nationwide'
+                      : (company.locations.length > 0 ? company.locations.join(', ') : null);
+                    const sizeLine = formatCompanySizeRange(company.companySizes);
+                    return (
+                      <div key={i} className="flex gap-2 flex-row">
+                        <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
+                        <div className="text-sm px-3 py-3 leading-relaxed rounded-2xl rounded-tl-sm max-w-[88%]" style={{ background: T.cyanBg, color: T.cyan, border: `1px solid ${T.cyanBdr}` }}>
+                          {msg.responseText && (
+                            <div className="mb-3" style={{ color: T.text }}>{msg.responseText}</div>
+                          )}
+                          <div className="mb-3" style={{ color: T.text }}>
+                            {(geography || sizeLine) && (
+                              <div className="mb-2">
+                                <div className="font-mono text-xs uppercase tracking-wide mb-1" style={{ color: T.textMuted }}>Company discovery</div>
+                                {geography && <div>• {geography}</div>}
+                                {sizeLine && <div>• {sizeLine}</div>}
+                              </div>
+                            )}
+                            {people.targetTitles.length > 0 && (
+                              <div className="mb-2">
+                                <div className="font-mono text-xs uppercase tracking-wide mb-1" style={{ color: T.textMuted }}>People targeting</div>
+                                {people.targetTitles.map(title => <div key={title}>• {title}</div>)}
+                              </div>
+                            )}
+                            <div className="text-xs" style={{ color: T.textMuted }}>
+                              Company discovery doesn't currently narrow by county or revenue.
+                            </div>
+                          </div>
+                          <div className="flex gap-2 flex-wrap">
+                            <button
+                              onClick={async () => { await confirmTargetingExtraction(msg.icp); }}
+                              className="px-3 py-1.5 rounded-lg text-xs font-mono transition-all"
+                              style={{ background: `${T.cyan}33`, border: `1px solid ${T.cyan}66`, color: T.cyan }}
+                            >
+                              Use this targeting →
+                            </button>
+                            <button
+                              onClick={() => {
+                                setPendingTargetingExtraction(null);
                                 setMessages(prev => [...prev, {
                                   role: 'assistant',
                                   content: 'Got it — skipped for now.',

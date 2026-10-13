@@ -19,11 +19,14 @@
   # API key's HTTP-referrer restrictions.
   #
   # All six are listed, not just the one that happens to fail first. The scan
-  # matches on variable NAME, and every one of the six appears as a literal in
-  # public/check-test26.html (31-36) and public/retry-leads.html (74-79) —
-  # debug pages that Vite copies to dist/ verbatim — as well as in the bundle
-  # via import.meta.env. Adding them one per failed build costs a deploy cycle
-  # each and converges on this same list.
+  # matches on variable NAME, and every one of the six reaches dist/ through
+  # import.meta.env. Adding them one per failed build costs a deploy cycle each
+  # and converges on this same list.
+  #
+  # They also used to appear as literals in public/check-test26.html and
+  # public/retry-leads.html, two unauthenticated debug pages Vite copied to
+  # dist/ verbatim. Those are deleted; this list is still required, because the
+  # bundle carries the values regardless.
   #
   # FIREBASE_API_KEY is the server-side name for the same key, read by ~10
   # functions. GOOGLE_SEARCH_ENGINE_ID is a Custom Search `cx` handle: it

@@ -139,10 +139,15 @@ describe('the delegated conversation stays intact', () => {
 
   it('the Phase 1B confirmation sequence is untouched', () => {
     // resolve → authoritative write → activate → projection → D7 → attributed search
-    expect(barry).toMatch(/resolveActiveIcp\(user\.uid\)/);
-    expect(barry).toMatch(/'icpProfiles', icpId/);
-    expect(barry).toMatch(/setActiveIcpProfile\(user\.uid, icpId\)/);
-    expect(barry).toMatch(/icpIdSource: 'barry_onboarding_confirmed'/);
+    // The sequence itself lives in confirmAndActivateIcp.js, shared with
+    // Mission Control Barry's targeting handoff — BarryOnboarding.jsx now
+    // only calls it.
+    const confirmIcp = read('../utils/confirmAndActivateIcp.js');
+    expect(barry).toMatch(/confirmAndActivateIcp\(user, extractedICP, 'barry_onboarding'\)/);
+    expect(confirmIcp).toMatch(/resolveActiveIcp\(user\.uid\)/);
+    expect(confirmIcp).toMatch(/'icpProfiles', icpId/);
+    expect(confirmIcp).toMatch(/setActiveIcpProfile\(user\.uid, icpId\)/);
+    expect(confirmIcp).toMatch(/icpIdSource: `\$\{source\}_confirmed`/);
     expect(barry).toMatch(/hasRetrievalConstraint/);
   });
 });

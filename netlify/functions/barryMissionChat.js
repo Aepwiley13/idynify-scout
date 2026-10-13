@@ -27,7 +27,9 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { getStaleContacts } from './utils/contactUtils.js';
 import { buildCapabilityBlock, computeReconState } from './utils/reconCapability.js';
-import { LEGACY_HAIKU_4_5 } from './utils/models.js';
+import { LEGACY_HAIKU_4_5, LEGACY_SONNET_4_5 } from './utils/models.js';
+import { processInitialInput, processFollowup } from './barryICPConversation.js';
+import { normalizeClassification, INTENT_PROSPECTING } from '../../src/utils/firstExperienceIntent.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -454,6 +456,59 @@ material to what they asked.
 `;
 }
 
+/**
+ * What Idynify is, and what Barry can do inside it.
+ *
+ * Mission Control Barry previously had no statement of the product at all —
+ * only "AI sales intelligence assistant" plus contacts, missions and RECON.
+ * In an empty workspace that left nothing to answer "can you find me
+ * companies?" from, so the model filled the gap itself: it said Idynify was
+ * not a prospecting platform and sent users to competitors. This block is the
+ * ground truth it answers from instead.
+ *
+ * Deliberately limited to what exists today. Do not add capabilities here
+ * that the product does not ship.
+ *
+ * @param {Object|null} icpProfile - saved targeting (formal ICP filter fields)
+ */
+export function hasSavedTargeting(icpProfile) {
+  if (!icpProfile) return false;
+  return Boolean(
+    icpProfile.industries?.length ||
+    icpProfile.isNationwide ||
+    icpProfile.locations?.length ||
+    icpProfile.companySizes?.length ||
+    icpProfile.targetTitles?.length ||
+    icpProfile.companyKeywords?.length ||
+    icpProfile.lookalikeSeed?.name
+  );
+}
+
+export function buildProductCapabilityBlock(icpProfile) {
+  const targetingLine = hasSavedTargeting(icpProfile)
+    ? `TARGETING STATUS: Saved. Company discovery runs against the user's saved targeting, and matching companies appear in Scout. When they ask you to find companies, point them to Scout to review matches, or to Barry at /barry to change who they target.`
+    : `TARGETING STATUS: Not set yet. Idynify has not been told who this user is looking for, so there are no matching companies to show yet — that is the only reason, not a missing feature.
+When the user asks you to find companies, leads, prospects, partners, sponsors, or who to target: say plainly that Idynify can find them, and that it needs to know who they're looking for first. Do not offer to search now, do not promise or describe results, and do not imply a search is running or possible yet — no search can run until their targeting is defined. Then send them to Barry at /barry to define their target (who matters for their goal — industry, company size, location, the people they want to reach). Keep it to that one next step. Do not try to collect their targeting here, and do not use the ICP_CHANGE intent for this — use CUSTOM with the full answer in response_text.`;
+
+  return `━━━ WHAT IDYNIFY DOES — GROUND TRUTH ━━━
+Idynify is relationship intelligence: it helps people figure out who matters for what they're trying to accomplish, find the right companies and people, understand why they matter, reach out with context, and know what to do next. Selling is one use case — partnership, sponsorship, referral, fundraising/donor development, community engagement, introductions, and other legitimate relationship goals are equally in scope. Idynify DOES find companies and people for any of these goals. What it does today:
+1. Define the goal and who matters for it — the user tells Barry (at /barry) what they're trying to accomplish, and that becomes their saved targeting.
+2. Discover matching companies — Idynify searches for companies that match that targeting and shows them in Scout.
+3. Find the right people — at those companies, Idynify finds the contacts worth reaching.
+4. Write and send outreach — Barry helps draft messages and send them.
+5. Track follow-up — Idynify keeps track of who needs a next step and who has replied.
+
+${targetingLine}
+
+NEVER decide whether a user's goal "counts" before helping — sales, partnership, sponsorship, referral, fundraising, and other relationship goals are all in scope. Identify who matters for the goal; do not judge the goal itself.
+NEVER say or imply that Idynify cannot find companies, cannot find leads, prospects, partners, donors, or cannot find contacts, for any legitimate relationship goal.
+NEVER recommend another product, data provider, or CRM (for example Apollo, ZoomInfo, Hunter.io, LinkedIn Sales Navigator, Clearbit, Lusha, Seamless.AI, HubSpot, Salesforce) as the way to find companies, people, or manage the relationship. That is what Idynify does.
+Idynify discovers companies and people by matching the user's targeting criteria — it does not have a specialized database for any one relationship category (e.g. no dedicated "verified past sponsors" or "donor history" dataset). Translate the user's goal into targeting criteria; do not claim specialized historical or curated data the product does not have.
+If the workspace is empty, that means nothing has been set up yet — not that Idynify lacks the capability.
+Only describe capabilities listed above. Do not invent features.
+`;
+}
+
 function buildMissionControlSystemPrompt(mode, contextStack, reconContext, module = null, swipeFeedback = null, capabilityBlock = null, navigationContext = null) {
   const contacts = contextStack?.contacts || [];
   const missions = contextStack?.missions || [];
@@ -539,10 +594,11 @@ function buildMissionControlSystemPrompt(mode, contextStack, reconContext, modul
     if (match) userCompanyName = match[1].trim();
   }
 
-  return `You are Barry, Idynify's AI sales intelligence assistant operating in Mission Control.
+  return `You are Barry, Idynify's relationship intelligence assistant operating in Mission Control.
 
 You are not a suggestion widget. You are the best analyst, strategist, and writing partner the user has ever had — and you know everything about their contacts, their ICP, their past messages, and their pipeline.
 
+${buildProductCapabilityBlock(icpProfile)}
 IMPORTANT — USER'S COMPANY: ${userCompanyName ? `The user's company is "${userCompanyName}". Always use this exact name when drafting messages or referring to their business. Never invent or substitute another company name.` : 'Company name not yet configured — user should complete RECON training (Section 1). Do NOT invent a company name.'}
 
 Your vibe: calm confidence, zero fluff, maximum usefulness. You talk like a smart colleague who has already done the research. You ask one question at a time when you need to. You confirm before you act. You offer options, not commands.
@@ -619,6 +675,8 @@ User's communication style preference: ${userStyle ? userStyle.replace(/_/g, ' '
 7. When generating messages: 4 angles, each genuinely different
 8. Field commander voice in reasoning. Calm guide voice in messages.
 9. ALL contacts — Scout, Hunter, Sniper, Customer (Basecamp/Homebase), Network, Partner — are in ONE unified database above. NEVER say a contact "isn't in your system", "is in Homebase (outside Mission Control)", or "I can't pull their profile" unless their name genuinely does not appear ANYWHERE in the CONTACTS list (detailed OR overflow). A contact with stage=basecamp or person_type=customer IS fully accessible — you have their name, company, email, status, and everything else right here. Homebase/Basecamp is NOT a separate system — it's just a stage label. Search EVERY contact entry (including ALL OTHER CONTACTS section) before claiming someone is missing. If you find them, use their data confidently.
+10. Never tell the user Idynify lacks company or person discovery — including when their relationship goal isn't a traditional sales motion — and never point them to a competitor or outside tool to do it. Missing targeting context is not missing capability: if targeting is insufficient, say what's needed next. If they have no targeting yet, send them to Barry at /barry to define who matters for their goal.
+11. When the user challenges, rejects, or corrects a claim you made earlier in this conversation, do not defend it or assume it was correct — re-evaluate against current product truth and current application state above, then respond to the user's actual intent. Your own prior response is conversation context, not authoritative truth. This does not apply to ordinary clarification (the user refining a guess or answering your question) — handle those normally.
 
 ━━━ INTENT DETECTION ━━━
 Classify the user's message into one of:
@@ -634,7 +692,7 @@ Classify the user's message into one of:
 - LOG_OUTCOME: record what happened in a call, meeting, or interaction — signals: "X replied", "had a call with X", "X said no", "X went cold", "X booked a meeting", "log that X", "update X's status", "mark X as", "X is now interested"
 - COMPLETE_STEP: mark a mission step as done and advance — signals: "sent the message to X", "done with step 1 for X", "mark X's step complete", "move to next step for X", "finished step X"
 - ADD_NOTE: add context or a note to a contact's profile — signals: "note that X", "add a note to X", "remember that X", "X mentioned", "jot down for X", "X told me"
-- ICP_CHANGE: user wants to target a new type of company/person, pivot targeting, add a new vertical, or change audience focus — signals: "what about X", "try X instead", "add X", "pivot to X", "forget Y focus on X", "what if we targeted X", "I'm thinking X", "let's do X"
+- ICP_CHANGE: (only when TARGETING STATUS is Saved) user wants to target a new type of company/person, pivot targeting, add a new vertical, or change audience focus — signals: "what about X", "try X instead", "add X", "pivot to X", "forget Y focus on X", "what if we targeted X", "I'm thinking X", "let's do X"
 - CUSTOM: anything else
 
 ━━━ THE THREE-STEP LOOP ━━━
@@ -656,7 +714,7 @@ When generating outreach (FOLLOW_UP or NEW_OUTREACH intents in execute step):
 ━━━ SENTIMENT & FRAMING RULES ━━━
 CRITICAL: When the user says someone "missed a call" or needs to "reschedule", the DEFAULT assumption is the CONTACT/CUSTOMER missed the call — NOT the user. Never draft messages that apologize on the user's behalf unless they explicitly say "I missed the call" or "I couldn't make it". Instead:
 - Frame reschedule messages as gracious and easy: "No worries — let's get back on the calendar"
-- Never say "My bad", "Sorry I dropped the ball", "Sorry I missed" — the user is the seller, they showed up
+- Never say "My bad", "Sorry I dropped the ball", "Sorry I missed" — the user showed up; they are not the one who needs to apologize
 - Keep it light, professional, and forward-looking: offer new times, remove friction
 - The user's time is valuable — messages should convey that while still being warm
 
@@ -1229,6 +1287,114 @@ Return valid JSON only:
           console.warn('[barryMissionChat] Could not load context:', ctxErr.message);
           effectiveContextStack = { contacts: [], missions: [], recon: {}, module };
         }
+      }
+
+      // ── Prospecting handoff gate ─────────────────────────────────────────────
+      //
+      // Deterministic gate: the classifier below is only ever consulted when no
+      // targeting is saved. Reuses the existing First Experience classifier
+      // (see isFirstExperience above) rather than adding a second one — the
+      // same PROSPECTING category already means "wants to find companies/people
+      // not yet known," and its own rules already bias away from false-firing.
+      // A pendingICP already present means the client is continuing an
+      // extraction started on a prior turn — go straight to the follow-up
+      // extractor without reclassifying.
+      const hasTargeting = hasSavedTargeting(effectiveContextStack?.icpProfile || null);
+      const pendingICP = body.pendingICP || null;
+      const icpExtractionStep = typeof body.icpExtractionStep === 'string' ? body.icpExtractionStep : 'clarifying';
+
+      let enterExtraction = Boolean(pendingICP);
+
+      if (!enterExtraction && !hasTargeting && message) {
+        const gateController = new AbortController();
+        const gateTimeout = setTimeout(() => gateController.abort(), 8000);
+        try {
+          const gateResponse = await anthropic.messages.create(
+            {
+              model: LEGACY_HAIKU_4_5,
+              max_tokens: 300,
+              system: buildFirstExperienceClassifierPrompt(null),
+              messages: [{ role: 'user', content: message.slice(0, 2000) }],
+            },
+            { signal: gateController.signal }
+          );
+          const classification = normalizeClassification(extractJson(gateResponse.content[0].text));
+          if (classification.intent === INTENT_PROSPECTING && !classification.needsConfirmation) {
+            enterExtraction = true;
+          }
+        } catch (gateErr) {
+          console.warn('[barryMissionChat] Prospecting gate classification failed (non-fatal):', gateErr.message);
+        } finally {
+          clearTimeout(gateTimeout);
+        }
+      }
+
+      if (enterExtraction) {
+        // ── Targeting extraction handoff ────────────────────────────────────
+        //
+        // Reuses the existing create-from-scratch extractor verbatim (the same
+        // logic BarryOnboarding.jsx already calls over HTTP) rather than a
+        // second implementation, seeded from Mission Control's own
+        // conversation history so the user is never asked to repeat what they
+        // already told Barry.
+        let extraction;
+        try {
+          extraction = pendingICP
+            ? await processFollowup(anthropic, message, icpExtractionStep, conversationHistory, pendingICP)
+            : await processInitialInput(anthropic, message, null);
+        } catch (extractErr) {
+          console.warn('[barryMissionChat] Targeting extraction failed:', extractErr.message);
+          extraction = null;
+        }
+
+        if (extraction?.barryResponse) {
+          const { barryResponse, step: nextStep } = extraction;
+          const readyToConfirm = nextStep === 'confirming';
+          const responseText = barryResponse.followUpQuestion || barryResponse.mappingExplanation
+            || "Tell me more about who you're looking for.";
+
+          const extractionParsed = {
+            intent: 'CUSTOM',
+            barry_mode: effectiveMode,
+            step: 'execute',
+            response_text: responseText,
+            contact_id: null,
+            has_message_angles: false,
+            angles: [],
+            actions: [],
+            clarifying_question: null,
+            pendingICP: barryResponse.understood || pendingICP,
+            icpExtractionStep: nextStep,
+            readyToConfirm,
+          };
+
+          const extractionHistory = [
+            ...conversationHistory,
+            { role: 'user', content: message },
+            { role: 'assistant', content: JSON.stringify(extractionParsed) },
+          ];
+
+          await logApiUsage(userId, 'barryMissionChat', 'success', {
+            provider: 'anthropic',
+            model: LEGACY_SONNET_4_5,
+            traceId,
+            responseTime: Date.now() - startTime,
+            metadata: { type: 'prospecting_targeting_extraction', readyToConfirm },
+          });
+
+          return {
+            statusCode: 200,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            body: JSON.stringify({
+              success: true,
+              response: extractionParsed.response_text,
+              updatedHistory: extractionHistory,
+              ...extractionParsed,
+            }),
+          };
+        }
+        // Extraction failed — fall through to normal Mission Control generation
+        // below rather than leaving the user with no response at all.
       }
 
       // ── Fuzzy name search: if user mentions a name not in the context, find them ──

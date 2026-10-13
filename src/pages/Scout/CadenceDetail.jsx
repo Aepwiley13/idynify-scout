@@ -11,6 +11,7 @@ import {
   Search, SlidersHorizontal, Download, ChevronDown, ChevronUp,
   Archive, Settings, MessageCircleReply, Info,
 } from 'lucide-react';
+import { cadenceTemplate, loadDeliveryHistory, formatSendDate } from '../../utils/cadenceSend';
 import BulkComposeModal from '../../components/scout/BulkComposeModal';
 
 const AVATAR_COLORS = [
@@ -49,16 +50,37 @@ function formatShortTime(ts) {
     + ', ' + d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
 }
 
-export function getCadenceStatus(cadence) {
+/**
+ * A send runs in the browser tab and writes `completedAt` only if the tab stays
+ * open to the end. One that started (status 'active') and has shown no
+ * activity for this long was interrupted — the tab closed or refreshed. Its
+ * emails up to that point did go out; `deliveredContactIds` lists who got one.
+ */
+const INTERRUPTED_AFTER_MS = 30 * 60 * 1000;
+
+const toMillis = (v) => {
+  if (!v) return 0;
+  if (typeof v.toMillis === 'function') return v.toMillis();
+  const d = v instanceof Date ? v : new Date(v);
+  return Number.isNaN(d.getTime()) ? 0 : d.getTime();
+};
+
+export function getCadenceStatus(cadence, now = Date.now()) {
   if (cadence.completedAt) return 'Completed';
+  if (cadence.status === 'active') {
+    const lastActivity = toMillis(cadence.lastSentAt) || toMillis(cadence.createdAt);
+    if (lastActivity && now - lastActivity > INTERRUPTED_AFTER_MS) return 'Interrupted';
+    return 'Active';
+  }
   if ((cadence.sentCount || 0) > 0) return 'Active';
   return 'Draft';
 }
 
 const STATUS_BADGE_COLORS = {
-  Completed: STATUS.green,
-  Active:    '#3b82f6',
-  Draft:     '#94a3b8',
+  Completed:   STATUS.green,
+  Active:      '#3b82f6',
+  Interrupted: '#f59e0b',
+  Draft:       '#94a3b8',
 };
 
 const CONTACT_STATUS_COLORS = {
@@ -84,6 +106,8 @@ export default function CadenceDetail() {
   const { cadenceId } = useParams();
   const user = useActiveUser();
   const [cadence, setCadence] = useState(null);
+  // contactId → every delivery of a cadence with this name (all sends, oldest first)
+  const [sendHistory, setSendHistory] = useState(() => new Map());
   const [loading, setLoading] = useState(true);
   const [bodyExpanded, setBodyExpanded] = useState(false);
   const [composeMode, setComposeMode] = useState(null);
@@ -118,6 +142,17 @@ export default function CadenceDetail() {
       setLoading(false);
     }
   }, [user?.uid, cadenceId]);
+
+  // A cadence sent again is a new send doc with the same name. Load them all
+  // so each person shows every date they were sent it.
+  useEffect(() => {
+    if (!user?.uid || !cadence?.name) return;
+    let cancelled = false;
+    loadDeliveryHistory(user.uid, cadence.name)
+      .then((h) => { if (!cancelled) setSendHistory(h); })
+      .catch((err) => console.warn('[CadenceDetail] send history unavailable', err?.message));
+    return () => { cancelled = true; };
+  }, [user?.uid, cadence?.name]);
 
   const checkReplies = useCallback(async () => {
     if (!user?.uid || !cadenceId || checkingReplies) return;
@@ -275,6 +310,7 @@ export default function CadenceDetail() {
   }
 
   const cadenceStatus = getCadenceStatus(cadence);
+  const template = cadenceTemplate(cadence);
   const statusColor = STATUS_BADGE_COLORS[cadenceStatus];
   const totalContacts = cadence.contactCount || contacts.length || 0;
   const sentCount = cadence.sentCount || 0;
@@ -777,6 +813,11 @@ export default function CadenceDetail() {
                                 {ct.company}
                               </div>
                             )}
+                            {sendHistory.get(ct.contactId)?.length > 1 && (
+                              <div data-testid={`send-history-${ct.contactId}`} style={{ fontSize: 11, color: T.textMuted, marginTop: 2 }}>
+                                {sendHistory.get(ct.contactId).map((d) => `Sent ${formatSendDate(d.at)}`).join(' · ')}
+                              </div>
+                            )}
                           </div>
                         </div>
                       </td>
@@ -924,11 +965,15 @@ export default function CadenceDetail() {
       {composeMode && (
         <BulkComposeModal
           contacts={[]}
-          initialSubject={cadence.subject || ''}
-          initialBody={cadence.body || ''}
-          initialPath={cadence.path || 'write_your_own'}
-          initialCc={cadence.cc || ''}
-          initialPersonalize={cadence.personalizedWithBarry !== false}
+          // The stored template, not `subject`/`body` — those are the first
+          // recipient's rendered email, greeting and opening line included.
+          initialSubject={template.subject}
+          initialBody={template.body}
+          initialCc={template.cc}
+          initialPersonalize={template.personalize}
+          // Adding people keeps the name, so the resend guard excludes anyone
+          // this cadence already reached. A duplicate is a new cadence.
+          initialCadenceName={composeMode === 'add' ? (cadence.name || '') : ''}
           onClose={() => setComposeMode(null)}
         />
       )}

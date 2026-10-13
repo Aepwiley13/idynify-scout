@@ -336,10 +336,13 @@ describe('10 — T-1 proposes and nothing more', () => {
 describe('11 — confirmation remains the authority boundary', () => {
   it('normalized targeting is proposed, and only handleConfirm makes it real', () => {
     const onboarding = read('../pages/Onboarding/BarryOnboarding.jsx');
-    // The creation event is still the one Phase 1B verified, and it is still
-    // reached only from the confirm action.
+    // The write/activate sequence itself lives in confirmAndActivateIcp.js,
+    // shared with Mission Control Barry's targeting handoff —
+    // BarryOnboarding.jsx now only calls it, still only from confirm.
+    const confirmIcp = read('../utils/confirmAndActivateIcp.js');
     expect(onboarding).toMatch(/onConfirm=\{handleConfirm\}/);
-    expect(onboarding).toMatch(/const resolution = await resolveActiveIcp\(user\.uid\)/);
+    expect(onboarding).toMatch(/confirmAndActivateIcp\(user, extractedICP, 'barry_onboarding'\)/);
+    expect(confirmIcp).toMatch(/const resolution = await resolveActiveIcp\(user\.uid\)/);
     expect(onboarding).not.toMatch(/normalizeTargetingText[\s\S]{0,200}setDoc/);
   });
 });

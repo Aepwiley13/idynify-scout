@@ -81,24 +81,36 @@ describe('1 — unresolved identity is never converted to DEFAULT_ICP_ID', () =>
 });
 
 describe('2 — onboarding creates an ICP only on explicit confirmation', () => {
-  const src = read('../pages/Onboarding/BarryOnboarding.jsx');
+  // The write/activate/bridge/search sequence itself lives in
+  // confirmAndActivateIcp.js, shared with Mission Control Barry's targeting
+  // handoff. BarryOnboarding.jsx invokes it only from handleConfirm and holds
+  // no icpProfiles write of its own.
+  const onboardingSrc = read('../pages/Onboarding/BarryOnboarding.jsx');
+  const src = read('../utils/confirmAndActivateIcp.js');
 
-  it('writes icpProfiles only inside handleConfirm', () => {
-    const confirmAt = src.indexOf('async function handleConfirm()');
+  it('BarryOnboarding writes icpProfiles only through confirmAndActivateIcp, called from handleConfirm', () => {
+    expect(onboardingSrc).not.toMatch(/'icpProfiles'/);
+
+    const confirmAt = onboardingSrc.indexOf('async function handleConfirm()');
     expect(confirmAt).toBeGreaterThan(-1);
-
-    const writes = [...src.matchAll(/'icpProfiles'/g)].map(m => m.index);
-    expect(writes.length).toBeGreaterThan(0);
-    writes.forEach(at => expect(at).toBeGreaterThan(confirmAt));
+    const refineAt = onboardingSrc.indexOf('function handleRefine()');
+    const calls = [...onboardingSrc.matchAll(/confirmAndActivateIcp\(/g)].map(m => m.index);
+    expect(calls.length).toBeGreaterThan(0);
+    calls.forEach(at => {
+      expect(at).toBeGreaterThan(confirmAt);
+      expect(at).toBeLessThan(refineAt);
+    });
   });
 
-  it('creates the ICP before projecting it to the bridge', () => {
+  it('confirmAndActivateIcp creates the ICP before projecting it to the bridge', () => {
     const icpWrite = src.indexOf("'icpProfiles'");
-    const bridgeWrite = src.indexOf("'companyProfile', 'current'\n      ),");
+    const bridgeWrite = src.indexOf("'companyProfile', 'current'");
 
-    // The bridge write that follows creation carries the identity.
-    expect(src).toMatch(/icpId,\s*icpIdSource: 'barry_onboarding_confirmed'/);
-    if (bridgeWrite > -1) expect(icpWrite).toBeLessThan(bridgeWrite);
+    expect(icpWrite).toBeGreaterThan(-1);
+    expect(bridgeWrite).toBeGreaterThan(-1);
+    expect(icpWrite).toBeLessThan(bridgeWrite);
+    // The bridge write carries the identity, parameterized by caller source.
+    expect(src).toMatch(/icpId,\s*icpIdSource: `\$\{source\}_confirmed`/);
   });
 
   it('a failed read does not cause a duplicate ICP', () => {
@@ -130,7 +142,7 @@ describe('3 — every search-companies caller carries identity or declines', () 
     ['../pages/Scout/DailyLeads.jsx', 'DailyLeads'],
     ['../pages/Scout/MissionControlDashboardV2.jsx', 'MissionControlDashboardV2'],
     ['../components/scout/BarryICPPanel.jsx', 'BarryICPPanel'],
-    ['../pages/Onboarding/BarryOnboarding.jsx', 'BarryOnboarding'],
+    ['../utils/confirmAndActivateIcp.js', 'confirmAndActivateIcp (BarryOnboarding + Mission Control)'],
   ];
 
   it.each(callers)('%s resolves before searching', (path, name) => {

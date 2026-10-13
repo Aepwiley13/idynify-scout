@@ -43,10 +43,10 @@ export function formatAddress(name, email) {
 }
 
 /**
- * A plain-text message with its headers encoded. `eol` keeps each caller's
- * existing line ending; Gmail accepts either.
+ * A plain-text message with its headers encoded — the exact header set
+ * gmail-send, gmail-send-wave and process-scheduled-engagements already sent.
  */
-export function buildPlainTextEmail({ toName, toEmail, subject, body, eol = '\n' }) {
+export function buildPlainTextEmail({ toName, toEmail, subject, body }) {
   return [
     `To: ${formatAddress(toName, toEmail)}`,
     `Subject: ${encodeHeaderValue(subject)}`,
@@ -54,5 +54,5 @@ export function buildPlainTextEmail({ toName, toEmail, subject, body, eol = '\n'
     'MIME-Version: 1.0',
     '',
     body,
-  ].join(eol);
+  ].join('\n');
 }

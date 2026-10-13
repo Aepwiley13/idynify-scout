@@ -42,12 +42,10 @@ describe('buildPlainTextEmail', () => {
     `${'A very long subject line that keeps going — '.repeat(4)}end`,
   ];
 
-  it.each(SUBJECTS)('subject round-trips byte for byte, with either line ending: %s', (subject) => {
-    for (const eol of ['\n', '\r\n']) {
-      const raw = buildPlainTextEmail({ toName: 'Aaron', toEmail: 'a@example.com', subject, body: 'x', eol });
-      const decoded = receivedHeader(raw, 'Subject');
-      expect(Buffer.from(decoded, 'utf8').equals(Buffer.from(subject, 'utf8'))).toBe(true);
-    }
+  it.each(SUBJECTS)('subject round-trips byte for byte: %s', (subject) => {
+    const raw = buildPlainTextEmail({ toName: 'Aaron', toEmail: 'a@example.com', subject, body: 'x' });
+    const decoded = receivedHeader(raw, 'Subject');
+    expect(Buffer.from(decoded, 'utf8').equals(Buffer.from(subject, 'utf8'))).toBe(true);
   });
 
   it('puts only 7-bit ASCII in the header lines', () => {
@@ -62,7 +60,7 @@ describe('buildPlainTextEmail', () => {
     expect(raw).toMatch(/^To: =\?UTF-8\?B\?[^\n]+ <j@example\.com>$/m);
   });
 
-  it('sends a bare address when there is no display name', () => {
+  it('sends a bare address when there is no display name, or the name is the address', () => {
     for (const toName of [undefined, null, '', 'j@example.com']) {
       const raw = buildPlainTextEmail({ toName, toEmail: 'j@example.com', subject: 's', body: 'x' });
       expect(raw.split('\n')[0]).toBe('To: j@example.com');

@@ -27,7 +27,7 @@ import { google } from 'googleapis';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
-import { buildPlainTextEmail } from './utils/emailHeaders.js';
+import { encodeHeaderValue, formatAddress } from './utils/emailHeaders.js';
 
 if (getApps().length === 0) {
   initializeApp({
@@ -157,9 +157,12 @@ async function executeGmailSend(userId, params) {
   } catch (_) {}
 
   const body = params.body + (signature ? `\n\n${signature}` : '');
-  const raw = Buffer.from(buildPlainTextEmail({
-    toName: params.to_name, toEmail: params.to_email, subject: params.subject, body, eol: '\r\n',
-  })).toString('base64url');
+  const raw = Buffer.from(
+    `To: ${formatAddress(params.to_name, params.to_email)}\r\n` +
+    `Subject: ${encodeHeaderValue(params.subject)}\r\n` +
+    `Content-Type: text/plain; charset=utf-8\r\n\r\n` +
+    body
+  ).toString('base64url');
 
   const sent = await gmail.users.messages.send({ userId: 'me', requestBody: { raw } });
   return { messageId: sent.data.id, threadId: sent.data.threadId };

@@ -82,6 +82,10 @@ export default function BarryWorkspace() {
   const [prospectingBusy, setProspectingBusy] = useState(false);
   const [prospectingStep, setProspectingStep] = useState(null);
   const [resultCompanies, setResultCompanies] = useState(null);
+  // The exact ICP the user confirmed in this conversation, as BarryOnboarding
+  // reports it. The surface ICP for decisions on the results card; null if no
+  // confirmation happened in this mount, and never replaced by a lookup.
+  const [confirmedIcpId, setConfirmedIcpId] = useState(null);
   const resultsDeliveredRef = useRef(false);
 
   const { barryState, companiesFoundCount } = useOnboardingState();
@@ -468,6 +472,7 @@ export default function BarryWorkspace() {
                             onBarryMessage={(content) => feCtrl.addTurn({ role: 'assistant', content })}
                             onProcessing={setProspectingBusy}
                             onStepChange={setProspectingStep}
+                            onIcpConfirmed={setConfirmedIcpId}
                           />
                         </div>
                       )}
@@ -486,6 +491,7 @@ export default function BarryWorkspace() {
                           <CompanyResultsCard
                             companies={resultCompanies}
                             totalCount={companiesFoundCount || resultCompanies.length}
+                            icpId={confirmedIcpId}
                             onAccept={(company) => {
                               feCtrl.addTurn({
                                 role: 'assistant',

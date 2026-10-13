@@ -205,6 +205,10 @@ describe('6 — it is an accelerator, not a step', () => {
 describe('7 — no website-derived targeting bypasses confirmation', () => {
   const onboarding = read('../pages/Onboarding/BarryOnboarding.jsx');
   const accelerator = read('../utils/websiteAccelerator.js');
+  // The write/activate/search sequence itself lives in
+  // confirmAndActivateIcp.js, shared with Mission Control Barry's targeting
+  // handoff — BarryOnboarding.jsx now only calls it.
+  const confirmIcp = read('../utils/confirmAndActivateIcp.js');
 
   it('the accelerator module cannot persist or search', () => {
     const body = code(accelerator);
@@ -221,7 +225,7 @@ describe('7 — no website-derived targeting bypasses confirmation', () => {
 
   it('the creation event is still reached only from confirm', () => {
     expect(onboarding).toMatch(/onConfirm=\{handleConfirm\}/);
-    expect(onboarding).toMatch(/const resolution = await resolveActiveIcp\(user\.uid\)/);
+    expect(confirmIcp).toMatch(/const resolution = await resolveActiveIcp\(user\.uid\)/);
   });
 
   it('a site that yields no supported constraint asks instead of proposing', () => {
@@ -229,7 +233,7 @@ describe('7 — no website-derived targeting bypasses confirmation', () => {
   });
 
   it('and the search is still gated on the floor with an explicit identity', () => {
-    expect(onboarding).toMatch(/const canSearch = hasRetrievalConstraint\(icpProfile\)/);
+    expect(confirmIcp).toMatch(/const canSearch = hasRetrievalConstraint\(icpProfile\)/);
     expect(onboarding).toMatch(/canSearch \? 'SEARCHING' : 'NEEDS_TARGETING'/);
   });
 });

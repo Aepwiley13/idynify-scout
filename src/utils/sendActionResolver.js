@@ -184,6 +184,7 @@ export async function sendEmailViaGmail({ userId, contact, subject, body, ccReci
       gmailMessageId: data.gmailMessageId,
       gmailThreadId: data.gmailThreadId,
       sentAt: data.sentAt,
+      emailFormat: data.emailFormat ?? null,
       message: 'Email sent via Gmail'
     };
 

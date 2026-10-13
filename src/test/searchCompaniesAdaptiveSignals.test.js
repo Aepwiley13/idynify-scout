@@ -48,8 +48,17 @@ describe('buildApolloQuery — adaptive industry signal', () => {
     const q = buildApolloQuery(PROFILE, { savedIndustries: ['Roofing'] });
 
     expect(q.q_organization_keyword_tags[0]).toBe('roofing');
+    // 'Construction' and 'Real Estate' both map to Apollo tag IDs (see
+    // organization_industry_tag_ids below), so they are represented there and
+    // deliberately do NOT also appear as free-text keywords — see "mapped
+    // industries are not duplicated" below for the regression coverage.
     expect(q.q_organization_keyword_tags).toEqual(
-      expect.arrayContaining(['construction', 'real estate', 'contractor']),
+      expect.arrayContaining(['contractor']),
+    );
+    expect(q.q_organization_keyword_tags).not.toContain('construction');
+    expect(q.q_organization_keyword_tags).not.toContain('real estate');
+    expect(q.organization_industry_tag_ids).toEqual(
+      expect.arrayContaining(['5567cd4773696439b10b0019', '5567cd4773696439b10b0077']),
     );
   });
 
@@ -96,5 +105,77 @@ describe('buildApolloQuery — person titles never reach an organisation query',
 
     expect(keys).not.toContain('title');
     expect(q.person_titles).toBeUndefined();
+  });
+});
+
+/**
+ * Wave 2C — a mapped industry is represented once, structurally, not twice.
+ *
+ * Apollo ANDs organization_industry_tag_ids with q_organization_keyword_tags.
+ * Sending 'Computer Software' both as the structured tag ID AND as the
+ * free-text keyword 'computer software' requires a double match that real
+ * organizations fail, which is what zeroed out production Test C (Utah +
+ * Computer Software -> 0 results, despite Utah alone and Utah + employee
+ * size both returning results normally).
+ */
+describe('buildApolloQuery — mapped industries are not duplicated into keyword tags', () => {
+  it('Computer Software + Utah: structured tag only, no keyword duplication', () => {
+    const q = buildApolloQuery({
+      industries: ['Computer Software'],
+      locations: ['Utah'],
+    });
+
+    expect(q.organization_industry_tag_ids).toEqual(['5567cd4773696439b10b0018']);
+    expect(q.organization_locations).toEqual(['Utah, United States']);
+    expect(q.q_organization_keyword_tags).toBeUndefined();
+  });
+
+  it('Computer Software + Utah + explicit companyKeywords: both filters present, industry still not duplicated', () => {
+    const q = buildApolloQuery({
+      industries: ['Computer Software'],
+      locations: ['Utah'],
+      companyKeywords: ['B2B'],
+    });
+
+    expect(q.organization_industry_tag_ids).toEqual(['5567cd4773696439b10b0018']);
+    expect(q.q_organization_keyword_tags).toEqual(['b2b']);
+    expect(q.organization_locations).toEqual(['Utah, United States']);
+  });
+
+  it('an industry that does not resolve to an Apollo tag ID keeps the existing keyword fallback', () => {
+    const q = buildApolloQuery({
+      industries: ['Not A Real Industry'],
+      locations: ['Utah'],
+    });
+
+    expect(q.organization_industry_tag_ids).toBeUndefined();
+    expect(q.q_organization_keyword_tags).toEqual(['not a real industry']);
+  });
+
+  it('location behavior is unchanged', () => {
+    const multiState = buildApolloQuery({ locations: ['Utah', 'Idaho'] });
+    expect(multiState.organization_locations).toEqual(['Utah, United States', 'Idaho, United States']);
+
+    const nationwide = buildApolloQuery({ isNationwide: true });
+    expect(nationwide.organization_locations).toEqual(['United States']);
+  });
+
+  it('company-size behavior is unchanged', () => {
+    const q = buildApolloQuery({
+      locations: ['Utah'],
+      companySizes: ['51-100', '101-200'],
+    });
+
+    expect(q.organization_num_employees_ranges).toEqual(['51,100', '101,200']);
+  });
+
+  it('explicit companyKeywords remain supported with no industries set', () => {
+    const q = buildApolloQuery({
+      locations: ['Utah'],
+      companyKeywords: ['agency', 'startup'],
+    });
+
+    expect(q.organization_industry_tag_ids).toBeUndefined();
+    expect(q.q_organization_keyword_tags).toEqual(['agency', 'startup']);
   });
 });

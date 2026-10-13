@@ -10,11 +10,23 @@
  * out of a failed lookup. Both are gone: the authoritative icpProfiles document
  * is written first, the bridge is written after as a projection carrying its
  * icpId, and an unresolved identity refuses the write instead of inventing one.
+ *
+ * ── companyKeywords is sanitized at this boundary, not just at extraction ──
+ * The reclarification prompt that produces `icpDelta` here (barryMissionChat
+ * .js's ICP reclarification path) has no connection to the from-scratch
+ * extraction's own validation — and even if it did, `action === 'add'` unions
+ * the incoming value onto whatever the existing profile already has, so a
+ * clean new delta is not enough: an invalid value written before validation
+ * existed (or by a path that still lacks it) survives a union forever,
+ * because a union never subtracts. Both sides of the merge are sanitized
+ * before combining, via the one shared implementation in
+ * src/utils/companyKeywordsResidue.js — not a second copy of the rule.
  */
 
 import { doc, setDoc, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { resolveActiveIcp, isResolved } from './resolveActiveIcp';
+import { sanitizeCompanyKeywords } from './companyKeywordsResidue';
 
 /**
  * Apply a confirmed ICP delta from Barry chat.
@@ -43,9 +55,20 @@ export async function updateIcpFromChat(userId, icpDelta, action, existingProfil
 
   let updatedIcpProfile;
   if (action === 'replace') {
+    // Replace keeps its existing field-selection rule exactly as it was —
+    // the delta's value wins when supplied, the old value survives when the
+    // field is omitted. What changes is that whichever value is actually
+    // chosen is sanitized before it is written, so an explicit [] still
+    // clears an old invalid value (sanitizeCompanyKeywords([]) is []) and an
+    // omitted field no longer carries a stale invalid value through
+    // untouched.
+    const chosenCompanyKeywords = icpDelta.companyKeywords !== undefined
+      ? icpDelta.companyKeywords
+      : authoritative.companyKeywords;
     updatedIcpProfile = {
       ...authoritative,
       ...icpDelta,
+      companyKeywords: sanitizeCompanyKeywords(chosenCompanyKeywords || []),
       managedByBarry: true,
       updatedAt: new Date().toISOString(),
     };
@@ -60,7 +83,13 @@ export async function updateIcpFromChat(userId, icpDelta, action, existingProfil
       companySizes: dedupe([...(current.companySizes || []), ...(icpDelta.companySizes || [])]),
       locations: dedupe([...(current.locations || []), ...(icpDelta.locations || [])]),
       targetTitles: dedupe([...(current.targetTitles || []), ...(icpDelta.targetTitles || [])]),
-      companyKeywords: dedupe([...(current.companyKeywords || []), ...(icpDelta.companyKeywords || [])]),
+      // Both sides sanitized before the union — see the file header. An add
+      // can only ever grow this list, so a value that survives sanitization
+      // here survives forever; an invalid value must never be one of them.
+      companyKeywords: dedupe([
+        ...sanitizeCompanyKeywords(current.companyKeywords || []),
+        ...sanitizeCompanyKeywords(icpDelta.companyKeywords || []),
+      ]),
       managedByBarry: true,
       updatedAt: new Date().toISOString(),
     };

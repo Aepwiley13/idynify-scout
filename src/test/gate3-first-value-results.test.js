@@ -27,6 +27,10 @@ const code = src => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm
 
 const onboarding = read('../pages/Onboarding/BarryOnboarding.jsx');
 const onboardingCode = code(onboarding);
+// The write/activate/bridge/search sequence itself lives in
+// confirmAndActivateIcp.js, shared with Mission Control Barry's targeting
+// handoff — BarryOnboarding.jsx now only calls it.
+const confirmIcpCode = code(read('../utils/confirmAndActivateIcp.js'));
 const workspace = read('../pages/Barry/BarryWorkspace.jsx');
 const workspaceCode = code(workspace);
 const resultsCard = read('../components/onboarding/CompanyResultsCard.jsx');
@@ -112,13 +116,18 @@ describe('R4 — Scoring does not alter persisted data', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 describe('R5 — Company acceptance uses canonical document', () => {
+  // Accept goes through the canonical company decision path shared by every
+  // decision surface, so the write it makes is read from there.
+  const decisionPathCode = code(read('../services/companyDecision.js'));
+
   it('CompanyResultsCard writes status accepted via updateDoc', () => {
-    expect(resultsCardCode).toMatch(/updateDoc/);
-    expect(resultsCardCode).toMatch(/status: 'accepted'/);
+    expect(resultsCardCode).toMatch(/approveCompany\(\{/);
+    expect(decisionPathCode).toMatch(/updateDoc/);
+    expect(decisionPathCode).toMatch(/status: direction === 'right' \? 'accepted'/);
   });
 
   it('writes to users/{uid}/companies/{companyId}', () => {
-    expect(resultsCardCode).toMatch(/doc\(db, 'users',.*'companies', company\.id\)/);
+    expect(decisionPathCode).toMatch(/doc\(db, 'users',.*'companies', company\.id\)/);
   });
 
   it('skip is presentation-only — does not persist a state change', () => {
@@ -128,7 +137,9 @@ describe('R5 — Company acceptance uses canonical document', () => {
   });
 
   it('sets swipe_source to barry_first_value', () => {
-    expect(resultsCardCode).toMatch(/swipe_source: 'barry_first_value'/);
+    expect(resultsCardCode).toMatch(/surface: DECISION_SURFACE\.BARRY_FIRST_VALUE/);
+    expect(decisionPathCode).toMatch(/BARRY_FIRST_VALUE: 'barry_first_value'/);
+    expect(decisionPathCode).toMatch(/swipe_source: surface/);
   });
 });
 
@@ -222,23 +233,23 @@ describe('R8 — Results card in _feCard system', () => {
 
 describe('R9 — ICP authority sequence preserved', () => {
   it('resolveActiveIcp still called', () => {
-    expect(onboardingCode).toMatch(/resolveActiveIcp\(user\.uid\)/);
+    expect(confirmIcpCode).toMatch(/resolveActiveIcp\(user\.uid\)/);
   });
 
   it('icpProfiles write still present', () => {
-    expect(onboardingCode).toMatch(/'icpProfiles', icpId/);
+    expect(confirmIcpCode).toMatch(/'icpProfiles', icpId/);
   });
 
   it('setActiveIcpProfile still called', () => {
-    expect(onboardingCode).toMatch(/setActiveIcpProfile\(user\.uid, icpId\)/);
+    expect(confirmIcpCode).toMatch(/setActiveIcpProfile\(user\.uid, icpId\)/);
   });
 
   it('icpIdSource attribution preserved', () => {
-    expect(onboardingCode).toMatch(/icpIdSource: 'barry_onboarding_confirmed'/);
+    expect(confirmIcpCode).toMatch(/icpIdSource: `\$\{source\}_confirmed`/);
   });
 
   it('search-companies trigger still present', () => {
-    expect(onboardingCode).toMatch(/search-companies/);
+    expect(confirmIcpCode).toMatch(/search-companies/);
   });
 });
 

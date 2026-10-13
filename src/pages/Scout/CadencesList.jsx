@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, query, orderBy, onSnapshot } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useActiveUser } from '../../context/ImpersonationContext';
 import { useT } from '../../theme/ThemeContext';
@@ -16,6 +16,7 @@ import KpiCard from '../../components/cadences/KpiCard';
 import useCadenceStats from '../../hooks/useCadenceStats';
 import BulkComposeModal from '../../components/scout/BulkComposeModal';
 import { getCadenceStatus } from './CadenceDetail';
+import { sortCadencesByRecency } from '../../utils/cadenceSend';
 
 function formatDateTime(ts) {
   if (!ts) return '—';
@@ -37,6 +38,7 @@ function formatShortDate(ts) {
 const STATUS_BADGE_COLORS = {
   Completed: STATUS.green,
   Active: '#3b82f6',
+  Interrupted: '#f59e0b',
   Draft: '#94a3b8',
 };
 
@@ -84,12 +86,13 @@ export default function CadencesList() {
 
   useEffect(() => {
     if (!user?.uid) return;
-    const q = query(
-      collection(db, 'users', user.uid, 'cadences'),
-      orderBy('completedAt', 'desc')
-    );
-    const unsub = onSnapshot(q, (snap) => {
-      setCadences(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    // No orderBy. Firestore omits every document that lacks the ordered field,
+    // and this used to order by completedAt — which is written only when a send
+    // runs to the end. A send interrupted by a closed tab or a refresh never got
+    // one, so it vanished from the list while its emails were already out.
+    // Sorted client-side instead, on completedAt falling back to createdAt.
+    const unsub = onSnapshot(collection(db, 'users', user.uid, 'cadences'), (snap) => {
+      setCadences(sortCadencesByRecency(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
       setLoading(false);
     }, () => setLoading(false));
     return unsub;
@@ -463,7 +466,7 @@ export default function CadencesList() {
                   }}
                 />
               </div>
-              <FilterDropdown label="Status" value={statusFilter} options={['All', 'Active', 'Completed', 'Draft']} onChange={v => { setStatusFilter(v); setCurrentPage(1); }} T={T} />
+              <FilterDropdown label="Status" value={statusFilter} options={['All', 'Active', 'Interrupted', 'Completed', 'Draft']} onChange={v => { setStatusFilter(v); setCurrentPage(1); }} T={T} />
               <FilterDropdown label="Owner" value="All" options={['All']} onChange={() => {}} T={T} />
               <FilterDropdown label="Last run" value="All" options={['All']} onChange={() => {}} T={T} />
               <button

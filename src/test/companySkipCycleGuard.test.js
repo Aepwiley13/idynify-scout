@@ -26,7 +26,10 @@ const here = dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(resolve(here, rel), 'utf8');
 const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
-const daily = strip(read('../pages/Scout/DailyLeads.jsx'));
+// Daily Discoveries plus the canonical company decision path it calls, which
+// owns the decision and skip writes.
+const decisionPath = strip(read('../services/companyDecision.js'));
+const daily = strip(read('../pages/Scout/DailyLeads.jsx')) + '\n' + decisionPath;
 
 /**
  * The body of handleSkipCompany.
@@ -41,7 +44,12 @@ function skipHandler() {
   const end = daily.indexOf('const handleUndo = async');
   expect(start, 'handleSkipCompany not found').toBeGreaterThan(-1);
   expect(end, 'anchor not found').toBeGreaterThan(start);
-  return daily.slice(start, end);
+  // …and the canonical skip it delegates the writes to.
+  const skipAt = decisionPath.indexOf('export async function skipCompany');
+  const skipEnd = decisionPath.indexOf('async function readCurrentCycleId');
+  expect(skipAt, 'skipCompany not found').toBeGreaterThan(-1);
+  expect(skipEnd, 'anchor not found').toBeGreaterThan(skipAt);
+  return daily.slice(start, end) + decisionPath.slice(skipAt, skipEnd);
 }
 const search = strip(read('../../netlify/functions/search-companies.js'));
 const writer = strip(read('../../netlify/functions/utils/icpRelationshipWriter.js'));

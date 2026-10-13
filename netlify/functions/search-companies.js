@@ -904,7 +904,16 @@ export function buildApolloQuery(companyProfile, adaptiveSignals) {
     if (industryIds.length > 0) {
       query.organization_industry_tag_ids = industryIds;
     }
-    keywordTags.push(...companyProfile.industries.map(i => i.toLowerCase()));
+    // An industry that resolved to a structured tag ID is already represented
+    // by organization_industry_tag_ids — Apollo ANDs that filter with
+    // q_organization_keyword_tags, so also pushing the same industry in as a
+    // free-text keyword requires a double match ("tagged Computer Software"
+    // AND "keyword-matches 'computer software'") that real organizations
+    // routinely fail, silently zeroing out results. Only an industry that did
+    // NOT resolve to a tag ID — which has no structured representation —
+    // keeps the existing keyword-tag fallback.
+    const unmappedIndustries = companyProfile.industries.filter(i => !resolveToCanonical(i));
+    keywordTags.push(...unmappedIndustries.map(i => i.toLowerCase()));
     console.log(`🏭 Industries selected: ${companyProfile.industries.join(', ')}`);
     console.log(`🏭 Apollo industry tag IDs: ${industryIds.length} mapped`);
   } else {

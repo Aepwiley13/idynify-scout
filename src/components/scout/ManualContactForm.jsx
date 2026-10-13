@@ -2,7 +2,7 @@ import { useState, useRef } from 'react';
 import { auth, db } from '../../firebase/config';
 import { collection, addDoc, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { UserPlus, Search, X, Loader } from 'lucide-react';
-import { CONTACT_STATUSES } from '../../utils/contactStateMachine';
+import { buildUserAddedContact } from '../../schemas/userAddedContact';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { recordReferralReceived } from '../../services/referralIntelligenceService';
 import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
@@ -103,42 +103,20 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
         return;
       }
 
-      // Create contact with manual source
-      const contactData = {
-        ...resolution.fields,
-        name: formData.name.trim(),
-        email: formData.email.trim() || null,
-        phone: formData.phone.trim() || null,
-        company: formData.company.trim() || null,
-        company_id: companyId,
-        company_name: formData.company.trim() || null,
-        title: formData.title.trim() || null,
-        linkedin_url: formData.linkedin_url.trim() || null,
-        address: formData.address.trim() || null,
-        website: formData.website.trim() || null,
-
-        // Relationship classification
-        person_type: 'lead',
-        stage_source: 'auto',
-
-        // Source tracking
+      // Create contact with manual source. The document shape is shared with
+      // the CSV import — see schemas/userAddedContact.js.
+      const contactData = buildUserAddedContact({
+        identityFields: resolution.fields,
+        person: formData,
+        companyId,
         source: referredBy ? 'referral' : 'manual',
-        enrichment_status: 'user_added',
         addedFrom: referredBy ? 'referral' : 'manual',
         addedFromSource: referredBy ? referredBy.id : null,
-
-        // Scout metadata
-        lead_status: 'saved',
-        contact_status: CONTACT_STATUSES.NEW,
-        contact_status_updated_at: new Date().toISOString(),
-        export_ready: true,
-        addedAt: new Date().toISOString(),
-        is_archived: false,   // required by every contact reader — never omit
-
-        // Placeholder for future enrichment
-        apollo_data: null,
-        enriched: false
-      };
+        extra: {
+          address: formData.address.trim() || null,
+          website: formData.website.trim() || null,
+        },
+      });
 
       // Add to user's contacts collection
       const contactsRef = collection(db, 'users', user.uid, 'contacts');

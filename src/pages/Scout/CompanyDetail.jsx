@@ -14,6 +14,7 @@ import { prepareContactWrite, applyContactMerge } from '../../services/contactWr
 import { RECORD_STATUS } from '../../constants/statusModel';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { calculateICPScore, DEFAULT_WEIGHTS } from '../../utils/icpScoring';
+import { DECISION_SURFACE, approveCompany } from '../../services/companyDecision';
 
 /**
  * @param {object}   props
@@ -905,13 +906,16 @@ export default function CompanyDetail({
     if (approvingCompany || !company) return;
     setApprovingCompany(true);
     try {
-      const userId = getEffectiveUser()?.uid;
-      if (!userId) throw new Error('Not authenticated');
+      const user = getEffectiveUser();
+      if (!user?.uid) throw new Error('Not authenticated');
 
-      await updateDoc(doc(db, 'users', userId, 'companies', companyId), {
-        status: 'accepted',
-        approvedAt: new Date().toISOString(),
-        approved_from: 'company_detail_preview',
+      // The canonical company decision path. The surface ICP is the one this
+      // page scores Match against; with none, nothing is guessed.
+      await approveCompany({
+        user,
+        company: { ...company, id: companyId },
+        surface: DECISION_SURFACE.COMPANY_DETAIL,
+        surfaceIcpId: matchIcp?.id ?? null,
       });
 
       setCompany(prev => ({ ...prev, status: 'accepted' }));

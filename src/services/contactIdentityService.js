@@ -92,7 +92,7 @@ const contactsRef = (userId) => collection(db, 'users', userId, 'contacts');
  * @returns {{userId: string, getById: Function, findByField: Function, loadScanWindow: Function}}
  */
 export function createWebAdapter(userId) {
-  const cache = { records: null, failed: false };
+  const cache = { records: null, failed: false, pending: null };
 
   return {
     userId,
@@ -152,16 +152,26 @@ export function createWebAdapter(userId) {
       if (cache.records) return cache.records;
       if (cache.failed) return [];
 
-      try {
-        // Deliberately unordered — see SCAN ORDERING in identityResolution.js.
-        const snap = await getDocs(query(contactsRef(userId), limit(SCAN_WINDOW)));
-        cache.records = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        return cache.records;
-      } catch (err) {
-        console.error('[contact-identity] fallback scan failed', { code: err?.code, message: err?.message });
-        cache.failed = true;
-        return [];
+      // The in-flight load is shared too. A batch caller resolving several
+      // candidates concurrently would otherwise start one scan per candidate
+      // before the first had populated the cache.
+      if (!cache.pending) {
+        cache.pending = (async () => {
+          try {
+            // Deliberately unordered — see SCAN ORDERING in identityResolution.js.
+            const snap = await getDocs(query(contactsRef(userId), limit(SCAN_WINDOW)));
+            cache.records = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            return cache.records;
+          } catch (err) {
+            console.error('[contact-identity] fallback scan failed', { code: err?.code, message: err?.message });
+            cache.failed = true;
+            return [];
+          } finally {
+            cache.pending = null;
+          }
+        })();
       }
+      return cache.pending;
     },
   };
 }

@@ -42,7 +42,10 @@ import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const raw = readFileSync(resolve(here, '../pages/Scout/DailyLeads.jsx'), 'utf8');
+// Daily Discoveries plus the canonical company decision path it calls, which
+// owns the decision write and the undo write.
+const raw = readFileSync(resolve(here, '../pages/Scout/DailyLeads.jsx'), 'utf8')
+  + '\n' + readFileSync(resolve(here, '../services/companyDecision.js'), 'utf8');
 
 /** Source with comments removed — a comment may name the thing the code must not do. */
 const src = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');

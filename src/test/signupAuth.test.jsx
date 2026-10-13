@@ -513,6 +513,25 @@ describe('sign in', () => {
     expect(screen.getByLabelText('Password')).toHaveAttribute('autocomplete', 'current-password');
   });
 
+  it('shows the sentence on its own, with technical details collapsed beneath it', async () => {
+    const user = userEvent.setup();
+    signIn.mockRejectedValue({ code: 'auth/invalid-credential' });
+    const quiet = vi.spyOn(console, 'error').mockImplementation(() => {});
+    await renderLogin();
+
+    await user.type(screen.getByLabelText('Email'), 'a@b.com');
+    await user.type(screen.getByLabelText('Password'), 'pw');
+    await user.click(screen.getByRole('button', { name: /^sign in$/i }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Email or password is incorrect.');
+    const details = alert.querySelector('details');
+    expect(details).not.toBeNull();
+    expect(details.open).toBe(false);
+    expect(details.querySelector('code')).toHaveTextContent('auth/invalid-credential');
+    quiet.mockRestore();
+  });
+
   it('MFA still prompts and still resolves through resolveMfaSignIn', async () => {
     const user = userEvent.setup();
     const mfaErr = { code: 'auth/multi-factor-auth-required' };

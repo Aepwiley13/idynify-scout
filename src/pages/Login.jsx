@@ -4,11 +4,33 @@ import { auth } from '../firebase/config';
 import { useNavigate, Link } from 'react-router-dom';
 import { Mail, ArrowRight } from 'lucide-react';
 import { resolveMfaSignIn } from '../utils/mfa';
+import { describeAuthError } from '../utils/authErrors';
 import AuthLayout from '../components/auth/AuthLayout';
 import AuthField from '../components/auth/AuthField';
 import PasswordField from '../components/auth/PasswordField';
 import BrandMark from '../components/auth/BrandMark';
 import { AUTH_ASSETS } from '../theme/tokens';
+
+/**
+ * The form-level error. The sentence is for the person signing in and gets the
+ * full width; the code · project · key line is for whoever is debugging, so it
+ * sits under it, collapsed, where it does not compete with the sentence. It is
+ * kept in production on purpose: the 2026-09-22 lockout happened there, and the
+ * key fingerprint is what would have found it.
+ */
+function SignInError({ message, technical }) {
+  return (
+    <div className="auth-alert auth-alert--stacked" role="alert" aria-live="polite">
+      <span>{message}</span>
+      {technical && (
+        <details className="auth-alert-details">
+          <summary>Technical details</summary>
+          <code>{technical}</code>
+        </details>
+      )}
+    </div>
+  );
+}
 
 /**
  * Sign in — the quiet variant of the authentication experience.
@@ -42,20 +64,21 @@ export default function Login() {
       await signInWithEmailAndPassword(auth, email, password);
       navigate('/');
     } catch (error) {
-      // Record the real Firebase error code and the project this client is
-      // actually talking to. Every non-MFA failure below renders as the same
-      // sentence, which makes a wrong-project misconfiguration and a wrong
-      // password indistinguishable from the screen. That ambiguity is how a
-      // config incident was read as a password problem for two days.
-      setDiag(`${error.code || 'unknown-error'} \u00b7 ${auth?.app?.options?.projectId || 'no-project-id'}`);
-
       if (error.code === 'auth/multi-factor-auth-required') {
         // MFA is enrolled — prompt for TOTP code
         setMfaRequired(true);
         setMfaError(error);
-      } else {
-        setError('Invalid credentials. Please try again.');
+        return;
       }
+
+      // Say which failure this was. See utils/authErrors.js — the short
+      // version is that a misconfigured deployment and a wrong password used
+      // to be the same sentence on screen, and the fingerprint is there
+      // because Firebase Auth routes by API key, not by projectId.
+      const { message, technical } = describeAuthError(error, auth);
+      setError(message);
+      setDiag(technical);
+      console.error('[auth] sign-in failed:', technical, error);
     } finally {
       setLoading(false);
     }
@@ -115,25 +138,7 @@ export default function Login() {
             autoFocus
           />
 
-          {error && (
-            <div className="auth-alert" role="alert" aria-live="polite">
-              <span>{error}</span>
-              {diag && (
-                <span
-                  style={{
-                    display: 'block',
-                    marginTop: 6,
-                    fontSize: 11,
-                    opacity: 0.75,
-                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                    wordBreak: 'break-all',
-                  }}
-                >
-                  {diag}
-                </span>
-              )}
-            </div>
-          )}
+          {error && <SignInError message={error} technical={diag} />}
 
           <div className="auth-cta-dock">
             <button type="submit" className="auth-cta" disabled={loading || mfaCode.length !== 6}>
@@ -187,25 +192,7 @@ export default function Login() {
             placeholder="Enter your password"
           />
 
-          {error && (
-            <div className="auth-alert" role="alert" aria-live="polite">
-              <span>{error}</span>
-              {diag && (
-                <span
-                  style={{
-                    display: 'block',
-                    marginTop: 6,
-                    fontSize: 11,
-                    opacity: 0.75,
-                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace',
-                    wordBreak: 'break-all',
-                  }}
-                >
-                  {diag}
-                </span>
-              )}
-            </div>
-          )}
+          {error && <SignInError message={error} technical={diag} />}
 
           <div className="auth-cta-dock">
             <button type="submit" className="auth-cta" disabled={loading}>

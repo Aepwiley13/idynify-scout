@@ -25,7 +25,11 @@ const verdict = await checkKeyMatchesProject({
 // No `|| fallback` here: describeVerdict supplies its own placeholder, and a
 // project id with a literal default is the exact shape checkNoHardcodedProjectId
 // exists to reject — including when it is only ever printed.
-const { fatal, text } = describeVerdict(verdict, process.env.VITE_FIREBASE_PROJECT_ID);
+const { fatal, text } = describeVerdict(
+  verdict,
+  process.env.VITE_FIREBASE_PROJECT_ID,
+  process.env.CONTEXT,
+);
 
 (fatal ? console.error : console.log)(text);
 process.exit(fatal ? 1 : 0);

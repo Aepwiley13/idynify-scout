@@ -99,14 +99,40 @@ export async function checkKeyMatchesProject({ apiKey, senderId, fetchImpl = fet
     : { status: 'mismatch', expected: String(senderId), actual: String(actual) };
 }
 
+/** Netlify's CONTEXT values, as its Environment variables screen labels them. */
+const NETLIFY_CONTEXT_LABEL = {
+  production: 'Production',
+  'deploy-preview': 'Deploy Previews',
+  'branch-deploy': 'Branch deploys',
+  dev: 'Local development',
+};
+
+/**
+ * Name the Netlify context whose value is wrong.
+ *
+ * Netlify keeps a separate value per deploy context. The 2026-09-22 fix went in
+ * under Production; every other context needed the same fix separately. A bare
+ * "fix VITE_FIREBASE_API_KEY" can send the reader to a value that is already right.
+ */
+function contextHint(context) {
+  if (!context) return '';
+  const label = NETLIFY_CONTEXT_LABEL[context] || context;
+  return (
+    `\n  This build ran in Netlify's "${context}" context. Set the value\n` +
+    `  under "${label}": a key fixed in one context is still wrong in\n` +
+    '  the others.\n'
+  );
+}
+
 /**
  * Render a verdict, and say whether it should stop the build.
  *
  * @param {Verdict} verdict
  * @param {string=} projectId  VITE_FIREBASE_PROJECT_ID, for the message only
+ * @param {string=} context    Netlify's CONTEXT, for the message only
  * @returns {{fatal: boolean, text: string}}
  */
-export function describeVerdict(verdict, projectId = '(unset)') {
+export function describeVerdict(verdict, projectId = '(unset)', context) {
   switch (verdict.status) {
     case 'ok':
       return { fatal: false, text: `✓ VITE_FIREBASE_API_KEY belongs to ${projectId} (project ${verdict.projectNumber})` };
@@ -123,7 +149,8 @@ export function describeVerdict(verdict, projectId = '(unset)') {
         text:
           '\n✗ VITE_FIREBASE_API_KEY was rejected by Google as invalid.\n\n' +
           '  Every sign-in on this build would fail. Copy the key from\n' +
-          '  Firebase Console → Project settings → General → Web API Key.\n',
+          '  Firebase Console → Project settings → General → Web API Key.\n' +
+          contextHint(context),
       };
 
     case 'mismatch':
@@ -139,7 +166,8 @@ export function describeVerdict(verdict, projectId = '(unset)') {
           '  return auth/invalid-credential for everyone and password resets\n' +
           '  would silently send nothing. This is the 2026-09-22 outage.\n\n' +
           '  Fix: Firebase Console → Project settings → General → Web API Key,\n' +
-          '  for the project above, into VITE_FIREBASE_API_KEY.\n',
+          '  for the project above, into VITE_FIREBASE_API_KEY.\n' +
+          contextHint(context),
       };
 
     default:

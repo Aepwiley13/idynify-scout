@@ -52,6 +52,20 @@ describe('checkKeyMatchesProject — the 2026-09-22 outage', () => {
     expect(text).toContain('263090641220');
     expect(text).toContain('999999999999');
   });
+
+  it('names the Netlify context, because the key is set once per context', async () => {
+    // After the outage the key was fixed under Production; the other contexts
+    // needed the same fix separately. Point at the value that is actually wrong.
+    const v = await checkKeyMatchesProject({ ...GOOD, fetchImpl: ownedBy('999999999999') });
+    const { text } = describeVerdict(v, 'the-configured-project', 'deploy-preview');
+    expect(text).toContain('"deploy-preview" context');
+    expect(text).toContain('under "Deploy Previews"');
+  });
+
+  it('says nothing about contexts when not running on Netlify', async () => {
+    const v = await checkKeyMatchesProject({ ...GOOD, fetchImpl: ownedBy('999999999999') });
+    expect(describeVerdict(v, 'the-configured-project').text).not.toMatch(/context/);
+  });
 });
 
 describe('checkKeyMatchesProject — a definitively bad key is fatal', () => {

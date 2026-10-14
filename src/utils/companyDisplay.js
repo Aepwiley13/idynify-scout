@@ -17,6 +17,7 @@
  */
 import { STATUS } from '../theme/tokens';
 import { normalizeIndustry } from './normalizeTargeting.js';
+import { isMissingValue } from './missingValue.js';
 // The sentinel and the domain read both come from the identity module rather
 // than being restated here. Re-deriving either in a second place is the exact
 // drift companyIdentityService exists to prevent — a presentational copy that
@@ -45,18 +46,7 @@ export function getMatchReasons(company) {
   return company.fit_reasons || company.matchReasons || company.match_reasons || [];
 }
 
-// Strings that stand in for a missing value. Discovery once stored a missing
-// industry as the literal "null", and other sources write "Unknown" or "N/A";
-// none of them is a fact about the company.
-const PLACEHOLDER_VALUES = new Set(['null', 'undefined', 'unknown', 'unknown industry', 'n/a', 'na', 'none', '-', '—']);
-
-export function isMissingValue(value) {
-  if (value === null || value === undefined) return true;
-  if (typeof value === 'number') return !Number.isFinite(value);
-  if (typeof value !== 'string') return false;
-  const trimmed = value.trim();
-  return !trimmed || PLACEHOLDER_VALUES.has(trimmed.toLowerCase());
-}
+export { isMissingValue };
 
 export const VERIFICATION_NEEDED_MESSAGE =
   'Potential match based on discovery criteria. Company details still need verification.';

@@ -27,6 +27,7 @@
 
 import { collection, doc, getDoc, getDocs, limit, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { normalizeLoose } from '../utils/identityNormalization';
+import { isMissingValue } from '../utils/missingValue';
 import { createCompanyRecord, COMPANY_STATUS } from '../schemas/companySchema';
 import { auth, db } from '../firebase/config';
 
@@ -666,12 +667,16 @@ export async function applyCompanyEnrichment(userId, companyId, discovered = {},
 
   if (domain && !normalizeDomain(existing.domain)) patch.domain = domain;
 
-  // Fill holes only; never restate what the record already has.
+  // Fill holes only; never restate what the record already has. A placeholder
+  // ("null", "Unknown", "N/A", blank) is a hole, not a value: discovery stored
+  // a missing industry as the string "null", and treating that as present left
+  // enriched companies unscorable on industry forever. Likewise a placeholder
+  // from enrichment is not worth writing, and an employee count must be > 0.
+  const isHole = (field, v) => isMissingValue(v) || (field === 'employee_count' && !(Number(v) > 0));
   for (const field of ['website_url', 'linkedin_url', 'industry', 'employee_count', 'location', 'logo_url']) {
     const value = discovered[field];
-    if (value === null || value === undefined || value === '') continue;
-    const current = existing[field];
-    if (current !== null && current !== undefined && current !== '') continue;
+    if (isHole(field, value)) continue;
+    if (!isHole(field, existing[field])) continue;
     patch[field] = value;
   }
 

@@ -7,7 +7,9 @@
  *   B. HELPER  — headers from getApolloHeaders(), exactly as production sends
  * and prints both results side by side. The key value is never printed.
  *
- *   npx netlify dev:exec node scripts/apollo-auth-check.mjs
+ *   npx netlify dev:exec --context production node scripts/apollo-auth-check.mjs
+ * (dev:exec defaults to the "Local development" context, whose APOLLO_API_KEY
+ * can differ from Production's.)
  *   APOLLO_API_KEY=... node scripts/apollo-auth-check.mjs
  *
  * Healthy: {"healthy":true,"is_logged_in":true}

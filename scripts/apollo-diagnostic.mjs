@@ -6,8 +6,10 @@
  * search-companies uses (getApolloHeaders() → X-Api-Key from APOLLO_API_KEY),
  * and prints the raw response metadata BEFORE any of our transforms.
  *
- * Run with the production env injected (key is never printed):
- *   npx netlify dev:exec node scripts/apollo-diagnostic.mjs
+ * Run with the PRODUCTION context's env injected (key is never printed).
+ * Netlify keeps a separate APOLLO_API_KEY per deploy context, and dev:exec
+ * defaults to the "Local development" context — pass --context production:
+ *   npx netlify dev:exec --context production node scripts/apollo-diagnostic.mjs
  * or
  *   APOLLO_API_KEY=... node scripts/apollo-diagnostic.mjs
  *
@@ -82,7 +84,13 @@ async function main() {
   console.log(`Apollo key in use: ${redactKey(getApolloHeaders())}`);
 
   // ── Test 4 (first, cheap): is the key alive at all? ──────────────────────
-  await call('TEST 4a — auth/health', `${BASE}/auth/health`, { method: 'GET' });
+  const health = await call('TEST 4a — auth/health', `${BASE}/auth/health`, { method: 'GET' });
+  if (health?.json?.is_logged_in !== true) {
+    console.log('\n⛔ auth/health did not return is_logged_in:true for this key. Every search below would');
+    console.log('   fail the same way, so the A/B would prove nothing. Stopping before spending credits.');
+    console.log('   Check which Netlify context supplied APOLLO_API_KEY (use --context production).');
+    process.exit(2);
+  }
   await call('TEST 4b — api usage stats (needs master key)', `${BASE}/usage_stats/api_usage_stats`, { body: {} });
 
   // ── Test 1 — bare minimum ────────────────────────────────────────────────
@@ -114,12 +122,15 @@ async function main() {
   };
   const t5 = await call('REPLAY — production-shaped Utah + Computer Software query (production URL)', PROD_URL, { body: prodQuery });
   const t5b = await call('REPLAY minus industry tag ID', PROD_URL, { body: { ...prodQuery, organization_industry_tag_ids: undefined } });
+  // The proposed fix's query: same replay, industry sent as a keyword tag instead of a tag ID.
+  const t5k = await call('REPLAY with keyword instead of tag ID (proposed fix)', PROD_URL,
+    { body: { ...prodQuery, organization_industry_tag_ids: undefined, q_organization_keyword_tags: ['computer software'] } });
 
   console.log('\n=== SUMMARY (total_entries / organizations returned) ===');
   for (const [label, r] of [
     ['1  bare /api/v1', t1], ['1p bare /v1', t1p], ['2  utah', t2], ['2p Utah, United States', t2p],
     ['3A tag id', t3a], ['3B organization_industries', t3b], ['3C keyword tags', t3c],
-    ['R  prod replay', t5], ['R- replay w/o tag id', t5b],
+    ['R  prod replay', t5], ['R- replay w/o tag id', t5b], ['RK replay keyword (fix)', t5k],
   ]) {
     console.log(`  ${label.padEnd(28)} HTTP ${r?.status ?? 'ERR'}  total=${total(r)}  orgs=${r?.json?.organizations?.length ?? 'n/a'}`);
   }

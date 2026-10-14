@@ -5,7 +5,10 @@
  * Calls GET /api/v1/auth/health twice:
  *   A. DIRECT  — headers built by hand here, bypassing getApolloHeaders()
  *   B. HELPER  — headers from getApolloHeaders(), exactly as production sends
- * and prints both results side by side. The key value is never printed.
+ * and prints both results side by side, then runs the same bare search the
+ * deployed apollo-key-fingerprint function runs (the authoritative auth
+ * test). The key value is never printed; its fingerprint matches the
+ * function's keySha256Prefix.
  *
  *   npx netlify dev:exec --context production node scripts/apollo-auth-check.mjs
  * (dev:exec defaults to the "Local development" context, whose APOLLO_API_KEY
@@ -66,3 +69,26 @@ if (direct.status === null || helper.status === null) {
 } else {
   console.log('  DIFFERENT → the helper changes how Apollo authenticates us.');
 }
+
+// Bare search — identical to netlify/functions/apollo-key-fingerprint.js.
+// Status is the authoritative auth test; only counts and codes are printed.
+console.log('\n=== BARE SEARCH (getApolloHeaders(), same as the deployed diagnostic) ===');
+const search = { searchStatus: null, searchReturnedOrganizations: null, searchTotalEntries: null, searchErrorCode: null };
+try {
+  const res = await fetch('https://api.apollo.io/api/v1/mixed_companies/search', {
+    method: 'POST',
+    headers: getApolloHeaders(),
+    body: JSON.stringify({ page: 1, per_page: 1 }),
+  });
+  search.searchStatus = res.status;
+  const body = await res.json().catch(() => null);
+  if (res.ok) {
+    search.searchReturnedOrganizations = Array.isArray(body?.organizations) ? body.organizations.length : null;
+    search.searchTotalEntries = body?.pagination?.total_entries ?? null;
+  } else {
+    search.searchErrorCode = body?.error_code ?? null;
+  }
+} catch (err) {
+  console.log(`  NETWORK ERROR: ${err.message}`);
+}
+console.log(`  ${JSON.stringify(search)}`);

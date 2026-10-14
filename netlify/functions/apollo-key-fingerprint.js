@@ -9,6 +9,9 @@
  *   - SHA-256 fingerprint (first 16 hex chars of the hash of the raw value,
  *     exactly as getApolloApiKey() reads it — no trimming)
  *   - auth/health HTTP status and is_logged_in, using getApolloHeaders()
+ *   - a bare mixed_companies/search {page:1, per_page:1} with the same
+ *     headers: HTTP status, organization count, total_entries, and Apollo's
+ *     error_code on a non-2xx. This is the authoritative auth test.
  *
  * Endpoint: /.netlify/functions/apollo-key-fingerprint
  * Method: POST
@@ -52,11 +55,39 @@ export const handler = async (event) => {
     // Network failure: healthStatus stays null.
   }
 
+  // Authoritative auth test: a bare search. Only counts and codes leave this
+  // function — never organization details.
+  let searchStatus = null;
+  let searchReturnedOrganizations = null;
+  let searchTotalEntries = null;
+  let searchErrorCode = null;
+  try {
+    const res = await fetch('https://api.apollo.io/api/v1/mixed_companies/search', {
+      method: 'POST',
+      headers: getApolloHeaders(),
+      body: JSON.stringify({ page: 1, per_page: 1 }),
+    });
+    searchStatus = res.status;
+    const body = await res.json().catch(() => null);
+    if (res.ok) {
+      searchReturnedOrganizations = Array.isArray(body?.organizations) ? body.organizations.length : null;
+      searchTotalEntries = body?.pagination?.total_entries ?? null;
+    } else {
+      searchErrorCode = body?.error_code ?? null;
+    }
+  } catch {
+    // Network failure: searchStatus stays null.
+  }
+
   return reply(200, {
     keyPresent: true,
     keyLength: key.length,
     keySha256Prefix: createHash('sha256').update(key).digest('hex').slice(0, 16),
     authHealthStatus: healthStatus,
     isLoggedIn,
+    searchStatus,
+    searchReturnedOrganizations,
+    searchTotalEntries,
+    searchErrorCode,
   });
 };

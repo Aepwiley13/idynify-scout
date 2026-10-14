@@ -58,15 +58,24 @@ const COOLDOWN_MS = 60 * 60 * 1000;
  */
 const SEND_TIMEOUT_MS = 10_000;
 
+/** The word that leads the subject line, per severity. */
+const SEVERITY_LABELS = Object.freeze({
+  failed: 'FAILED',
+  partial_failure: 'PARTIAL',
+  unexpected_use: 'UNEXPECTED',
+});
+
 /**
- * Report a failed or partially-failed scheduled run.
+ * Report a failed or partially-failed scheduled run — or, with severity
+ * 'unexpected_use', a call that should not happen at all, such as a request to
+ * a deprecated endpoint nothing is meant to reach.
  *
  * NEVER THROWS. An alerting failure must not turn a partial failure into a
  * total one — the caller has already done its work by the time this runs.
  *
  * @param {object}  args
  * @param {string}  args.job      Function name, e.g. 'daily-leads-refresh'.
- * @param {'partial_failure'|'failed'} args.severity
+ * @param {'partial_failure'|'failed'|'unexpected_use'} args.severity
  * @param {string}  args.summary  One line a human can act on.
  * @param {object} [args.detail]  Counters or an error message, rendered as-is.
  * @param {object} [args.db]      Firestore handle. Omitted, the cooldown is
@@ -87,7 +96,8 @@ export async function alertOps({ job, severity, summary, detail = {}, db = null 
       return { sent: false, reason: 'cooldown' };
     }
 
-    const label = severity === 'failed' ? 'FAILED' : 'PARTIAL';
+    // Anything unrecognised reads as PARTIAL, as every non-'failed' value always has.
+    const label = SEVERITY_LABELS[severity] ?? 'PARTIAL';
 
     // Scannable on a lock screen, where roughly the first 35 characters
     // survive. Severity first so the eye lands on it, then the job name, then

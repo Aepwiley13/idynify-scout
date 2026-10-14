@@ -40,7 +40,7 @@ vi.mock('../../netlify/functions/firebase-admin.js', () => ({
 vi.mock('../../netlify/functions/utils/logApiUsage.js', () => ({ logApiUsage }));
 
 import {
-  handler, CODES, SUCCESS, LOG_EVENT, KILL_SWITCH_ENV, DEPRECATION_HEADER, ALERT_JOBS, ALERT_BUDGET_MS,
+  handler, CODES, SUCCESS, STAGES, LOG_EVENT, KILL_SWITCH_ENV, DEPRECATION_HEADER, ALERT_JOBS, ALERT_BUDGET_MS,
 } from '../../netlify/functions/extractBusinessCard.js';
 
 // ─── Fixtures ───────────────────────────────────────────────────────────────
@@ -322,6 +322,37 @@ describe('every failure has its own status and stable code', () => {
     expect(res.statusCode).toBe(500);
     expect(parse(res)).toMatchObject({ success: false, code: CODES.INTERNAL_ERROR });
     expect(visionRequests).toHaveLength(0);
+  });
+
+  it('500 INTERNAL_ERROR on an unexpected exception: generic to the caller, diagnosable in the log', async () => {
+    // The thrown message carries card content on purpose: it must not be logged.
+    logApiUsage.mockRejectedValueOnce(new RangeError('write failed for jane.smith@acmerockets.com'));
+    const res = await handler(event());
+
+    expect(res.statusCode).toBe(500);
+    expect(parse(res)).toEqual({ success: false, error: 'Something went wrong. Please try again.', code: CODES.INTERNAL_ERROR });
+    // Category without content: the error's name and the last step reached.
+    expect(lastTelemetry()).toMatchObject({ outcome: CODES.INTERNAL_ERROR, errorName: 'RangeError', stage: STAGES.USAGE });
+    expectNoSecrets(allLogText(), 'logs');
+    expectNoSecrets(res.body, 'response');
+  });
+
+  it('500 INTERNAL_ERROR for missing configuration names the cause and the step', async () => {
+    delete process.env.GOOGLE_VISION_API_KEY;
+    await handler(event());
+
+    expect(lastTelemetry()).toMatchObject({ outcome: CODES.INTERNAL_ERROR, errorName: 'ConfigMissing', stage: STAGES.CONFIG });
+  });
+
+  it.each([
+    ['kill switch', () => { process.env[KILL_SWITCH_ENV] = 'off'; }, () => event(), STAGES.REQUEST],
+    ['bad token', () => {}, () => event({ body: JSON.stringify({ userId: UID, authToken: 'x', imageBase64: IMAGE }) }), STAGES.AUTH],
+    ['upstream failure', () => { visionReply = vision.httpError; }, () => event(), STAGES.OCR],
+    ['success', () => {}, () => event(), STAGES.RESPOND],
+  ])('%s records the last step reached', async (_label, arrange, make, stage) => {
+    arrange();
+    await handler(make());
+    expect(lastTelemetry().stage).toBe(stage);
   });
 
   it('keeps every message generic: no provider, variable or step named', async () => {

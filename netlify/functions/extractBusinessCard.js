@@ -79,6 +79,17 @@ export const CODES = Object.freeze({
 /** The outcome recorded for a successful extraction. Never sent as a `code`. */
 export const SUCCESS = 'SUCCESS';
 
+/** The steps a request passes through, in order. Telemetry records the last one reached. */
+export const STAGES = Object.freeze({
+  REQUEST: 'request',   // kill switch, method, body validation
+  AUTH: 'auth',         // token present and verified, user match
+  CONFIG: 'config',     // Vision key present
+  OCR: 'ocr',           // the Vision call
+  PARSE: 'parse',       // parseBusinessCardText
+  USAGE: 'usage',       // the apiLogs row
+  RESPOND: 'respond',
+});
+
 // Generic on purpose: no provider, variable or step is named. NO_TEXT_FOUND
 // keeps the wording the old client already shows its users.
 const FAILURES = {
@@ -189,6 +200,9 @@ export const handler = async (event, context) => {
   const telemetry = {
     requestId: requestIdOf(event, context),
     originHost: originHostOf(event.headers),
+    // The last step the request reached (STAGES). With errorName, it is what
+    // makes an INTERNAL_ERROR diagnosable without logging a single value.
+    stage: STAGES.REQUEST,
     authenticated: false,
     userMismatch: false,
     uid: null,
@@ -232,6 +246,7 @@ export const handler = async (event, context) => {
       return finish(failure(CODES.INVALID_REQUEST), CODES.INVALID_REQUEST);
     }
 
+    telemetry.stage = STAGES.AUTH;
     const authToken = extractAuthToken(event);
     if (!authToken) {
       return finish(failure(CODES.UNAUTHORIZED), CODES.UNAUTHORIZED);
@@ -266,6 +281,7 @@ export const handler = async (event, context) => {
       return settle(CODES.USER_MISMATCH);
     }
 
+    telemetry.stage = STAGES.CONFIG;
     const googleVisionApiKey = process.env.GOOGLE_VISION_API_KEY;
     if (!googleVisionApiKey) {
       return settle(CODES.INTERNAL_ERROR, { errorName: 'ConfigMissing' });
@@ -275,6 +291,7 @@ export const handler = async (event, context) => {
     const base64Image = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
     telemetry.imageChars = base64Image.length;
 
+    telemetry.stage = STAGES.OCR;
     let visionData;
     try {
       const visionResponse = await fetch(
@@ -317,11 +334,13 @@ export const handler = async (event, context) => {
     }
 
     // Parse text into structured contact fields
+    telemetry.stage = STAGES.PARSE;
     const extractedData = parseBusinessCardText(fullText);
     const fieldsExtracted = Object.keys(extractedData).filter(k => extractedData[k]).length;
     telemetry.textChars = fullText.length;
     telemetry.fieldsExtracted = fieldsExtracted;
 
+    telemetry.stage = STAGES.USAGE;
     await logApiUsage(tokenUid, OPERATION, 'success', {
       provider: 'google',
       responseTime: Date.now() - startedAt,
@@ -329,6 +348,7 @@ export const handler = async (event, context) => {
     });
 
     // The unchanged contract: the same three fields, with the same values.
+    telemetry.stage = STAGES.RESPOND;
     return finish(respond(200, { success: true, extractedData, rawText: fullText }), SUCCESS);
   } catch (err) {
     // Name only, never the message or stack, for the same reason as above.

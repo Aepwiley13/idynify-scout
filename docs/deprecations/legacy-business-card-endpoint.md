@@ -28,6 +28,14 @@ Inside the repo there is exactly one caller, and it is unreachable. A repository
 
 What did **not** change: the success body (`success`, `extractedData`, `rawText`), `parseBusinessCardText` (byte-identical), and the request sent to Vision.
 
+## Known legacy parser defect (intentionally unchanged)
+
+**`parseBusinessCardText` can save the local part of an email as the website.** Its website pattern runs over the whole card text and takes the first match without an `@`. On a card with `jane.smith@acmerockets.com`, the first match is `jane.smith`, so the result is `website: "jane.smith"` even when the card prints `www.acmerockets.com`.
+
+This is a real bug, and it is **deliberately not fixed**. It belongs to the retired scanner, which is being removed rather than repaired. The lockdown changes no parser behavior, so a caller we have not found yet keeps getting exactly what it got before.
+
+`src/test/legacyBusinessCardEndpoint.test.js` ("extracts exactly what the legacy parser always extracted") asserts `website: 'jane.smith'`. **That assertion pins existing behavior; it does not describe desired behavior.** It exists so that any change to the legacy parser is noticed. Relationship Capture uses its own extraction and does not inherit this parser.
+
 ## Responses
 
 Every response carries `Content-Type: application/json`, `Access-Control-Allow-Origin: *` and `Deprecation: @1791936000`.
@@ -51,14 +59,16 @@ Error bodies are `{ success: false, error: <generic message>, code }`.
 Every request writes exactly one line at `warn` level:
 
 ```
-legacy_endpoint.extractBusinessCard { requestId, originHost, authenticated, userMismatch, uid,
+legacy_endpoint.extractBusinessCard { requestId, originHost, stage, authenticated, userMismatch, uid,
   outcome, status, timestamp, ms, imageChars?, textChars?, fieldsExtracted?,
   upstreamStatus?, upstreamError?, errorName?, alertJob, alert }
 ```
 
 - `uid` is the **verified** token holder, or `null`. The body's `userId` is never recorded.
 - `originHost` is the host of `Origin` (or `Referer`) only. A full URL can carry credentials or identifiers in its userinfo, path or query, so none of those are kept.
-- `upstreamError` and `errorName` are error *names* (`TypeError`), never messages.
+- `stage` is the last step the request reached: `request` → `auth` → `config` → `ocr` → `parse` → `usage` → `respond`.
+- `upstreamError` and `errorName` are error *names* (`TypeError`, or `ConfigMissing` for missing configuration), never messages.
+- An `INTERNAL_ERROR` is diagnosed from `errorName` plus `stage`. For example, `ConfigMissing` at `config`, or a `RangeError` at `parse`. The caller only ever sees the generic message.
 - `alert` is `sent`, or why it was not: `cooldown`, `no_resend_key`, `alert_budget_exceeded`, `resend_<status>`, …
 
 Requests with a verified user also write an `apiLogs` row with endpoint `GOOGLE_EXTRACTBUSINESSCARD`, so they show up in the admin API-logs view.
@@ -87,6 +97,8 @@ Other properties of the alert:
 - The alert is awaited for at most 3 seconds, then abandoned, so a slow email provider never holds up the caller.
 - It sends only where `RESEND_API_KEY` and `OPS_ALERT_EMAIL` are set, as for every other alertOps alert.
 
+> **Monitoring is active only if both variables are set in the Netlify *production* context.** If either is missing, the alert is silently skipped, as it is for the scheduled-job alerts (see `DEPLOYMENT.md`). The telemetry line then reads `alert: 'no_resend_key'` or `'no_ops_alert_email'`. Status at the time of the lockdown PR: **not verified**, because that session had no Netlify access. Confirm both under Site configuration → Environment variables (production context) before relying on the alert. Until then, the telemetry line and the `apiLogs` rows are the only signals.
+
 **Contents.** The endpoint path, the request id, a timestamp, the outcome code and status, the calling host, `authenticated` and `userMismatch`.
 
 **Never included:**
@@ -98,6 +110,22 @@ Other properties of the alert:
 - any user identifier
 
 Existing ops alerts carry no user identifiers, and this one follows that. To identify an authenticated caller, find the `GOOGLE_EXTRACTBUSINESSCARD` row in the admin API-logs view at the alert's timestamp, or the telemetry line with the alert's `requestId`.
+
+### `ops_alerts` lifecycle
+
+This is existing alertOps behavior, unchanged by this endpoint, which only adds two document ids.
+
+| | |
+|---|---|
+| Document | `ops_alerts/{key}`, one per alert key |
+| Shape | `{ lastAlertAtMs: number, lastAlertAt: ISO-8601 string, job: string }` |
+| Written | Only after an email is accepted by the provider, with `set(…, { merge: true })`. The same document is overwritten each time, never appended to. A skipped or failed send writes nothing. |
+| Read | On each alert attempt, to check the one-hour cooldown |
+| Expiry | None. There is no TTL policy and no cleanup job, and none is needed. A document only holds the time of the last alert; once that is more than an hour old it has no effect. |
+| Growth | Bounded by the number of distinct keys, which are constants in code, never derived from a request: five scheduled jobs plus the two keys here, so seven documents at most. |
+| Access | Admin SDK only. `firestore.rules` denies every client read and write on `ops_alerts/{job}`, so no client can silence an alert by moving the cooldown forward. |
+
+The five scheduled jobs (`daily-leads-refresh`, `gmail-sync-worker`, `process-barry-inbox-queue`, `process-barry-queue`, `process-scheduled-engagements`) have used this collection the same way since alertOps was introduced.
 
 ## Kill switch
 
@@ -130,6 +158,7 @@ Not provable from the repo: callers outside it. The observation window below exi
 
 Delete the endpoint only when **all** of these hold:
 
+- [ ] `RESEND_API_KEY` and `OPS_ALERT_EMAIL` were confirmed in production before the 30-day window started. If they were not, the window is judged on the telemetry line and `apiLogs` rows alone, and that should be said explicitly.
 - [ ] This lockdown has been deployed to production for at least **30 days**.
 - [ ] No unexpected calls in the last 30 days: no `legacy_endpoint.extractBusinessCard` lines, no `GOOGLE_EXTRACTBUSINESSCARD` rows, no alerts. Named, deliberate test calls are the only exception.
 - [ ] The historical `APOLLO_EXTRACTBUSINESSCARD` check is done, and its last-call date and count are recorded here.

@@ -19,12 +19,32 @@ import CompanyDetailModal from '../../components/scout/CompanyDetailModal';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { calculateICPScore, DEFAULT_WEIGHTS } from '../../utils/icpScoring';
-import { getDisplayIndustry, getDisplayBarryIntel } from '../../utils/companyDisplay';
+import { getDisplayIndustry, getDisplayBarryIntel, isMissingValue } from '../../utils/companyDisplay';
+import { isEnrichmentPending } from '../../services/companyEnrichment';
+import { usePendingEnrichmentUpdates } from '../../hooks/usePendingEnrichmentUpdates';
 import {
   RECORD_STATUS,
   isEngagedRecord,
   readRecordStatus,
 } from '../../constants/statusModel';
+
+// Match is Company × ICP: derived on demand against the resolved ICP, or left
+// explicitly unattributed when none resolves (see loadSavedCompanies).
+function withIcpMatch(company, icp) {
+  return icp
+    ? { ...company, fit_score: calculateICPScore(company, icp, icp.scoringWeights || DEFAULT_WEIGHTS), match_attributed: true }
+    : { ...company, fit_score: null, match_attributed: false };
+}
+
+export const VERIFYING_LABEL = 'Verifying company details…';
+
+// A company value for display. Missing is "N/A" — or "…" while company-only
+// enrichment is still running, so a value about to arrive never reads as absent.
+// `count` formats a number with thousands separators (employees, not years).
+export function displayValue(value, pending, { count = false } = {}) {
+  if (isMissingValue(value) || value === 0) return pending ? '…' : 'N/A';
+  return count && typeof value === 'number' ? value.toLocaleString('en-US') : value;
+}
 
 // ─── SavedCompanies ───────────────────────────────────────────────────────────
 export default function SavedCompanies({ onSelectCompany }) {
@@ -40,6 +60,23 @@ export default function SavedCompanies({ onSelectCompany }) {
   const [activeTab, setActiveTab] = useState('active'); // 'active' | 'archived'
   const [searchTerm, setSearchTerm] = useState('');
   const [detailCompany, setDetailCompany] = useState(null);
+  const [userId, setUserId] = useState(null);
+  const icpRef = useRef(null);
+
+  // A company accepted moments ago may still be verifying when this page loads.
+  // Its document is watched until enrichment lands, then merged and rescored in
+  // place — real industry, employees, HQ, Match and Barry, no refresh needed.
+  usePendingEnrichmentUpdates({
+    userId,
+    companies: [...companies, ...archivedCompanies],
+    onUpdate: (id, data) => {
+      const merge = list => list.map(c => (c.id === id
+        ? withIcpMatch({ ...c, ...data, id: c.id, contact_count: c.contact_count, suggested_contact_count: c.suggested_contact_count }, icpRef.current)
+        : c));
+      setCompanies(merge);
+      setArchivedCompanies(merge);
+    },
+  });
 
   const updateViewMode = (mode) => {
     setViewMode(mode);
@@ -118,16 +155,10 @@ export default function SavedCompanies({ onSelectCompany }) {
       // explicitly unattributed rather than presented as accurate.
       const resolution = await resolveActiveIcp(user.uid);
       const icp = isResolved(resolution) ? resolution.profile : null;
+      icpRef.current = icp;
+      setUserId(userId);
 
-      const withMatch = list => list.map(c => (
-        icp
-          ? {
-              ...c,
-              fit_score: calculateICPScore(c, icp, icp.scoringWeights || DEFAULT_WEIGHTS),
-              match_attributed: true,
-            }
-          : { ...c, fit_score: null, match_attributed: false }
-      ));
+      const withMatch = list => list.map(c => withIcpMatch(c, icp));
 
       const companiesList = withMatch(enrichWithContacts(acceptedSnap));
       const archivedList = withMatch(enrichWithContacts(archivedSnap));
@@ -301,7 +332,7 @@ export default function SavedCompanies({ onSelectCompany }) {
       {/* ── Content ── */}
       {viewMode === 'swipe' ? (
         <SwipeDeck
-          key={noContactCompanies.map(c => c.id).join(',')}
+          key={noContactCompanies.map(c => c.id).sort().join(',')}
           companies={noContactCompanies}
           totalActive={companies.length}
           T={T}
@@ -343,7 +374,11 @@ export default function SavedCompanies({ onSelectCompany }) {
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <CompanyName company={company} style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text }} />
-                    <div style={{ fontSize: 10, color: T.textFaint }}>{getDisplayIndustry(company)} · {(company.apolloEnrichment?.snapshot?.founded_year || company.founded_year) ? `Founded ${company.apolloEnrichment?.snapshot?.founded_year || company.founded_year}` : ''}</div>
+                    <div style={{ fontSize: 10, color: T.textFaint }}>
+                      {isEnrichmentPending(company)
+                        ? VERIFYING_LABEL
+                        : <>{getDisplayIndustry(company)} · {(company.apolloEnrichment?.snapshot?.founded_year || company.founded_year) ? `Founded ${company.apolloEnrichment?.snapshot?.founded_year || company.founded_year}` : ''}</>}
+                    </div>
                   </div>
                   {company.contact_count > 0 && (
                     <span style={{ fontSize: 9, background: `${STATUS.green}15`, color: STATUS.green, borderRadius: 7, padding: '2px 7px' }}>
@@ -414,7 +449,7 @@ function BarryAvatar({ size = 20, style = {} }) {
 }
 
 // ─── SwipeDeck ────────────────────────────────────────────────────────────────
-function SwipeDeck({ companies, totalActive, T, onFindContact }) {
+export function SwipeDeck({ companies, totalActive, T, onFindContact }) {
   const [deck, setDeck] = useState(() => [...companies]);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -424,7 +459,9 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
   const [initialCount] = useState(() => companies.length);
   const handlersRef = useRef({});
 
-  const current = deck[0];
+  // The deck holds the order; the latest data comes from props, so a company
+  // whose enrichment lands while it is on screen updates in place.
+  const current = deck[0] ? (companies.find(c => c.id === deck[0].id) ?? deck[0]) : undefined;
   const remaining = deck.length;
   const withContacts = totalActive - remaining;
   const progress = totalActive > 0 ? Math.round((withContacts / totalActive) * 100) : 100;
@@ -536,23 +573,28 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
 
   // ── Card-level derived values (DailyLeads parity) ────────────────────────────
   const overlayOpacity = Math.min(Math.abs(dragOffset.x) / 100 * 1.5, 0.85);
-  // A null score means no ICP resolved, so this company has no current Match —
-  // an explicit unattributed state, not a zero.
+  // No ICP resolved → no current Match, an explicit unattributed state. An ICP
+  // with a null score is different: the company was not measurable yet (G1-06),
+  // shown as — / "Not enough data", never as "No active ICP" or a zero.
   const score = current?.fit_score ?? null;
-  const matchUnattributed = score === null;
-  const sc = matchUnattributed ? STATUS.amber : score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : STATUS.red;
-  const scoreLabel = matchUnattributed
-    ? 'No active ICP'
+  const matchUnattributed = current?.match_attributed === false;
+  const isScored = score !== null;
+  const pending = isEnrichmentPending(current);
+  const sc = !isScored ? T.textFaint : score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : STATUS.red;
+  const scoreLabel = !isScored
+    ? (pending ? VERIFYING_LABEL : 'Not enough data')
     : score >= 75 ? 'Strong Fit' : score >= 50 ? 'Good Match' : 'Low Fit';
   // getDisplayBarryIntel strips the legacy "Matches your ICP criteria" claim,
   // which was built from ICP settings rather than company data.
   const barryText = getDisplayBarryIntel(current)
     || current?.description
     || `${current?.name} is on your hunt list — find the right contact to start engaging.`;
-  const hqLocation = current?.hq_location
-    || (current?.headquarters_city ? `${current.headquarters_city}${current.headquarters_state ? ', ' + current.headquarters_state : ''}` : null)
-    || current?.headquarters || current?.location || current?.city
-    || current?.apolloEnrichment?.snapshot?.location?.full || null;
+  const hqLocation = [
+    current?.hq_location,
+    !isMissingValue(current?.headquarters_city) ? `${current.headquarters_city}${!isMissingValue(current?.headquarters_state) ? ', ' + current.headquarters_state : ''}` : null,
+    current?.headquarters, current?.location, current?.city,
+    current?.apolloEnrichment?.snapshot?.location?.full,
+  ].find(v => typeof v === 'string' && !isMissingValue(v)) || null;
   const CARD_H = 'clamp(390px, calc(100vh - 300px), 590px)';
 
   // ── Dot position indicator ────────────────────────────────────────────────────
@@ -689,17 +731,17 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
                 </div>
                 <CompanyName company={current} style={{ display: 'block', fontSize: 18, fontWeight: 700, color: T.text, textAlign: 'center' }} />
                 <div style={{ fontSize: 10, color: T.textFaint, marginTop: 3, letterSpacing: 1.5 }}>
-                  {getDisplayIndustry(current, '').toUpperCase()}
+                  {pending ? VERIFYING_LABEL : getDisplayIndustry(current, '').toUpperCase()}
                 </div>
               </div>
 
               {/* Stats grid — bordered cells like DailyLeads */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: `1px solid ${T.border}` }}>
                 {[
-                  ['EMPLOYEES', current.employee_count || current.apolloEnrichment?.snapshot?.estimated_num_employees || current.company_size || 'N/A'],
-                  ['FOUNDED',   current.founded_year || current.apolloEnrichment?.snapshot?.founded_year || 'N/A'],
-                  ['REVENUE',   current.revenue || current.apolloEnrichment?.snapshot?.revenue_range || 'N/A'],
-                  ['HQ',        hqLocation || '—'],
+                  ['EMPLOYEES', displayValue(current.employee_count || current.apolloEnrichment?.snapshot?.estimated_num_employees || current.company_size, pending, { count: true })],
+                  ['FOUNDED',   displayValue(current.founded_year || current.apolloEnrichment?.snapshot?.founded_year, pending)],
+                  ['REVENUE',   displayValue(current.revenue || current.apolloEnrichment?.snapshot?.revenue_range, pending)],
+                  ['HQ',        hqLocation || (pending ? '…' : '—')],
                 ].map(([l, v]) => (
                   <div key={l} style={{ padding: '8px 14px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
                     <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>{l}</div>
@@ -719,14 +761,14 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
                 </div>
               )}
 
-              {/* Fit score row (when available) */}
-              {!matchUnattributed && score > 0 && (
+              {/* Fit score row — measured, or an honest — while it cannot be */}
+              {!matchUnattributed && (
                 <div style={{ padding: '8px 14px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <div>
                     <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>FIT SCORE</div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <span style={{ fontSize: 18, fontWeight: 800, color: sc }}>{score}</span>
-                      <span style={{ fontSize: 10, color: T.textFaint }}>/100</span>
+                      <span data-testid="saved-fit-score" style={{ fontSize: 18, fontWeight: 800, color: sc }}>{isScored ? score : '—'}</span>
+                      {isScored && <span style={{ fontSize: 10, color: T.textFaint }}>/100</span>}
                       <span style={{ fontSize: 9, color: sc, fontWeight: 700, padding: '2px 7px', background: `${sc}15`, borderRadius: 5, border: `1px solid ${sc}40` }}>{scoreLabel}</span>
                     </div>
                   </div>
@@ -797,7 +839,11 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
 }
 
 // ─── Company Card (v5 style) ──────────────────────────────────────────────────
-function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts, onArchive, onRestore }) {
+export function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts, onArchive, onRestore }) {
+  const pending = isEnrichmentPending(company);
+  const location = [
+    company.apolloEnrichment?.snapshot?.location?.full, company.hq_location, company.location, company.city,
+  ].find(v => typeof v === 'string' && !isMissingValue(v));
   return (
     <div
       style={{ background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 13, overflow: 'hidden', transition: 'all 0.15s', cursor: 'pointer' }}
@@ -812,7 +858,7 @@ function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts, onArch
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <CompanyName company={company} style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} />
-            <div style={{ fontSize: 10, color: T.textMuted }}>{getDisplayIndustry(company)}</div>
+            <div style={{ fontSize: 10, color: T.textMuted }}>{pending ? VERIFYING_LABEL : getDisplayIndustry(company)}</div>
           </div>
           {company.contact_count > 0 && (
             <div style={{ fontSize: 9, background: `${STATUS.green}18`, color: STATUS.green, borderRadius: 7, padding: '2px 7px', border: `1px solid ${STATUS.green}30`, flexShrink: 0 }}>
@@ -827,10 +873,10 @@ function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts, onArch
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
           {[
-            ['EMPLOYEES', company.apolloEnrichment?.snapshot?.estimated_num_employees || company.employee_count || company.company_size || 'N/A'],
-            ['FOUNDED', company.apolloEnrichment?.snapshot?.founded_year || company.founded_year || 'N/A'],
-            ['INDUSTRY', getDisplayIndustry(company)],
-            ['LOCATION', company.apolloEnrichment?.snapshot?.location?.full || company.location || company.city || 'N/A'],
+            ['EMPLOYEES', displayValue(company.apolloEnrichment?.snapshot?.estimated_num_employees || company.employee_count || company.company_size, pending, { count: true })],
+            ['FOUNDED', displayValue(company.apolloEnrichment?.snapshot?.founded_year || company.founded_year, pending)],
+            ['INDUSTRY', getDisplayIndustry(company, pending ? '…' : 'N/A')],
+            ['LOCATION', displayValue(location, pending)],
           ].map(([l, v]) => (
             <div key={l}>
               <div style={{ fontSize: 8, letterSpacing: 1, color: T.textFaint }}>{l}</div>

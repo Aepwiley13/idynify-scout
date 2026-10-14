@@ -51,6 +51,7 @@ import { prepareContactWrite, applyContactMerge } from './contactWriteGuard';
 import { RECORD_STATUS } from '../constants/statusModel';
 import { DEFAULT_ICP_ID } from '../utils/reconSectionMap';
 import { recordDecision, recordSkip, recordPersonEncounter } from './icpRelationshipService';
+import { enrichAcceptedCompany } from './companyEnrichment';
 
 /** Where a decision was made. Persisted as `swipe_source`, which names the surface. */
 export const DECISION_SURFACE = Object.freeze({
@@ -316,7 +317,7 @@ export async function triggerPeopleDiscovery({ user, company, icpTitles, activeI
 
 /**
  * Approve from a surface that has no decision flow of its own: the decision,
- * then persona people discovery.
+ * then persona people discovery and, independently, company-only enrichment.
  *
  * Resolves once the DECISION has committed, so the surface responds exactly as
  * fast as it did before. Discovery is a side effect of a decision that already
@@ -332,7 +333,10 @@ export async function approveCompany({ user, company, surface, surfaceIcpId = nu
     const icpTitles = await resolveDecisionPersona(user.uid, result.activeICPId);
     await triggerPeopleDiscovery({ user, company, icpTitles, activeICPId: result.activeICPId, causeId: result.swipedAt });
   })().catch(err => console.error('[companyDecision] people discovery after approve failed:', err));
-  return { ...result, peopleDiscovery };
+  // Company-only enrichment: independent of people discovery, never awaited,
+  // never throws. One organization lookup now that the user has said yes.
+  const companyEnrichment = enrichAcceptedCompany({ userId: user.uid, company });
+  return { ...result, peopleDiscovery, companyEnrichment };
 }
 
 /**

@@ -12,6 +12,7 @@
  *   - getDisplayName(company) → { label, hint, derived } (name provenance)
  *   - isMissingValue(value)  → true for null/empty/"null"/"unknown"/"n/a"
  *   - getDisplayBarryIntel(company) → Barry text safe to show as evidence
+ *   - isProvisionalBarryIntel(company) → Barry text still awaiting verified facts
  *
  * Presentation only — no data fetching, no scoring, no side effects.
  */
@@ -58,6 +59,18 @@ export const VERIFICATION_NEEDED_MESSAGE =
 // the claim is removed when shown rather than presented as fact.
 const LEGACY_ICP_CLAIM = /\s*Matches your ICP criteria:[\s\S]*$/i;
 const LEGACY_SECTOR_FILLER = / is a this sector company/i;
+
+/**
+ * Whether a company's stored Barry text is the provisional kind: absent, the
+ * discovery-time "needs verification" text, or the legacy ICP-derived claim.
+ * Only provisional text may be replaced when verified facts arrive; anything
+ * else was written by a richer source and stays.
+ */
+export function isProvisionalBarryIntel(company) {
+  const raw = company?.barry_intel || company?.barry_context || company?.barryIntel;
+  if (typeof raw !== 'string' || isMissingValue(raw)) return true;
+  return raw.includes(VERIFICATION_NEEDED_MESSAGE) || LEGACY_ICP_CLAIM.test(raw) || LEGACY_SECTOR_FILLER.test(raw);
+}
 
 export function getDisplayBarryIntel(company) {
   if (!company) return null;

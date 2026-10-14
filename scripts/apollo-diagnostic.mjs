@@ -84,9 +84,12 @@ async function main() {
   console.log(`Apollo key in use: ${redactKey(getApolloHeaders())}`);
 
   // ── Test 4 (first, cheap): is the key alive at all? ──────────────────────
-  const health = await call('TEST 4a — auth/health', `${BASE}/auth/health`, { method: 'GET' });
-  if (health?.json?.is_logged_in !== true) {
-    console.log('\n⛔ auth/health did not return is_logged_in:true for this key. Every search below would');
+  // auth/health is reported but not trusted; the bare search status is the
+  // authoritative auth test (is_logged_in can read false for a working key).
+  await call('TEST 4a — auth/health (informational)', `${BASE}/auth/health`, { method: 'GET' });
+  const gate = await call('AUTH GATE — bare search {page:1, per_page:1}', DOC_URL, { body: { page: 1, per_page: 1 } });
+  if (gate?.status !== 200) {
+    console.log(`\n⛔ Bare search returned HTTP ${gate?.status ?? 'network error'} for this key. Every arm below would`);
     console.log('   fail the same way, so the A/B would prove nothing. Stopping before spending credits.');
     console.log('   Check which Netlify context supplied APOLLO_API_KEY (use --context production).');
     process.exit(2);

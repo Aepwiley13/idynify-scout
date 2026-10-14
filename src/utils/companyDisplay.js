@@ -10,11 +10,14 @@
  *   - getMatchReasons(company) → reasons array     (fallback chain)
  *   - getDisplayIndustry(company) → canonical industry name for display
  *   - getDisplayName(company) → { label, hint, derived } (name provenance)
+ *   - isMissingValue(value)  → true for null/empty/"null"/"unknown"/"n/a"
+ *   - getDisplayBarryIntel(company) → Barry text safe to show as evidence
  *
  * Presentation only — no data fetching, no scoring, no side effects.
  */
 import { STATUS } from '../theme/tokens';
 import { normalizeIndustry } from './normalizeTargeting.js';
+import { isMissingValue } from './missingValue.js';
 // The sentinel and the domain read both come from the identity module rather
 // than being restated here. Re-deriving either in a second place is the exact
 // drift companyIdentityService exists to prevent — a presentational copy that
@@ -43,16 +46,41 @@ export function getMatchReasons(company) {
   return company.fit_reasons || company.matchReasons || company.match_reasons || [];
 }
 
+export { isMissingValue };
+
+export const VERIFICATION_NEEDED_MESSAGE =
+  'Potential match based on discovery criteria. Company details still need verification.';
+
+// Discovery used to append "Matches your ICP criteria: …" built from the ICP's
+// own settings (always as the last sentence), and to call an industry-less
+// company "a this sector company".
+// Neither was evidence about the company. Those records are still stored, so
+// the claim is removed when shown rather than presented as fact.
+const LEGACY_ICP_CLAIM = /\s*Matches your ICP criteria:[\s\S]*$/i;
+const LEGACY_SECTOR_FILLER = / is a this sector company/i;
+
+export function getDisplayBarryIntel(company) {
+  if (!company) return null;
+  const raw = company.barry_intel || company.barry_context || company.barryIntel;
+  if (isMissingValue(raw) || typeof raw !== 'string') return null;
+  if (!LEGACY_ICP_CLAIM.test(raw) && !LEGACY_SECTOR_FILLER.test(raw)) return raw;
+  const cleaned = raw.replace(LEGACY_ICP_CLAIM, '').replace(LEGACY_SECTOR_FILLER, '').trim();
+  if (cleaned.includes(VERIFICATION_NEEDED_MESSAGE)) return cleaned;
+  return cleaned ? `${cleaned} ${VERIFICATION_NEEDED_MESSAGE}` : VERIFICATION_NEEDED_MESSAGE;
+}
+
 // Industry display name — resolves non-canonical values (e.g. "saas") to
 // Apollo canonical names (e.g. "Computer Software") via the alias map.
 // Falls through to the raw value when no mapping exists.
 export function getDisplayIndustry(company, fallback = 'N/A') {
   if (!company) return fallback;
-  const raw = company.apolloEnrichment?.snapshot?.industry
-    || company.industry
-    || company.primary_industry
-    || company.company_industry;
-  if (!raw || typeof raw !== 'string' || !raw.trim()) return fallback;
+  const raw = [
+    company.apolloEnrichment?.snapshot?.industry,
+    company.industry,
+    company.primary_industry,
+    company.company_industry,
+  ].find(v => typeof v === 'string' && !isMissingValue(v));
+  if (!raw) return fallback;
   const result = normalizeIndustry(raw);
   return result.status === 'matched' ? result.value : raw;
 }

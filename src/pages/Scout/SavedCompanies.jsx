@@ -19,7 +19,7 @@ import CompanyDetailModal from '../../components/scout/CompanyDetailModal';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { calculateICPScore, DEFAULT_WEIGHTS } from '../../utils/icpScoring';
-import { getDisplayIndustry } from '../../utils/companyDisplay';
+import { getDisplayIndustry, getDisplayBarryIntel } from '../../utils/companyDisplay';
 import {
   RECORD_STATUS,
   isEngagedRecord,
@@ -544,7 +544,9 @@ function SwipeDeck({ companies, totalActive, T, onFindContact }) {
   const scoreLabel = matchUnattributed
     ? 'No active ICP'
     : score >= 75 ? 'Strong Fit' : score >= 50 ? 'Good Match' : 'Low Fit';
-  const barryText = current?.barry_intel || current?.barry_context || current?.barryIntel
+  // getDisplayBarryIntel strips the legacy "Matches your ICP criteria" claim,
+  // which was built from ICP settings rather than company data.
+  const barryText = getDisplayBarryIntel(current)
     || current?.description
     || `${current?.name} is on your hunt list — find the right contact to start engaging.`;
   const hqLocation = current?.hq_location

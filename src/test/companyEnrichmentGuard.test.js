@@ -239,6 +239,102 @@ describe('enrichment discovering an identity that already exists', () => {
 });
 
 // ─── End-to-end: can the lazy path actually fire? ───────────────────────────
+/**
+ * Placeholders are holes. Discovery stored a missing industry as the string
+ * "null"; because enrichment only filled fields that were null/undefined/'',
+ * that string blocked the real Apollo industry, and scoring — which reads only
+ * the top-level field — stayed unmeasured on industry even after enrichment.
+ */
+describe('enrichment replaces placeholder values, and only placeholder values', () => {
+  const ENRICHED = {
+    apollo_organization_id: 'org-1',
+    industry: 'Computer Software',
+    employee_count: 45,
+    location: 'Lehi, Utah, United States',
+  };
+
+  it.each([
+    ['"null"', 'null'],
+    ['"unknown"', 'unknown'],
+    ['"Unknown" (any case)', 'Unknown'],
+    ['"n/a"', 'n/a'],
+    ['"N/A"', 'N/A'],
+    ['a blank string', ''],
+    ['whitespace', '   '],
+    ['null', null],
+  ])('replaces an industry stored as %s with the enriched industry', async (_label, stored) => {
+    COMPANIES = [{ id: 'c1', name: 'Acme', apollo_organization_id: 'org-1', industry: stored }];
+
+    const res = await applyCompanyEnrichment(UID, 'c1', ENRICHED);
+
+    expect(res.action).toBe('updated');
+    expect(lastUpdate().industry).toBe('Computer Software');
+  });
+
+  it('never overwrites a real stored industry', async () => {
+    COMPANIES = [{ id: 'c1', name: 'Acme', apollo_organization_id: 'org-1', industry: 'Internet' }];
+
+    await applyCompanyEnrichment(UID, 'c1', ENRICHED);
+
+    expect(lastUpdate()?.industry).toBeUndefined();
+    expect(COMPANIES[0].industry).toBe('Internet');
+  });
+
+  it('fills employee_count over a missing, zero or placeholder value, never over a real count', async () => {
+    for (const stored of [undefined, null, 0, 'null', 'N/A', '']) {
+      COMPANIES = [{ id: 'c1', name: 'Acme', apollo_organization_id: 'org-1', employee_count: stored }];
+      WRITES = [];
+      await applyCompanyEnrichment(UID, 'c1', ENRICHED);
+      expect(lastUpdate().employee_count).toBe(45);
+    }
+
+    COMPANIES = [{ id: 'c1', name: 'Acme', apollo_organization_id: 'org-1', employee_count: 12 }];
+    WRITES = [];
+    await applyCompanyEnrichment(UID, 'c1', ENRICHED);
+    expect(lastUpdate()?.employee_count).toBeUndefined();
+    expect(COMPANIES[0].employee_count).toBe(12);
+  });
+
+  it('fills location over a placeholder, never over a real location', async () => {
+    COMPANIES = [{ id: 'c1', name: 'Acme', apollo_organization_id: 'org-1', location: 'Unknown' }];
+    await applyCompanyEnrichment(UID, 'c1', ENRICHED);
+    expect(lastUpdate().location).toBe('Lehi, Utah, United States');
+
+    COMPANIES = [{ id: 'c1', name: 'Acme', apollo_organization_id: 'org-1', location: 'Provo, Utah' }];
+    WRITES = [];
+    await applyCompanyEnrichment(UID, 'c1', ENRICHED);
+    expect(lastUpdate()?.location).toBeUndefined();
+    expect(COMPANIES[0].location).toBe('Provo, Utah');
+  });
+
+  it('never writes a placeholder that enrichment itself returned', async () => {
+    COMPANIES = [{ id: 'c1', name: 'Acme', apollo_organization_id: 'org-1', industry: 'null' }];
+
+    const res = await applyCompanyEnrichment(UID, 'c1', {
+      apollo_organization_id: 'org-1', industry: 'Unknown', employee_count: 0, location: 'N/A',
+    });
+
+    expect(res.action).toBe('updated'); // the Apollo id fields still write
+    const patch = lastUpdate();
+    expect(patch.industry).toBeUndefined();
+    expect(patch.employee_count).toBeUndefined();
+    expect(patch.location).toBeUndefined();
+  });
+
+  it('a discovered company stored with industry "null" becomes scorable on industry, size and location once enriched', async () => {
+    const { calculateICPScore, computeCoverage, DEFAULT_WEIGHTS } = await import('../utils/icpScoring.js');
+    const icp = { industries: ['Computer Software'], locations: ['Utah'], companySizes: ['21-50'] };
+    COMPANIES = [{ id: 'c1', name: 'Acme', apollo_organization_id: 'org-1', industry: 'null', status: 'accepted' }];
+
+    expect(calculateICPScore(COMPANIES[0], icp, DEFAULT_WEIGHTS)).toBeNull();
+
+    await applyCompanyEnrichment(UID, 'c1', ENRICHED);
+
+    expect(computeCoverage(COMPANIES[0], icp).complete).toBe(true);
+    expect(calculateICPScore(COMPANIES[0], icp, DEFAULT_WEIGHTS)).toBe(100);
+  });
+});
+
 describe('a bare-name company reaches the existing lazy enrichment', () => {
   it('created from a work email alone, it carries the domain enrichCompany needs', async () => {
     const { companyId, created } = await ensureCompanyForContact(

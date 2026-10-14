@@ -30,7 +30,7 @@ const searchFn = read('../../netlify/functions/search-companies.js');
 
 describe('Which ICP fields become real Apollo constraints', () => {
   it.each([
-    ['industries', { industries: ['Accounting'] }, 'organization_industry_tag_ids'],
+    ['industries', { industries: ['Accounting'] }, 'q_organization_keyword_tags'],
     ['companyKeywords', { companyKeywords: ['saas'] }, 'q_organization_keyword_tags'],
     ['companySizes', { companySizes: ['11-20'] }, 'organization_num_employees_ranges'],
     ['locations', { locations: ['Texas'] }, 'organization_locations'],
@@ -71,22 +71,21 @@ describe('Which ICP fields become real Apollo constraints', () => {
     expect(withRevenue).toEqual(buildApolloQuery({}, null));
   });
 
-  it('industries resolve to Apollo industry tag IDs, not duplicated into keyword tags', () => {
+  it('industries reach Apollo as lowercased keyword tags, never as industry tag IDs', () => {
     const query = buildApolloQuery({ industries: ['Accounting'] }, null);
 
-    expect(query.organization_industry_tag_ids).toEqual(['5567cd4773696439b10b0000']);
-    // Apollo ANDs organization_industry_tag_ids with q_organization_keyword_tags,
-    // so a mapped industry is represented once, structurally — duplicating it
-    // as a free-text keyword too (Wave 2C) is what zeroed out production
-    // results when an industry filter was combined with a location filter.
-    expect(query.q_organization_keyword_tags).toBeUndefined();
+    expect(query.q_organization_keyword_tags).toEqual(['accounting']);
+    // The APOLLO_INDUSTRIES tag IDs match nothing in Apollo: a production A/B
+    // returned 0 for the Computer Software tag ID against 2,093,188 for the
+    // keyword. Sending them zeroes every search that carries an industry.
+    expect(query.organization_industry_tag_ids).toBeUndefined();
   });
 
-  it('ICP aliases resolve to canonical Apollo industry tag IDs, not duplicated into keyword tags', () => {
+  it('an ICP alias is sent as the user\'s own industry, lowercased, with no tag ID', () => {
     const query = buildApolloQuery({ industries: ['Credit Unions'] }, null);
 
-    expect(query.organization_industry_tag_ids).toEqual(['5567cd4773696439b10b000a']);
-    expect(query.q_organization_keyword_tags).toBeUndefined();
+    expect(query.q_organization_keyword_tags).toEqual(['credit unions']);
+    expect(query.organization_industry_tag_ids).toBeUndefined();
   });
 
   it('avoidIndustries reaches nothing — it is not even read here', () => {

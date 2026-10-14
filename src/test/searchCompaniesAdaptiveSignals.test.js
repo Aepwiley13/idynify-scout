@@ -31,6 +31,7 @@ vi.mock('../../netlify/functions/utils/verifyAuthToken.js', () => ({
 }));
 
 const { buildApolloQuery } = await import('../../netlify/functions/search-companies.js');
+const { COMPANY_SIZE_OPTIONS } = await import('../constants/targetingCanon.js');
 
 const PROFILE = {
   industries: ['Construction', 'Real Estate'],
@@ -48,18 +49,8 @@ describe('buildApolloQuery — adaptive industry signal', () => {
     const q = buildApolloQuery(PROFILE, { savedIndustries: ['Roofing'] });
 
     expect(q.q_organization_keyword_tags[0]).toBe('roofing');
-    // 'Construction' and 'Real Estate' both map to Apollo tag IDs (see
-    // organization_industry_tag_ids below), so they are represented there and
-    // deliberately do NOT also appear as free-text keywords — see "mapped
-    // industries are not duplicated" below for the regression coverage.
-    expect(q.q_organization_keyword_tags).toEqual(
-      expect.arrayContaining(['contractor']),
-    );
-    expect(q.q_organization_keyword_tags).not.toContain('construction');
-    expect(q.q_organization_keyword_tags).not.toContain('real estate');
-    expect(q.organization_industry_tag_ids).toEqual(
-      expect.arrayContaining(['5567cd4773696439b10b0019', '5567cd4773696439b10b0077']),
-    );
+    expect(q.q_organization_keyword_tags).toEqual(['roofing', 'construction', 'real estate', 'contractor']);
+    expect(q.organization_industry_tag_ids).toBeUndefined();
   });
 
   it('does not duplicate an industry the profile already declares', () => {
@@ -109,47 +100,73 @@ describe('buildApolloQuery — person titles never reach an organisation query',
 });
 
 /**
- * Wave 2C — a mapped industry is represented once, structurally, not twice.
+ * Industries reach Apollo as lowercased keyword tags, never as
+ * organization_industry_tag_ids.
  *
- * Apollo ANDs organization_industry_tag_ids with q_organization_keyword_tags.
- * Sending 'Computer Software' both as the structured tag ID AND as the
- * free-text keyword 'computer software' requires a double match that real
- * organizations fail, which is what zeroed out production Test C (Utah +
- * Computer Software -> 0 results, despite Utah alone and Utah + employee
- * size both returning results normally).
+ * Production A/B against mixed_companies/search (Utah, every size, Computer
+ * Software), run in the deployed runtime:
+ *   Utah only                        73,240
+ *   tag ID only                           0
+ *   keyword "computer software"   2,093,188
+ *   production query with tag ID          0
+ *   same, no industry                59,872
+ *   same, keyword instead of tag ID   5,693
+ * The APOLLO_INDUSTRIES tag IDs match nothing, so every search carrying one
+ * returned zero. Tag IDs were removed for the same reason in Dec 2025 and
+ * re-introduced Sep 15 2026.
  */
-describe('buildApolloQuery — mapped industries are not duplicated into keyword tags', () => {
-  it('Computer Software + Utah: structured tag only, no keyword duplication', () => {
+describe('buildApolloQuery — industries are keyword tags, never tag IDs', () => {
+  it('Utah + every company size + Computer Software builds exactly the query verified in production', () => {
     const q = buildApolloQuery({
       industries: ['Computer Software'],
+      companySizes: COMPANY_SIZE_OPTIONS,
       locations: ['Utah'],
     });
 
-    expect(q.organization_industry_tag_ids).toEqual(['5567cd4773696439b10b0018']);
-    expect(q.organization_locations).toEqual(['Utah, United States']);
-    expect(q.q_organization_keyword_tags).toBeUndefined();
+    // Arm RK of the production A/B: 5,693 results. The same query with
+    // organization_industry_tag_ids instead of the keyword returned 0.
+    expect(q).toEqual({
+      page: 1,
+      per_page: 50,
+      q_organization_keyword_tags: ['computer software'],
+      organization_num_employees_ranges: [
+        '1,10', '11,20', '21,50', '51,100', '101,200', '201,500',
+        '501,1000', '1001,2000', '2001,5000', '5001,10000', '10001,999999',
+      ],
+      organization_locations: ['Utah, United States'],
+    });
   });
 
-  it('Computer Software + Utah + explicit companyKeywords: both filters present, industry still not duplicated', () => {
+  it('a mapped industry is sent as a keyword, with no tag ID', () => {
+    const q = buildApolloQuery({ industries: ['Computer Software'], locations: ['Utah'] });
+
+    expect(q.q_organization_keyword_tags).toEqual(['computer software']);
+    expect(q.organization_industry_tag_ids).toBeUndefined();
+  });
+
+  it('an alias is sent as the industry the user chose, lowercased, not its canonical name', () => {
+    const q = buildApolloQuery({ industries: ['SaaS'] });
+
+    expect(q.q_organization_keyword_tags).toEqual(['saas']);
+    expect(q.organization_industry_tag_ids).toBeUndefined();
+  });
+
+  it('an unmapped industry is sent the same way', () => {
+    const q = buildApolloQuery({ industries: ['Not A Real Industry'], locations: ['Utah'] });
+
+    expect(q.q_organization_keyword_tags).toEqual(['not a real industry']);
+    expect(q.organization_industry_tag_ids).toBeUndefined();
+  });
+
+  it('industries come before explicit companyKeywords in the keyword tags', () => {
     const q = buildApolloQuery({
       industries: ['Computer Software'],
       locations: ['Utah'],
       companyKeywords: ['B2B'],
     });
 
-    expect(q.organization_industry_tag_ids).toEqual(['5567cd4773696439b10b0018']);
-    expect(q.q_organization_keyword_tags).toEqual(['b2b']);
+    expect(q.q_organization_keyword_tags).toEqual(['computer software', 'b2b']);
     expect(q.organization_locations).toEqual(['Utah, United States']);
-  });
-
-  it('an industry that does not resolve to an Apollo tag ID keeps the existing keyword fallback', () => {
-    const q = buildApolloQuery({
-      industries: ['Not A Real Industry'],
-      locations: ['Utah'],
-    });
-
-    expect(q.organization_industry_tag_ids).toBeUndefined();
-    expect(q.q_organization_keyword_tags).toEqual(['not a real industry']);
   });
 
   it('location behavior is unchanged', () => {

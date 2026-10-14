@@ -416,12 +416,12 @@ export const handler = async (event) => {
 
     // Validate query parameters before sending
     console.log('🔍 Validating request parameters...');
-    console.log('   - Industries count:', apolloQuery.organization_industry_tag_ids?.length || 0);
+    console.log('   - Industries count:', companyProfile.industries?.length || 0);
     console.log('   - Employee range valid:', !!apolloQuery.organization_num_employees_ranges);
     console.log('   - Keywords:', apolloQuery.q_organization_keyword_tags);
     console.log('   - Per page:', apolloQuery.per_page);
 
-    if (!apolloQuery.organization_industry_tag_ids || apolloQuery.organization_industry_tag_ids.length === 0) {
+    if (!companyProfile.industries || companyProfile.industries.length === 0) {
       console.warn('⚠️  No industry filters provided - search may return broad results');
     }
 
@@ -898,24 +898,15 @@ export function buildApolloQuery(companyProfile, adaptiveSignals) {
   // Build keyword tags combining industries and company keywords
   const keywordTags = [];
 
-  // Map ICP industries to Apollo industry tag IDs for proper filtering
+  // Industries go to Apollo as lowercased keyword tags. Do NOT send them as
+  // organization_industry_tag_ids: the APOLLO_INDUSTRIES IDs match nothing in
+  // Apollo. A production A/B (Utah + every size) returned 0 with the Computer
+  // Software tag ID and 5,693 with the keyword "computer software"; the tag ID
+  // alone returned 0 against 2,093,188 for the keyword. Same failure that
+  // removed tag IDs in Dec 2025, re-introduced Sep 15 2026.
   if (companyProfile.industries && companyProfile.industries.length > 0) {
-    const industryIds = getIndustryIds(companyProfile.industries);
-    if (industryIds.length > 0) {
-      query.organization_industry_tag_ids = industryIds;
-    }
-    // An industry that resolved to a structured tag ID is already represented
-    // by organization_industry_tag_ids — Apollo ANDs that filter with
-    // q_organization_keyword_tags, so also pushing the same industry in as a
-    // free-text keyword requires a double match ("tagged Computer Software"
-    // AND "keyword-matches 'computer software'") that real organizations
-    // routinely fail, silently zeroing out results. Only an industry that did
-    // NOT resolve to a tag ID — which has no structured representation —
-    // keeps the existing keyword-tag fallback.
-    const unmappedIndustries = companyProfile.industries.filter(i => !resolveToCanonical(i));
-    keywordTags.push(...unmappedIndustries.map(i => i.toLowerCase()));
+    keywordTags.push(...companyProfile.industries.map(i => i.toLowerCase()));
     console.log(`🏭 Industries selected: ${companyProfile.industries.join(', ')}`);
-    console.log(`🏭 Apollo industry tag IDs: ${industryIds.length} mapped`);
   } else {
     console.log('⚠️  No industries selected!');
   }

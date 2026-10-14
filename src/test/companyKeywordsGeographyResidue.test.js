@@ -311,13 +311,10 @@ describe('Legitimate company-type keyword survives the same boundary', () => {
       locations: barryResponse.understood.locations,
     });
 
-    // 'Computer Software' resolves to an Apollo industry tag ID, so it is
-    // represented structurally (organization_industry_tag_ids) rather than
-    // also duplicated as a free-text keyword (Wave 2C) — Apollo ANDs the two
-    // filters, and the duplication is what zeroed out production results.
-    // The legitimate company-type keyword 'saas' is unaffected by that fix
-    // and must still reach the query, which is this test's actual point.
-    expect(apolloQuery.organization_industry_tag_ids).toEqual(['5567cd4773696439b10b0018']);
-    expect(apolloQuery.q_organization_keyword_tags).toEqual(['saas']);
+    // The industry reaches Apollo as a keyword tag ahead of the company-type
+    // keyword; the legitimate keyword 'saas' must still reach the query,
+    // which is this test's actual point.
+    expect(apolloQuery.organization_industry_tag_ids).toBeUndefined();
+    expect(apolloQuery.q_organization_keyword_tags).toEqual(['computer software', 'saas']);
   });
 });

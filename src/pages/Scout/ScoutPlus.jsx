@@ -4,7 +4,6 @@ import { openContact, ENTRY_POINTS, DISPLAY_MODES } from '../../utils/navigation
 import { UserPlus, Upload, Camera, CheckCircle, Eye, PlusCircle, Linkedin, ArrowLeft, Building2, Search, RefreshCw, Tag, AlertTriangle } from 'lucide-react';
 import ManualContactForm from '../../components/scout/ManualContactForm';
 import CSVUpload from '../../components/scout/CSVUpload';
-import BusinessCardCapture from '../../components/scout/BusinessCardCapture';
 import LinkedInLinkSearch from '../../components/scout/LinkedInLinkSearch';
 import CompanySearch from './CompanySearch';
 import CadencePickerModal from '../../components/cadences/CadencePickerModal';
@@ -16,10 +15,13 @@ export default function ScoutPlus() {
   const navigate = useNavigate();
   const location = useLocation();
   const T = useT();
-  // Allow callers to deep-link into a specific view via location state (e.g. initialView: 'company-search')
-  const validViews = ['menu', 'manual', 'csv', 'business-card', 'linkedin-link', 'company-search'];
+  // Allow callers to deep-link into a specific view via location state (e.g. initialView: 'company-search').
+  // 'business-card' is deliberately absent: it was the last way into the legacy
+  // scanner, whose endpoint is deprecated. The "Coming soon" card below is
+  // display-only. See docs/deprecations/legacy-business-card-endpoint.md.
+  const validViews = ['menu', 'manual', 'csv', 'linkedin-link', 'company-search'];
   const initialView = validViews.includes(location.state?.initialView) ? location.state.initialView : 'menu';
-  const [currentView, setCurrentView] = useState(initialView); // 'menu', 'manual', 'csv', 'business-card', 'linkedin-link', 'company-search', 'success'
+  const [currentView, setCurrentView] = useState(initialView); // 'menu', 'manual', 'csv', 'linkedin-link', 'company-search', 'success'
   const [addedItems, setAddedItems] = useState([]);
   const [lastUploadType, setLastUploadType] = useState(null); // 'leads' or 'companies'
   // CSV contact imports only: { batchId, tag, created, updated, failed }
@@ -126,7 +128,6 @@ export default function ScoutPlus() {
             {currentView === 'menu' && 'Scout+'}
             {currentView === 'manual' && 'Add Manually'}
             {currentView === 'csv' && 'Upload CSV'}
-            {currentView === 'business-card' && 'Scan Business Card'}
             {currentView === 'linkedin-link' && 'LinkedIn Link'}
             {currentView === 'company-search' && 'Company Search'}
             {currentView === 'success' && (importResult ? 'Import Complete' : lastUploadType === 'companies' ? 'Companies Added Successfully!' : 'Contact Added Successfully!')}
@@ -240,10 +241,6 @@ export default function ScoutPlus() {
 
         {currentView === 'csv' && (
           <CSVUpload onContactsAdded={handleContactAdded} onCancel={handleBack} />
-        )}
-
-        {currentView === 'business-card' && (
-          <BusinessCardCapture onContactAdded={handleContactAdded} onCancel={handleBack} />
         )}
 
         {currentView === 'linkedin-link' && (

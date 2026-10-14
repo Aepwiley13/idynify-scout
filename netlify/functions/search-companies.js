@@ -293,34 +293,6 @@ const INDUSTRY_ALIASES_SERVER = {
   'food and beverage': 'Food & Beverages',
 };
 
-function resolveToCanonical(name) {
-  if (!name) return null;
-  if (APOLLO_INDUSTRIES[name]) return name;
-  const alias = INDUSTRY_ALIASES_SERVER[name.toLowerCase().trim()];
-  if (alias && APOLLO_INDUSTRIES[alias]) return alias;
-  return null;
-}
-
-function getIndustryIds(industryNames) {
-  console.log('\n🔍 Industry ID Mapping:');
-  const ids = industryNames.map(name => {
-    const canonical = resolveToCanonical(name);
-    if (canonical) {
-      const id = APOLLO_INDUSTRIES[canonical];
-      console.log(`  "${name}" -> "${canonical}" -> ${id}`);
-      return id;
-    }
-    console.error(`  ❌ WARNING: Industry "${name}" not found in APOLLO_INDUSTRIES mapping or aliases!`);
-    return undefined;
-  }).filter(id => id !== undefined);
-
-  if (ids.length === 0 && industryNames.length > 0) {
-    console.error('❌ CRITICAL: No valid industry IDs mapped! This will return companies from ALL industries!');
-  }
-
-  return ids;
-}
-
 function formatStatesForApollo(states) {
   return states.map(state => `${state}, United States`);
 }

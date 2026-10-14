@@ -1294,41 +1294,86 @@ async function getExistingCompanyIds(userId, authToken) {
   }
 }
 
-/**
- * Generate a factual Barry intel summary from available company data.
- * No AI — rule-based so it runs inline without latency cost.
- */
-function buildBarryIntel(company, companyProfile) {
-  const name = company.name || 'This company';
-  const industry = company.industry || company.primary_industry || 'this sector';
-  const currentYear = new Date().getFullYear();
+// Strings that stand in for a missing value. Apollo, and older writes of ours,
+// produce them; none of them is a fact about the company.
+const PLACEHOLDER_VALUES = new Set(['null', 'undefined', 'unknown', 'unknown industry', 'n/a', 'na', 'none', '-', '—']);
 
-  let summary = `${name} is a ${industry} company`;
+function realString(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  if (!trimmed || PLACEHOLDER_VALUES.has(trimmed.toLowerCase())) return null;
+  return trimmed;
+}
 
-  if (company.founded_year) {
-    const age = currentYear - company.founded_year;
-    summary += `, founded in ${company.founded_year} (${age}y old)`;
+function realCount(value) {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return Math.round(value);
+  if (typeof value === 'string' && /^\d+$/.test(value.trim())) {
+    const n = parseInt(value.trim(), 10);
+    return n > 0 ? n : null;
   }
+  return null;
+}
 
+/**
+ * The company attributes Apollo actually returned for this organization —
+ * industry, employee count, HQ — and nothing else. A field Apollo did not
+ * send is absent from the result, never filled in. In particular nothing here
+ * reads the ICP: the ICP is what the user is looking for, not evidence of
+ * what this company is.
+ */
+export function extractVerifiedCompanyFields(company) {
+  const fields = {};
+
+  const industry = realString(company.industry) || realString(company.primary_industry);
+  if (industry) fields.industry = industry;
+
+  const employeeCount = realCount(company.estimated_num_employees);
+  if (employeeCount) fields.employee_count = employeeCount;
+
+  const city = realString(company.city) || realString(company.primary_location?.city);
+  const state = realString(company.state) || realString(company.primary_location?.state);
+  const country = realString(company.country) || realString(company.primary_location?.country);
+  if (state) fields.state = state;
+  const hq = [city, state, country].filter(Boolean).join(', ');
+  if (hq) fields.hq_location = hq;
+
+  return fields;
+}
+
+export const VERIFICATION_NEEDED_MESSAGE =
+  'Potential match based on discovery criteria. Company details still need verification.';
+
+/**
+ * A factual Barry intel summary built only from what Apollo returned for this
+ * company. Rule-based, so it runs inline without latency cost.
+ *
+ * It states facts and never claims a match: a company reaches Scout because it
+ * satisfied the search, which is not evidence that it matches the ICP. Match
+ * claims belong to the scorer, which only makes them from company data. When
+ * industry, size or HQ is unknown it says so rather than assuming.
+ */
+export function buildBarryIntel(company) {
+  const name = realString(company.name) || 'This company';
+  const verified = extractVerifiedCompanyFields(company);
+
+  const facts = [];
+  if (verified.employee_count) facts.push(`about ${verified.employee_count.toLocaleString('en-US')} employees`);
+  if (verified.hq_location) facts.push(`headquartered in ${verified.hq_location}`);
+  if (company.founded_year) {
+    const age = new Date().getFullYear() - company.founded_year;
+    facts.push(`founded in ${company.founded_year} (${age}y old)`);
+  }
   const revenue = company.organization_revenue_printed
     || (company.organization_revenue ? `$${(company.organization_revenue / 1000000).toFixed(1)}M` : null);
-  if (revenue) {
-    summary += ` with ${revenue} in revenue`;
-  }
+  if (revenue) facts.push(`${revenue} in revenue`);
 
+  let summary = verified.industry ? `${name} is a ${verified.industry} company` : name;
+  if (facts.length > 0) summary += `${verified.industry ? ',' : ':'} ${facts.join(', ')}`;
   summary += '.';
+  if (!verified.industry && facts.length === 0) summary = '';
 
-  // ICP fit context
-  const icpHints = [];
-  if (companyProfile.targetTitles?.length > 0) {
-    icpHints.push(`targeting ${companyProfile.targetTitles.slice(0, 2).join(' / ')}`);
-  }
-  if (companyProfile.companySizes?.length > 0) {
-    icpHints.push(`${companyProfile.companySizes[0]} employees`);
-  }
-  if (icpHints.length > 0) {
-    summary += ` Matches your ICP criteria: ${icpHints.join(', ')}.`;
-  }
+  const complete = verified.industry && verified.employee_count && verified.hq_location;
+  if (!complete) summary = summary ? `${summary} ${VERIFICATION_NEEDED_MESSAGE}` : VERIFICATION_NEEDED_MESSAGE;
 
   return summary;
 }
@@ -1367,7 +1412,7 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
         console.log(`  Phone: ${phone}`);
         console.log(`  Website: ${company.website_url || company.primary_domain}`);
         console.log(`  LinkedIn: ${company.linkedin_url}`);
-        console.log(`  ⚠️  NOTE: Apollo search endpoint does NOT return employee_count or location`);
+        console.log(`  Verified fields: ${JSON.stringify(extractVerifiedCompanyFields(company))}`);
       }
 
       // Use Apollo's actual industry data; never fall back to the ICP's own industry
@@ -1379,8 +1424,9 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
       // hard 0, and validateCompanyData then dropped the company below the fit
       // gate — meaning an industry-poor Apollo batch filtered itself down to an
       // empty queue. Absent stays absent: the scorer reports it as unmeasured
-      // (G1-06) rather than as a miss.
-      const industry = company.industry || company.primary_industry || null;
+      // (G1-06) rather than as a miss. The same holds for employee count and HQ:
+      // only what Apollo returned for this company, never the ICP's criteria.
+      const verified = extractVerifiedCompanyFields(company);
 
       const companyObj = {
         // IDs
@@ -1388,7 +1434,7 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
 
         // Basic Info (what Scout displays)
         name: company.name || 'Unknown Company',
-        industry,
+        ...verified,
 
         // Use revenue and founded year (Apollo DOES return these)
         revenue: revenue,
@@ -1412,7 +1458,7 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
         icpId,
 
         // Barry intel — rule-based summary from available data
-        barry_intel: buildBarryIntel({ ...company, industry }, companyProfile),
+        barry_intel: buildBarryIntel(company),
       };
 
       return companyObj;
@@ -1438,7 +1484,13 @@ async function saveCompaniesToFirestore(userId, authToken, companies, companyPro
         fields: {
           apollo_organization_id: { stringValue: String(company.apollo_organization_id) },
           name: { stringValue: String(company.name) },
-          industry: { stringValue: String(company.industry) },
+          // Only fields Apollo actually returned. An absent value is left out of
+          // the payload, and so out of the updateMask: never "null", and never a
+          // stored value overwritten with nothing.
+          ...(company.industry ? { industry: { stringValue: company.industry } } : {}),
+          ...(company.employee_count ? { employee_count: { integerValue: String(company.employee_count) } } : {}),
+          ...(company.state ? { state: { stringValue: company.state } } : {}),
+          ...(company.hq_location ? { hq_location: { stringValue: company.hq_location } } : {}),
           revenue: { stringValue: String(company.revenue || '') },
           founded_year: { integerValue: String(company.founded_year || 0) },
           phone: { stringValue: String(company.phone || '') },

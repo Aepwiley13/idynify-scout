@@ -21,7 +21,7 @@ import CompanyLogo from '../../components/scout/CompanyLogo';
 import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
 import BarryICPPanel, { BarryAvatar } from '../../components/scout/BarryICPPanel';
 import { getScoreBreakdown, DEFAULT_WEIGHTS, calculateICPScore, generateMatchReasons, computeCoverage } from '../../utils/icpScoring';
-import { getDisplayIndustry } from '../../utils/companyDisplay';
+import { getDisplayIndustry, getDisplayBarryIntel, isMissingValue, VERIFICATION_NEEDED_MESSAGE } from '../../utils/companyDisplay';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 import { RECORD_STATUS } from '../../constants/statusModel';
@@ -346,8 +346,14 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
   const sc = !isScored ? T.textFaint : score >= 75 ? STATUS.green : score >= 50 ? STATUS.amber : STATUS.red;
   const scoreLabel = !isScored ? 'Not enough data'
     : score >= 75 ? 'Strong Fit' : score >= 50 ? 'Good Match' : 'Low Fit';
-  const barryText = company.barry_intel || company.barry_context || company.barryIntel
-    || `${company.name} is a ${getDisplayIndustry(company, 'company')} — review their profile to assess fit.`;
+  // Barry states verified facts only. A stored legacy claim built from the
+  // ICP's own settings is stripped by getDisplayBarryIntel; with no stored text
+  // and no known industry, say what is true: found by the search, unverified.
+  const knownIndustry = getDisplayIndustry(company, null);
+  const barryText = getDisplayBarryIntel(company)
+    || (knownIndustry
+      ? `${company.name} is a ${knownIndustry} company — review their profile to assess fit.`
+      : VERIFICATION_NEEDED_MESSAGE);
 
   // ICP factor breakdown (calculated live from stored profile)
   const breakdown = (icpProfile && company) ? getScoreBreakdown(company, icpProfile, icpWeights || DEFAULT_WEIGHTS) : null;
@@ -370,20 +376,24 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
     : null;
 
   // HQ and CEO — try multiple Apollo field names
-  const hqLocation = company.hq_location
-    || (company.headquarters_city ? `${company.headquarters_city}${company.headquarters_state ? ', ' + company.headquarters_state : ''}` : null)
-    || company.headquarters
-    || company.location
-    || company.state
-    || null;
+  const hqLocation = [
+    company.hq_location,
+    !isMissingValue(company.headquarters_city) ? `${company.headquarters_city}${!isMissingValue(company.headquarters_state) ? ', ' + company.headquarters_state : ''}` : null,
+    company.headquarters,
+    company.location,
+    company.state,
+  ].find(v => typeof v === 'string' && !isMissingValue(v)) || null;
+  const employees = [company.employee_count, company.company_size].find(v => !isMissingValue(v)) ?? null;
 
   const ceoName = company.ceo_name
     || (company.primary_contact?.name ? `${company.primary_contact.name}${company.primary_contact.title ? ' · ' + company.primary_contact.title : ''}` : null)
     || null;
 
-  // Confidence: count meaningful data fields
-  const dataFields = [company.industry, company.employee_count || company.company_size,
-    company.revenue, hqLocation, ceoName, company.barry_intel || company.barry_context].filter(Boolean);
+  // Confidence: count company data we actually have. Placeholders ("null",
+  // "Unknown", "N/A") are not data, and Barry's text is derived from these
+  // fields rather than being a field itself, so it does not count.
+  const dataFields = [knownIndustry, employees, company.revenue, hqLocation, ceoName]
+    .filter(v => !isMissingValue(v));
   const confidence = dataFields.length >= 4 ? 'High' : dataFields.length >= 2 ? 'Medium' : 'Low';
   const confColor = confidence === 'High' ? STATUS.green : confidence === 'Medium' ? STATUS.amber : STATUS.red;
 
@@ -505,7 +515,7 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: `1px solid ${T.border}` }}>
           {[
             ['INDUSTRY',  getDisplayIndustry(company)],
-            ['EMPLOYEES', company.employee_count || company.company_size || 'N/A'],
+            ['EMPLOYEES', employees == null ? 'N/A' : (typeof employees === 'number' ? employees.toLocaleString('en-US') : employees)],
             ['REVENUE',   company.revenue || 'N/A'],
             ['FOUNDED',   company.founded_year || 'N/A'],
             ['HQ',        hqLocation || '—'],
@@ -543,8 +553,9 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
           <div>
             <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>ICP MATCH SCORE</div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-              <span style={{ fontSize: wide ? 20 : 18, fontWeight: 800, color: sc }}>{score}</span>
-              <span style={{ fontSize: 10, color: T.textFaint }}>/100</span>
+              {/* G1-06: an unmeasured score is not 0/100 — 0 is a verdict. */}
+              <span data-testid="icp-match-score" style={{ fontSize: wide ? 20 : 18, fontWeight: 800, color: sc }}>{isScored ? score : '—'}</span>
+              {isScored && <span style={{ fontSize: 10, color: T.textFaint }}>/100</span>}
               <span style={{
                 fontSize: 9, color: sc, fontWeight: 700,
                 padding: '2px 7px', background: `${sc}15`, borderRadius: 5,

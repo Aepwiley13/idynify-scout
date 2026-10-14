@@ -671,9 +671,14 @@ export async function applyCompanyEnrichment(userId, companyId, discovered = {},
   // ("null", "Unknown", "N/A", blank) is a hole, not a value: discovery stored
   // a missing industry as the string "null", and treating that as present left
   // enriched companies unscorable on industry forever. Likewise a placeholder
-  // from enrichment is not worth writing, and an employee count must be > 0.
-  const isHole = (field, v) => isMissingValue(v) || (field === 'employee_count' && !(Number(v) > 0));
-  for (const field of ['website_url', 'linkedin_url', 'industry', 'employee_count', 'location', 'logo_url']) {
+  // from enrichment is not worth writing, and a count or year must be > 0
+  // (older discovery wrote founded_year: 0, and manual search employee_count: 0).
+  const POSITIVE_NUMBER_FIELDS = new Set(['employee_count', 'founded_year']);
+  const isHole = (field, v) => isMissingValue(v) || (POSITIVE_NUMBER_FIELDS.has(field) && !(Number(v) > 0));
+  for (const field of [
+    'website_url', 'linkedin_url', 'industry', 'employee_count', 'location', 'logo_url',
+    'hq_location', 'state', 'founded_year', 'revenue',
+  ]) {
     const value = discovered[field];
     if (isHole(field, value)) continue;
     if (!isHole(field, existing[field])) continue;

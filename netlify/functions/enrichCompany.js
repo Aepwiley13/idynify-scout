@@ -3,6 +3,13 @@ import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apo
 import { logApolloError } from './utils/apolloErrorLogger.js';
 import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } from './utils/scoutContactContract.js';
 import { verifyAuthToken } from './utils/verifyAuthToken.js';
+import { canonicalCompanyFields, buildBarryIntel } from './utils/companyFacts.js';
+
+// `mode: 'company'` runs the organization lookup only: one Apollo call, no
+// decision-maker search and no person matches. Used after a user accepts a
+// company, where only verified company attributes are wanted. Any other value
+// is the full enrichment the company detail views use.
+export const ENRICH_MODE = Object.freeze({ FULL: 'full', COMPANY: 'company' });
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -15,7 +22,8 @@ export const handler = async (event) => {
   }
 
   try {
-    const { userId, authToken, domain, organizationId } = JSON.parse(event.body);
+    const { userId, authToken, domain, organizationId, mode: requestedMode } = JSON.parse(event.body);
+    const mode = requestedMode === ENRICH_MODE.COMPANY ? ENRICH_MODE.COMPANY : ENRICH_MODE.FULL;
 
     if (!userId || !authToken || (!domain && !organizationId)) {
       throw new Error('Missing required parameters: need domain or organizationId');
@@ -58,7 +66,7 @@ export const handler = async (event) => {
     // Step 2: Get decision makers (Director+ in Sales/RevOps/Marketing/Ops)
     let decisionMakers = [];
 
-    if (organization.id || organizationId) {
+    if (mode === ENRICH_MODE.FULL && (organization.id || organizationId)) {
       const orgId = organization.id || organizationId;
 
       console.log('👥 Fetching decision makers...');
@@ -161,6 +169,7 @@ export const handler = async (event) => {
         facebook_url: organization.facebook_url,
         twitter_url: organization.twitter_url,
         domain: organization.primary_domain,
+        logo_url: organization.logo_url || null,
         industry: organization.industry,
         description: organization.short_description || organization.description || null,
         keywords: organization.keywords || [],
@@ -233,8 +242,14 @@ export const handler = async (event) => {
       _raw: {
         apolloOrgId: organization.id,
         enrichedAt: Date.now(),
-        domain: domain
-      }
+        domain: domain,
+        mode,
+      },
+
+      // Verified top-level company fields and the factual Barry text for them,
+      // by the same rules discovery uses (utils/companyFacts.js).
+      canonical: canonicalCompanyFields(organization),
+      barry_intel: buildBarryIntel(organization),
     };
 
     console.log('✅ Company enrichment complete');
@@ -256,7 +271,8 @@ export const handler = async (event) => {
       responseTime,
       metadata: {
         domain,
-        companyName: organization.name
+        companyName: organization.name,
+        mode,
       }
     });
 

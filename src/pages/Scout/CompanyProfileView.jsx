@@ -21,6 +21,7 @@ import {
   FileText, Tag, Phone, ExternalLink, Loader, Zap, ChevronLeft, Code, User,
 } from 'lucide-react';
 import { canEnrich, enrichmentSignals, applyCompanyEnrichment } from '../../services/companyIdentityService';
+import { isFullEnrichmentFresh } from '../../services/companyEnrichment';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS } from '../../theme/tokens';
 import CompanyLogo from '../../components/scout/CompanyLogo';
@@ -161,8 +162,9 @@ export default function CompanyProfileView({ companyId, onBack }) {
       if (!user) return;
 
       // Check cache (14 days) unless force-refreshing
-      if (!forceRefresh && companyData.apolloEnrichment && companyData.apolloEnrichedAt &&
-        Date.now() - companyData.apolloEnrichedAt < 14 * 24 * 60 * 60 * 1000) {
+      // A company-only result (written on accept) has no decision makers and
+      // does not count as this view's cache.
+      if (!forceRefresh && isFullEnrichmentFresh(companyData)) {
         setEnrichedData(companyData.apolloEnrichment);
         return;
       }

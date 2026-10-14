@@ -9,6 +9,7 @@ import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Li
 import CompanyLogo from './CompanyLogo';
 import { searchPeople, updatePerson } from '../../services/peopleService';
 import { canEnrich, enrichmentSignals, applyCompanyEnrichment } from '../../services/companyIdentityService';
+import { isFullEnrichmentFresh } from '../../services/companyEnrichment';
 import './CompanyDetailModal.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { getDisplayIndustry } from '../../utils/companyDisplay';
@@ -110,10 +111,9 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
       }
 
       // Check if cache is still fresh (skip API call)
-      if (!forceRefresh &&
-          existingEnrichment &&
-          currentData.apolloEnrichedAt &&
-          Date.now() - currentData.apolloEnrichedAt < 14 * 24 * 60 * 60 * 1000) {
+      // A company-only result (written on accept) is shown above but does not
+      // count as this modal's cache: it has no decision makers.
+      if (!forceRefresh && isFullEnrichmentFresh(currentData)) {
         console.log('✅ Using cached Apollo data');
         return;
       }

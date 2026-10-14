@@ -22,6 +22,7 @@ import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
 import BarryICPPanel, { BarryAvatar } from '../../components/scout/BarryICPPanel';
 import { getScoreBreakdown, DEFAULT_WEIGHTS, calculateICPScore, generateMatchReasons, computeCoverage } from '../../utils/icpScoring';
 import { getDisplayIndustry, getDisplayBarryIntel, isMissingValue, VERIFICATION_NEEDED_MESSAGE } from '../../utils/companyDisplay';
+import { enrichAcceptedCompany } from '../../services/companyEnrichment';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 import { RECORD_STATUS } from '../../constants/statusModel';
@@ -2039,6 +2040,10 @@ export default function DailyLeads({ onNavigate }) {
       // A duplicate the shared guard caught: the decision already stands.
       if (!decision.recorded) return;
       const { swipedAt } = decision;
+      // Company-only enrichment (one Apollo organization lookup), started now
+      // and never awaited: the save is already done and must not wait on it.
+      // Independent of the people discovery further down.
+      if (direction === 'right') enrichAcceptedCompany({ userId: user.uid, company });
 
       const isInterested = direction === 'right';
       const newSwipeCount = isInterested
@@ -2492,6 +2497,7 @@ export default function DailyLeads({ onNavigate }) {
         if (company.status === 'pending') {
           const companyRef = doc(db, 'users', user.uid, 'companies', company.id);
           await updateDoc(companyRef, { status: 'accepted', swipedAt: new Date().toISOString(), swipeDirection: 'right', swipe_source: 'people_mode' });
+          enrichAcceptedCompany({ userId: user.uid, company });
           if (targetTitlesRef.current.length > 0) {
             const formattedTitles = targetTitlesRef.current.map((title, idx) => ({ title, rank: idx + 1, score: 100 - (idx * 10) }));
             await updateDoc(companyRef, { selected_titles: formattedTitles, titles_updated_at: new Date().toISOString(), titles_source: 'icp_auto' });

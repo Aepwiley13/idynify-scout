@@ -9,6 +9,7 @@ import './CompanyDetail.css';
 import { searchPeople, updatePerson } from '../../services/peopleService';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { canEnrich, enrichmentSignals, applyCompanyEnrichment } from '../../services/companyIdentityService';
+import { isFullEnrichmentFresh } from '../../services/companyEnrichment';
 import { openContact, ENTRY_POINTS } from '../../utils/navigation';
 import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 import { RECORD_STATUS } from '../../constants/statusModel';
@@ -176,12 +177,13 @@ export default function CompanyDetail({
       // Auto-trigger enrichment if no cached data or cache is stale. Skipped in
       // preview: enrichment writes back to the company document, and it also
       // spends an Apollo credit on a record the user may be about to reject.
-      const isStale = !companyData.apolloEnrichedAt ||
-        Date.now() - companyData.apolloEnrichedAt > 14 * 24 * 60 * 60 * 1000;
+      // A company-only result (written on accept) has no decision makers, so it
+      // does not count as this page's cache: the full enrichment still runs.
+      const isStale = !isFullEnrichmentFresh(companyData);
       // canEnrich: a company created from a typed name alone carries neither a
       // domain nor an Apollo org id, and enrichCompany rejects a request with
       // neither. Skipping is not a loss — there is nothing to look it up by.
-      if (!previewOnly && canEnrich(companyData) && (!companyData.apolloEnrichment || isStale)) {
+      if (!previewOnly && canEnrich(companyData) && isStale) {
         enrichCompanyData(false);
       }
     } catch (error) {
@@ -754,10 +756,7 @@ export default function CompanyDetail({
       const currentData = companyDoc.data();
 
       // Check if cache is still fresh
-      if (!forceRefresh &&
-          currentData.apolloEnrichment &&
-          currentData.apolloEnrichedAt &&
-          Date.now() - currentData.apolloEnrichedAt < 14 * 24 * 60 * 60 * 1000) {
+      if (!forceRefresh && isFullEnrichmentFresh(currentData)) {
         console.log('✅ Using cached Apollo data');
         return;
       }

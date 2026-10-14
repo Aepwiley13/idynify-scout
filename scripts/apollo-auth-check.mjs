@@ -14,6 +14,7 @@
  *
  * Healthy: {"healthy":true,"is_logged_in":true}
  */
+import { createHash } from 'crypto';
 import { getApolloHeaders } from '../netlify/functions/utils/apolloConstants.js';
 
 const URL = 'https://api.apollo.io/api/v1/auth/health';
@@ -44,7 +45,7 @@ if (!KEY) {
   console.error('APOLLO_API_KEY is not set — nothing to test.');
   process.exit(1);
 }
-console.log(`APOLLO_API_KEY present: ${KEY.length} chars` +
+console.log(`APOLLO_API_KEY present: ${KEY.length} chars, sha256 prefix ${createHash('sha256').update(KEY).digest('hex').slice(0, 16)}` +
   `${KEY !== KEY.trim() ? ' — ⚠️ HAS LEADING/TRAILING WHITESPACE' : ''}` +
   `${/^["']|["']$/.test(KEY) ? ' — ⚠️ WRAPPED IN QUOTES' : ''}`);
 

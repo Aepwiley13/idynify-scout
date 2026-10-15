@@ -1,3 +1,14 @@
+/**
+ * @deprecated The legacy business-card scanner. NOT REACHABLE FROM ANY SCREEN.
+ *
+ * This is the only client of the deprecated /.netlify/functions/
+ * extractBusinessCard endpoint. Nothing imports it, so it is not in the
+ * production bundle, and src/test/legacyBusinessCardEntryPoints.test.jsx fails
+ * if anything starts importing it again. It is deleted together with the
+ * endpoint once the deletion criteria in
+ * docs/deprecations/legacy-business-card-endpoint.md are met. Its replacement
+ * is the Relationship Capture flow, which does not use this endpoint.
+ */
 import { useState, useRef } from 'react';
 import { auth, db } from '../../firebase/config';
 import { collection, addDoc, doc, getDoc, updateDoc } from 'firebase/firestore';
@@ -53,20 +64,17 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
 
       console.log('📥 OCR response status:', response.status, response.statusText);
 
+      // Never log the response body or the extracted fields: both are the card.
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ OCR API error response:', errorText);
         throw new Error(`OCR service error (${response.status}): ${errorText}`);
       }
 
       const data = await response.json();
-      console.log('📊 OCR response data:', data);
 
       if (!data.success) {
         throw new Error(data.error || 'OCR extraction failed');
       }
-
-      console.log('✅ OCR extraction successful:', data.extractedData);
 
       setExtractedData(data.extractedData);
       setFormData(prev => ({
@@ -75,8 +83,8 @@ export default function BusinessCardCapture({ onContactAdded, onCancel }) {
       }));
 
     } catch (err) {
-      console.error('❌ OCR extraction error:', err);
-      console.error('Error details:', err.message);
+      // The message can carry the server's response text, so only the name is logged.
+      console.error('❌ OCR extraction error:', err?.name);
       setError(err.message || 'Failed to extract card data. Please enter details manually.');
       // Set empty extracted data to allow manual entry
       setExtractedData({

@@ -3,19 +3,24 @@
  * dedicated page at src/pages/Scout/ScoutPlus.jsx (route: /scout-plus).
  * This file is retained temporarily for reference and should be removed
  * in a future cleanup pass.
+ *
+ * UNUSED: nothing imports this component (2026-10-14). Its "Scan Business
+ * Card" option was removed when the legacy scanner endpoint was locked down,
+ * so reviving this modal cannot reopen that flow. Delete it in a later
+ * cleanup, after the new Relationship Capture flow exists. See
+ * docs/deprecations/legacy-business-card-endpoint.md.
  */
 import { useState } from 'react';
-import { X, UserPlus, Upload, Camera, CheckCircle, Eye, PlusCircle, Linkedin } from 'lucide-react';
+import { X, UserPlus, Upload, CheckCircle, Eye, PlusCircle, Linkedin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { openContact, ENTRY_POINTS, DISPLAY_MODES } from '../../utils/navigation';
 import ManualContactForm from './ManualContactForm';
 import CSVUpload from './CSVUpload';
-import BusinessCardCapture from './BusinessCardCapture';
 import LinkedInLinkSearch from './LinkedInLinkSearch';
 
 export default function AddContactModal({ onClose, onContactAdded }) {
   const navigate = useNavigate();
-  const [currentView, setCurrentView] = useState('menu'); // 'menu', 'manual', 'csv', 'business-card', 'linkedin-link', 'success'
+  const [currentView, setCurrentView] = useState('menu'); // 'menu', 'manual', 'csv', 'linkedin-link', 'success'
   const [addedContacts, setAddedContacts] = useState([]);
 
   const handleBack = () => {
@@ -79,7 +84,6 @@ export default function AddContactModal({ onClose, onContactAdded }) {
               {currentView === 'menu' && 'Scout+'}
               {currentView === 'manual' && 'Add Manually'}
               {currentView === 'csv' && 'Upload CSV'}
-              {currentView === 'business-card' && 'Scan Business Card'}
               {currentView === 'linkedin-link' && 'LinkedIn Link'}
               {currentView === 'success' && 'Contact Added Successfully!'}
             </h2>
@@ -132,24 +136,6 @@ export default function AddContactModal({ onClose, onContactAdded }) {
                 </div>
               </button>
 
-              {/* Business Card Capture */}
-              <button
-                onClick={() => setCurrentView('business-card')}
-                className="w-full bg-white hover:bg-purple-50 border-2 border-gray-200 hover:border-purple-400 rounded-xl p-6 text-left transition-all group"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:bg-purple-200 transition-colors">
-                    <Camera className="w-6 h-6 text-purple-600" />
-                  </div>
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold text-gray-900 mb-1">Scan Business Card</h3>
-                    <p className="text-sm text-gray-600">
-                      Take a photo or upload an image. Perfect for post-event follow-ups.
-                    </p>
-                  </div>
-                </div>
-              </button>
-
               {/* LinkedIn Link */}
               <button
                 onClick={() => setCurrentView('linkedin-link')}
@@ -176,10 +162,6 @@ export default function AddContactModal({ onClose, onContactAdded }) {
 
           {currentView === 'csv' && (
             <CSVUpload onContactsAdded={handleContactAdded} onCancel={handleBack} />
-          )}
-
-          {currentView === 'business-card' && (
-            <BusinessCardCapture onContactAdded={handleContactAdded} onCancel={handleBack} />
           )}
 
           {currentView === 'linkedin-link' && (

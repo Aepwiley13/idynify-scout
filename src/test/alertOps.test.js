@@ -83,6 +83,20 @@ describe('alertOps sends', () => {
     expect(body.subject).toBe('[FAILED] daily-leads-refresh');
   });
 
+  // A call to a deprecated endpoint is not a failed run. Calling it PARTIAL
+  // would send whoever reads it looking for a job that never ran.
+  it('labels an unexpected call as UNEXPECTED', async () => {
+    await alertOps({ ...base, job: 'extractBusinessCard.legacy.authenticated', severity: 'unexpected_use', detail: {} });
+    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    expect(body.subject).toBe('[UNEXPECTED] extractBusinessCard.legacy.authenticated');
+  });
+
+  it('still reads any other severity as PARTIAL, as it always has', async () => {
+    await alertOps({ ...base, severity: 'something_new', detail: {} });
+    const body = JSON.parse(globalThis.fetch.mock.calls[0][1].body);
+    expect(body.subject).toBe('[PARTIAL] daily-leads-refresh');
+  });
+
   // A subject that needs scrolling is a subject that gets ignored. Severity
   // first, then the job, then the count — the first ~35 characters of a lock
   // screen have to be enough to decide whether to get out of bed.

@@ -1,8 +1,10 @@
 /**
- * The Saved Companies grid card is the fast-scan layer: name, ICP fit (only
- * when an ICP is active), industry, employees, founded, location, corporate
- * phone when one is stored, contacts, and one next action. Deeper intelligence
- * — overview, decision makers, Barry — lives in the company detail view.
+ * The Saved Companies grid card is the fast-scan layer: name, industry,
+ * employees, founded, location, corporate phone when one is stored, contacts,
+ * and one next action. It shows no ICP fit pill, so the company name gets the
+ * full header width; the fit score stays in the swipe view and the detail
+ * view. Deeper intelligence — overview, decision makers, Barry — lives in the
+ * company detail view.
  * Every value is stored company or enrichment data or an honest unknown; the
  * card never fetches anything and never shows a placeholder as a fact.
  */
@@ -17,7 +19,7 @@ vi.mock('../components/scout/CompanyLogo', () => ({ default: () => <div data-tes
 vi.mock('../components/scout/CompanyDetailModal', () => ({ default: () => null }));
 
 const {
-  CompanyCardV5, fitPillFor, contactsSummaryFor, nextActionFor, industryLineFor,
+  CompanyCardV5, contactsSummaryFor, nextActionFor, industryLineFor,
   cardLocationFor, cardPhoneFor, telHrefFor, VERIFYING_LABEL,
 } = await import('../pages/Scout/SavedCompanies.jsx');
 const { VERIFICATION_NEEDED_MESSAGE } = await import('../utils/companyDisplay.js');
@@ -61,11 +63,10 @@ beforeEach(() => {
 });
 
 describe('the card is the fast-scan layer', () => {
-  it('shows name, fit, industry, employees, founded, location, phone, contacts and the next action', () => {
+  it('shows name, industry, employees, founded, location, phone, contacts and the next action', () => {
     const { container } = renderCard(company());
 
     expect(container.textContent).toContain('MarketStar');
-    expect(screen.getByTestId('card-fit-pill').textContent).toBe('100 · Strong fit');
     expect(screen.getByTestId('card-industry').textContent).toBe('Outsourcing/Offshoring');
     expect(screen.getByTestId('card-employees').textContent).toBe('5,300');
     expect(screen.getByTestId('card-founded').textContent).toBe('1988');
@@ -179,32 +180,36 @@ describe('short location', () => {
   });
 });
 
-describe('fit pill states', () => {
+describe('no fit pill on the grid card', () => {
+  const FIT_TEXT = /Strong fit|Good fit|Low fit|Not enough data|Verifying…|\/100/;
+
   it.each([
-    [{ fit_score: 100 }, '100 · Strong fit'],
-    [{ fit_score: 82 }, '82 · Strong fit'],
-    [{ fit_score: 60 }, '60 · Good fit'],
-    [{ fit_score: 20 }, '20 · Low fit'],
-    [{ fit_score: 0 }, '0 · Low fit'],
-    [{ fit_score: null }, '— · Not enough data'],
-    [{ fit_score: null, company_enrichment_status: 'pending', company_enrichment_requested_at: Date.now() }, 'Verifying…'],
-  ])('%o → %s', (extra, label) => {
-    expect(fitPillFor(company(extra)).label).toBe(label);
-    renderCard(company(extra));
-    expect(screen.getByTestId('card-fit-pill').textContent).toBe(label);
-  });
-
-  it('no active ICP → no fit pill at all', () => {
-    const c = company({ fit_score: null, match_attributed: false });
-    expect(fitPillFor(c)).toBeNull();
-    renderCard(c);
+    ['a strong fit', { fit_score: 100 }],
+    ['a good fit', { fit_score: 60 }],
+    ['a low fit', { fit_score: 20 }],
+    ['a zero score', { fit_score: 0 }],
+    ['no score yet', { fit_score: null }],
+    ['enrichment pending', { fit_score: null, company_enrichment_status: 'pending', company_enrichment_requested_at: Date.now() }],
+    ['no active ICP', { fit_score: null, match_attributed: false }],
+  ])('%s: no pill and no fit label', (_, extra) => {
+    const { container } = renderCard(company(extra));
     expect(screen.queryByTestId('card-fit-pill')).toBeNull();
+    expect(container.textContent).not.toMatch(FIT_TEXT);
+    expect(container.textContent).not.toMatch(/\bnull\b/);
   });
 
-  it('never renders "null", "N/A" or a /100 as a fit', () => {
-    const { container } = renderCard(company({ fit_score: null }));
-    expect(screen.getByTestId('card-fit-pill').textContent).not.toMatch(/null|N\/A|\/100/);
-    expect(container.textContent).not.toMatch(/\bnull\b/);
+  it('the company name has the header to itself: only the logo sits beside it', () => {
+    renderCard(company({ fit_score: 100 }));
+    const nameBlock = screen.getByText('MarketStar').closest('div');
+    expect(nameBlock.style.flex).toMatch(/^1/);
+    expect(nameBlock.parentElement.children).toHaveLength(2);
+  });
+
+  it('an archived card adds only its Archived badge to the header', () => {
+    renderCard(company({ fit_score: 100 }), { isArchived: true });
+    const header = screen.getByText('MarketStar').closest('div').parentElement;
+    expect(header.children).toHaveLength(3);
+    expect(header.lastElementChild.textContent).toBe('Archived');
   });
 });
 
@@ -238,7 +243,6 @@ describe('unknowns are honest', () => {
     expect(screen.getByTestId('card-founded').textContent).toBe('N/A');
     expect(screen.getByTestId('card-location').textContent).toBe('N/A');
     expect(screen.queryByTestId('card-phone')).toBeNull();
-    expect(screen.getByTestId('card-fit-pill').textContent).toBe('— · Not enough data');
     expect(container.textContent).not.toMatch(/\bnull\b/);
   });
 
@@ -251,7 +255,6 @@ describe('unknowns are honest', () => {
     const { container } = renderCard(pending);
 
     expect(screen.getByTestId('card-industry').textContent).toBe(VERIFYING_LABEL);
-    expect(screen.getByTestId('card-fit-pill').textContent).toBe('Verifying…');
     expect(screen.getByTestId('card-employees').textContent).toBe('…');
     expect(screen.getByTestId('card-founded').textContent).toBe('…');
     expect(screen.getByTestId('card-location').textContent).toBe('…');

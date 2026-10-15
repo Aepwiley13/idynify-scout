@@ -202,6 +202,7 @@ describe('behaviour is unchanged', () => {
 
 const SCOPE = '.company-detail-overlay .cdm';
 const OVERLAY = '.company-detail-overlay.cdm-overlay';
+const DARK = 'body.theme-dark .company-detail-overlay .cdm';
 const cssText = fs.readFileSync(path.resolve(__dirname, '../components/scout/CompanyDetailModal.css'), 'utf8');
 
 /** Every rule in the scoped layer: selector, declarations and enclosing media query. */
@@ -227,7 +228,7 @@ describe('scoped layout stylesheet', () => {
   it('every .cdm rule is scoped to the modal, so pages that share class names are untouched', () => {
     const rules = scopedRules();
     expect(rules.length).toBeGreaterThan(20);
-    rules.forEach(r => expect(r.selector.startsWith(SCOPE) || r.selector === OVERLAY).toBe(true));
+    rules.forEach(r => expect(r.selector.startsWith(SCOPE) || r.selector === OVERLAY || r.selector.startsWith(DARK)).toBe(true));
   });
 
   it('the panel opens below the app top bar and gets only the height left beneath it', () => {
@@ -337,3 +338,66 @@ describe('scoped layout stylesheet', () => {
     expect(rule(`${SCOPE} .find-contacts-btn`).width).toBe('100%');
   });
 });
+
+describe('dark themes', () => {
+  const darkRules = () => scopedRules().filter(r => r.selector.startsWith(DARK));
+  const TOKENS = ['--cdm-bg', '--cdm-surface', '--cdm-inset', '--cdm-border', '--cdm-text', '--cdm-muted',
+    '--cdm-accent', '--cdm-accent-soft', '--cdm-hover', '--cdm-focus', '--cdm-success', '--cdm-primary'];
+
+  it('apply only under body.theme-dark, scoped to the modal', () => {
+    const rules = darkRules();
+    expect(rules.length).toBeGreaterThan(40);
+    // No dark rule sits in a media query or reaches outside the modal.
+    rules.forEach(r => expect(r.media).toBeNull());
+  });
+
+  it('define one set of modal tokens, built on the theme variables', () => {
+    const tokens = rule(DARK);
+    TOKENS.forEach(t => expect(tokens[t], t).toBeTruthy());
+    expect(tokens['--cdm-bg']).toBe('var(--bg-secondary)');
+    expect(tokens['--cdm-surface']).toBe('var(--bg-card)');
+    expect(tokens['--cdm-border']).toBe('var(--border-2)');
+    expect(tokens['--cdm-text']).toBe('var(--text-primary)');
+    expect(tokens['--cdm-muted']).toBe('var(--text-secondary)');
+    expect(tokens['color-scheme']).toBe('dark');
+  });
+
+  it('replace every light background the modal hard-codes', () => {
+    const surface = 'var(--cdm-surface)';
+    expect(rule(`${DARK} .company-detail-header`).background).toBe(surface);
+    expect(rule(`${DARK} .contact-status-card`).background).toBe(surface);
+    expect(rule(`${DARK} .snapshot-section`).background).toContain(surface);
+    expect(rule(`${DARK} .decision-maker-card.selected`).background).toBe('var(--cdm-accent-soft)');
+    expect(rule(`${DARK} .btn-add-selected:disabled`).background).toBe('var(--cdm-hover)');
+    expect(rule(`${DARK} .company-detail-content::after`).background).toContain('var(--cdm-bg)');
+    expect(rule(`${DARK} .dept-card`).background).toBe('var(--cdm-accent-soft)');
+  });
+
+  it('colour the text from the tokens, never the light-mode hex values', () => {
+    expect(rule(`${DARK} .company-detail-name`).color).toBe('var(--cdm-text)');
+    expect(rule(`${DARK} .section-title`).color).toBe('var(--cdm-text)');
+    expect(rule(`${DARK} .snapshot-value`).color).toBe('var(--cdm-text)');
+    expect(rule(`${DARK} .snapshot-label`).color).toBe('var(--cdm-muted)');
+    expect(rule(`${DARK} .tech-category`).color).toBe('var(--cdm-muted)');
+    const LIGHT = /#(?:eff6ff|f9fafb|dbeafe|e5e7eb|d1d5db|f5f3ff|000000|1e40af|065f46)\b|rgba\(255,\s*255,\s*255,\s*0\.95\)/i;
+    darkRules().forEach(r => Object.values(r.decls).forEach(v => expect(v, r.selector).not.toMatch(LIGHT)));
+  });
+
+  it('keep the green badges and the blue CTA, darkened for contrast', () => {
+    expect(rule(`${DARK} .contact-badge-inline`).background).toBe('var(--cdm-success)');
+    expect(rule(`${DARK} .data-quality-badge`).background).toBe('var(--cdm-success)');
+    expect(rule(DARK)['--cdm-success']).toBe('#047857');
+    expect(rule(`${DARK} .find-contacts-btn`).background).toBe('var(--cdm-primary)');
+  });
+
+  it('show a focus ring on every control', () => {
+    expect(rule(`${DARK} button:focus-visible`).outline).toBe('2px solid var(--cdm-focus)');
+    expect(rule(`${DARK} input:focus-visible`).outline).toBe('2px solid var(--cdm-focus)');
+  });
+
+  it('change no layout: only colour, background, border colour, shadow, outline and tokens', () => {
+    const ALLOWED = /^(--cdm-|color$|color-scheme$|background$|border-color$|border-bottom-color$|border-top-color$|box-shadow$|outline$|outline-offset$|border$)/;
+    darkRules().forEach(r => Object.keys(r.decls).forEach(prop => expect(prop, `${r.selector} { ${prop} }`).toMatch(ALLOWED)));
+  });
+});
+

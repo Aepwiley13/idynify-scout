@@ -134,6 +134,163 @@ export function extractIdentifiers(candidate = {}) {
   };
 }
 
+// ─── Relationship Capture keys ──────────────────────────────────────────────
+//
+// ADDITIVE ONLY. Nothing above this line changed when these were added, and
+// nothing in the app calls them yet: the capture pipeline adopts them in later
+// PRs. The four helpers above stay exactly as they were because today's contact
+// matching depends on their output. `normalizePhone`, for example, folds an
+// extension into the number and keeps a UK "(0)"; fixing that here would
+// silently change which existing contacts match. `normalizeCapturePhone` does
+// both correctly, for capture only.
+//
+// Like the rest of this file they are dependency-free and total: any input
+// returns a value, never a throw. (The public-suffix-aware `domainKey` lives in
+// src/capture/validators.js, because its dependency would otherwise be bundled
+// into every server function that imports this file.)
+
+/** Legal-form words dropped from the END of a company name for comparison. */
+const LEGAL_SUFFIXES = new Set([
+  'inc', 'incorporated', 'llc', 'llp', 'lp', 'ltd', 'limited', 'corp', 'corporation',
+  'co', 'plc', 'gmbh', 'ag', 'sa', 'sas', 'sarl', 'bv', 'nv', 'pty', 'pte', 'srl',
+  'spa', 'oy', 'ab', 'kk', 'lda',
+]);
+
+/**
+ * A company name reduced for COMPARISON — never for display.
+ *
+ * Accents folded, case and punctuation removed, spaces collapsed, a leading
+ * "the" and trailing legal forms dropped: "Acmé, Inc." and "ACME INC" both
+ * become `acme`. The printed name is always kept separately; this key is only
+ * ever compared against another key.
+ *
+ * Returns null when nothing distinctive is left ("Inc.", "The Co."), so a
+ * caller can tell "no key" from "a key".
+ */
+export function nameKey(name) {
+  if (typeof name !== 'string') return null;
+  const tokens = name
+    .normalize('NFKD').replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    // Dots and apostrophes join rather than split: "L.L.C." → "llc", "Macy's" → "macys".
+    .replace(/[.'’`]/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean);
+
+  if (tokens[0] === 'the') tokens.shift();
+  while (tokens.length && (LEGAL_SUFFIXES.has(tokens.at(-1)) || tokens.at(-1) === 'and')) {
+    tokens.pop();
+  }
+  return tokens.length ? tokens.join(' ') : null;
+}
+
+/**
+ * Printed labels, tried against the start of the text. A label counts only
+ * when the number follows it directly, so "Tel/Fax:" is not read as "Tel".
+ */
+const PHONE_LABELS = [
+  [/^(?:mobile|mob|cell(?:ular)?|m)\b\.?\s*:?\s*(?=[+(\d])/i, 'mobile'],
+  [/^(?:fax|f)\b\.?\s*:?\s*(?=[+(\d])/i, 'fax'],
+  [/^(?:direct|dir|d)\b\.?\s*:?\s*(?=[+(\d])/i, 'direct'],
+  [/^(?:office|work|main|tel(?:ephone)?|phone|ph|t|o|p)\b\.?\s*:?\s*(?=[+(\d])/i, 'office'],
+];
+
+/** Any other short printed label ("Toll Free:", "Tel/Fax:", "Hotline"): stripped, kind stays null. */
+const OTHER_PHONE_LABEL = /^[a-z][a-z ./&'-]{0,24}?\s*:?\s*(?=[+(\d])/i;
+
+const PHONE_EXTENSION = /[\s,;]*(?:ext\.?|extension|x)\s*\.?\s*(\d{1,6})\s*$/i;
+
+/** US and Canada share +1 and one numbering plan (NANP). */
+const NANP_DEFAULT_COUNTRIES = new Set(['US', 'CA']);
+const NANP_NUMBER = /^[2-9]\d{2}[2-9]\d{6}$/;
+
+/**
+ * Normalize one printed phone number for capture.
+ *
+ *  - An explicit `+` is authoritative: `+49 30 1234 5678` → `+493012345678`,
+ *    and a UK trunk "(0)" after the country code is dropped, as E.164 requires.
+ *  - Without a `+`, +1 is applied only when the default country is US or CA
+ *    AND the digits are a valid NANP number. Anything else stays as printed
+ *    national digits with `country_unresolved`. A number is never converted
+ *    into a country it was not printed for.
+ *  - The extension (`x204`, `ext. 204`) and a printed label (M, T, F, D,
+ *    Mobile, Office, Fax, Direct) come back as separate fields; an unlabeled
+ *    number, or one under any other label ("Toll Free", "Tel/Fax"), has
+ *    `kind: null`, never a guess.
+ *  - No repair: letters (vanity numbers) or too few digits make it invalid.
+ *
+ * @param {string} raw
+ * @param {{ defaultCountry?: string }} [options]  ISO 3166 alpha-2, e.g. 'US'
+ * @returns {{ input: string|null, kind: 'mobile'|'office'|'direct'|'fax'|null,
+ *   extension: string|null, e164: string|null, national: string|null,
+ *   explicitCountryCode: boolean, normalized: string|null, valid: boolean,
+ *   issues: string[] }}
+ */
+export function normalizeCapturePhone(raw, { defaultCountry = null } = {}) {
+  const result = {
+    input: null, kind: null, extension: null, e164: null, national: null,
+    explicitCountryCode: false, normalized: null, valid: false, issues: [],
+  };
+  if (typeof raw !== 'string' || !raw.trim()) {
+    result.issues.push('empty');
+    return result;
+  }
+
+  let body = raw.trim();
+  result.input = body;
+
+  const label = PHONE_LABELS.find(([pattern]) => pattern.test(body));
+  if (label) {
+    result.kind = label[1];
+    body = body.replace(label[0], '');
+  } else {
+    body = body.replace(OTHER_PHONE_LABEL, '');
+  }
+
+  const extension = body.match(PHONE_EXTENSION);
+  if (extension) {
+    result.extension = extension[1];
+    body = body.slice(0, extension.index);
+  }
+
+  body = body.trim();
+  if (!body || /[^\d\s()+\-./]/.test(body) || body.indexOf('+', 1) !== -1) {
+    result.issues.push('invalid_characters');
+    return result;
+  }
+
+  result.explicitCountryCode = /^\(?\+/.test(body);
+  const digits = (result.explicitCountryCode ? body.replace(/\(0\)/g, '') : body).replace(/\D/g, '');
+
+  if (digits.length < 7) { result.issues.push('too_short'); return result; }
+  if (digits.length > 15) { result.issues.push('too_long'); return result; }
+
+  if (result.explicitCountryCode) {
+    if (digits.length < 8) { result.issues.push('too_short'); return result; }
+    result.e164 = `+${digits}`;
+    if (digits.startsWith('1') && NANP_NUMBER.test(digits.slice(1))) result.national = digits.slice(1);
+  } else if (NANP_DEFAULT_COUNTRIES.has(String(defaultCountry ?? '').toUpperCase())) {
+    const nsn = digits.length === 11 && digits.startsWith('1') ? digits.slice(1) : digits;
+    if (NANP_NUMBER.test(nsn)) {
+      result.e164 = `+1${nsn}`;
+      result.national = nsn;
+    } else {
+      result.national = digits;
+      result.issues.push('country_unresolved');
+    }
+  } else {
+    result.national = digits;
+    result.issues.push('country_unresolved');
+  }
+
+  result.normalized = result.e164 ?? result.national;
+  result.valid = true;
+  return result;
+}
+
 export default {
   normalizeEmail,
   normalizeLinkedInUrl,

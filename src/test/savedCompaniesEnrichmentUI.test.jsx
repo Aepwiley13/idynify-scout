@@ -91,9 +91,11 @@ describe('the saved-company card while enrichment is pending', () => {
     expect(container.textContent).not.toContain(VERIFYING_LABEL);
     expect(container.textContent).toContain('Computer Software');
     expect(container.textContent).toContain('42');
-    expect(container.textContent).toContain('Lehi, Utah, United States');
-    // Founded lives in the detail view and Barry, not on the grid card.
-    expect(container.textContent).not.toContain('2012');
+    // The card shows the short city/state; the detail view keeps the full address.
+    expect(container.textContent).toContain('Lehi, Utah');
+    expect(container.textContent).not.toContain('United States');
+    expect(container.textContent).toContain('2012');
+    expect(container.textContent).not.toContain('2,012');
   });
 
   it('after a failed or abandoned enrichment, shows the normal unknown state, not "Verifying"', () => {

@@ -1,10 +1,12 @@
 /**
- * The Saved Companies grid card answers, at a glance: who, industry and where,
- * how big, contact state, ICP fit (only when an ICP is active), Barry's short
- * reason, and the one next action. Every value is verified company data or an
- * honest unknown — never "null", a stray 0, or the ICP's own criteria.
+ * The Saved Companies grid card is the fast-scan layer: name, ICP fit (only
+ * when an ICP is active), industry, employees, founded, location, corporate
+ * phone when one is stored, contacts, and one next action. Deeper intelligence
+ * — overview, decision makers, Barry — lives in the company detail view.
+ * Every value is stored company or enrichment data or an honest unknown; the
+ * card never fetches anything and never shows a placeholder as a fact.
  */
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 
 vi.mock('firebase/firestore', () => new Proxy({}, {
@@ -15,27 +17,35 @@ vi.mock('../components/scout/CompanyLogo', () => ({ default: () => <div data-tes
 vi.mock('../components/scout/CompanyDetailModal', () => ({ default: () => null }));
 
 const {
-  CompanyCardV5, fitPillFor, contactsSummaryFor, nextActionFor, cardSubtitleFor, VERIFYING_LABEL,
+  CompanyCardV5, fitPillFor, contactsSummaryFor, nextActionFor, industryLineFor,
+  cardLocationFor, cardPhoneFor, telHrefFor, VERIFYING_LABEL,
 } = await import('../pages/Scout/SavedCompanies.jsx');
 const { VERIFICATION_NEEDED_MESSAGE } = await import('../utils/companyDisplay.js');
 
 const T = new Proxy({ isDark: false }, { get: (t, k) => (k in t ? t[k] : '#888') });
 
-// A saved company with verified data and a measured fit under an active ICP.
+// A saved, enriched company with a measured fit under an active ICP.
 const company = (extra = {}) => ({
-  id: 'acme',
-  name: 'Acme Software',
+  id: 'marketstar',
+  name: 'MarketStar',
   status: 'accepted',
-  industry: 'Computer Software',
-  employee_count: 1250,
-  hq_location: 'Lehi, Utah, United States',
-  founded_year: 2012,
-  website_url: 'https://acme.example',
-  linkedin_url: 'https://linkedin.com/company/acme',
-  barry_intel: 'Acme Software is a Computer Software company, about 1,250 employees, headquartered in Lehi, Utah, United States.',
-  contact_count: 3,
-  suggested_contact_count: 2,
-  fit_score: 82,
+  industry: 'Outsourcing/Offshoring',
+  employee_count: 5300,
+  founded_year: 1988,
+  hq_location: 'Ogden, Utah, United States',
+  phone: '+1 801-000-0000',
+  website_url: 'https://marketstar.example',
+  linkedin_url: 'https://linkedin.com/company/marketstar',
+  apolloEnrichment: {
+    snapshot: {
+      phone: '+1 800-877-8259',
+      location: { city: 'Ogden', state: 'Utah', country: 'United States', full: 'Ogden, Utah, United States' },
+    },
+  },
+  barry_intel: 'MarketStar is an Outsourcing/Offshoring company, about 5,300 employees, headquartered in Ogden, Utah.',
+  contact_count: 0,
+  suggested_contact_count: 0,
+  fit_score: 100,
   match_attributed: true,
   ...extra,
 });
@@ -44,37 +54,46 @@ const renderCard = (c, props = {}) => render(
   <CompanyCardV5 company={c} T={T} onClick={vi.fn()} onFindContacts={vi.fn()} onArchive={vi.fn()} onRestore={vi.fn()} {...props} />,
 );
 
-describe('the card answers the at-a-glance questions', () => {
-  it('shows name, "Industry · Location", employees, contacts, fit, Barry and the next action', () => {
+const fetchSpy = vi.fn();
+beforeEach(() => {
+  fetchSpy.mockReset();
+  global.fetch = fetchSpy;
+});
+
+describe('the card is the fast-scan layer', () => {
+  it('shows name, fit, industry, employees, founded, location, phone, contacts and the next action', () => {
     const { container } = renderCard(company());
 
-    expect(container.textContent).toContain('Acme Software');
-    expect(screen.getByTestId('card-subtitle').textContent).toBe('Computer Software · Lehi, Utah, United States');
-    expect(container.textContent).toContain('EMPLOYEES');
-    expect(container.textContent).toContain('1,250');
-    expect(container.textContent).toContain('CONTACTS');
-    expect(container.textContent).toContain('3 · 2 suggested');
-    expect(screen.getByTestId('card-fit-pill').textContent).toBe('82 · Strong fit');
-    expect(screen.getByTestId('card-barry').textContent).toMatch(/^Acme Software is a Computer Software company/);
-    expect(screen.getByTestId('card-next-action').textContent).toBe('View 3 contacts →');
+    expect(container.textContent).toContain('MarketStar');
+    expect(screen.getByTestId('card-fit-pill').textContent).toBe('100 · Strong fit');
+    expect(screen.getByTestId('card-industry').textContent).toBe('Outsourcing/Offshoring');
+    expect(screen.getByTestId('card-employees').textContent).toBe('5,300');
+    expect(screen.getByTestId('card-founded').textContent).toBe('1988');
+    expect(screen.getByTestId('card-location').textContent).toBe('Ogden, Utah');
+    expect(screen.getByTestId('card-phone').textContent).toBe('+1 800-877-8259');
+    expect(screen.getByTestId('card-contacts').textContent).toBe('None yet');
+    expect(screen.getByTestId('card-next-action').textContent).toBe('Find contacts →');
   });
 
-  it('no longer shows Founded or a duplicate Industry cell', () => {
-    const { container } = renderCard(company());
-    expect(container.textContent).not.toContain('FOUNDED');
-    expect(container.textContent).not.toContain('2012');
-    expect(container.textContent).not.toContain('INDUSTRY');
-    expect(container.textContent.match(/Computer Software ·/g)).toHaveLength(1);
+  it('Founded is back, formatted as a year', () => {
+    renderCard(company({ founded_year: 2012 }));
+    expect(screen.getByTestId('card-founded').textContent).toBe('2012');
   });
 
-  it('clamps Barry to two lines and keeps the full text on hover', () => {
-    renderCard(company());
-    const barry = screen.getByTestId('card-barry');
-    expect(barry.style.webkitLineClamp || barry.style.WebkitLineClamp).toBe('2');
-    expect(barry.getAttribute('title')).toBe(company().barry_intel);
+  it('Barry is not on the grid card at all', () => {
+    const { container } = renderCard(company({ barry_intel: `Something. ${VERIFICATION_NEEDED_MESSAGE}`, description: 'A description.' }));
+    expect(screen.queryByTestId('card-barry')).toBeNull();
+    expect(container.textContent).not.toContain('BARRY');
+    expect(container.textContent).not.toContain(VERIFICATION_NEEDED_MESSAGE);
+    expect(container.textContent).not.toContain('A description.');
   });
 
-  it('keeps Visit, LinkedIn and Archive, and the primary action opens contacts without opening the card', () => {
+  it('makes no API or enrichment call to render', () => {
+    renderCard(company({ apolloEnrichment: undefined, phone: '' }));
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('keeps Visit, LinkedIn and Archive; the primary action does not also open the card', () => {
     const onFindContacts = vi.fn();
     const onClick = vi.fn();
     const onArchive = vi.fn();
@@ -97,8 +116,72 @@ describe('the card answers the at-a-glance questions', () => {
   });
 });
 
+describe('corporate phone', () => {
+  it('reads apolloEnrichment.snapshot.phone first', () => {
+    expect(cardPhoneFor(company())).toBe('+1 800-877-8259');
+  });
+
+  it('falls back to the phone discovery stored', () => {
+    const c = company({ apolloEnrichment: undefined });
+    expect(cardPhoneFor(c)).toBe('+1 801-000-0000');
+    renderCard(c);
+    expect(screen.getByTestId('card-phone').textContent).toBe('+1 801-000-0000');
+  });
+
+  it('is hidden when missing — no cell, no label, no placeholder', () => {
+    const c = company({ apolloEnrichment: { snapshot: { phone: null } }, phone: '' });
+    expect(cardPhoneFor(c)).toBeNull();
+    const { container } = renderCard(c);
+    expect(screen.queryByTestId('card-phone')).toBeNull();
+    expect(container.textContent).not.toContain('PHONE');
+  });
+
+  it('treats placeholder phone values as missing', () => {
+    expect(cardPhoneFor(company({ apolloEnrichment: { snapshot: { phone: 'null' } }, phone: 'N/A' }))).toBeNull();
+  });
+
+  it('is a tel: link', () => {
+    renderCard(company());
+    const link = screen.getByTestId('card-phone');
+    expect(link.tagName).toBe('A');
+    expect(link.getAttribute('href')).toBe('tel:+18008778259');
+    expect(telHrefFor('(801) 555-0100')).toBe('tel:8015550100');
+  });
+
+  it('a phone click does not bubble up and open the detail modal', () => {
+    const onClick = vi.fn();
+    renderCard(company(), { onClick });
+    fireEvent.click(screen.getByTestId('card-phone'));
+    expect(onClick).not.toHaveBeenCalled();
+  });
+});
+
+describe('short location', () => {
+  it('uses "City, State" from the enrichment snapshot', () => {
+    expect(cardLocationFor(company())).toBe('Ogden, Utah');
+  });
+
+  it('uses the company city and state when the snapshot has none', () => {
+    expect(cardLocationFor(company({ apolloEnrichment: undefined, city: 'Lehi', state: 'Utah' }))).toBe('Lehi, Utah');
+  });
+
+  it('otherwise uses the stored HQ string without a trailing United States', () => {
+    expect(cardLocationFor(company({ apolloEnrichment: undefined }))).toBe('Ogden, Utah');
+    expect(cardLocationFor(company({ apolloEnrichment: undefined, hq_location: 'London, England, United Kingdom' })))
+      .toBe('London, England, United Kingdom');
+  });
+
+  it('is N/A when nothing is stored, and … while verifying', () => {
+    const none = company({ apolloEnrichment: undefined, hq_location: undefined });
+    expect(cardLocationFor(none)).toBeNull();
+    renderCard(none);
+    expect(screen.getByTestId('card-location').textContent).toBe('N/A');
+  });
+});
+
 describe('fit pill states', () => {
   it.each([
+    [{ fit_score: 100 }, '100 · Strong fit'],
     [{ fit_score: 82 }, '82 · Strong fit'],
     [{ fit_score: 60 }, '60 · Good fit'],
     [{ fit_score: 20 }, '20 · Low fit'],
@@ -118,10 +201,9 @@ describe('fit pill states', () => {
     expect(screen.queryByTestId('card-fit-pill')).toBeNull();
   });
 
-  it('never renders "null", "N/A" or a bare 0 as a fit', () => {
+  it('never renders "null", "N/A" or a /100 as a fit', () => {
     const { container } = renderCard(company({ fit_score: null }));
-    const pill = screen.getByTestId('card-fit-pill').textContent;
-    expect(pill).not.toMatch(/null|N\/A|^0$|\/100/);
+    expect(screen.getByTestId('card-fit-pill').textContent).not.toMatch(/null|N\/A|\/100/);
     expect(container.textContent).not.toMatch(/\bnull\b/);
   });
 });
@@ -137,54 +219,42 @@ describe('contact state and the next action', () => {
     expect(contactsSummaryFor(company(extra))).toBe(summary);
     expect(nextActionFor(company(extra))).toBe(action);
     renderCard(company(extra));
+    expect(screen.getByTestId('card-contacts').textContent).toBe(summary);
     expect(screen.getByTestId('card-next-action').textContent).toBe(action);
   });
 });
 
 describe('unknowns are honest', () => {
-  it('a company with no verified data says so without placeholders', () => {
+  it('a company with no verified data shows N/A facts and no fake values', () => {
     const sparse = company({
-      industry: 'null', employee_count: undefined, hq_location: undefined, fit_score: null,
-      barry_intel: `Sparse Co. ${VERIFICATION_NEEDED_MESSAGE}`, contact_count: 0, suggested_contact_count: 0,
+      industry: 'null', employee_count: undefined, founded_year: 0, hq_location: undefined,
+      apolloEnrichment: undefined, phone: '', fit_score: null,
     });
     const { container } = renderCard(sparse);
 
-    expect(screen.getByTestId('card-subtitle').textContent).toBe('Industry and location unknown');
-    expect(container.textContent).toContain('N/A');
-    expect(container.textContent).toContain('None yet');
+    expect(industryLineFor(sparse)).toBe('Industry unknown');
+    expect(screen.getByTestId('card-industry').textContent).toBe('Industry unknown');
+    expect(screen.getByTestId('card-employees').textContent).toBe('N/A');
+    expect(screen.getByTestId('card-founded').textContent).toBe('N/A');
+    expect(screen.getByTestId('card-location').textContent).toBe('N/A');
+    expect(screen.queryByTestId('card-phone')).toBeNull();
     expect(screen.getByTestId('card-fit-pill').textContent).toBe('— · Not enough data');
-    expect(screen.getByTestId('card-barry').textContent).toContain(VERIFICATION_NEEDED_MESSAGE);
     expect(container.textContent).not.toMatch(/\bnull\b/);
   });
 
-  it('shows whichever half of the subtitle is known', () => {
-    expect(cardSubtitleFor(company({ hq_location: undefined }))).toBe('Computer Software');
-    expect(cardSubtitleFor(company({ industry: 'Unknown' }))).toBe('Lehi, Utah, United States');
-  });
-
-  it('while enrichment runs: Verifying in the subtitle and pill, … for employees', () => {
+  it('while enrichment runs: Verifying, and … for the facts about to arrive', () => {
     const pending = company({
-      industry: undefined, employee_count: undefined, hq_location: undefined, fit_score: null,
+      industry: undefined, employee_count: undefined, founded_year: undefined, hq_location: undefined,
+      apolloEnrichment: undefined, phone: '', fit_score: null,
       company_enrichment_status: 'pending', company_enrichment_requested_at: Date.now(),
     });
     const { container } = renderCard(pending);
 
-    expect(screen.getByTestId('card-subtitle').textContent).toBe(VERIFYING_LABEL);
+    expect(screen.getByTestId('card-industry').textContent).toBe(VERIFYING_LABEL);
     expect(screen.getByTestId('card-fit-pill').textContent).toBe('Verifying…');
-    expect(container.textContent).toContain('…');
+    expect(screen.getByTestId('card-employees').textContent).toBe('…');
+    expect(screen.getByTestId('card-founded').textContent).toBe('…');
+    expect(screen.getByTestId('card-location').textContent).toBe('…');
     expect(container.textContent).not.toContain('N/A');
-  });
-
-  it('strips a legacy ICP-derived claim from Barry, and falls back to the description', () => {
-    renderCard(company({ barry_intel: 'Old Co is a this sector company. Matches your ICP criteria: 11-20 employees.' }));
-    expect(screen.getByTestId('card-barry').textContent).not.toContain('Matches your ICP criteria');
-
-    const { container } = renderCard(company({ id: 'd', barry_intel: undefined, description: 'Payroll software for restaurants.' }));
-    expect(container.textContent).toContain('Payroll software for restaurants.');
-  });
-
-  it('hides the Barry row when there is nothing to say', () => {
-    renderCard(company({ barry_intel: undefined, description: undefined }));
-    expect(screen.queryByTestId('card-barry')).toBeNull();
   });
 });

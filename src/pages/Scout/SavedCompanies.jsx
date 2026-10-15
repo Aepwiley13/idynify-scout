@@ -840,10 +840,11 @@ export function SwipeDeck({ companies, totalActive, T, onFindContact }) {
 
 // ─── Company Card (v5 style) ──────────────────────────────────────────────────
 // ─── Grid card ────────────────────────────────────────────────────────────────
-// What a saved-company card says at a glance: who, industry and where, how big,
-// contact state, ICP fit (only when an ICP is active), Barry's short reason, and
-// the one thing to do next. Every value is verified company data or an honest
-// unknown — never a placeholder, a stray 0, or the ICP's own criteria.
+// The fast-scan layer: quick company facts, ICP fit (only when an ICP is
+// active), and the one thing to do next. Deeper intelligence — overview,
+// decision makers, tech stack, Barry — lives in the company detail view.
+// Every value is stored company or enrichment data, or an honest unknown; the
+// card never triggers an API call and never shows a placeholder as a fact.
 
 /** The fit pill, or null when no ICP is active (no pill at all). */
 export function fitPillFor(company) {
@@ -875,26 +876,62 @@ export function nextActionFor(company) {
   return 'Find contacts →';
 }
 
-/** "Industry · Location", whichever half is known. */
-export function cardSubtitleFor(company) {
+/** The line under the company name: its industry. */
+export function industryLineFor(company) {
   if (isEnrichmentPending(company)) return VERIFYING_LABEL;
-  const industry = getDisplayIndustry(company, null);
-  const location = [
-    company?.apolloEnrichment?.snapshot?.location?.full, company?.hq_location, company?.location, company?.city,
-  ].find(v => typeof v === 'string' && !isMissingValue(v));
-  const parts = [industry, location].filter(Boolean);
-  return parts.length ? parts.join(' · ') : 'Industry and location unknown';
+  return getDisplayIndustry(company, null) || 'Industry unknown';
+}
+
+const TRAILING_US = /,\s*(United States( of America)?|USA|US)\s*$/i;
+
+/**
+ * Short location: "City, State" when both are known (e.g. "Ogden, Utah"),
+ * otherwise the stored HQ string with a trailing United States dropped. The
+ * full address stays in the detail view. Null when nothing is stored.
+ */
+export function cardLocationFor(company) {
+  const loc = company?.apolloEnrichment?.snapshot?.location;
+  const city = !isMissingValue(loc?.city) ? loc.city : (!isMissingValue(company?.city) ? company.city : null);
+  const state = !isMissingValue(loc?.state) ? loc.state : (!isMissingValue(company?.state) ? company.state : null);
+  if (city && state) return `${city}, ${state}`;
+  const full = [loc?.full, company?.hq_location, company?.location, company?.city]
+    .find(v => typeof v === 'string' && !isMissingValue(v));
+  return full ? full.replace(TRAILING_US, '').trim() : null;
+}
+
+/**
+ * The corporate phone already stored on the company — the enrichment snapshot
+ * (what the detail view shows as Corporate Phone) first, then the phone
+ * discovery saved. Null when neither exists; nothing is fetched for it.
+ */
+export function cardPhoneFor(company) {
+  return [company?.apolloEnrichment?.snapshot?.phone, company?.phone]
+    .find(v => typeof v === 'string' && !isMissingValue(v))?.trim() ?? null;
+}
+
+/** tel: href for a stored phone: digits, keeping a leading +. */
+export function telHrefFor(phone) {
+  const trimmed = String(phone).trim();
+  return `tel:${trimmed.startsWith('+') ? '+' : ''}${trimmed.replace(/\D/g, '')}`;
+}
+
+function CardFact({ name, testId, T, children }) {
+  return (
+    <div style={{ minWidth: 0 }}>
+      <div style={{ fontSize: 8, letterSpacing: 1, color: T.textFaint }}>{name}</div>
+      <div data-testid={testId} style={{ fontSize: 11, color: T.textMuted, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{children}</div>
+    </div>
+  );
 }
 
 export function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts, onArchive, onRestore }) {
   const pending = isEnrichmentPending(company);
   const fit = fitPillFor(company);
-  const subtitle = cardSubtitleFor(company);
-  const employees = displayValue(
-    company.apolloEnrichment?.snapshot?.estimated_num_employees || company.employee_count || company.company_size,
-    pending, { count: true },
-  );
-  const barry = getDisplayBarryIntel(company) || (isMissingValue(company.description) ? null : company.description);
+  const snapshot = company.apolloEnrichment?.snapshot;
+  const employees = displayValue(snapshot?.estimated_num_employees || company.employee_count || company.company_size, pending, { count: true });
+  const founded = displayValue(snapshot?.founded_year || company.founded_year, pending);
+  const location = displayValue(cardLocationFor(company), pending);
+  const phone = cardPhoneFor(company);
   const hasContacts = company.contact_count > 0;
   const iconButton = { padding: '5px 8px', borderRadius: 6, border: `1px solid ${T.border}`, background: T.surface, color: T.textFaint, cursor: 'pointer', display: 'flex', alignItems: 'center' };
 
@@ -906,14 +943,14 @@ export function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts,
       onClick={onClick}
     >
       <div style={{ padding: '14px 14px 11px', flex: 1 }}>
-        {/* Header: who, and how strong the fit is */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 10 }}>
+        {/* Header: who, what industry, and how strong the fit is */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 12 }}>
           <div style={{ width: 36, height: 36, borderRadius: 9, background: T.surface, border: `1px solid ${T.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, overflow: 'hidden', flexShrink: 0 }}>
             <CompanyLogo company={company} size="default" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <CompanyName company={company} style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} />
-            <div data-testid="card-subtitle" title={subtitle} style={{ fontSize: 10, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>
+            <div data-testid="card-industry" style={{ fontSize: 10, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{industryLineFor(company)}</div>
           </div>
           {fit && (
             <div data-testid="card-fit-pill" style={{ fontSize: 9, fontWeight: 700, color: fit.color || T.textFaint, background: fit.color ? `${fit.color}15` : T.surface, border: `1px solid ${fit.color ? `${fit.color}40` : T.border}`, borderRadius: 7, padding: '3px 7px', flexShrink: 0, whiteSpace: 'nowrap' }}>
@@ -927,27 +964,25 @@ export function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts,
           )}
         </div>
 
-        {/* Facts: how big, and where the contacts stand */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginBottom: barry ? 10 : 0 }}>
-          {[['EMPLOYEES', employees], ['CONTACTS', contactsSummaryFor(company)]].map(([l, v]) => (
-            <div key={l}>
-              <div style={{ fontSize: 8, letterSpacing: 1, color: T.textFaint }}>{l}</div>
-              <div style={{ fontSize: 10, color: T.textMuted, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* Barry: why it may be relevant, two lines at most */}
-        {barry && (
-          <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
-            <span style={{ fontSize: 8, letterSpacing: 1, color: BRAND.pink, fontWeight: 700, paddingTop: 2, flexShrink: 0 }}>BARRY</span>
-            <p
-              data-testid="card-barry"
-              title={barry}
-              style={{ margin: 0, fontSize: 10, lineHeight: 1.5, color: T.textMuted, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
-            >{barry}</p>
+        {/* Quick facts */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 10, rowGap: 9 }}>
+          <CardFact T={T} name="EMPLOYEES" testId="card-employees">{employees}</CardFact>
+          <CardFact T={T} name="FOUNDED" testId="card-founded">{founded}</CardFact>
+          <CardFact T={T} name="LOCATION" testId="card-location">{location}</CardFact>
+          {phone && (
+            <CardFact T={T} name="PHONE">
+              <a
+                data-testid="card-phone"
+                href={telHrefFor(phone)}
+                onClick={e => e.stopPropagation()}
+                style={{ color: T.textMuted, textDecoration: 'none' }}
+              >{phone}</a>
+            </CardFact>
+          )}
+          <div style={{ gridColumn: '1 / -1' }}>
+            <CardFact T={T} name="CONTACTS" testId="card-contacts">{contactsSummaryFor(company)}</CardFact>
           </div>
-        )}
+        </div>
       </div>
 
       {/* Actions: quick links, archive, and the one thing to do next */}

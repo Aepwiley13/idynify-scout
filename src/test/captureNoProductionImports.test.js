@@ -6,6 +6,9 @@
  * claim is only checkable if nothing in the app, the server functions or the
  * scripts imports them yet. Tests may. When a later PR wires capture in, it
  * updates the allow-list below on purpose, in review.
+ *
+ * Approved so far: one offline, read-only script (PR 3's historical audit),
+ * which no shipped code imports. It changes no application behaviour.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
@@ -38,6 +41,10 @@ function sources(roots) {
 const isTest = path => path.startsWith('src/test/');
 const isCapture = path => path.startsWith('src/capture/');
 
+/** Offline scripts approved, in review, to use the capture building blocks. Never shipped code. */
+const APPROVED_OFFLINE_CONSUMERS = ['scripts/auditBusinessCardRecords.mjs'];
+const isApproved = path => APPROVED_OFFLINE_CONSUMERS.includes(path);
+
 /** Production paths: everything that is not a test and not the capture modules themselves. */
 const PRODUCTION = sources(['src', 'netlify', 'functions', 'scripts', 'public'])
   .concat([['index.html', readFileSync(resolve(repo, 'index.html'), 'utf8')]])
@@ -46,6 +53,7 @@ const PRODUCTION = sources(['src', 'netlify', 'functions', 'scripts', 'public'])
 describe('no production path uses the capture foundation yet', () => {
   it('nothing imports src/capture/*', () => {
     const importers = PRODUCTION
+      .filter(([path]) => !isApproved(path))
       .filter(([, src]) => /(?:from\s+|import\s*\(\s*|require\s*\(\s*)['"][^'"]*\/capture\/(?:contract|validators|confidence|safeguards)(?:\.js)?['"]/.test(src))
       .map(([path]) => path);
     expect(importers).toEqual([]);
@@ -58,10 +66,21 @@ describe('no production path uses the capture foundation yet', () => {
     const viaObject = /\b\w+\s*\.\s*(?:nameKey|normalizeCapturePhone)\s*\(/;
     const importsModule = /['"][^'"]*identityNormalization(?:\.js)?['"]/;
     const callers = PRODUCTION
-      .filter(([path]) => path !== 'src/utils/identityNormalization.js')
+      .filter(([path]) => path !== 'src/utils/identityNormalization.js' && !isApproved(path))
       .filter(([, src]) => named.test(src) || (importsModule.test(src) && viaObject.test(src)))
       .map(([path]) => path);
     expect(callers).toEqual([]);
+  });
+
+  it('the approved consumers are offline scripts that nothing else imports', () => {
+    for (const path of APPROVED_OFFLINE_CONSUMERS) {
+      expect(path.startsWith('scripts/'), path).toBe(true);
+      expect(existsSync(resolve(repo, path)), path).toBe(true);
+      const name = path.slice(path.lastIndexOf('/') + 1).replace(/\.m?js$/, '');
+      const importsIt = new RegExp(`['"][^'"]*\\b${name}(?:\\.m?js)?['"]`);
+      const referrers = PRODUCTION.filter(([other, src]) => other !== path && importsIt.test(src)).map(([other]) => other);
+      expect(referrers, `${path} is imported by other code`).toEqual([]);
+    }
   });
 
   it('only src/capture/validators.js imports tldts', () => {

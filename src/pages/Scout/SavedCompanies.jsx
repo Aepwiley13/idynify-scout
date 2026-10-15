@@ -19,7 +19,7 @@ import CompanyDetailModal from '../../components/scout/CompanyDetailModal';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { calculateICPScore, DEFAULT_WEIGHTS } from '../../utils/icpScoring';
-import { getDisplayIndustry, getDisplayBarryIntel, isMissingValue } from '../../utils/companyDisplay';
+import { getDisplayIndustry, getDisplayBarryIntel, isMissingValue, getFitTier } from '../../utils/companyDisplay';
 import { isEnrichmentPending } from '../../services/companyEnrichment';
 import { usePendingEnrichmentUpdates } from '../../hooks/usePendingEnrichmentUpdates';
 import {
@@ -839,30 +839,85 @@ export function SwipeDeck({ companies, totalActive, T, onFindContact }) {
 }
 
 // ─── Company Card (v5 style) ──────────────────────────────────────────────────
+// ─── Grid card ────────────────────────────────────────────────────────────────
+// What a saved-company card says at a glance: who, industry and where, how big,
+// contact state, ICP fit (only when an ICP is active), Barry's short reason, and
+// the one thing to do next. Every value is verified company data or an honest
+// unknown — never a placeholder, a stray 0, or the ICP's own criteria.
+
+/** The fit pill, or null when no ICP is active (no pill at all). */
+export function fitPillFor(company) {
+  if (company?.match_attributed === false) return null;
+  if (isEnrichmentPending(company)) return { label: 'Verifying…', color: null };
+  const score = company?.fit_score;
+  if (score === null || score === undefined) return { label: '— · Not enough data', color: null };
+  const tier = getFitTier(score);
+  const tierLabel = tier.label.charAt(0) + tier.label.slice(1).toLowerCase();
+  return { label: `${score} · ${tierLabel}`, color: tier.color };
+}
+
+/** "3", "3 · 2 suggested", "2 suggested", or "None yet". */
+export function contactsSummaryFor(company) {
+  const saved = company?.contact_count || 0;
+  const suggested = company?.suggested_contact_count || 0;
+  if (saved > 0 && suggested > 0) return `${saved} · ${suggested} suggested`;
+  if (saved > 0) return String(saved);
+  if (suggested > 0) return `${suggested} suggested`;
+  return 'None yet';
+}
+
+/** The primary action's label, from the contact state. */
+export function nextActionFor(company) {
+  const saved = company?.contact_count || 0;
+  const suggested = company?.suggested_contact_count || 0;
+  if (saved > 0) return `View ${saved} contact${saved === 1 ? '' : 's'} →`;
+  if (suggested > 0) return `Review ${suggested} suggested →`;
+  return 'Find contacts →';
+}
+
+/** "Industry · Location", whichever half is known. */
+export function cardSubtitleFor(company) {
+  if (isEnrichmentPending(company)) return VERIFYING_LABEL;
+  const industry = getDisplayIndustry(company, null);
+  const location = [
+    company?.apolloEnrichment?.snapshot?.location?.full, company?.hq_location, company?.location, company?.city,
+  ].find(v => typeof v === 'string' && !isMissingValue(v));
+  const parts = [industry, location].filter(Boolean);
+  return parts.length ? parts.join(' · ') : 'Industry and location unknown';
+}
+
 export function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts, onArchive, onRestore }) {
   const pending = isEnrichmentPending(company);
-  const location = [
-    company.apolloEnrichment?.snapshot?.location?.full, company.hq_location, company.location, company.city,
-  ].find(v => typeof v === 'string' && !isMissingValue(v));
+  const fit = fitPillFor(company);
+  const subtitle = cardSubtitleFor(company);
+  const employees = displayValue(
+    company.apolloEnrichment?.snapshot?.estimated_num_employees || company.employee_count || company.company_size,
+    pending, { count: true },
+  );
+  const barry = getDisplayBarryIntel(company) || (isMissingValue(company.description) ? null : company.description);
+  const hasContacts = company.contact_count > 0;
+  const iconButton = { padding: '5px 8px', borderRadius: 6, border: `1px solid ${T.border}`, background: T.surface, color: T.textFaint, cursor: 'pointer', display: 'flex', alignItems: 'center' };
+
   return (
     <div
-      style={{ background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 13, overflow: 'hidden', transition: 'all 0.15s', cursor: 'pointer' }}
+      style={{ background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 13, overflow: 'hidden', transition: 'all 0.15s', cursor: 'pointer', display: 'flex', flexDirection: 'column' }}
       onMouseEnter={e => { e.currentTarget.style.borderColor = T.borderHov; e.currentTarget.style.transform = 'translateY(-1px)'; }}
       onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.transform = 'none'; }}
       onClick={onClick}
     >
-      <div style={{ padding: '14px 14px 11px', borderBottom: `1px solid ${T.border}` }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 9 }}>
+      <div style={{ padding: '14px 14px 11px', flex: 1 }}>
+        {/* Header: who, and how strong the fit is */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 10 }}>
           <div style={{ width: 36, height: 36, borderRadius: 9, background: T.surface, border: `1px solid ${T.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, overflow: 'hidden', flexShrink: 0 }}>
             <CompanyLogo company={company} size="default" />
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <CompanyName company={company} style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} />
-            <div style={{ fontSize: 10, color: T.textMuted }}>{pending ? VERIFYING_LABEL : getDisplayIndustry(company)}</div>
+            <div data-testid="card-subtitle" title={subtitle} style={{ fontSize: 10, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{subtitle}</div>
           </div>
-          {company.contact_count > 0 && (
-            <div style={{ fontSize: 9, background: `${STATUS.green}18`, color: STATUS.green, borderRadius: 7, padding: '2px 7px', border: `1px solid ${STATUS.green}30`, flexShrink: 0 }}>
-              {company.contact_count} contact{company.contact_count !== 1 ? 's' : ''}
+          {fit && (
+            <div data-testid="card-fit-pill" style={{ fontSize: 9, fontWeight: 700, color: fit.color || T.textFaint, background: fit.color ? `${fit.color}15` : T.surface, border: `1px solid ${fit.color ? `${fit.color}40` : T.border}`, borderRadius: 7, padding: '3px 7px', flexShrink: 0, whiteSpace: 'nowrap' }}>
+              {fit.label}
             </div>
           )}
           {isArchived && (
@@ -871,50 +926,53 @@ export function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts,
             </div>
           )}
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5 }}>
-          {[
-            ['EMPLOYEES', displayValue(company.apolloEnrichment?.snapshot?.estimated_num_employees || company.employee_count || company.company_size, pending, { count: true })],
-            ['FOUNDED', displayValue(company.apolloEnrichment?.snapshot?.founded_year || company.founded_year, pending)],
-            ['INDUSTRY', getDisplayIndustry(company, pending ? '…' : 'N/A')],
-            ['LOCATION', displayValue(location, pending)],
-          ].map(([l, v]) => (
+
+        {/* Facts: how big, and where the contacts stand */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 5, marginBottom: barry ? 10 : 0 }}>
+          {[['EMPLOYEES', employees], ['CONTACTS', contactsSummaryFor(company)]].map(([l, v]) => (
             <div key={l}>
               <div style={{ fontSize: 8, letterSpacing: 1, color: T.textFaint }}>{l}</div>
               <div style={{ fontSize: 10, color: T.textMuted, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
             </div>
           ))}
         </div>
+
+        {/* Barry: why it may be relevant, two lines at most */}
+        {barry && (
+          <div style={{ display: 'flex', gap: 6, alignItems: 'flex-start' }}>
+            <span style={{ fontSize: 8, letterSpacing: 1, color: BRAND.pink, fontWeight: 700, paddingTop: 2, flexShrink: 0 }}>BARRY</span>
+            <p
+              data-testid="card-barry"
+              title={barry}
+              style={{ margin: 0, fontSize: 10, lineHeight: 1.5, color: T.textMuted, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+            >{barry}</p>
+          </div>
+        )}
       </div>
-      <div style={{ padding: '9px 12px' }}>
-        <div style={{ display: 'flex', gap: 5, marginBottom: 7 }}>
-          <button
-            onClick={e => { e.stopPropagation(); if (company.website_url) window.open(company.website_url, '_blank'); }}
-            style={{ flex: 1, padding: 4, borderRadius: 6, border: `1px solid #7c5ce430`, background: '#7c5ce410', color: '#b388ff', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
-          ><Globe size={11} />Visit</button>
-          <button
-            onClick={e => { e.stopPropagation(); if (company.linkedin_url) window.open(company.linkedin_url, '_blank'); }}
-            style={{ flex: 1, padding: 4, borderRadius: 6, border: `1px solid #0077b530`, background: '#0077b510', color: '#3b82f6', fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 }}
-          ><Linkedin size={11} />LinkedIn</button>
-          {!isArchived && (
-            <button
-              onClick={e => { e.stopPropagation(); onArchive(); }}
-              title="Archive company"
-              style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${T.border}`, background: T.surface, color: T.textFaint, fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-            ><Archive size={11} /></button>
-          )}
-          {isArchived && (
-            <button
-              onClick={e => { e.stopPropagation(); onRestore(); }}
-              title="Restore company"
-              style={{ padding: '4px 8px', borderRadius: 6, border: `1px solid ${T.border}`, background: T.surface, color: T.textFaint, fontSize: 10, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
-            ><RotateCcw size={11} /></button>
-          )}
-        </div>
+
+      {/* Actions: quick links, archive, and the one thing to do next */}
+      <div style={{ padding: '9px 12px', borderTop: `1px solid ${T.border}`, display: 'flex', gap: 5, alignItems: 'center' }}>
         <button
+          onClick={e => { e.stopPropagation(); if (company.website_url) window.open(company.website_url, '_blank'); }}
+          title="Visit website" aria-label="Visit website"
+          style={{ ...iconButton, border: '1px solid #7c5ce430', background: '#7c5ce410', color: '#b388ff' }}
+        ><Globe size={12} /></button>
+        <button
+          onClick={e => { e.stopPropagation(); if (company.linkedin_url) window.open(company.linkedin_url, '_blank'); }}
+          title="LinkedIn" aria-label="LinkedIn"
+          style={{ ...iconButton, border: '1px solid #0077b530', background: '#0077b510', color: '#3b82f6' }}
+        ><Linkedin size={12} /></button>
+        {isArchived ? (
+          <button onClick={e => { e.stopPropagation(); onRestore(); }} title="Restore company" aria-label="Restore company" style={iconButton}><RotateCcw size={12} /></button>
+        ) : (
+          <button onClick={e => { e.stopPropagation(); onArchive(); }} title="Archive company" aria-label="Archive company" style={iconButton}><Archive size={12} /></button>
+        )}
+        <button
+          data-testid="card-next-action"
           onClick={e => { e.stopPropagation(); (onFindContacts || onClick)(); }}
-          style={{ width: '100%', padding: 7, borderRadius: 7, border: 'none', background: company.contact_count > 0 ? T.cyanBg : `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: company.contact_count > 0 ? T.cyan : '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', borderColor: company.contact_count > 0 ? T.cyanBdr : 'none' }}
+          style={{ marginLeft: 'auto', padding: '6px 11px', borderRadius: 7, border: hasContacts ? `1px solid ${T.cyanBdr}` : 'none', background: hasContacts ? T.cyanBg : `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: hasContacts ? T.cyan : '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
         >
-          {company.contact_count > 0 ? 'View Contacts →' : 'Find Contacts →'}
+          {nextActionFor(company)}
         </button>
       </div>
     </div>

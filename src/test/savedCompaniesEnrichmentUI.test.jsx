@@ -92,8 +92,8 @@ describe('the saved-company card while enrichment is pending', () => {
     expect(container.textContent).toContain('Computer Software');
     expect(container.textContent).toContain('42');
     expect(container.textContent).toContain('Lehi, Utah, United States');
-    expect(container.textContent).toContain('2012');
-    expect(container.textContent).not.toContain('2,012');
+    // Founded lives in the detail view and Barry, not on the grid card.
+    expect(container.textContent).not.toContain('2012');
   });
 
   it('after a failed or abandoned enrichment, shows the normal unknown state, not "Verifying"', () => {

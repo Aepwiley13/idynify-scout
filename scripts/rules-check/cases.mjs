@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import {
   initializeTestEnvironment, assertSucceeds, assertFails,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField } from 'firebase/firestore';
 
 const env = await initializeTestEnvironment({
   projectId: 'demo-icp-rules',
@@ -83,6 +83,134 @@ const CASES = [
       () => setDoc(doc(me, 'ops_alerts/gmail-sync-worker'), { lastAlertAtMs: 9e15 })],
   ['23  ops_alerts delete', 'DENY', () => deleteDoc(doc(me, 'ops_alerts/daily-leads-refresh'))],
 ];
+
+// ── users/{uid}: server-controlled fields ──────────────────────────────────
+// The owner keeps every profile write the app makes today, but cannot add,
+// change or remove a field the server trusts for authorization or that
+// records billing. The list below is this suite's own copy, taken from the
+// code that writes and reads these fields, so a field dropped from the rules
+// fails here instead of passing quietly.
+const SERVER_CONTROLLED = {
+  // authorization: utils/adminAuth.js, utils/superAdminAuth.js
+  role: 'admin', permissions: ['*'], permissionsOverride: true, permissions_reset_at: 'x',
+  // suspension: adminSuspendAccount.js, adminReactivateAccount.js
+  accountStatus: 'suspended', suspendedAt: 'x', suspendedBy: 'x', suspensionReason: 'x',
+  reactivatedAt: 'x', reactivatedBy: 'x', reactivationReason: 'x',
+  // billing: stripe-webhook.js, Signup.jsx
+  hasCompletedPayment: true, paymentCompletedAt: 'x', subscriptionTier: 'pro',
+  subscriptionStatus: 'active', selectedTier: 'pro', status: 'active', credits: 99999,
+  monthlyCredits: 99999, tierLimits: { teamSeats: 99 }, features: { mobilePhone: true },
+  billingCycleDate: 1, stripeCustomerId: 'cus_someone_else', stripeSubscriptionId: 'sub_x',
+};
+
+// Exactly what Signup.jsx writes when it creates the document.
+const signup = (tier) => ({
+  email: 'new@example.test', createdAt: new Date(0), selectedTier: tier, subscriptionTier: tier,
+  status: 'pending_payment', hasCompletedPayment: false,
+  credits: tier === 'pro' ? 1250 : 400, monthlyCredits: tier === 'pro' ? 1250 : 400,
+});
+
+// P: a signed-up, unpaid user. A: an admin. SA: a super admin.
+await env.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, 'users/P'), { ...signup('starter'), preferences: { theme: 'light' }, reconProgress: { currentSection: 1 } });
+  await setDoc(doc(db, 'users/A'), { email: 'a@example.test', role: 'admin' });
+  await setDoc(doc(db, 'users/SA'), { email: 'sa@example.test', role: 'super_admin', permissions: ['tenants.read'] });
+});
+const p = env.authenticatedContext('P').firestore();
+const a = env.authenticatedContext('A').firestore();
+const sa = env.authenticatedContext('SA').firestore();
+let fresh = 0;
+const newUser = () => { const uid = `NEW${++fresh}`; return [uid, env.authenticatedContext(uid).firestore()]; };
+const create = (data, opts) => { const [uid, db] = newUser(); return () => setDoc(doc(db, `users/${uid}`), data, opts); };
+const asAdminSdk = (write) => () => env.withSecurityRulesDisabled(ctx => write(ctx.firestore()));
+
+const USER_DOC_CASES = [
+  // Every profile write the app makes today (shapes copied from the call sites).
+  ['P  displayName            UserSettings.jsx:527', 'ALLOW', () => updateDoc(doc(p, 'users/P'), { displayName: 'Pat' })],
+  ['P  bookingLink            UserSettings.jsx:545', 'ALLOW', () => updateDoc(doc(p, 'users/P'), { bookingLink: 'https://cal.example.test/p' })],
+  ['P  preferences.theme      ThemeContext.jsx:102', 'ALLOW', () => setDoc(doc(p, 'users/P'), { preferences: { theme: 'dark' } }, { merge: true })],
+  ['P  preferences.<key>      useUserPreference.js:74', 'ALLOW', () => updateDoc(doc(p, 'users/P'), { 'preferences.missionSounds': false })],
+  ['P  onboarding             useOnboardingState.js:198', 'ALLOW', () => setDoc(doc(p, 'users/P'), { onboarding: { started: true } }, { merge: true })],
+  ['P  onboarding + barry     BarryOnboarding.jsx:536', 'ALLOW', () => setDoc(doc(p, 'users/P'), {
+      onboardingComplete: true, onboardingCompletedAt: new Date(0), onboardingSource: 'barry',
+      barryState: 'SEARCHING', companiesFoundCount: 0, hasSeenMCWelcome: false }, { merge: true })],
+  ['P  onboardingComplete     ReconOnboardingWizard.jsx:132', 'ALLOW', () => setDoc(doc(p, 'users/P'), { onboardingComplete: true }, { merge: true })],
+  ['P  hasSeenMCWelcome       MissionControlDashboardV2.jsx:335', 'ALLOW', () => setDoc(doc(p, 'users/P'), { hasSeenMCWelcome: true }, { merge: true })],
+  ['P  barryState + count     ICPSettings.jsx:297, search-companies.js', 'ALLOW', () => setDoc(doc(p, 'users/P'), { barryState: 'READY', companiesFoundCount: 12 }, { merge: true })],
+  ['P  firstName              resolveWho.js:125', 'ALLOW', () => setDoc(doc(p, 'users/P'), { firstName: 'Pat' }, { merge: true })],
+  ['P  section1Output         Section1Foundation.jsx:301', 'ALLOW', () => updateDoc(doc(p, 'users/P'), {
+      section1Output: { summary: 'x' }, 'reconProgress.currentSection': 2, 'reconProgress.section1Completed': true, 'reconProgress.lastUpdated': new Date(0) })],
+  ['P  sectionNAnswers        Section2..10 *.jsx', 'ALLOW', () => updateDoc(doc(p, 'users/P'), { section5Answers: { q1: 'x' }, 'reconProgress.section5LastSaved': new Date(0) })],
+  ['P  scoutData autosave     ImprovedScoutQuestionnaire.jsx:219', 'ALLOW', () => updateDoc(doc(p, 'users/P'), { scoutData: { goal: 'x' }, lastModified: new Date(0) })],
+  ['P  scoutData submit       ImprovedScoutQuestionnaire.jsx:346', 'ALLOW', () => updateDoc(doc(p, 'users/P'), { scoutData: { goal: 'y' }, scoutCompleted: true, scoutCompletedAt: new Date(0) })],
+  ['P  reads own document', 'ALLOW', () => getDoc(doc(p, 'users/P'))],
+
+  // Signup creates the document with its billing fields, exactly as Signup.jsx writes them.
+  ['new  signup, starter (400 credits)', 'ALLOW', create(signup('starter'))],
+  ['new  signup, pro (1250 credits)', 'ALLOW', create(signup('pro'))],
+  ['new  first write is a profile merge', 'ALLOW', create({ preferences: { theme: 'dark' } }, { merge: true })],
+  // Only the tiers the app sells: starter and pro (Homepage.jsx, CheckoutPage.jsx, stripe-webhook.js).
+  ['new  signup, unknown tier team', 'DENY', create(signup('team'))],
+  ['new  signup, unknown tier enterprise', 'DENY', create(signup('enterprise'))],
+  ['new  signup, tier hunter (never sold)', 'DENY', create(signup('hunter'))],
+  ['new  signup, tier admin', 'DENY', create(signup('admin'))],
+  ['new  signup, empty tier', 'DENY', create(signup(''))],
+  ['new  signup, tier Pro (wrong case)', 'DENY', create({ ...signup('pro'), selectedTier: 'Pro', subscriptionTier: 'Pro' })],
+  ['new  signup, tier "pro " (trailing space)', 'DENY', create({ ...signup('pro'), selectedTier: 'pro ', subscriptionTier: 'pro ' })],
+  ['new  signup, tier not a string', 'DENY', create({ ...signup('starter'), selectedTier: 1, subscriptionTier: 1 })],
+  ['new  signup, selected pro but tier starter', 'DENY', create({ ...signup('pro'), subscriptionTier: 'starter' })],
+  ['new  signup claiming pro credits on starter', 'DENY', create({ ...signup('starter'), credits: 1250, monthlyCredits: 1250 })],
+  ['new  signup with 99999 credits', 'DENY', create({ ...signup('starter'), credits: 99999, monthlyCredits: 99999 })],
+  ['new  signup already paid', 'DENY', create({ ...signup('starter'), hasCompletedPayment: true })],
+  ['new  signup with status active', 'DENY', create({ ...signup('starter'), status: 'active' })],
+  ['new  signup tier differs from selected tier', 'DENY', create({ ...signup('starter'), subscriptionTier: 'pro' })],
+  ['new  only some signup billing fields', 'DENY', create({ email: 'x@example.test', credits: 400 })],
+  ['new  signup plus role admin', 'DENY', create({ ...signup('starter'), role: 'admin' })],
+  ['new  signup plus role super_admin', 'DENY', create({ ...signup('starter'), role: 'super_admin' })],
+  ['new  role user, nothing else', 'DENY', create({ role: 'user' })],
+  ['new  merge-create with role admin', 'DENY', create({ role: 'admin' }, { merge: true })],
+
+  // Role: cannot be added, changed or removed, and no one can elevate themselves.
+  ['P  add role admin', 'DENY', () => updateDoc(doc(p, 'users/P'), { role: 'admin' })],
+  ['P  add role super_admin', 'DENY', () => updateDoc(doc(p, 'users/P'), { role: 'super_admin' })],
+  ['P  merge role admin with a profile field', 'DENY', () => setDoc(doc(p, 'users/P'), { displayName: 'Pat', role: 'admin' }, { merge: true })],
+  ['A  change role admin → super_admin', 'DENY', () => updateDoc(doc(a, 'users/A'), { role: 'super_admin' })],
+  ['A  remove role', 'DENY', () => updateDoc(doc(a, 'users/A'), { role: deleteField() })],
+  ['A  overwrite the document without role', 'DENY', () => setDoc(doc(a, 'users/A'), { email: 'a@example.test' })],
+  ['SA change own permissions', 'DENY', () => updateDoc(doc(sa, 'users/SA'), { permissions: ['*'] })],
+  ['SA remove own permissions (falls back to all)', 'DENY', () => updateDoc(doc(sa, 'users/SA'), { permissions: deleteField() })],
+
+  // Billing: the simulated-checkout write (CheckoutPage.jsx:93) is a client
+  // granting itself a paid plan, so it is refused like any other.
+  ['P  simulated checkout write', 'DENY', () => updateDoc(doc(p, 'users/P'), {
+      hasCompletedPayment: true, paymentCompletedAt: 'x', subscriptionTier: 'pro', subscriptionStatus: 'active',
+      credits: { total: 1250, used: 0, remaining: 1250, resetDate: 'x' },
+      tierLimits: { creditsPerMonth: 1250, companiesPerMonth: 50, contactsPerMonth: 250, teamSeats: 1, support: '24-hour email' },
+      features: { mobilePhone: true }, billingCycleDate: 1 })],
+  ['P  credits via dotted path', 'DENY', () => updateDoc(doc(p, 'users/P'), { 'credits.remaining': 99999 })],
+  ['P  features.mobilePhone via dotted path', 'DENY', () => updateDoc(doc(p, 'users/P'), { 'features.mobilePhone': true })],
+  ['P  delete own user document', 'DENY', () => deleteDoc(doc(p, 'users/P'))],
+  ['OTHER updates P', 'DENY', () => updateDoc(doc(other, 'users/P'), { displayName: 'x' })],
+  ['OTHER reads P', 'DENY', () => getDoc(doc(other, 'users/P'))],
+
+  // Every server-controlled field, one at a time: add or change, and create with it.
+  ...Object.entries(SERVER_CONTROLLED).map(([field, value]) =>
+    [`P  set ${field}`, 'DENY', () => updateDoc(doc(p, 'users/P'), { [field]: value })]),
+  ...Object.entries(SERVER_CONTROLLED).map(([field, value]) =>
+    [`new  create with ${field}`, 'DENY', create({ email: 'x@example.test', [field]: value })]),
+  // ...and remove each one P holds.
+  ...['selectedTier', 'subscriptionTier', 'status', 'hasCompletedPayment', 'credits', 'monthlyCredits'].map(field =>
+    [`P  remove ${field}`, 'DENY', () => updateDoc(doc(p, 'users/P'), { [field]: deleteField() })]),
+
+  // Server writes go through the Admin SDK, which these rules do not apply to.
+  ['admin sdk  stripe-webhook checkout write', 'ALLOW', asAdminSdk(db => updateDoc(doc(db, 'users/P'), {
+      hasCompletedPayment: true, subscriptionTier: 'pro', subscriptionStatus: 'active', stripeCustomerId: 'cus_P',
+      credits: { total: 1250, used: 0, remaining: 1250, resetDate: 'x' }, tierLimits: { teamSeats: 1 }, features: { mobilePhone: true } }))],
+  ['admin sdk  suspend account', 'ALLOW', asAdminSdk(db => setDoc(doc(db, 'users/P'), { accountStatus: 'suspended', suspendedBy: 'A' }, { merge: true }))],
+  ['admin sdk  grant role', 'ALLOW', asAdminSdk(db => updateDoc(doc(db, 'users/P'), { role: 'admin' }))],
+];
+CASES.push(...USER_DOC_CASES.map(([name, expect, run], i) => [`${String(24 + i).padStart(2, '0')}  ${name}`, expect, run]));
 
 let pass = 0, fail = 0;
 const failures = [];

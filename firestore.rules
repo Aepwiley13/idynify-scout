@@ -26,8 +26,29 @@
 //      grants access if ANY matching rule allows it, so every guard above has to
 //      be repeated there. Omitting one silently re-grants what was withheld.
 //
+// ─── SERVER-CONTROLLED FIELDS ON users/{uid} ────────────────────────────────
+// The owner may write their own user document, but not the fields the server
+// trusts for authorization or that record billing. Each is written only by the
+// Admin SDK, which bypasses these rules:
+//   role                       admin / super_admin access (utils/adminAuth.js,
+//                              utils/superAdminAuth.js, verifyAuthToken.js)
+//   permissions, permissionsOverride, permissions_reset_at
+//                              super-admin permission set (superAdminAuth.js,
+//                              superAdminRepairTools.js)
+//   accountStatus, suspended*, reactivated*
+//                              suspension state (adminSuspendAccount.js,
+//                              adminReactivateAccount.js)
+//   hasCompletedPayment, paymentCompletedAt, subscriptionTier,
+//   subscriptionStatus, selectedTier, status, credits, monthlyCredits,
+//   tierLimits, features, billingCycleDate, stripeCustomerId,
+//   stripeSubscriptionId       billing (stripe-webhook.js; Signup.jsx at create)
+// One client write is allowed: Signup.jsx creates the document with six of the
+// billing fields, only on a supported tier and only with the values it writes
+// (see signupTiers and signupBilling).
+// Deleting the user document is not allowed from a client.
+//
 // ─── BEFORE CHANGING THIS FILE ──────────────────────────────────────────────
-// CI runs the 19-case suite in scripts/rules-check on every PR. Run it locally
+// CI runs the suite in scripts/rules-check on every PR. Run it locally
 // too — it needs a JDK 21+ and takes under a minute. Case 09 is the one that
 // matters most: `update users/U/companies/c1 → ALLOW`. The likely failure mode
 // of a bad rule is that EVERY product write denies, not that the protected
@@ -41,9 +62,53 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
 
+    // Fields on users/{uid} that only the server may set (header above).
+    function serverControlledUserFields() {
+      return ['role', 'permissions', 'permissionsOverride', 'permissions_reset_at',
+              'accountStatus', 'suspendedAt', 'suspendedBy', 'suspensionReason',
+              'reactivatedAt', 'reactivatedBy', 'reactivationReason',
+              'hasCompletedPayment', 'paymentCompletedAt', 'subscriptionTier',
+              'subscriptionStatus', 'selectedTier', 'status', 'credits',
+              'monthlyCredits', 'tierLimits', 'features', 'billingCycleDate',
+              'stripeCustomerId', 'stripeSubscriptionId'];
+    }
+
+    // The billing fields Signup.jsx writes when it creates the document.
+    function signupBillingFields() {
+      return ['selectedTier', 'subscriptionTier', 'status',
+              'hasCompletedPayment', 'credits', 'monthlyCredits'];
+    }
+
+    // The tiers a user can sign up for: the two the homepage links to
+    // (Homepage.jsx), the two CheckoutPage.jsx has a price and a payment link
+    // for, and the two stripe-webhook.js maps a payment to.
+    function signupTiers() {
+      return ['starter', 'pro'];
+    }
+
+    // Exactly what Signup.jsx writes: an unpaid account on a supported tier,
+    // with the credits that tier starts with (1250 for pro, 400 for starter).
+    function signupBilling(data) {
+      return data.keys().hasAll(signupBillingFields())
+        && data.status == 'pending_payment'
+        && data.hasCompletedPayment == false
+        && data.selectedTier in signupTiers()
+        && data.subscriptionTier == data.selectedTier
+        && data.credits == (data.selectedTier == 'pro' ? 1250 : 400)
+        && data.monthlyCredits == data.credits;
+    }
+
     match /users/{userId} {
       allow read: if owns(userId);
-      allow write: if owns(userId);
+      allow create: if owns(userId)
+        && !request.resource.data.keys().hasAny(
+             serverControlledUserFields().removeAll(signupBillingFields()))
+        && (!request.resource.data.keys().hasAny(signupBillingFields())
+            || signupBilling(request.resource.data));
+      allow update: if owns(userId)
+        && !request.resource.data.diff(resource.data).affectedKeys()
+             .hasAny(serverControlledUserFields());
+      allow delete: if false;
 
       // Every 2-deep document under the user. `coll` is a SINGLE-segment
       // wildcard, so it is a plain string and can be compared directly — no

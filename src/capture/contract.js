@@ -180,10 +180,11 @@ export function validateCardExtraction(extraction) {
     if (value === null && level !== 'unknown') fail(path, 'null_value_not_unknown');
     if (value === null && normalized !== null) fail(`${path}.normalized`, 'normalized_without_value');
     if (value !== null && source === null) fail(`${path}.source`, 'value_without_source');
-    // Inference is labelled, and never above possible.
+    // Inference is labelled, and never above possible until the user confirms
+    // it. Confirming raises the level but keeps the label: provenance is never lost.
     if (source === 'inferred' && inferredFrom === null) fail(`${path}.inferredFrom`, 'inferred_without_origin');
     if (inferredFrom !== null && source !== 'inferred' && !derivedOrigin) fail(`${path}.inferredFrom`, 'origin_without_inferred');
-    if (source === 'inferred' && ['confirmed', 'likely'].includes(level)) fail(`${path}.extraction.level`, 'inferred_above_possible');
+    if (source === 'inferred' && !userConfirmed && ['confirmed', 'likely'].includes(level)) fail(`${path}.extraction.level`, 'inferred_above_possible');
     // The user's word is final.
     if (userEdited && source !== 'user') fail(`${path}.source`, 'user_edit_without_user_source');
     if ((userEdited || userConfirmed) && level !== 'confirmed') fail(`${path}.extraction.level`, 'user_action_not_confirmed');

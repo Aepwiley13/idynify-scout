@@ -169,6 +169,15 @@ describe('the contract rules', () => {
     expectError(x => { x.person.givenName.extraction.level = 'likely'; }, 'person.givenName.extraction.level', 'inferred_above_possible');
   });
 
+  it('a user confirming an inferred value raises its level and keeps its provenance', () => {
+    expect(errorsAfter(x => {
+      x.company.domain = makeField({
+        value: 'acme.com', normalized: 'acme.com', source: 'inferred', inferredFrom: 'email_domain',
+        score: 0.8, level: 'confirmed', witness: 'skipped', userConfirmed: true,
+      });
+    })).toEqual([]);
+  });
+
   it('only company.domain may name the printed text it was read from without being inferred', () => {
     expect(errorsAfter(x => {
       Object.assign(x.company.domain, { value: 'acme.com', normalized: 'acme.com', inferredFrom: 'email_domain' });
@@ -205,6 +214,22 @@ describe('the contract rules', () => {
       'company.domain.normalized', 'domain_not_registrable');
     expectError(x => { x.company.domain.value = 'wixsite.com'; x.company.domain.normalized = 'wixsite.com'; },
       'company.domain.value', 'domain_shared_host');
+  });
+
+  it('a shared-host URL stays as printed; only its domain is barred from company identity', () => {
+    const linkedinPerson = 'https://www.linkedin.com/in/sarahchen';
+    expect(errorsAfter(x => {
+      x.person.linkedinUrl.value = linkedinPerson;
+      x.person.linkedinUrl.normalized = 'linkedin.com/in/sarahchen';
+      Object.assign(x.company.website, { raw: 'acme.wixsite.com', value: 'acme.wixsite.com', normalized: 'acme.wixsite.com' });
+      Object.assign(x.company.domain, { value: 'acme.com', normalized: 'acme.com', inferredFrom: 'email_domain' });
+    })).toEqual([]);
+    expectError(x => { x.company.domain.value = 'linkedin.com'; x.company.domain.normalized = 'linkedin.com'; },
+      'company.domain.value', 'domain_shared_host');
+    expectError(x => {
+      Object.assign(x.company.website, { raw: 'acme.wixsite.com', value: 'acme.wixsite.com', normalized: 'acme.wixsite.com' });
+      x.company.domain.value = 'wixsite.com'; x.company.domain.normalized = 'wixsite.com';
+    }, 'company.domain.value', 'domain_shared_host');
   });
 
   it('a company domain comes from usable printed text on this card', () => {

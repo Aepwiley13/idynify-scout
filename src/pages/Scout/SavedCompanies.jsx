@@ -19,7 +19,7 @@ import CompanyDetailModal from '../../components/scout/CompanyDetailModal';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { calculateICPScore, DEFAULT_WEIGHTS } from '../../utils/icpScoring';
-import { getDisplayIndustry, getDisplayBarryIntel, isMissingValue, getFitTier } from '../../utils/companyDisplay';
+import { getDisplayIndustry, getDisplayBarryIntel, isMissingValue } from '../../utils/companyDisplay';
 import { isEnrichmentPending } from '../../services/companyEnrichment';
 import { usePendingEnrichmentUpdates } from '../../hooks/usePendingEnrichmentUpdates';
 import {
@@ -840,22 +840,13 @@ export function SwipeDeck({ companies, totalActive, T, onFindContact }) {
 
 // ─── Company Card (v5 style) ──────────────────────────────────────────────────
 // ─── Grid card ────────────────────────────────────────────────────────────────
-// The fast-scan layer: quick company facts, ICP fit (only when an ICP is
-// active), and the one thing to do next. Deeper intelligence — overview,
-// decision makers, tech stack, Barry — lives in the company detail view.
+// The fast-scan layer: quick company facts and the one thing to do next.
+// The ICP fit score is not shown here, so the company name gets the full header
+// width; it stays in the swipe view and the company detail view. Deeper
+// intelligence — overview, decision makers, tech stack, Barry — lives in the
+// company detail view.
 // Every value is stored company or enrichment data, or an honest unknown; the
 // card never triggers an API call and never shows a placeholder as a fact.
-
-/** The fit pill, or null when no ICP is active (no pill at all). */
-export function fitPillFor(company) {
-  if (company?.match_attributed === false) return null;
-  if (isEnrichmentPending(company)) return { label: 'Verifying…', color: null };
-  const score = company?.fit_score;
-  if (score === null || score === undefined) return { label: '— · Not enough data', color: null };
-  const tier = getFitTier(score);
-  const tierLabel = tier.label.charAt(0) + tier.label.slice(1).toLowerCase();
-  return { label: `${score} · ${tierLabel}`, color: tier.color };
-}
 
 /** "3", "3 · 2 suggested", "2 suggested", or "None yet". */
 export function contactsSummaryFor(company) {
@@ -926,7 +917,6 @@ function CardFact({ name, testId, T, children }) {
 
 export function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts, onArchive, onRestore }) {
   const pending = isEnrichmentPending(company);
-  const fit = fitPillFor(company);
   const snapshot = company.apolloEnrichment?.snapshot;
   const employees = displayValue(snapshot?.estimated_num_employees || company.employee_count || company.company_size, pending, { count: true });
   const founded = displayValue(snapshot?.founded_year || company.founded_year, pending);
@@ -943,7 +933,7 @@ export function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts,
       onClick={onClick}
     >
       <div style={{ padding: '14px 14px 9px', flex: 1 }}>
-        {/* Header: who, what industry, and how strong the fit is */}
+        {/* Header: who and what industry. The name takes the full width. */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 9 }}>
           <div style={{ width: 36, height: 36, borderRadius: 9, background: T.surface, border: `1px solid ${T.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, overflow: 'hidden', flexShrink: 0 }}>
             <CompanyLogo company={company} size="default" />
@@ -952,11 +942,6 @@ export function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts,
             <CompanyName company={company} style={{ display: 'block', fontSize: 13, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} />
             <div data-testid="card-industry" style={{ fontSize: 10, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{industryLineFor(company)}</div>
           </div>
-          {fit && (
-            <div data-testid="card-fit-pill" style={{ fontSize: 9, fontWeight: 700, color: fit.color || T.textFaint, background: fit.color ? `${fit.color}15` : T.surface, border: `1px solid ${fit.color ? `${fit.color}40` : T.border}`, borderRadius: 7, padding: '3px 7px', flexShrink: 0, whiteSpace: 'nowrap' }}>
-              {fit.label}
-            </div>
-          )}
           {isArchived && (
             <div style={{ fontSize: 9, background: T.surface, color: T.textFaint, borderRadius: 7, padding: '2px 7px', border: `1px solid ${T.border}`, flexShrink: 0 }}>
               Archived

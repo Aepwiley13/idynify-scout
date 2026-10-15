@@ -4,7 +4,9 @@ Two suites against a **real** Firestore emulator on a throwaway `demo-` project.
 No production project, no credentials, no access to real data.
 
 - `cases.mjs` — **who** may write. The append-only rules on `lineageEvents` and
-  `criteriaVersions`.
+  `criteriaVersions`, and the server-controlled fields on `users/{uid}` (role,
+  permissions, suspension, billing): every profile write the app makes still
+  succeeds, and no client can add, change or remove one of those fields.
 - `write-semantics.mjs` — **what a write does** to the fields it was not told
   about. Guards the rediscovery `updateMask`.
 

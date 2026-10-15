@@ -942,9 +942,9 @@ export function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts,
       onMouseLeave={e => { e.currentTarget.style.borderColor = T.border; e.currentTarget.style.transform = 'none'; }}
       onClick={onClick}
     >
-      <div style={{ padding: '14px 14px 11px', flex: 1 }}>
+      <div style={{ padding: '14px 14px 9px', flex: 1 }}>
         {/* Header: who, what industry, and how strong the fit is */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 9 }}>
           <div style={{ width: 36, height: 36, borderRadius: 9, background: T.surface, border: `1px solid ${T.border2}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 17, overflow: 'hidden', flexShrink: 0 }}>
             <CompanyLogo company={company} size="default" />
           </div>
@@ -965,7 +965,7 @@ export function CompanyCardV5({ company, isArchived, T, onClick, onFindContacts,
         </div>
 
         {/* Quick facts */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 10, rowGap: 9 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 10, rowGap: 6 }}>
           <CardFact T={T} name="EMPLOYEES" testId="card-employees">{employees}</CardFact>
           <CardFact T={T} name="FOUNDED" testId="card-founded">{founded}</CardFact>
           <CardFact T={T} name="LOCATION" testId="card-location">{location}</CardFact>

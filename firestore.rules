@@ -47,7 +47,7 @@
 // Deleting the user document is not allowed from a client.
 //
 // ─── BEFORE CHANGING THIS FILE ──────────────────────────────────────────────
-// CI runs the 19-case suite in scripts/rules-check on every PR. Run it locally
+// CI runs the suite in scripts/rules-check on every PR. Run it locally
 // too — it needs a JDK 21+ and takes under a minute. Case 09 is the one that
 // matters most: `update users/U/companies/c1 → ALLOW`. The likely failure mode
 // of a bad rule is that EVERY product write denies, not that the protected

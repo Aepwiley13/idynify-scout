@@ -138,6 +138,15 @@ describe('normalizeCapturePhone', () => {
     expect(normalizeCapturePhone('(415) 555-0142', us).kind).toBeNull();
   });
 
+  it.each([
+    ['Toll Free: 1-800-555-0199', '+18005550199'],
+    ['Tel/Fax: (415) 555-0100', '+14155550100'],
+    ['Hotline +1 415 555 0100', '+14155550100'],
+    ['Main Line: 415-555-0100', '+14155550100'],
+  ])('any other label %j is stripped and the number kept, with no kind', (input, e164) => {
+    expect(normalizeCapturePhone(input, us)).toMatchObject({ kind: null, e164, valid: true, issues: [] });
+  });
+
   it('an ambiguous number is never converted into a country it was not printed for', () => {
     // A UK national number seen with a US default: not NANP, so not +1.
     expect(normalizeCapturePhone('020 7946 0018', us)).toMatchObject({

@@ -37,6 +37,8 @@ describe('hosts and domains', () => {
   it('extracts a bare host from printed forms', () => {
     expect(hostOf('HTTPS://WWW.Acme.com:443/a?b#c')).toBe('www.acme.com');
     expect(hostOf('jane@acme.com')).toBeNull();
+    expect(hostOf('https://user@acme.com/')).toBeNull();
+    expect(hostOf('youtube.com/@acme')).toBe('youtube.com');
     expect(emailHost('Jane@Sales.Acme.com')).toBe('sales.acme.com');
   });
 
@@ -58,6 +60,7 @@ describe('URLs', () => {
     ['www.acme.com', 'acme.com'],
     ['acme.com/team', 'acme.com/team'],
     ['http://Acme.co.uk/About?ref=card#x', 'acme.co.uk/About'],
+    ['https://www.youtube.com/@acme', 'youtube.com/@acme'],
   ])('%j → %j', (input, normalized) => {
     const result = validateUrl(input);
     expect(result.ok).toBe(true);

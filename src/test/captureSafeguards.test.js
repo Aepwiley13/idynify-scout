@@ -55,6 +55,7 @@ describe('section 9 — ISP and shared-host domains', () => {
   it.each([
     'acme.wixsite.com', 'https://acme.squarespace.com', 'acme.business.site', 'acme.github.io',
     'linktr.ee/acme', 'sites.google.com/view/acme', 'facebook.com/acmebakery', 'instagram.com/acme',
+    'https://www.youtube.com/@acme', 'medium.com/@acme',
   ])('%s is kept as a website only, never a company key', (website) => {
     expect(isSharedHost(website)).toBe(true);
     expect(websiteSafeguards(website)).toEqual([SAFEGUARDS.SHARED_HOST_DOMAIN]);
@@ -81,6 +82,7 @@ describe('section 9 — email local part as website', () => {
   it('jane.smith from jane.smith@acme.com is never a website', () => {
     expect(websiteSafeguards('jane.smith', { emails: ['jane.smith@acme.com'] })).toEqual([SAFEGUARDS.WEBSITE_FROM_EMAIL]);
     expect(websiteSafeguards('jane.smith@acme.com')).toEqual([SAFEGUARDS.WEBSITE_FROM_EMAIL]);
+    expect(websiteSafeguards('mailto:jane.smith@acme.com')).toEqual([SAFEGUARDS.WEBSITE_FROM_EMAIL]);
   });
 
   it('a real printed website alongside the same email is fine', () => {

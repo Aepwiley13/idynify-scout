@@ -30,8 +30,12 @@
  * candidate, not a display name.
  */
 
-import { CHECKS, domainKey, emailHost } from './validators.js';
-import { SAFEGUARDS, CAPTURE_FREE_EMAIL_DOMAINS, CAPTURE_ISP_EMAIL_DOMAINS, websiteSafeguards } from './safeguards.js';
+import { nameKey } from '../utils/identityNormalization.js';
+import { CHECKS, domainKey, domainStem, emailHost } from './validators.js';
+import {
+  SAFEGUARDS, CAPTURE_FREE_EMAIL_DOMAINS, CAPTURE_ISP_EMAIL_DOMAINS,
+  domainSafeguards, emailDomainSafeguards, websiteSafeguards,
+} from './safeguards.js';
 
 export const CONTRACT_VERSION = 'card-extraction/v1';
 
@@ -245,22 +249,38 @@ export function validateCardExtraction(extraction) {
         fail('company.website.value', 'website_from_email');
       }
     }
-    // The domain is a registrable domain, from a website or a work email, never a mailbox provider.
+    // The domain is a registrable domain, never a mailbox provider or a shared
+    // host. Unless the user typed it, it names the printed text it was read
+    // from, and that text is on this card and usable: a clean website at this
+    // domain, or a work address at it (not a role, free-mail or ISP address).
     if (isPlainObject(domain) && domain.value !== null) {
-      if (domain.inferredFrom !== null && !['website', 'email_domain'].includes(domain.inferredFrom)) {
+      const fromUser = domain.source === 'user';
+      if (domain.inferredFrom === null ? !fromUser : !['website', 'email_domain'].includes(domain.inferredFrom)) {
         fail('company.domain.inferredFrom', 'domain_bad_origin');
       }
       const key = domainKey(domain.value);
-      if (domain.normalized !== key) fail('company.domain.normalized', 'domain_not_registrable');
-      if (CAPTURE_FREE_EMAIL_DOMAINS.has(key) || CAPTURE_ISP_EMAIL_DOMAINS.has(key)) {
+      if (!key || domain.normalized !== key) fail('company.domain.normalized', 'domain_not_registrable');
+      const codes = domainSafeguards(domain.value);
+      if (codes.includes(SAFEGUARDS.FREE_EMAIL_DOMAIN) || codes.includes(SAFEGUARDS.ISP_EMAIL_DOMAIN)) {
         fail('company.domain.value', 'domain_from_mailbox_provider');
       }
+      if (codes.includes(SAFEGUARDS.SHARED_HOST_DOMAIN)) fail('company.domain.value', 'domain_shared_host');
+      const fromWebsite = isPlainObject(website) && typeof website.value === 'string'
+        && !websiteSafeguards(website.value, { emails }).length && domainKey(website.value) === key;
+      const fromWorkEmail = emails.some(email => !emailDomainSafeguards(email).length && domainKey(emailHost(email)) === key);
+      if (key && ((domain.inferredFrom === 'website' && !fromWebsite) || (domain.inferredFrom === 'email_domain' && !fromWorkEmail))) {
+        fail('company.domain.inferredFrom', 'domain_origin_not_on_card');
+      }
     }
-    // A company name is never manufactured from a mailbox provider ("Gmail").
-    if (isPlainObject(name) && name.value !== null && name.source === 'inferred' && name.inferredFrom === 'email_domain') {
+    // A company name is never manufactured from a mailbox provider: "Gmail"
+    // from a gmail.com address. A personal address printed beside a work one
+    // does not taint a name inferred from the work domain.
+    if (isPlainObject(name) && typeof name.value === 'string' && name.source === 'inferred' && name.inferredFrom === 'email_domain') {
       const providers = emails.map(emailHost).map(domainKey)
         .filter(key => CAPTURE_FREE_EMAIL_DOMAINS.has(key) || CAPTURE_ISP_EMAIL_DOMAINS.has(key));
-      if (providers.length) fail('company.name', 'company_name_from_mailbox_provider');
+      if (providers.some(key => domainKey(name.value) === key || nameKey(name.value) === domainStem(key))) {
+        fail('company.name', 'company_name_from_mailbox_provider');
+      }
     }
   }
 

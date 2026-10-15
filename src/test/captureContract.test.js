@@ -170,7 +170,9 @@ describe('the contract rules', () => {
   });
 
   it('only company.domain may name the printed text it was read from without being inferred', () => {
-    expect(errorsAfter(x => { x.company.domain.inferredFrom = 'email_domain'; })).toEqual([]);
+    expect(errorsAfter(x => {
+      Object.assign(x.company.domain, { value: 'acme.com', normalized: 'acme.com', inferredFrom: 'email_domain' });
+    })).toEqual([]);
     expectError(x => { x.company.domain.inferredFrom = 'full_name'; }, 'company.domain.inferredFrom', 'domain_bad_origin');
   });
 
@@ -198,12 +200,43 @@ describe('the contract rules', () => {
       'company.domain.normalized', 'domain_not_registrable');
     expectError(x => { x.company.domain.value = 'gmail.com'; x.company.domain.normalized = 'gmail.com'; },
       'company.domain.value', 'domain_from_mailbox_provider');
+    // A value with no registrable domain fails even when it claims no normalized form.
+    expectError(x => { x.company.domain.value = 'acmerockets'; x.company.domain.normalized = null; },
+      'company.domain.normalized', 'domain_not_registrable');
+    expectError(x => { x.company.domain.value = 'wixsite.com'; x.company.domain.normalized = 'wixsite.com'; },
+      'company.domain.value', 'domain_shared_host');
+  });
+
+  it('a company domain comes from usable printed text on this card', () => {
+    // From a role address: still the person's email, never company evidence.
+    expectError(x => {
+      x.person.emails[0] = makeEmailField({ value: 'info@acme.com', normalized: 'info@acme.com', source: 'card_text', score: 0.98, level: 'confirmed', witness: 'agree' }, 'role');
+      Object.assign(x.company.domain, { value: 'acme.com', normalized: 'acme.com', inferredFrom: 'email_domain' });
+    }, 'company.domain.inferredFrom', 'domain_origin_not_on_card');
+    // From a website that is not the one printed.
+    expectError(x => { x.company.website.value = 'www.beta.io'; x.company.website.normalized = 'beta.io'; },
+      'company.domain.inferredFrom', 'domain_origin_not_on_card');
+    // From a website when none was printed.
+    expectError(x => { x.company.website = makeField(); }, 'company.domain.inferredFrom', 'domain_origin_not_on_card');
+    // Read from the card but not saying from what.
+    expectError(x => { x.company.domain.inferredFrom = null; }, 'company.domain.inferredFrom', 'domain_bad_origin');
+    // Typed by the user: their word, no printed origin needed.
+    expect(errorsAfter(x => {
+      Object.assign(x.company.domain, { source: 'user', inferredFrom: null, witness: null, userEdited: true });
+    })).toEqual([]);
   });
 
   it('a company name is never manufactured from a mailbox provider', () => {
     expectError(x => {
       x.company.name = makeField({ value: 'Gmail', normalized: 'gmail', source: 'inferred', inferredFrom: 'email_domain', score: 0.6, level: 'possible' });
     }, 'company.name', 'company_name_from_mailbox_provider');
+  });
+
+  it('a personal address beside a work one does not taint a name inferred from the work domain', () => {
+    // The fixture prints dana+events@acme.com and jose@gmail.com.
+    expect(errorsAfter(x => {
+      x.company.name = makeField({ value: 'Acme', normalized: 'acme', source: 'inferred', inferredFrom: 'email_domain', score: 0.6, level: 'possible' });
+    })).toEqual([]);
   });
 
   it.each([

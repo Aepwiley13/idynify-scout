@@ -196,7 +196,10 @@ export function websiteSafeguards(website, { emails = [] } = {}) {
     .filter(email => email.includes('@'))
     .map(email => email.slice(0, email.lastIndexOf('@')));
   const bare = text.replace(/^[a-z][a-z0-9+.-]*:\/\//, '').replace(/^www\./, '').replace(/\/+$/, '');
-  if (text.includes('@') || locals.includes(bare)) return [SAFEGUARDS.WEBSITE_FROM_EMAIL];
+  // An @ before the path makes it an email address; one in the path
+  // (`youtube.com/@acme`) is an ordinary URL.
+  const authority = bare.split(/[/?#]/)[0];
+  if (authority.includes('@') || locals.includes(bare)) return [SAFEGUARDS.WEBSITE_FROM_EMAIL];
   return domainSafeguards(text);
 }
 

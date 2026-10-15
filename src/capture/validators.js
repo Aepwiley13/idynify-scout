@@ -55,17 +55,19 @@ export const DOUBT_CHECKS = Object.freeze(new Set([CHECKS.OCR_SUSPECTED]));
  * The bare hostname inside whatever was printed, or null.
  *
  * Accepts `acme.com`, `www.acme.com`, `https://www.acme.com/about?x=1`, a
- * trailing-dot FQDN and a port. Rejects anything with `@` (an email is not a
- * host; callers wanting an email's domain use `emailHost`), whitespace, or an
- * empty label (`acme..com`, a bare `www.`).
+ * trailing-dot FQDN and a port. Rejects an `@` before the path (an email
+ * address or embedded credentials is never a host; callers wanting an
+ * email's domain use `emailHost`), whitespace, or an empty label
+ * (`acme..com`, a bare `www.`). An `@` inside the path is fine:
+ * `youtube.com/@acme` has the host `youtube.com`.
  */
 export function hostOf(input) {
   if (typeof input !== 'string') return null;
   let value = input.trim().toLowerCase();
-  if (!value || /\s/.test(value) || value.includes('@')) return null;
+  if (!value || /\s/.test(value)) return null;
+  value = value.replace(/^[a-z][a-z0-9+.-]*:\/\//, '').split(/[/?#]/)[0];
+  if (value.includes('@')) return null;
   value = value
-    .replace(/^[a-z][a-z0-9+.-]*:\/\//, '')
-    .split(/[/?#]/)[0]
     .replace(/:\d+$/, '')
     .replace(/\.$/, '');
   if (!value || value.split('.').some(label => label === '')) return null;
@@ -170,7 +172,10 @@ export function validateEmail(input) {
 function parseHttpUrl(input) {
   if (typeof input !== 'string') return null;
   const value = input.trim();
-  if (!value || /\s/.test(value) || value.includes('@')) return null;
+  // An @ before the path is an email address or embedded credentials; one in
+  // the path (`youtube.com/@acme`) is an ordinary URL.
+  const authority = value.replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').split(/[/?#]/)[0];
+  if (!value || /\s/.test(value) || authority.includes('@')) return null;
   const withScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(value) ? value : `https://${value}`;
   let url;
   try {
@@ -186,7 +191,8 @@ function parseHttpUrl(input) {
 /**
  * A printed website. Normalized form: scheme-less host (without `www.`) plus
  * path, no query or fragment, no trailing slash. An email address is never a
- * URL, and a host without a real public suffix (`jane.smith`) is invalid.
+ * URL (though a path may contain `@`, as in `youtube.com/@acme`), and a host
+ * without a real public suffix (`jane.smith`) is invalid.
  */
 export function validateUrl(input) {
   const url = parseHttpUrl(input);

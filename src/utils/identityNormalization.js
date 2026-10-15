@@ -187,13 +187,19 @@ export function nameKey(name) {
   return tokens.length ? tokens.join(' ') : null;
 }
 
-/** Printed labels, tried against the start of the text. Absent → kind null. */
+/**
+ * Printed labels, tried against the start of the text. A label counts only
+ * when the number follows it directly, so "Tel/Fax:" is not read as "Tel".
+ */
 const PHONE_LABELS = [
-  [/^(?:mobile|mob|cell(?:ular)?|m)\b\.?\s*:?\s*/i, 'mobile'],
-  [/^(?:fax|f)\b\.?\s*:?\s*/i, 'fax'],
-  [/^(?:direct|dir|d)\b\.?\s*:?\s*/i, 'direct'],
-  [/^(?:office|work|main|tel(?:ephone)?|phone|ph|t|o|p)\b\.?\s*:?\s*/i, 'office'],
+  [/^(?:mobile|mob|cell(?:ular)?|m)\b\.?\s*:?\s*(?=[+(\d])/i, 'mobile'],
+  [/^(?:fax|f)\b\.?\s*:?\s*(?=[+(\d])/i, 'fax'],
+  [/^(?:direct|dir|d)\b\.?\s*:?\s*(?=[+(\d])/i, 'direct'],
+  [/^(?:office|work|main|tel(?:ephone)?|phone|ph|t|o|p)\b\.?\s*:?\s*(?=[+(\d])/i, 'office'],
 ];
+
+/** Any other short printed label ("Toll Free:", "Tel/Fax:", "Hotline"): stripped, kind stays null. */
+const OTHER_PHONE_LABEL = /^[a-z][a-z ./&'-]{0,24}?\s*:?\s*(?=[+(\d])/i;
 
 const PHONE_EXTENSION = /[\s,;]*(?:ext\.?|extension|x)\s*\.?\s*(\d{1,6})\s*$/i;
 
@@ -212,7 +218,8 @@ const NANP_NUMBER = /^[2-9]\d{2}[2-9]\d{6}$/;
  *    into a country it was not printed for.
  *  - The extension (`x204`, `ext. 204`) and a printed label (M, T, F, D,
  *    Mobile, Office, Fax, Direct) come back as separate fields; an unlabeled
- *    number has `kind: null`, never a guess.
+ *    number, or one under any other label ("Toll Free", "Tel/Fax"), has
+ *    `kind: null`, never a guess.
  *  - No repair: letters (vanity numbers) or too few digits make it invalid.
  *
  * @param {string} raw
@@ -235,12 +242,12 @@ export function normalizeCapturePhone(raw, { defaultCountry = null } = {}) {
   let body = raw.trim();
   result.input = body;
 
-  for (const [pattern, kind] of PHONE_LABELS) {
-    if (pattern.test(body)) {
-      result.kind = kind;
-      body = body.replace(pattern, '');
-      break;
-    }
+  const label = PHONE_LABELS.find(([pattern]) => pattern.test(body));
+  if (label) {
+    result.kind = label[1];
+    body = body.replace(label[0], '');
+  } else {
+    body = body.replace(OTHER_PHONE_LABEL, '');
   }
 
   const extension = body.match(PHONE_EXTENSION);

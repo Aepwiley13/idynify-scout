@@ -276,6 +276,31 @@ describe('scoped layout stylesheet', () => {
     expect(rule(`${SCOPE} .company-detail-content *`)['min-width']).toBe('0');
   });
 
+  it('the sections form a centred column at most 1000px wide, the header aligned with it', () => {
+    const column = 'max(1.75rem, calc((100% - 1000px) / 2))';
+    const content = rule(`${SCOPE} .company-detail-content`);
+    const header = rule(`${SCOPE} .company-detail-header`);
+    // Padding, not an auto-margin wrapper: the column can never size wider than the panel.
+    expect(content.padding).toBe(`1.5rem ${column}`);
+    expect(content.margin).toBe('0');
+    expect(content['min-width']).toBe('0');
+    expect(header.padding).toBe(`1.25rem ${column}`);
+    // The scrollbar's width is reserved on both edges of both, so a visible
+    // scrollbar neither pulls the column off centre nor misaligns the header.
+    expect(content['scrollbar-gutter']).toBe('stable both-edges');
+    expect(header['scrollbar-gutter']).toBe('stable both-edges');
+    // The header is a scroll container for that gutter; it must not shrink.
+    expect(header['flex-shrink']).toBe('0');
+  });
+
+  it('narrow windows give the header and content the same 1rem sides', () => {
+    for (const selector of [`${SCOPE} .company-detail-header`, `${SCOPE} .company-detail-content`]) {
+      const sides = rule(selector, '(max-width: 600px)');
+      expect(sides['padding-left']).toBe('1rem');
+      expect(sides['padding-right']).toBe('1rem');
+    }
+  });
+
   it('the snapshot is 3 columns on desktop, 2 on narrower windows, 1 on phones', () => {
     expect(rule(`${SCOPE} .snapshot-grid`)['grid-template-columns']).toBe('repeat(3, minmax(0, 1fr))');
     expect(rule(`${SCOPE} .snapshot-grid`, '(max-width: 860px)')['grid-template-columns']).toBe('repeat(2, minmax(0, 1fr))');

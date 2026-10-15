@@ -1340,12 +1340,18 @@
   box-sizing: border-box;
 }
 
-/* Header — logo, name, industry, refresh, close; one row at every width */
+/* Header — logo, name, industry, refresh, close; one row at every width.
+   Same side padding as the content column, so the logo lines up with it. */
 .company-detail-overlay .cdm .company-detail-header {
   flex-direction: row;
   align-items: center;
   gap: 1rem;
-  padding: 1.25rem 1.75rem;
+  padding: 1.25rem max(1.75rem, calc((100% - 1000px) / 2));
+  /* Reserves the same scrollbar gutter as the content below, so the logo
+     and the close button line up with the section edges. */
+  overflow: hidden;
+  scrollbar-gutter: stable both-edges;
+  flex-shrink: 0;
 }
 
 .company-detail-overlay .cdm .header-content {
@@ -1396,17 +1402,22 @@
   font-size: 0.9375rem;
 }
 
-/* One vertical scroll area, never wider than the panel */
+/* One vertical scroll area, never wider than the panel. The sections form a
+   centred column at most 1000px wide: the side padding grows to centre it
+   (padding, not an auto-margin wrapper, so it can never size wider than the
+   panel), and the scrollbar's width is reserved on both edges so a visible
+   scrollbar does not pull the column off centre. */
 .company-detail-overlay .cdm .company-detail-content {
   margin: 0;
   max-width: none;
   width: auto;
   min-width: 0;
   align-self: stretch;
-  padding: 1.5rem 1.75rem;
+  padding: 1.5rem max(1.75rem, calc((100% - 1000px) / 2));
   box-sizing: border-box;
   overflow-x: hidden;
   overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
 }
 
 .company-detail-overlay .cdm .company-detail-content * {
@@ -1686,8 +1697,15 @@
     width: 100%;
   }
 
+  .company-detail-overlay .cdm .company-detail-header,
   .company-detail-overlay .cdm .company-detail-content {
-    padding: 1rem;
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .company-detail-overlay .cdm .company-detail-content {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
   }
 
   .company-detail-overlay .cdm .detail-section,

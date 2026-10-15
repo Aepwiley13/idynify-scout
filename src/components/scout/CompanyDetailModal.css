@@ -1495,9 +1495,10 @@
   overflow-wrap: break-word;
 }
 
-/* Company Overview — readable line length */
+/* Company Overview — the paragraph spans the section's full width */
 .company-detail-overlay .cdm .company-overview-text {
-  max-width: 72ch;
+  max-width: none;
+  line-height: 1.65;
   overflow-wrap: break-word;
 }
 

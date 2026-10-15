@@ -318,8 +318,10 @@ describe('scoped layout stylesheet', () => {
     expect(rule(`${SCOPE} .decision-makers-actions`)['flex-wrap']).toBe('wrap');
   });
 
-  it('the overview keeps a readable line length', () => {
-    expect(rule(`${SCOPE} .company-overview-text`)['max-width']).toMatch(/^\d+ch$/);
+  it('the overview paragraph spans the section rather than a narrow column', () => {
+    const overview = rule(`${SCOPE} .company-overview-text`);
+    expect(overview['max-width']).toBe('none');
+    expect(overview['line-height']).toBe('1.65');
   });
 
   it('the header stays one row at every width', () => {

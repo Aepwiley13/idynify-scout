@@ -37,9 +37,11 @@
   text-align: left;
 }
 
-/* Company Snapshot — 3 × 2, then 2 and 1 columns as the section narrows */
+/* Company Snapshot — 3 × 2, then 2 and 1 columns as the section narrows.
+   The same surface as Overview and Links; the blue border and icons set it
+   apart without turning it into a blue banner. */
 .ci-snapshot {
-  background: linear-gradient(135deg, #eff6ff 0%, #f9fafb 100%);
+  background: var(--bg-card);
   border-color: rgba(59, 130, 246, 0.15);
 }
 

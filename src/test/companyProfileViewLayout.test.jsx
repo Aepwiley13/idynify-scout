@@ -218,6 +218,15 @@ describe('CompanyInfoSections.css', () => {
     expect(rules.some(r => r.at === 'container (max-width: 400px)' && r.selector === '.ci-snapshot-grid')).toBe(true);
   });
 
+  it('in light themes the snapshot sits on the same surface as Overview and Links, with a blue border', () => {
+    const snapshot = rules.find(r => r.selector === '.ci-snapshot' && !r.at).decls;
+    const section = rules.find(r => r.selector === '.ci-section' && !r.at).decls;
+    expect(snapshot.background).toBe(section.background);
+    expect(snapshot.background).toBe('var(--bg-card)');
+    expect(snapshot['border-color']).toBe('rgba(59, 130, 246, 0.15)');
+    expect(rules.find(r => r.selector === '.ci-snapshot-icon').decls.color).toBe('#3b82f6');
+  });
+
   it('has a dark-theme version under body.theme-dark', () => {
     const dark = rules.filter(r => r.selector.startsWith('body.theme-dark '));
     expect(dark.map(r => r.selector)).toEqual(expect.arrayContaining([

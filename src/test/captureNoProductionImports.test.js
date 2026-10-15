@@ -9,6 +9,11 @@
  *
  * Approved so far: one offline, read-only script (PR 3's historical audit),
  * which no shipped code imports. It changes no application behaviour.
+ *
+ * PR 4 adds the first capture server files (the rollout switch, captureConfig
+ * and the operation store). They do not import src/capture either, and the
+ * list of capture server files below is pinned so the next endpoint is added
+ * deliberately.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
@@ -107,10 +112,22 @@ describe('no production path uses the capture foundation yet', () => {
     }
   });
 
-  it('no capture endpoint or flag exists', () => {
+  // PR 4 adds the rollout switch, the config endpoint and the operation store,
+  // and nothing else: no endpoint that extracts, previews or saves a card yet.
+  // A later PR adds its endpoint to this list on purpose, in review.
+  const APPROVED_CAPTURE_SERVER_FILES = [
+    'netlify/functions/captureConfig.js',
+    'netlify/functions/utils/captureFlags.js',
+    'netlify/functions/utils/captureOperations.js',
+  ];
+
+  it('the only capture server files are the approved ones', () => {
     const functions = sources(['netlify/functions']).map(([path]) => path);
-    expect(functions.filter(path => /capture/i.test(path))).toEqual([]);
+    expect(functions.filter(path => /capture/i.test(path)).sort()).toEqual([...APPROVED_CAPTURE_SERVER_FILES].sort());
+  });
+
+  it('CAPTURE_MODE is read in one place', () => {
     const flagged = PRODUCTION.filter(([, src]) => /\bCAPTURE_MODE\b/.test(src)).map(([path]) => path);
-    expect(flagged).toEqual([]);
+    expect(flagged).toEqual(['netlify/functions/utils/captureFlags.js']);
   });
 });

@@ -114,10 +114,15 @@ service cloud.firestore {
       // wildcard, so it is a plain string and can be compared directly — no
       // path indexing and no size(), neither of which exists for the recursive
       // wildcard binding.
+      //
+      // capture_operations is server-only: the capture endpoints read and
+      // write it through the Admin SDK, and no client may touch it.
       match /{coll}/{docId} {
-        allow read:   if owns(userId);
-        allow create: if owns(userId);
-        allow update, delete: if owns(userId) && coll != 'lineageEvents';
+        allow read:   if owns(userId) && coll != 'capture_operations';
+        allow create: if owns(userId) && coll != 'capture_operations';
+        allow update, delete: if owns(userId)
+                              && coll != 'lineageEvents'
+                              && coll != 'capture_operations';
       }
 
       // One level inside an ICP profile: criteriaVersions is append-only,
@@ -136,10 +141,11 @@ service cloud.firestore {
       // repeated here — omitting `lineageEvents` here silently re-granted the
       // update the rule above had just withheld.
       match /{coll}/{docId}/{rest=**} {
-        allow read:  if owns(userId);
+        allow read:  if owns(userId) && coll != 'capture_operations';
         allow write: if owns(userId)
                      && coll != 'icpProfiles'
-                     && coll != 'lineageEvents';
+                     && coll != 'lineageEvents'
+                     && coll != 'capture_operations';
       }
     }
 
@@ -171,6 +177,17 @@ service cloud.firestore {
     // unprotected to anyone reading this file for what is covered. Default
     // behaviour is not a decision until it is written down.
     match /ops_alerts/{job} {
+      allow read, write: if false;
+    }
+
+    // Relationship Capture, server-only like ops_alerts. capture_reports holds
+    // opt-in bad-scan reports (card images and values, kept 30 days);
+    // capture_enrollment is the beta rollout list, and a client that could
+    // write it could enroll itself.
+    match /capture_reports/{reportId} {
+      allow read, write: if false;
+    }
+    match /capture_enrollment/{userId} {
       allow read, write: if false;
     }
   }

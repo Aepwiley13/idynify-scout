@@ -16,7 +16,7 @@ import { readFileSync } from 'node:fs';
 import {
   initializeTestEnvironment, assertSucceeds, assertFails,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, deleteField, collection, getDocs } from 'firebase/firestore';
 
 const env = await initializeTestEnvironment({
   projectId: 'demo-icp-rules',
@@ -211,6 +211,47 @@ const USER_DOC_CASES = [
   ['admin sdk  grant role', 'ALLOW', asAdminSdk(db => updateDoc(doc(db, 'users/P'), { role: 'admin' }))],
 ];
 CASES.push(...USER_DOC_CASES.map(([name, expect, run], i) => [`${String(24 + i).padStart(2, '0')}  ${name}`, expect, run]));
+
+// ── Relationship Capture: server-only collections ──────────────────────────
+// capture_operations (per user), capture_reports and capture_enrollment are
+// read and written only by the capture endpoints through the Admin SDK. No
+// client, the owner included, may read or write them; a user who could write
+// capture_enrollment could enroll themselves into the beta.
+const OP = 'cap_3f2a9c1e-5b7d-4e8a-9c21-7d4e5f6a8b90';
+await env.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, `users/${U}/capture_operations/${OP}`), { operationId: OP, state: 'previewed', previewVersion: 1 });
+  await setDoc(doc(db, 'capture_reports/rpt_1'), { operationId: OP, userId: U, status: 'new' });
+  await setDoc(doc(db, `capture_enrollment/${U}`), { stage: 'beta' });
+});
+
+const CAPTURE_CASES = [
+  ['capture_operations  owner reads one', 'DENY', () => getDoc(doc(me, `users/${U}/capture_operations/${OP}`))],
+  ['capture_operations  owner lists them', 'DENY', () => getDocs(collection(me, `users/${U}/capture_operations`))],
+  ['capture_operations  owner creates one', 'DENY', () => setDoc(doc(me, `users/${U}/capture_operations/cap_new`), { state: 'created' })],
+  ['capture_operations  owner marks one committed', 'DENY', () => updateDoc(doc(me, `users/${U}/capture_operations/${OP}`), { state: 'committed' })],
+  ['capture_operations  owner deletes one', 'DENY', () => deleteDoc(doc(me, `users/${U}/capture_operations/${OP}`))],
+  ['capture_operations  owner writes beneath one', 'DENY', () => setDoc(doc(me, `users/${U}/capture_operations/${OP}/notes/n1`), { note: 'x' })],
+  ['capture_operations  owner reads beneath one', 'DENY', () => getDoc(doc(me, `users/${U}/capture_operations/${OP}/notes/n1`))],
+  ['capture_operations  OTHER reads one', 'DENY', () => getDoc(doc(other, `users/${U}/capture_operations/${OP}`))],
+  ['capture_reports     reads one', 'DENY', () => getDoc(doc(me, 'capture_reports/rpt_1'))],
+  ['capture_reports     creates one', 'DENY', () => setDoc(doc(me, 'capture_reports/rpt_2'), { userId: U, status: 'new' })],
+  ['capture_reports     updates one', 'DENY', () => updateDoc(doc(me, 'capture_reports/rpt_1'), { status: 'resolved' })],
+  ['capture_enrollment  reads own', 'DENY', () => getDoc(doc(me, `capture_enrollment/${U}`))],
+  ['capture_enrollment  enrolls itself', 'DENY', () => setDoc(doc(p, 'capture_enrollment/P'), { stage: 'beta' })],
+  ['capture_enrollment  changes own stage', 'DENY', () => updateDoc(doc(me, `capture_enrollment/${U}`), { stage: 'on' })],
+  ['capture_enrollment  removes own entry', 'DENY', () => deleteDoc(doc(me, `capture_enrollment/${U}`))],
+  ['capture_enrollment  OTHER reads U', 'DENY', () => getDoc(doc(other, `capture_enrollment/${U}`))],
+  // Ordinary data next to them is untouched.
+  ['capture neighbours  update companies/c1 still allowed', 'ALLOW', () => updateDoc(doc(me, `users/${U}/companies/c1`), { status: 'saved' })],
+  ['capture neighbours  read contacts/k1 still allowed', 'ALLOW', () => getDoc(doc(me, `users/${U}/contacts/k1`))],
+  // The capture endpoints write through the Admin SDK, which rules do not apply to.
+  ['admin sdk  creates an operation', 'ALLOW', asAdminSdk(db => setDoc(doc(db, `users/${U}/capture_operations/cap_admin`), { state: 'created' }))],
+  ['admin sdk  enrolls a user', 'ALLOW', asAdminSdk(db => setDoc(doc(db, 'capture_enrollment/P'), { stage: 'beta' }))],
+  ['admin sdk  writes a report', 'ALLOW', asAdminSdk(db => setDoc(doc(db, 'capture_reports/rpt_3'), { status: 'new' }))],
+];
+const firstCaptureCase = CASES.length + 1;
+CASES.push(...CAPTURE_CASES.map(([name, expect, run], i) => [`${firstCaptureCase + i}  ${name}`, expect, run]));
 
 let pass = 0, fail = 0;
 const failures = [];

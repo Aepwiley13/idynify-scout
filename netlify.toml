@@ -76,13 +76,21 @@
 # actually limits who can reach a preview. This file makes the two automated
 # writers fail safe if someone gets past that.
 
+#
+# CAPTURE_MODE (Relationship Capture, docs/capture/capture-mode.md) is pinned
+# off for the same reason: a preview that captured a card would write a real
+# contact into production. Set it in the Netlify UI for the Production
+# context only.
+
 [context.branch-deploy.environment]
   DISCOVERY_CRON_ENABLED = "false"
   GMAIL_IDENTITY_MODE = "dry_run"
+  CAPTURE_MODE = "off"
 
 [context.deploy-preview.environment]
   DISCOVERY_CRON_ENABLED = "false"
   GMAIL_IDENTITY_MODE = "dry_run"
+  CAPTURE_MODE = "off"
 
 [functions]
   directory = "netlify/functions"

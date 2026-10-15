@@ -149,8 +149,17 @@ const USER_DOC_CASES = [
   // Signup creates the document with its billing fields, exactly as Signup.jsx writes them.
   ['new  signup, starter (400 credits)', 'ALLOW', create(signup('starter'))],
   ['new  signup, pro (1250 credits)', 'ALLOW', create(signup('pro'))],
-  ['new  signup, any other ?tier= (400 credits)', 'ALLOW', create(signup('team'))],
   ['new  first write is a profile merge', 'ALLOW', create({ preferences: { theme: 'dark' } }, { merge: true })],
+  // Only the tiers the app sells: starter and pro (Homepage.jsx, CheckoutPage.jsx, stripe-webhook.js).
+  ['new  signup, unknown tier team', 'DENY', create(signup('team'))],
+  ['new  signup, unknown tier enterprise', 'DENY', create(signup('enterprise'))],
+  ['new  signup, tier hunter (never sold)', 'DENY', create(signup('hunter'))],
+  ['new  signup, tier admin', 'DENY', create(signup('admin'))],
+  ['new  signup, empty tier', 'DENY', create(signup(''))],
+  ['new  signup, tier Pro (wrong case)', 'DENY', create({ ...signup('pro'), selectedTier: 'Pro', subscriptionTier: 'Pro' })],
+  ['new  signup, tier "pro " (trailing space)', 'DENY', create({ ...signup('pro'), selectedTier: 'pro ', subscriptionTier: 'pro ' })],
+  ['new  signup, tier not a string', 'DENY', create({ ...signup('starter'), selectedTier: 1, subscriptionTier: 1 })],
+  ['new  signup, selected pro but tier starter', 'DENY', create({ ...signup('pro'), subscriptionTier: 'starter' })],
   ['new  signup claiming pro credits on starter', 'DENY', create({ ...signup('starter'), credits: 1250, monthlyCredits: 1250 })],
   ['new  signup with 99999 credits', 'DENY', create({ ...signup('starter'), credits: 99999, monthlyCredits: 99999 })],
   ['new  signup already paid', 'DENY', create({ ...signup('starter'), hasCompletedPayment: true })],

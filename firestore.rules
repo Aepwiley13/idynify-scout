@@ -43,7 +43,8 @@
 //   tierLimits, features, billingCycleDate, stripeCustomerId,
 //   stripeSubscriptionId       billing (stripe-webhook.js; Signup.jsx at create)
 // One client write is allowed: Signup.jsx creates the document with six of the
-// billing fields, and only with the values it writes (see signupBilling).
+// billing fields, only on a supported tier and only with the values it writes
+// (see signupTiers and signupBilling).
 // Deleting the user document is not allowed from a client.
 //
 // ─── BEFORE CHANGING THIS FILE ──────────────────────────────────────────────
@@ -78,14 +79,20 @@ service cloud.firestore {
               'hasCompletedPayment', 'credits', 'monthlyCredits'];
     }
 
-    // Exactly what Signup.jsx writes: an unpaid account whose credits follow
-    // from the tier the user picked (1250 for pro, 400 otherwise).
+    // The tiers a user can sign up for: the two the homepage links to
+    // (Homepage.jsx), the two CheckoutPage.jsx has a price and a payment link
+    // for, and the two stripe-webhook.js maps a payment to.
+    function signupTiers() {
+      return ['starter', 'pro'];
+    }
+
+    // Exactly what Signup.jsx writes: an unpaid account on a supported tier,
+    // with the credits that tier starts with (1250 for pro, 400 for starter).
     function signupBilling(data) {
       return data.keys().hasAll(signupBillingFields())
         && data.status == 'pending_payment'
         && data.hasCompletedPayment == false
-        && data.selectedTier is string
-        && data.selectedTier.size() <= 40
+        && data.selectedTier in signupTiers()
         && data.subscriptionTier == data.selectedTier
         && data.credits == (data.selectedTier == 'pro' ? 1250 : 400)
         && data.monthlyCredits == data.credits;

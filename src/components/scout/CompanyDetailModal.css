@@ -1304,3 +1304,453 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Panel layout (scoped)
+
+   Every stylesheet in the app ships in one global bundle, and pages loaded
+   after this file reuse the modal's class names — CompanyDetail.css gives
+   .company-detail-content `margin: 0 auto` and .decision-makers-grid three
+   fixed columns, ContactProfile.css collapses .snapshot-grid to one column
+   under 1200px. Inside the modal that made the content wider than the panel
+   and clipped its right edge.
+
+   The rules below are scoped to the modal (.company-detail-overlay .cdm), so
+   they outrank those page rules wherever they apply and leave the pages, which
+   still use the unscoped rules above, untouched.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* The overlay is rendered into <body>, above the whole app. The panel opens
+   below the app's top bar (--cdm-top-offset, measured on open) and gets only
+   the height left beneath it, so its header is never off-screen: centred when
+   there is room, top-aligned on short screens, its content scrolling inside. */
+.company-detail-overlay.cdm-overlay {
+  align-items: center;
+  padding-top: calc(var(--cdm-top-offset, 0px) + 16px);
+  padding-bottom: 16px;
+  box-sizing: border-box;
+}
+
+.company-detail-overlay .cdm {
+  width: min(1080px, calc(100vw - 48px));
+  max-width: none;
+  max-height: calc(100vh - var(--cdm-top-offset, 0px) - 32px);
+  max-height: calc(100dvh - var(--cdm-top-offset, 0px) - 32px);
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+/* Header — logo, name, industry, refresh, close; one row at every width.
+   Same side padding as the content column, so the logo lines up with it. */
+.company-detail-overlay .cdm .company-detail-header {
+  flex-direction: row;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.25rem max(1.75rem, calc((100% - 1000px) / 2));
+  /* Reserves the same scrollbar gutter as the content below, so the logo
+     and the close button line up with the section edges. */
+  overflow: hidden;
+  scrollbar-gutter: stable both-edges;
+  flex-shrink: 0;
+}
+
+.company-detail-overlay .cdm .header-content {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 0;
+}
+
+.company-detail-overlay .cdm .header-text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.company-detail-overlay .cdm .header-actions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+  width: auto;
+  padding: 0;
+}
+
+.company-detail-overlay .cdm .refresh-button,
+.company-detail-overlay .cdm .close-button {
+  position: static;
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+}
+
+.company-detail-overlay .cdm .company-detail-logo-wrapper {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+}
+
+.company-detail-overlay .cdm .company-detail-name {
+  font-size: 1.5rem;
+  margin: 0 0 0.25rem 0;
+  overflow-wrap: anywhere;
+}
+
+.company-detail-overlay .cdm .company-detail-industry {
+  font-size: 0.9375rem;
+}
+
+/* One vertical scroll area, never wider than the panel. The sections form a
+   centred column at most 1000px wide: the side padding grows to centre it
+   (padding, not an auto-margin wrapper, so it can never size wider than the
+   panel), and the scrollbar's width is reserved on both edges so a visible
+   scrollbar does not pull the column off centre. */
+.company-detail-overlay .cdm .company-detail-content {
+  margin: 0;
+  max-width: none;
+  width: auto;
+  min-width: 0;
+  align-self: stretch;
+  padding: 1.5rem max(1.75rem, calc((100% - 1000px) / 2));
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
+}
+
+.company-detail-overlay .cdm .company-detail-content * {
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+/* Sections */
+.company-detail-overlay .cdm .detail-section {
+  margin: 0 0 1rem 0;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card);
+  box-shadow: none;
+  text-align: left;
+}
+
+.company-detail-overlay .cdm .detail-section:last-child {
+  margin-bottom: 0;
+}
+
+.company-detail-overlay .cdm .section-title {
+  font-size: 1rem;
+  margin: 0 0 1rem 0;
+  text-align: left;
+}
+
+.company-detail-overlay .cdm .section-header-with-actions {
+  margin-bottom: 1rem;
+}
+
+.company-detail-overlay .cdm .section-header-with-actions .section-title {
+  margin-bottom: 0;
+}
+
+.company-detail-overlay .cdm .section-subtitle {
+  margin: 0.25rem 0 0 0;
+  padding: 0;
+  font-size: 0.8125rem;
+}
+
+/* Company Snapshot — 3 × 2 on desktop */
+.company-detail-overlay .cdm .snapshot-section {
+  background: linear-gradient(135deg, #eff6ff 0%, #f9fafb 100%);
+  border-color: rgba(59, 130, 246, 0.15);
+}
+
+.company-detail-overlay .cdm .snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem 1.5rem;
+}
+
+.company-detail-overlay .cdm .snapshot-item {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.625rem;
+}
+
+.company-detail-overlay .cdm .snapshot-icon {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+}
+
+.company-detail-overlay .cdm .snapshot-label {
+  font-size: 0.6875rem;
+  margin: 0 0 0.25rem 0;
+}
+
+.company-detail-overlay .cdm .snapshot-value {
+  font-size: 0.875rem;
+  overflow-wrap: break-word;
+}
+
+/* Company Overview — the paragraph spans the section's full width */
+.company-detail-overlay .cdm .company-overview-text {
+  max-width: none;
+  line-height: 1.65;
+  overflow-wrap: break-word;
+}
+
+/* Links — compact buttons side by side */
+.company-detail-overlay .cdm .links-container {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+
+.company-detail-overlay .cdm .link-button {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  border-radius: 9px;
+  font-size: 0.875rem;
+}
+
+.company-detail-overlay .cdm .link-button .ml-auto {
+  margin-left: 0.25rem;
+}
+
+/* Key Decision Makers — cards wrap, no horizontal scrolling */
+.company-detail-overlay .cdm .decision-makers-section {
+  padding: 1.25rem 1.5rem;
+  margin: 0 0 1rem 0;
+}
+
+.company-detail-overlay .cdm .decision-makers-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 0.875rem;
+  margin: 0;
+}
+
+.company-detail-overlay .cdm .decision-maker-card {
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  border-radius: 10px;
+}
+
+.company-detail-overlay .cdm .decision-maker-header {
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding-right: 2rem;
+}
+
+.company-detail-overlay .cdm .decision-maker-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: none;
+}
+
+.company-detail-overlay .cdm .decision-maker-name {
+  font-size: 0.9375rem;
+  margin: 0 0 0.125rem 0;
+  overflow-wrap: anywhere;
+}
+
+.company-detail-overlay .cdm .decision-maker-title {
+  font-size: 0.8125rem;
+  margin: 0 0 0.375rem 0;
+  overflow-wrap: anywhere;
+}
+
+.company-detail-overlay .cdm .decision-maker-dept {
+  display: inline-block;
+  font-size: 0.6875rem;
+  overflow-wrap: anywhere;
+}
+
+.company-detail-overlay .cdm .decision-maker-linkedin {
+  margin-top: auto;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.company-detail-overlay .cdm .decision-maker-select-indicator {
+  top: 0.75rem;
+  right: 0.75rem;
+}
+
+.company-detail-overlay .cdm .decision-maker-select-indicator .checkbox {
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-card);
+  box-shadow: none;
+}
+
+.company-detail-overlay .cdm .decision-maker-select-indicator .checkbox.checked {
+  border-color: #3b82f6;
+  background: #3b82f6;
+  color: #ffffff;
+}
+
+.company-detail-overlay .cdm .decision-maker-select-indicator .checkbox svg {
+  width: 16px;
+  height: 16px;
+}
+
+.company-detail-overlay .cdm .decision-makers-actions {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.company-detail-overlay .cdm .btn-add-selected,
+.company-detail-overlay .cdm .btn-find-more {
+  flex: 1 1 220px;
+  min-width: 0;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.875rem;
+}
+
+/* Add Your Contacts */
+.company-detail-overlay .cdm .people-search-container,
+.company-detail-overlay .cdm .people-search-input-wrapper,
+.company-detail-overlay .cdm .people-search-input {
+  width: 100%;
+}
+
+/* Tech Stack — wrapping grid */
+.company-detail-overlay .cdm .tech-stack-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 0.625rem;
+}
+
+.company-detail-overlay .cdm .tech-card {
+  padding: 0.625rem 0.75rem;
+  gap: 0.625rem;
+}
+
+.company-detail-overlay .cdm .tech-name {
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.company-detail-overlay .cdm .tech-category {
+  overflow-wrap: anywhere;
+}
+
+/* Data Confidence — compact row */
+.company-detail-overlay .cdm .data-quality-section {
+  background: var(--bg-secondary);
+}
+
+.company-detail-overlay .cdm .data-quality-info {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.75rem 2rem;
+}
+
+/* Ready to Connect — full width, never clipped. The card is its own frame. */
+.company-detail-overlay .cdm .detail-section:has(> .contact-status-card) {
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.company-detail-overlay .cdm .contact-status-card {
+  padding: 1.25rem 1.5rem;
+}
+
+.company-detail-overlay .cdm .status-header {
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.company-detail-overlay .cdm .status-header .section-title {
+  margin: 0;
+}
+
+.company-detail-overlay .cdm .find-contacts-btn {
+  width: 100%;
+}
+
+/* Narrower windows: fewer columns */
+@media (max-width: 860px) {
+  .company-detail-overlay .cdm .snapshot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .company-detail-overlay .cdm {
+    width: 100%;
+  }
+
+  .company-detail-overlay .cdm .company-detail-header,
+  .company-detail-overlay .cdm .company-detail-content {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+
+  .company-detail-overlay .cdm .company-detail-content {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  .company-detail-overlay .cdm .detail-section,
+  .company-detail-overlay .cdm .decision-makers-section {
+    padding: 1rem;
+  }
+}
+
+/* Phones: the bottom sheet from the rules above */
+@media (max-width: 480px) {
+  .company-detail-overlay.cdm-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .company-detail-overlay .cdm {
+    max-height: 92vh;
+  }
+
+  .company-detail-overlay .cdm .company-detail-header {
+    padding: 1rem;
+    gap: 0.75rem;
+  }
+
+  .company-detail-overlay .cdm .company-detail-logo-wrapper {
+    width: 44px;
+    height: 44px;
+  }
+
+  .company-detail-overlay .cdm .company-detail-name {
+    font-size: 1.125rem;
+  }
+
+  .company-detail-overlay .cdm .company-detail-industry {
+    font-size: 0.8125rem;
+  }
+
+  .company-detail-overlay .cdm .refresh-button,
+  .company-detail-overlay .cdm .close-button {
+    width: 36px;
+    height: 36px;
+  }
+
+  .company-detail-overlay .cdm .snapshot-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

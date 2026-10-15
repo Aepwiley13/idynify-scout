@@ -17,7 +17,10 @@ import { render, screen, fireEvent, within, cleanup } from '@testing-library/rea
 import { MemoryRouter } from 'react-router-dom';
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import postcss from 'postcss';
+
+const here = path.dirname(fileURLToPath(import.meta.url));
 
 const people = [
   ['Jennifer Montgomery-Alexander', 'Chief Executive Officer and President, Global Operations', 'Executive'],
@@ -141,17 +144,26 @@ describe('company detail modal structure', () => {
 
   it('shows all six snapshot facts in one grid', async () => {
     const { container } = await renderModal();
-    const items = container.querySelectorAll('.snapshot-grid > .snapshot-item');
-    expect([...items].map(i => i.querySelector('.snapshot-label').textContent))
+    const items = container.querySelectorAll('.ci-snapshot-grid > .ci-snapshot-item');
+    expect([...items].map(i => i.querySelector('.ci-snapshot-label').textContent))
       .toEqual(['Industry', 'Employees', 'Revenue', 'Founded', 'Address', 'Phone']);
-    expect(container.querySelector('.snapshot-grid').textContent).toContain('2475 Washington Blvd, Ogden, Utah 84401, United States');
+    expect(container.querySelector('.ci-snapshot-grid').textContent).toContain('2475 Washington Blvd, Ogden, Utah 84401, United States');
+  });
+
+  it('renders Snapshot, Overview and Links with the components shared with the company profile page', async () => {
+    const { container } = await renderModal();
+    const content = container.querySelector('.cdm .company-detail-content');
+    const order = ['company-snapshot', 'company-overview', 'company-links']
+      .map(id => [...content.children].indexOf(content.querySelector(`[data-testid="${id}"]`)));
+    expect(order.every(i => i >= 0)).toBe(true);
+    expect(order).toEqual([...order].sort((a, b) => a - b));
   });
 
   it('keeps the overview, both links, the contact search, tech stack, data confidence and the CTA', async () => {
     const { container } = await renderModal();
-    expect(container.querySelector('.company-overview-text').textContent).toContain('MarketStar designs');
-    expect(within(container.querySelector('.links-container')).getByText('Visit Website')).toBeTruthy();
-    expect(within(container.querySelector('.links-container')).getByText('View on LinkedIn')).toBeTruthy();
+    expect(container.querySelector('.ci-overview-text').textContent).toContain('MarketStar designs');
+    expect(within(container.querySelector('.ci-links')).getByText('Visit Website')).toBeTruthy();
+    expect(within(container.querySelector('.ci-links')).getByText('View on LinkedIn')).toBeTruthy();
     expect(container.querySelector('.people-search-input')).not.toBeNull();
     expect(container.querySelectorAll('.tech-stack-grid > .tech-card')).toHaveLength(techStack.length);
     expect([...container.querySelectorAll('.data-quality-label')].map(l => l.textContent))
@@ -203,7 +215,26 @@ describe('behaviour is unchanged', () => {
 const SCOPE = '.company-detail-overlay .cdm';
 const OVERLAY = '.company-detail-overlay.cdm-overlay';
 const DARK = 'body.theme-dark .company-detail-overlay .cdm';
-const cssText = fs.readFileSync(path.resolve(__dirname, '../components/scout/CompanyDetailModal.css'), 'utf8');
+const cssText = fs.readFileSync(path.resolve(here, '../components/scout/CompanyDetailModal.css'), 'utf8');
+const ciCssText = fs.readFileSync(path.resolve(here, '../components/scout/CompanyInfoSections.css'), 'utf8');
+
+/** Rules of the shared Snapshot / Overview / Links stylesheet, with their @media or @container. */
+function ciRules() {
+  const rules = [];
+  postcss.parse(ciCssText).walkRules(r => {
+    const decls = {};
+    r.walkDecls(d => { decls[d.prop] = d.value; });
+    const at = r.parent?.type === 'atrule' ? r.parent.params : null;
+    r.selectors.forEach(selector => rules.push({ selector, decls, at }));
+  });
+  return rules;
+}
+
+function ciRule(selector, at = null) {
+  const found = ciRules().find(r => r.selector === selector && r.at === at);
+  if (!found) throw new Error(`no CompanyInfoSections rule for "${selector}"${at ? ` in ${at}` : ''}`);
+  return found.decls;
+}
 
 /** Every rule in the scoped layer: selector, declarations and enclosing media query. */
 function scopedRules() {
@@ -254,7 +285,7 @@ describe('scoped layout stylesheet', () => {
       if (!/\.(jsx?|tsx?)$/.test(entry.name) || entry.name === 'CompanyDetailModal.jsx' || full.includes(`${path.sep}test${path.sep}`)) return;
       if (/className=[^>]*\bcdm\b/.test(fs.readFileSync(full, 'utf8'))) offenders.push(full);
     });
-    walk(path.resolve(__dirname, '..'));
+    walk(path.resolve(here, '..'));
     expect(offenders).toEqual([]);
   });
 
@@ -302,10 +333,15 @@ describe('scoped layout stylesheet', () => {
     }
   });
 
-  it('the snapshot is 3 columns on desktop, 2 on narrower windows, 1 on phones', () => {
-    expect(rule(`${SCOPE} .snapshot-grid`)['grid-template-columns']).toBe('repeat(3, minmax(0, 1fr))');
-    expect(rule(`${SCOPE} .snapshot-grid`, '(max-width: 860px)')['grid-template-columns']).toBe('repeat(2, minmax(0, 1fr))');
-    expect(rule(`${SCOPE} .snapshot-grid`, '(max-width: 480px)')['grid-template-columns']).toBe('minmax(0, 1fr)');
+  it('the shared Snapshot, Overview and Links sections take the modal\'s section spacing', () => {
+    expect(rule(`${SCOPE} .ci-section`).margin).toBe('0 0 1rem 0');
+    expect(rule(`${SCOPE} .ci-section`, '(max-width: 600px)').padding).toBe('1rem');
+  });
+
+  it('the snapshot is 3 columns, then 2 and 1 as its section narrows (CompanyInfoSections.css)', () => {
+    expect(ciRule('.ci-snapshot-grid')['grid-template-columns']).toBe('repeat(3, minmax(0, 1fr))');
+    expect(ciRule('.ci-snapshot-grid', '(max-width: 706px)')['grid-template-columns']).toBe('repeat(2, minmax(0, 1fr))');
+    expect(ciRule('.ci-snapshot-grid', '(max-width: 400px)')['grid-template-columns']).toBe('minmax(0, 1fr)');
   });
 
   it('decision makers and tech stack wrap into as many columns as fit', () => {
@@ -320,7 +356,7 @@ describe('scoped layout stylesheet', () => {
   });
 
   it('the overview paragraph spans the section rather than a narrow column', () => {
-    const overview = rule(`${SCOPE} .company-overview-text`);
+    const overview = ciRule('.ci-overview-text');
     expect(overview['max-width']).toBe('none');
     expect(overview['line-height']).toBe('1.65');
   });
@@ -333,8 +369,8 @@ describe('scoped layout stylesheet', () => {
   });
 
   it('the links are compact inline buttons and the CTA spans its card', () => {
-    expect(rule(`${SCOPE} .links-container`)['flex-direction']).toBe('row');
-    expect(rule(`${SCOPE} .link-button`).width).toBe('auto');
+    expect(ciRule('.ci-links')['flex-direction']).toBe('row');
+    expect(ciRule('.ci-link').width).toBe('auto');
     expect(rule(`${SCOPE} .find-contacts-btn`).width).toBe('100%');
   });
 });
@@ -366,7 +402,7 @@ describe('dark themes', () => {
     const surface = 'var(--cdm-surface)';
     expect(rule(`${DARK} .company-detail-header`).background).toBe(surface);
     expect(rule(`${DARK} .contact-status-card`).background).toBe(surface);
-    expect(rule(`${DARK} .snapshot-section`).background).toContain(surface);
+    expect(ciRule('body.theme-dark .ci-snapshot').background).toContain('var(--bg-card)');
     expect(rule(`${DARK} .decision-maker-card.selected`).background).toBe('var(--cdm-accent-soft)');
     expect(rule(`${DARK} .btn-add-selected:disabled`).background).toBe('var(--cdm-hover)');
     expect(rule(`${DARK} .company-detail-content::after`).background).toContain('var(--cdm-bg)');
@@ -376,11 +412,14 @@ describe('dark themes', () => {
   it('colour the text from the tokens, never the light-mode hex values', () => {
     expect(rule(`${DARK} .company-detail-name`).color).toBe('var(--cdm-text)');
     expect(rule(`${DARK} .section-title`).color).toBe('var(--cdm-text)');
-    expect(rule(`${DARK} .snapshot-value`).color).toBe('var(--cdm-text)');
-    expect(rule(`${DARK} .snapshot-label`).color).toBe('var(--cdm-muted)');
+    // The shared snapshot follows the theme variables, which the dark themes redefine.
+    expect(ciRule('.ci-snapshot-value').color).toBe('var(--text-primary)');
+    expect(ciRule('.ci-snapshot-label').color).toBe('var(--text-secondary)');
     expect(rule(`${DARK} .tech-category`).color).toBe('var(--cdm-muted)');
     const LIGHT = /#(?:eff6ff|f9fafb|dbeafe|e5e7eb|d1d5db|f5f3ff|000000|1e40af|065f46)\b|rgba\(255,\s*255,\s*255,\s*0\.95\)/i;
     darkRules().forEach(r => Object.values(r.decls).forEach(v => expect(v, r.selector).not.toMatch(LIGHT)));
+    ciRules().filter(r => r.selector.startsWith('body.theme-dark'))
+      .forEach(r => Object.values(r.decls).forEach(v => expect(v, r.selector).not.toMatch(LIGHT)));
   });
 
   it('keep the green badges and the blue CTA, darkened for contrast', () => {

@@ -6,7 +6,7 @@ import { RECORD_STATUS } from '../../constants/statusModel';
 import { useCanonicalNavigation } from '../../utils/navigation';
 import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
-import { X, Building2, Users, DollarSign, Calendar, MapPin, Briefcase, Globe, Linkedin, ExternalLink, Loader, AlertCircle, TrendingUp, Code, Award, CheckCircle, UserPlus, RefreshCw, Search, User, Phone } from 'lucide-react';
+import { X, Building2, Users, Linkedin, Loader, AlertCircle, TrendingUp, Code, Award, CheckCircle, UserPlus, RefreshCw, Search, User } from 'lucide-react';
 import CompanyLogo from './CompanyLogo';
 import { searchPeople, updatePerson } from '../../services/peopleService';
 import { canEnrich, enrichmentSignals, applyCompanyEnrichment } from '../../services/companyIdentityService';
@@ -14,6 +14,7 @@ import { isFullEnrichmentFresh } from '../../services/companyEnrichment';
 import './CompanyDetailModal.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { getDisplayIndustry } from '../../utils/companyDisplay';
+import { CompanySnapshot, CompanyOverview, CompanyLinks } from './CompanyInfoSections';
 
 export default function CompanyDetailModal({ company, onClose, onFindMoreContacts, sourceModule = 'scout' }) {
   const navigate = useNavigate();
@@ -238,22 +239,7 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
     return num > 0 ? `+${num}%` : `${num}%`;
   }
 
-  function formatRevenue(value) {
-    if (!value) return null;
-    const num = typeof value === 'string' ? parseFloat(value.replace(/[^0-9.]/g, '')) : value;
-    if (isNaN(num) || num === 0) return String(value);
-    if (num >= 1e9) return `$${(num / 1e9).toFixed(1)}B`;
-    if (num >= 1e6) return `$${(num / 1e6).toFixed(1)}M`;
-    if (num >= 1e3) return `$${(num / 1e3).toFixed(0)}K`;
-    return `$${num.toLocaleString()}`;
-  }
 
-  function formatEmployees(value) {
-    if (!value) return null;
-    const num = typeof value === 'string' ? parseInt(value.replace(/[^0-9]/g, ''), 10) : value;
-    if (isNaN(num) || num === 0) return String(value);
-    return num.toLocaleString();
-  }
 
   function handleSelectDecisionMaker(person) {
     setSelectedDecisionMakers(prev => {
@@ -498,107 +484,14 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
             </div>
           ) : null}
 
-          {/* Section 1: Company Snapshot — always visible, enrichedData fills in richer values */}
-          <div className="detail-section snapshot-section">
-            <h3 className="section-title">Company Snapshot</h3>
-            <div className="snapshot-grid">
-              <div className="snapshot-item">
-                <Briefcase className="snapshot-icon" />
-                <div>
-                  <p className="snapshot-label">Industry</p>
-                  <p className="snapshot-value">{getDisplayIndustry(company, 'Not available')}</p>
-                </div>
-              </div>
-
-              <div className="snapshot-item">
-                <Users className="snapshot-icon" />
-                <div>
-                  <p className="snapshot-label">Employees</p>
-                  <p className="snapshot-value">
-                    {enrichedData?.snapshot?.employee_count_range ||
-                     formatEmployees(enrichedData?.snapshot?.estimated_num_employees) ||
-                     formatEmployees(company.employee_count) ||
-                     company.company_size ||
-                     'Not available'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="snapshot-item">
-                <DollarSign className="snapshot-icon" />
-                <div>
-                  <p className="snapshot-label">Revenue</p>
-                  <p className="snapshot-value">
-                    {enrichedData?.snapshot?.revenue_range ||
-                     formatRevenue(enrichedData?.snapshot?.annual_revenue) ||
-                     formatRevenue(company.revenue) ||
-                     'Not available'}
-                  </p>
-                </div>
-              </div>
-
-              <div className="snapshot-item">
-                <Calendar className="snapshot-icon" />
-                <div>
-                  <p className="snapshot-label">Founded</p>
-                  <p className="snapshot-value">{enrichedData?.snapshot?.founded_year || company.founded_year || 'Not available'}</p>
-                </div>
-              </div>
-
-              <div className="snapshot-item">
-                <MapPin className="snapshot-icon" />
-                <div>
-                  <p className="snapshot-label">Address</p>
-                  <p className="snapshot-value">{enrichedData?.snapshot?.location?.full || company.location || 'Not available'}</p>
-                </div>
-              </div>
-
-              <div className="snapshot-item">
-                <Phone className="snapshot-icon" />
-                <div>
-                  <p className="snapshot-label">Phone</p>
-                  <p className="snapshot-value">{enrichedData?.snapshot?.phone || 'Not available'}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Company Overview — shown whenever a description is available */}
-          {enrichedData?.snapshot?.description && (
-            <div className="detail-section">
-              <h3 className="section-title">Company Overview</h3>
-              <p className="company-overview-text">{enrichedData.snapshot.description}</p>
-            </div>
-          )}
-
-          {/* Links — always shown when URLs are available */}
-          {(enrichedData?.snapshot?.website_url || enrichedData?.dataQuality?.linkedin_url || company.website_url || company.linkedin_url) && (
-            <div className="detail-section">
-              <h3 className="section-title">Links</h3>
-              <div className="links-container">
-                {(enrichedData?.snapshot?.website_url || company.website_url) && (
-                  <button
-                    className="link-button website"
-                    onClick={() => handleOpenLink(enrichedData?.snapshot?.website_url || company.website_url)}
-                  >
-                    <Globe className="w-5 h-5" />
-                    <span>Visit Website</span>
-                    <ExternalLink className="w-4 h-4 ml-auto" />
-                  </button>
-                )}
-                {(enrichedData?.dataQuality?.linkedin_url || company.linkedin_url) && (
-                  <button
-                    className="link-button linkedin"
-                    onClick={() => handleOpenLink(enrichedData?.dataQuality?.linkedin_url || company.linkedin_url)}
-                  >
-                    <Linkedin className="w-5 h-5" />
-                    <span>View on LinkedIn</span>
-                    <ExternalLink className="w-4 h-4 ml-auto" />
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+          {/* Company Snapshot, Overview and Links — shared with the company profile page */}
+          <CompanySnapshot company={company} snapshot={enrichedData?.snapshot} />
+          <CompanyOverview description={enrichedData?.snapshot?.description} />
+          <CompanyLinks
+            websiteUrl={enrichedData?.snapshot?.website_url || company.website_url}
+            linkedinUrl={enrichedData?.dataQuality?.linkedin_url || company.linkedin_url}
+            onOpen={handleOpenLink}
+          />
 
           {enrichedData && (
             <>

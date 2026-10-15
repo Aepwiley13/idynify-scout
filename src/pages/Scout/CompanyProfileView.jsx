@@ -15,16 +15,16 @@ import { useNavigate } from 'react-router-dom';
 import { useCanonicalNavigation, ENTRY_POINTS } from '../../utils/navigation';
 import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
 import {
-  ArrowLeft, Building2, Users, Globe, Linkedin, MapPin, Calendar,
-  DollarSign, Briefcase, Target, Search, X, UserPlus, CheckCircle,
+  ArrowLeft, Building2, Users, Linkedin, Target, Search, X, UserPlus, CheckCircle,
   Award, Archive, RotateCcw, RefreshCw, ChevronDown, ChevronUp,
-  FileText, Tag, Phone, ExternalLink, Loader, Zap, ChevronLeft, Code, User,
+  Tag, ExternalLink, Loader, Zap, ChevronLeft, Code, User,
 } from 'lucide-react';
 import { canEnrich, enrichmentSignals, applyCompanyEnrichment } from '../../services/companyIdentityService';
 import { isFullEnrichmentFresh } from '../../services/companyEnrichment';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS } from '../../theme/tokens';
 import CompanyLogo from '../../components/scout/CompanyLogo';
+import { CompanySnapshot, CompanyOverview, CompanyLinks } from '../../components/scout/CompanyInfoSections';
 import ContactProfile from './ContactProfile';
 import { searchPeople, updatePerson } from '../../services/peopleService';
 
@@ -551,433 +551,390 @@ export default function CompanyProfileView({ companyId, onBack }) {
       )}
 
       {/* ── Scrollable body ── */}
-      <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* The scroller is not itself a flex column: as one, it shrank any section
+          with overflow: hidden to nothing once the page outgrew the viewport
+          (the company card rendered 2px tall). The inner column grows freely. */}
+      <div ref={scrollContainerRef} data-testid="company-profile-scroll" style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '24px 20px 32px' }}>
+        <div data-testid="company-profile-sections" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
 
-        {/* ── Company info card ── */}
-        <div style={{ background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 13, overflow: 'hidden' }}>
-          {/* Stats grid */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 0 }}>
-            {[
-              ['Employees', snap.estimated_num_employees || company.employee_count || company.company_size || 'N/A', Users],
-              ['Founded', snap.founded_year || company.founded_year || 'N/A', Calendar],
-              ['Location', snap.location?.full || company.location || 'N/A', MapPin],
-              ['Industry', snap.industry || company.industry || 'N/A', Briefcase],
-              ...(snap.annual_revenue || snap.revenue_range || company.revenue ? [['Revenue', snap.revenue_range || snap.annual_revenue || company.revenue, DollarSign]] : []),
-            ].map(([label, value, Icon]) => (
-              <div key={label} style={{ padding: '12px 14px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4 }}>
-                  <Icon size={11} color={T.textFaint} />
-                  <span style={{ fontSize: 9, letterSpacing: 1, color: T.textFaint, fontWeight: 600 }}>{label.toUpperCase()}</span>
-                </div>
-                <div style={{ fontSize: 12, color: T.text, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{String(value)}</div>
-              </div>
-            ))}
-          </div>
-
-          {/* Quick links */}
-          <div style={{ padding: '10px 14px', display: 'flex', gap: 6, flexWrap: 'wrap', borderBottom: `1px solid ${T.border}` }}>
-            {(company.website_url || snap.website_url) && (
-              <button onClick={() => window.open(company.website_url || snap.website_url, '_blank')}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 7, border: `1px solid #7c5ce430`, background: '#7c5ce410', color: '#b388ff', fontSize: 11, cursor: 'pointer' }}>
-                <Globe size={11} />Website
-              </button>
-            )}
-            {(company.linkedin_url || snap.linkedin_url) && (
-              <button onClick={() => window.open(company.linkedin_url || snap.linkedin_url, '_blank')}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 7, border: `1px solid #0077b530`, background: '#0077b510', color: '#3b82f6', fontSize: 11, cursor: 'pointer' }}>
-                <Linkedin size={11} />LinkedIn
-              </button>
-            )}
-            {(snap.phone || company?.phone) && (
-              <button onClick={() => window.location.href = `tel:${snap.phone || company?.phone}`}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 11px', borderRadius: 7, border: `1px solid ${T.border}`, background: T.surface, color: T.textMuted, fontSize: 11, cursor: 'pointer' }}>
-                <Phone size={11} />{snap.phone || company?.phone}
-              </button>
-            )}
-          </div>
-
-          {/* Company Overview — always visible, never collapsed */}
-          <div style={{ borderBottom: (company.industry || snap.keywords?.length > 0) ? `1px solid ${T.border}` : 'none', padding: '10px 14px 12px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 7 }}>
-              <FileText size={12} color={T.textFaint} />
-              <span style={{ fontSize: 11, fontWeight: 600, color: T.textMuted, letterSpacing: 0.3, textTransform: 'uppercase' }}>Company Overview</span>
-            </div>
-            <div style={{ fontSize: 12, color: T.textMuted, lineHeight: 1.65 }}>
-              {(snap.description || company?.description)
-                ? (snap.description || company?.description)
-                : enriching
-                  ? <span style={{ color: T.textFaint, fontStyle: 'italic' }}>Loading overview…</span>
-                  : <span style={{ color: T.textFaint, fontStyle: 'italic' }}>No overview available.</span>
-              }
-            </div>
-          </div>
-
-          {/* Collapsible keywords — shown when industry OR keywords are present */}
-          {(snap.industry || company.industry || snap.keywords?.length > 0) && (
-            <div>
-              <button onClick={() => setShowKeywords(v => !v)}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', background: 'transparent', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 12 }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Tag size={12} />Industries & Keywords</span>
-                {showKeywords ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-              </button>
-              {showKeywords && (
-                <div style={{ padding: '0 14px 12px', display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                  {(snap.industry || company.industry) && <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, background: `${BRAND.pink}15`, color: BRAND.pink, border: `1px solid ${BRAND.pink}30` }}>{snap.industry || company.industry}</span>}
-                  {snap.keywords?.map((kw, i) => (
-                    <span key={i} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, background: T.surface, color: T.textMuted, border: `1px solid ${T.border}` }}>{kw}</span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* ── Tech Stack ── */}
-        {enrichedData?.techStack?.length > 0 && (
-          <Section title={`Tech Stack (${enrichedData.techStack.length})`} icon={<Code size={14} color={BRAND.cyan} />} T={T}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 8 }}>
-              {enrichedData.techStack.map((tech, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 9, background: T.surface, border: `1px solid ${T.border}` }}>
-                  <Code size={13} color={BRAND.cyan} style={{ flexShrink: 0 }} />
-                  <div style={{ minWidth: 0 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tech.name}</div>
-                    {tech.category && <div style={{ fontSize: 9, color: T.textFaint, marginTop: 1 }}>{tech.category}</div>}
+          {/* ── Company: Snapshot, Overview, Links (shared with the company detail modal) ── */}
+          <CompanySnapshot company={company} snapshot={snap} />
+          <CompanyOverview
+            description={snap.description || company?.description}
+            placeholder={enriching ? 'Loading overview…' : 'No overview available.'}
+          >
+            {/* Industries & keywords, collapsible, under the overview text */}
+            {(snap.industry || company.industry || snap.keywords?.length > 0) && (
+              <div style={{ marginTop: 14, paddingTop: 10, borderTop: `1px solid ${T.border}` }}>
+                <button onClick={() => setShowKeywords(v => !v)}
+                  style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 0, background: 'transparent', border: 'none', cursor: 'pointer', color: T.textMuted, fontSize: 12 }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}><Tag size={12} />Industries & Keywords</span>
+                  {showKeywords ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                </button>
+                {showKeywords && (
+                  <div style={{ paddingTop: 10, display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                    {(snap.industry || company.industry) && <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, background: `${BRAND.pink}15`, color: BRAND.pink, border: `1px solid ${BRAND.pink}30` }}>{snap.industry || company.industry}</span>}
+                    {snap.keywords?.map((kw, i) => (
+                      <span key={i} style={{ fontSize: 10, padding: '3px 8px', borderRadius: 6, background: T.surface, color: T.textMuted, border: `1px solid ${T.border}` }}>{kw}</span>
+                    ))}
                   </div>
-                </div>
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {/* ── Data Confidence ── */}
-        {enrichedData?.dataQuality && (
-          <Section title="Data Confidence" icon={<Award size={14} color={STATUS.green} />} T={T}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${T.border}` }}>
-                <span style={{ fontSize: 12, color: T.textMuted }}>Last Updated</span>
-                <span style={{ fontSize: 12, color: T.text, fontWeight: 500 }}>
-                  {new Date(enrichedData._raw?.enrichedAt || Date.now()).toLocaleDateString()}
-                </span>
+                )}
               </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${T.border}` }}>
-                <span style={{ fontSize: 12, color: T.textMuted }}>Status</span>
-                <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 6, background: `${STATUS.green}15`, color: STATUS.green, border: `1px solid ${STATUS.green}30`, fontWeight: 600 }}>
-                  {enrichedData.dataQuality.organization_status || 'Active'}
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
-                <span style={{ fontSize: 12, color: T.textMuted }}>Source</span>
-                <span style={{ fontSize: 12, color: T.text, fontWeight: 500 }}>Verified Data</span>
-              </div>
-            </div>
-          </Section>
-        )}
+            )}
+          </CompanyOverview>
+          <CompanyLinks
+            websiteUrl={company.website_url || snap.website_url}
+            linkedinUrl={company.linkedin_url || snap.linkedin_url}
+            onOpen={url => window.open(url, '_blank')}
+          />
 
-        {/* ── Saved Contacts ── */}
-        {approvedContacts.length > 0 && (
-          <Section title={`Saved Contacts (${approvedContacts.length})`} icon={<CheckCircle size={14} color={STATUS.green} />} T={T}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 10 }}>
-              {approvedContacts.map(c => (
-                <ContactPhotoCard
-                  key={c.id}
-                  contact={c}
-                  badge={<div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, background: `${STATUS.green}20`, color: STATUS.green, borderRadius: 6, padding: '2px 6px' }}><CheckCircle size={9} />Saved</div>}
-                  footer={
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      <button onClick={() => setEngageContactId(c.id)}
-                        style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
-                        <Zap size={13} />Engage
-                      </button>
-                      <button onClick={() => openContact({ contactId: c.id, entryPoint: ENTRY_POINTS.COMPANY })}
-                        style={{ width: '100%', padding: '7px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.cyan},#009aa0)`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-                        View Full Profile →
-                      </button>
-                    </div>
-                  }
-                  getLeadershipBadge={getLeadershipBadge}
-                  T={T}
-                />
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {/* ── Decision Makers from Apollo ── */}
-        {decisionMakers.length > 0 && (
-          <Section title="Key Decision Makers" subtitle="Select contacts to add as leads" icon={<Users size={14} color={BRAND.cyan} />} T={T}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 10 }}>
-              {decisionMakers.map((person, i) => {
-                const isSelected = selectedDecisionMakers.some(p => p.id === person.id);
-                const alreadySaved = approvedContacts.some(c => c.apollo_person_id === person.id);
-                const savedContact = alreadySaved
-                  ? approvedContacts.find(c => c.apollo_person_id === person.id)
-                  : null;
-                return (
+          {/* ── Saved Contacts ── */}
+          {approvedContacts.length > 0 && (
+            <Section title={`Saved Contacts (${approvedContacts.length})`} icon={<CheckCircle size={14} color={STATUS.green} />} T={T}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 10 }}>
+                {approvedContacts.map(c => (
                   <ContactPhotoCard
-                    key={i}
-                    contact={person}
-                    selected={isSelected}
-                    alreadySaved={alreadySaved}
-                    onClick={!alreadySaved ? () => {
-                      setSelectedDecisionMakers(prev =>
-                        isSelected ? prev.filter(p => p.id !== person.id) : [...prev, person]
-                      );
-                    } : undefined}
-                    badge={alreadySaved
-                      ? <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, background: `${STATUS.green}20`, color: STATUS.green, borderRadius: 6, padding: '2px 6px' }}><CheckCircle size={9} />Saved</div>
-                      : isSelected ? <div style={{ fontSize: 9, background: `${BRAND.pink}20`, color: BRAND.pink, borderRadius: 6, padding: '2px 6px' }}>Selected</div> : null
-                    }
-                    footer={savedContact ? (
+                    key={c.id}
+                    contact={c}
+                    badge={<div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, background: `${STATUS.green}20`, color: STATUS.green, borderRadius: 6, padding: '2px 6px' }}><CheckCircle size={9} />Saved</div>}
+                    footer={
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                        <button onClick={() => setEngageContactId(savedContact.id)}
+                        <button onClick={() => setEngageContactId(c.id)}
                           style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
                           <Zap size={13} />Engage
                         </button>
-                        <button onClick={() => openContact({ contactId: savedContact.id, entryPoint: ENTRY_POINTS.COMPANY })}
+                        <button onClick={() => openContact({ contactId: c.id, entryPoint: ENTRY_POINTS.COMPANY })}
                           style={{ width: '100%', padding: '7px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.cyan},#009aa0)`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
                           View Full Profile →
                         </button>
                       </div>
-                    ) : undefined}
+                    }
                     getLeadershipBadge={getLeadershipBadge}
                     T={T}
                   />
-                );
-              })}
-            </div>
-            {selectedDecisionMakers.length > 0 && (
-              <button onClick={saveDecisionMakers} disabled={savingDMs}
-                style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 9, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-                {savingDMs ? <><div style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', animation: 'spin 1s linear infinite' }} />Saving…</>
-                  : <><UserPlus size={13} />Save {selectedDecisionMakers.length} Contacts</>}
-              </button>
-            )}
-          </Section>
-        )}
-
-        {/* ── Contact Search by Title ── */}
-        <Section title="Find Contacts by Title" subtitle="Search Apollo for people at this company" icon={<Search size={14} color={BRAND.pink} />} T={T}>
-          {/* Title input */}
-          <form onSubmit={addTitle} style={{ display: 'flex', gap: 7, marginBottom: 10 }}>
-            <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 7, background: T.input, border: `1px solid ${T.border}`, borderRadius: 8, padding: '7px 11px' }}>
-              <Search size={13} color={T.textFaint} />
-              <input
-                value={customTitleInput}
-                onChange={e => setCustomTitleInput(e.target.value)}
-                placeholder='Add a title (e.g. "VP Sales", "CEO", "Marketing Manager")…'
-                style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 12, color: T.text }}
-              />
-            </div>
-            <button type="submit" disabled={!customTitleInput.trim()}
-              style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: customTitleInput.trim() ? `linear-gradient(135deg,${BRAND.pink},#c0146a)` : T.surface, color: customTitleInput.trim() ? '#fff' : T.textFaint, fontSize: 12, fontWeight: 600, cursor: customTitleInput.trim() ? 'pointer' : 'default' }}>
-              Add
-            </button>
-          </form>
-
-          {/* Active titles */}
-          {selectedTitles.length > 0 && (
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
-              {selectedTitles.map(t => (
-                <div key={t.title} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderRadius: 7, background: `${BRAND.pink}12`, border: `1px solid ${BRAND.pink}30`, fontSize: 11, color: BRAND.pink }}>
-                  <Target size={10} />
-                  <span>{t.title}</span>
-                  <button onClick={() => removeTitle(t.title)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: BRAND.pink, display: 'flex', padding: 0 }}><X size={11} /></button>
-                </div>
-              ))}
-              {selectedTitles.length > 1 && (
-                <button onClick={() => { setSelectedTitles([]); setSearchResults([]); }}
-                  style={{ padding: '4px 9px', borderRadius: 7, border: `1px solid ${T.border}`, background: T.surface, color: T.textFaint, fontSize: 11, cursor: 'pointer' }}>
-                  Clear All
-                </button>
-              )}
-            </div>
+                ))}
+              </div>
+            </Section>
           )}
 
-          {/* Search results */}
-          {searchingContacts ? (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 30, color: T.textFaint, fontSize: 12 }}>
-              <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${BRAND.pink}`, borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }} />
-              Searching for contacts at {company.name}…
-            </div>
-          ) : availableResults.length > 0 ? (
-            <>
-              {/* Bulk action bar */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <span style={{ fontSize: 11, color: T.textFaint }}>{availableResults.length} contact{availableResults.length !== 1 ? 's' : ''} found</span>
-                <div style={{ display: 'flex', gap: 7 }}>
-                  {selectedContactIds.size > 0 ? (
-                    <>
-                      <span style={{ fontSize: 11, color: T.textMuted, alignSelf: 'center' }}>{selectedContactIds.size} selected</span>
-                      <button onClick={bulkApprove} disabled={savingBulk}
-                        style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
-                        {savingBulk ? 'Saving…' : <><UserPlus size={11} />Save {selectedContactIds.size} Contacts</>}
-                      </button>
-                      <button onClick={() => setSelectedContactIds(new Set())}
-                        style={{ padding: '5px 10px', borderRadius: 7, border: `1px solid ${T.border}`, background: T.surface, color: T.textFaint, fontSize: 11, cursor: 'pointer' }}>
-                        Clear
-                      </button>
-                    </>
-                  ) : (
-                    <button onClick={() => setSelectedContactIds(new Set(availableResults.map(c => c.id)))}
-                      style={{ padding: '5px 12px', borderRadius: 7, border: `1px solid ${T.border}`, background: T.surface, color: T.textMuted, fontSize: 11, cursor: 'pointer' }}>
-                      Select All
-                    </button>
-                  )}
-                </div>
-              </div>
+          {/* ── Decision Makers from Apollo ── */}
+          {decisionMakers.length > 0 && (
+            <Section title="Key Decision Makers" subtitle="Select contacts to add as leads" icon={<Users size={14} color={BRAND.cyan} />} T={T}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 10 }}>
-                {availableResults.map(c => {
-                  const isSelected = selectedContactIds.has(c.id);
-                  const isApproving = approvingContactIds.has(c.id);
-                  const badge = getLeadershipBadge(c);
+                {decisionMakers.map((person, i) => {
+                  const isSelected = selectedDecisionMakers.some(p => p.id === person.id);
+                  const alreadySaved = approvedContacts.some(c => c.apollo_person_id === person.id);
+                  const savedContact = alreadySaved
+                    ? approvedContacts.find(c => c.apollo_person_id === person.id)
+                    : null;
                   return (
                     <ContactPhotoCard
-                      key={c.id}
-                      contact={c}
+                      key={i}
+                      contact={person}
                       selected={isSelected}
-                      onClick={() => setSelectedContactIds(prev => {
-                        const s = new Set(prev);
-                        s.has(c.id) ? s.delete(c.id) : s.add(c.id);
-                        return s;
-                      })}
-                      badge={isSelected ? <div style={{ fontSize: 9, background: `${BRAND.pink}20`, color: BRAND.pink, borderRadius: 6, padding: '2px 6px' }}>Selected</div> : null}
-                      footer={
-                        isApproving ? (
-                          <div style={{ width: '100%', padding: '5px 0', textAlign: 'center', fontSize: 10, color: T.textFaint }}>Saving…</div>
-                        ) : (
-                          <button onClick={e => { e.stopPropagation(); approveContact(c); }}
-                            style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                            <UserPlus size={12} />Save Contact
-                          </button>
-                        )
+                      alreadySaved={alreadySaved}
+                      onClick={!alreadySaved ? () => {
+                        setSelectedDecisionMakers(prev =>
+                          isSelected ? prev.filter(p => p.id !== person.id) : [...prev, person]
+                        );
+                      } : undefined}
+                      badge={alreadySaved
+                        ? <div style={{ display: 'flex', alignItems: 'center', gap: 3, fontSize: 9, background: `${STATUS.green}20`, color: STATUS.green, borderRadius: 6, padding: '2px 6px' }}><CheckCircle size={9} />Saved</div>
+                        : isSelected ? <div style={{ fontSize: 9, background: `${BRAND.pink}20`, color: BRAND.pink, borderRadius: 6, padding: '2px 6px' }}>Selected</div> : null
                       }
+                      footer={savedContact ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <button onClick={() => setEngageContactId(savedContact.id)}
+                            style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                            <Zap size={13} />Engage
+                          </button>
+                          <button onClick={() => openContact({ contactId: savedContact.id, entryPoint: ENTRY_POINTS.COMPANY })}
+                            style={{ width: '100%', padding: '7px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.cyan},#009aa0)`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                            View Full Profile →
+                          </button>
+                        </div>
+                      ) : undefined}
                       getLeadershipBadge={getLeadershipBadge}
                       T={T}
                     />
                   );
                 })}
               </div>
-            </>
-          ) : selectedTitles.length > 0 && !searchingContacts ? (
-            <div style={{ textAlign: 'center', padding: 24, color: T.textFaint, fontSize: 12 }}>
-              {searchResults.length > 0 && availableResults.length === 0
-                ? <><CheckCircle size={28} color={STATUS.green} style={{ display: 'block', margin: '0 auto 8px' }} />All found contacts are already saved!</>
-                : <>No contacts found for these titles at {company.name}. Try different titles.</>}
-            </div>
-          ) : selectedTitles.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: 24, color: T.textFaint, fontSize: 12 }}>
-              <Target size={28} color={T.textFaint} style={{ display: 'block', margin: '0 auto 8px', opacity: 0.4 }} />
-              Add job titles above to start finding contacts
-            </div>
-          ) : null}
-        </Section>
-
-        {/* ── Suggested Contacts ── */}
-        {suggestedContacts.length > 0 && (
-          <Section title={`Suggested Contacts (${suggestedContacts.length})`} subtitle="Auto-discovered from your ICP" icon={<Target size={14} color={BRAND.cyan} />} T={T}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 10 }}>
-              {suggestedContacts.map(c => (
-                <ContactPhotoCard
-                  key={c.id}
-                  contact={c}
-                  badge={<div style={{ fontSize: 9, background: `${BRAND.cyan}15`, color: BRAND.cyan, borderRadius: 6, padding: '2px 6px' }}>Suggested</div>}
-                  footer={
-                    <button onClick={e => { e.stopPropagation(); approveContact({ id: c.apollo_person_id || c.id, ...c }); }}
-                      style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
-                      <UserPlus size={12} />Save Contact
-                    </button>
-                  }
-                  getLeadershipBadge={getLeadershipBadge}
-                  T={T}
-                />
-              ))}
-            </div>
-          </Section>
-        )}
-
-        {/* ── Add Your Contacts ── */}
-        <Section title="Add Your Contacts" subtitle="Search your existing leads & people by name and link them to this company" icon={<UserPlus size={14} color={BRAND.pink} />} T={T}>
-          {addPeopleSuccess && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 12px', borderRadius: 8, background: `${STATUS.green}15`, border: `1px solid ${STATUS.green}30`, color: STATUS.green, fontSize: 12, marginBottom: 10 }}>
-              <CheckCircle size={13} />Contacts successfully linked to {company.name}!
-            </div>
+              {selectedDecisionMakers.length > 0 && (
+                <button onClick={saveDecisionMakers} disabled={savingDMs}
+                  style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px', borderRadius: 9, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                  {savingDMs ? <><div style={{ width: 12, height: 12, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.4)', borderTopColor: '#fff', animation: 'spin 1s linear infinite' }} />Saving…</>
+                    : <><UserPlus size={13} />Save {selectedDecisionMakers.length} Contacts</>}
+                </button>
+              )}
+            </Section>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: T.input, border: `1px solid ${T.border}`, borderRadius: 8, padding: '7px 11px', marginBottom: 10 }}>
-            <Search size={13} color={T.textFaint} />
-            <input
-              type="text"
-              value={peopleSearchQuery}
-              onChange={handlePeopleSearch}
-              placeholder="Search all leads & people by name..."
-              style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 12, color: T.text }}
-            />
-            {peopleSearchQuery && (
-              <button onClick={() => { setPeopleSearchQuery(''); setPeopleResults([]); setSelectedPeopleToAdd([]); }}
-                style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textFaint, display: 'flex', padding: 0 }}>
-                <X size={13} />
+
+          {/* ── Contact Search by Title ── */}
+          <Section title="Find Contacts by Title" subtitle="Search Apollo for people at this company" icon={<Search size={14} color={BRAND.pink} />} T={T}>
+            {/* Title input */}
+            <form onSubmit={addTitle} style={{ display: 'flex', gap: 7, marginBottom: 10 }}>
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 7, background: T.input, border: `1px solid ${T.border}`, borderRadius: 8, padding: '7px 11px' }}>
+                <Search size={13} color={T.textFaint} />
+                <input
+                  value={customTitleInput}
+                  onChange={e => setCustomTitleInput(e.target.value)}
+                  placeholder='Add a title (e.g. "VP Sales", "CEO", "Marketing Manager")…'
+                  style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 12, color: T.text }}
+                />
+              </div>
+              <button type="submit" disabled={!customTitleInput.trim()}
+                style={{ padding: '7px 14px', borderRadius: 8, border: 'none', background: customTitleInput.trim() ? `linear-gradient(135deg,${BRAND.pink},#c0146a)` : T.surface, color: customTitleInput.trim() ? '#fff' : T.textFaint, fontSize: 12, fontWeight: 600, cursor: customTitleInput.trim() ? 'pointer' : 'default' }}>
+                Add
+              </button>
+            </form>
+
+            {/* Active titles */}
+            {selectedTitles.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
+                {selectedTitles.map(t => (
+                  <div key={t.title} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '4px 9px', borderRadius: 7, background: `${BRAND.pink}12`, border: `1px solid ${BRAND.pink}30`, fontSize: 11, color: BRAND.pink }}>
+                    <Target size={10} />
+                    <span>{t.title}</span>
+                    <button onClick={() => removeTitle(t.title)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: BRAND.pink, display: 'flex', padding: 0 }}><X size={11} /></button>
+                  </div>
+                ))}
+                {selectedTitles.length > 1 && (
+                  <button onClick={() => { setSelectedTitles([]); setSearchResults([]); }}
+                    style={{ padding: '4px 9px', borderRadius: 7, border: `1px solid ${T.border}`, background: T.surface, color: T.textFaint, fontSize: 11, cursor: 'pointer' }}>
+                    Clear All
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Search results */}
+            {searchingContacts ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: 30, color: T.textFaint, fontSize: 12 }}>
+                <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${BRAND.pink}`, borderTopColor: 'transparent', animation: 'spin 1s linear infinite' }} />
+                Searching for contacts at {company.name}…
+              </div>
+            ) : availableResults.length > 0 ? (
+              <>
+                {/* Bulk action bar */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                  <span style={{ fontSize: 11, color: T.textFaint }}>{availableResults.length} contact{availableResults.length !== 1 ? 's' : ''} found</span>
+                  <div style={{ display: 'flex', gap: 7 }}>
+                    {selectedContactIds.size > 0 ? (
+                      <>
+                        <span style={{ fontSize: 11, color: T.textMuted, alignSelf: 'center' }}>{selectedContactIds.size} selected</span>
+                        <button onClick={bulkApprove} disabled={savingBulk}
+                          style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px', borderRadius: 7, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>
+                          {savingBulk ? 'Saving…' : <><UserPlus size={11} />Save {selectedContactIds.size} Contacts</>}
+                        </button>
+                        <button onClick={() => setSelectedContactIds(new Set())}
+                          style={{ padding: '5px 10px', borderRadius: 7, border: `1px solid ${T.border}`, background: T.surface, color: T.textFaint, fontSize: 11, cursor: 'pointer' }}>
+                          Clear
+                        </button>
+                      </>
+                    ) : (
+                      <button onClick={() => setSelectedContactIds(new Set(availableResults.map(c => c.id)))}
+                        style={{ padding: '5px 12px', borderRadius: 7, border: `1px solid ${T.border}`, background: T.surface, color: T.textMuted, fontSize: 11, cursor: 'pointer' }}>
+                        Select All
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 10 }}>
+                  {availableResults.map(c => {
+                    const isSelected = selectedContactIds.has(c.id);
+                    const isApproving = approvingContactIds.has(c.id);
+                    const badge = getLeadershipBadge(c);
+                    return (
+                      <ContactPhotoCard
+                        key={c.id}
+                        contact={c}
+                        selected={isSelected}
+                        onClick={() => setSelectedContactIds(prev => {
+                          const s = new Set(prev);
+                          s.has(c.id) ? s.delete(c.id) : s.add(c.id);
+                          return s;
+                        })}
+                        badge={isSelected ? <div style={{ fontSize: 9, background: `${BRAND.pink}20`, color: BRAND.pink, borderRadius: 6, padding: '2px 6px' }}>Selected</div> : null}
+                        footer={
+                          isApproving ? (
+                            <div style={{ width: '100%', padding: '5px 0', textAlign: 'center', fontSize: 10, color: T.textFaint }}>Saving…</div>
+                          ) : (
+                            <button onClick={e => { e.stopPropagation(); approveContact(c); }}
+                              style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                              <UserPlus size={12} />Save Contact
+                            </button>
+                          )
+                        }
+                        getLeadershipBadge={getLeadershipBadge}
+                        T={T}
+                      />
+                    );
+                  })}
+                </div>
+              </>
+            ) : selectedTitles.length > 0 && !searchingContacts ? (
+              <div style={{ textAlign: 'center', padding: 24, color: T.textFaint, fontSize: 12 }}>
+                {searchResults.length > 0 && availableResults.length === 0
+                  ? <><CheckCircle size={28} color={STATUS.green} style={{ display: 'block', margin: '0 auto 8px' }} />All found contacts are already saved!</>
+                  : <>No contacts found for these titles at {company.name}. Try different titles.</>}
+              </div>
+            ) : selectedTitles.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 24, color: T.textFaint, fontSize: 12 }}>
+                <Target size={28} color={T.textFaint} style={{ display: 'block', margin: '0 auto 8px', opacity: 0.4 }} />
+                Add job titles above to start finding contacts
+              </div>
+            ) : null}
+          </Section>
+
+          {/* ── Suggested Contacts ── */}
+          {suggestedContacts.length > 0 && (
+            <Section title={`Suggested Contacts (${suggestedContacts.length})`} subtitle="Auto-discovered from your ICP" icon={<Target size={14} color={BRAND.cyan} />} T={T}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(160px,1fr))', gap: 10 }}>
+                {suggestedContacts.map(c => (
+                  <ContactPhotoCard
+                    key={c.id}
+                    contact={c}
+                    badge={<div style={{ fontSize: 9, background: `${BRAND.cyan}15`, color: BRAND.cyan, borderRadius: 6, padding: '2px 6px' }}>Suggested</div>}
+                    footer={
+                      <button onClick={e => { e.stopPropagation(); approveContact({ id: c.apollo_person_id || c.id, ...c }); }}
+                        style={{ width: '100%', padding: '9px 0', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>
+                        <UserPlus size={12} />Save Contact
+                      </button>
+                    }
+                    getLeadershipBadge={getLeadershipBadge}
+                    T={T}
+                  />
+                ))}
+              </div>
+            </Section>
+          )}
+
+          {/* ── Add Your Contacts ── */}
+          <Section title="Add Your Contacts" subtitle="Search your existing leads & people by name and link them to this company" icon={<UserPlus size={14} color={BRAND.pink} />} T={T}>
+            {addPeopleSuccess && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 12px', borderRadius: 8, background: `${STATUS.green}15`, border: `1px solid ${STATUS.green}30`, color: STATUS.green, fontSize: 12, marginBottom: 10 }}>
+                <CheckCircle size={13} />Contacts successfully linked to {company.name}!
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: T.input, border: `1px solid ${T.border}`, borderRadius: 8, padding: '7px 11px', marginBottom: 10 }}>
+              <Search size={13} color={T.textFaint} />
+              <input
+                type="text"
+                value={peopleSearchQuery}
+                onChange={handlePeopleSearch}
+                placeholder="Search all leads & people by name..."
+                style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', fontSize: 12, color: T.text }}
+              />
+              {peopleSearchQuery && (
+                <button onClick={() => { setPeopleSearchQuery(''); setPeopleResults([]); setSelectedPeopleToAdd([]); }}
+                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textFaint, display: 'flex', padding: 0 }}>
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+
+            {searchingPeople && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', color: T.textFaint, fontSize: 12 }}>
+                <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />Searching…
+              </div>
+            )}
+
+            {!searchingPeople && peopleResults.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
+                {peopleResults.map(person => {
+                  const isSelected = selectedPeopleToAdd.some(p => p.id === person.id);
+                  const isAlreadyLinked = person.company_id === companyId;
+                  return (
+                    <div
+                      key={person.id}
+                      onClick={() => !isAlreadyLinked && handleTogglePersonSelection(person)}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 9,
+                        background: isSelected ? `${BRAND.pink}10` : T.surface,
+                        border: `1px solid ${isSelected ? BRAND.pink + '40' : T.border}`,
+                        cursor: isAlreadyLinked ? 'default' : 'pointer', opacity: isAlreadyLinked ? 0.6 : 1,
+                      }}
+                    >
+                      <div style={{ width: 32, height: 32, borderRadius: '50%', background: T.border, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
+                        {person.photo_url
+                          ? <img src={person.photo_url} alt={person.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          : <User size={15} color={T.textFaint} />}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{person.name}</div>
+                        <div style={{ fontSize: 10, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {[person.title, person.company_name || person.company].filter(Boolean).join(' · ')}
+                        </div>
+                      </div>
+                      {isAlreadyLinked
+                        ? <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 5, background: `${STATUS.green}15`, color: STATUS.green, flexShrink: 0 }}>Already linked</span>
+                        : <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${isSelected ? BRAND.pink : T.border}`, background: isSelected ? BRAND.pink : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                            {isSelected && <CheckCircle size={11} color="#fff" />}
+                          </div>
+                      }
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {!searchingPeople && peopleSearchQuery.length >= 2 && peopleResults.length === 0 && (
+              <div style={{ fontSize: 12, color: T.textFaint, padding: '8px 0' }}>No contacts found for &ldquo;{peopleSearchQuery}&rdquo;</div>
+            )}
+
+            {selectedPeopleToAdd.length > 0 && (
+              <button onClick={handleAddPeopleToCompany} disabled={addingPeopleToCompany}
+                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                {addingPeopleToCompany
+                  ? <><Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />Adding…</>
+                  : <><UserPlus size={13} />Add {selectedPeopleToAdd.length} to {company.name}</>}
               </button>
             )}
-          </div>
+          </Section>
 
-          {searchingPeople && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', color: T.textFaint, fontSize: 12 }}>
-              <Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />Searching…
-            </div>
-          )}
-
-          {!searchingPeople && peopleResults.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 10 }}>
-              {peopleResults.map(person => {
-                const isSelected = selectedPeopleToAdd.some(p => p.id === person.id);
-                const isAlreadyLinked = person.company_id === companyId;
-                return (
-                  <div
-                    key={person.id}
-                    onClick={() => !isAlreadyLinked && handleTogglePersonSelection(person)}
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 9,
-                      background: isSelected ? `${BRAND.pink}10` : T.surface,
-                      border: `1px solid ${isSelected ? BRAND.pink + '40' : T.border}`,
-                      cursor: isAlreadyLinked ? 'default' : 'pointer', opacity: isAlreadyLinked ? 0.6 : 1,
-                    }}
-                  >
-                    <div style={{ width: 32, height: 32, borderRadius: '50%', background: T.border, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', flexShrink: 0 }}>
-                      {person.photo_url
-                        ? <img src={person.photo_url} alt={person.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        : <User size={15} color={T.textFaint} />}
+          {/* ── Tech Stack ── */}
+          {enrichedData?.techStack?.length > 0 && (
+            <Section title={`Tech Stack (${enrichedData.techStack.length})`} icon={<Code size={14} color={BRAND.cyan} />} T={T}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 8 }}>
+                {enrichedData.techStack.map((tech, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 9, background: T.surface, border: `1px solid ${T.border}` }}>
+                    <Code size={13} color={BRAND.cyan} style={{ flexShrink: 0 }} />
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{tech.name}</div>
+                      {tech.category && <div style={{ fontSize: 9, color: T.textFaint, marginTop: 1 }}>{tech.category}</div>}
                     </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{person.name}</div>
-                      <div style={{ fontSize: 10, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {[person.title, person.company_name || person.company].filter(Boolean).join(' · ')}
-                      </div>
-                    </div>
-                    {isAlreadyLinked
-                      ? <span style={{ fontSize: 9, padding: '2px 7px', borderRadius: 5, background: `${STATUS.green}15`, color: STATUS.green, flexShrink: 0 }}>Already linked</span>
-                      : <div style={{ width: 18, height: 18, borderRadius: 5, border: `2px solid ${isSelected ? BRAND.pink : T.border}`, background: isSelected ? BRAND.pink : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                          {isSelected && <CheckCircle size={11} color="#fff" />}
-                        </div>
-                    }
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            </Section>
           )}
 
-          {!searchingPeople && peopleSearchQuery.length >= 2 && peopleResults.length === 0 && (
-            <div style={{ fontSize: 12, color: T.textFaint, padding: '8px 0' }}>No contacts found for &ldquo;{peopleSearchQuery}&rdquo;</div>
+          {/* ── Data Confidence ── */}
+          {enrichedData?.dataQuality && (
+            <Section title="Data Confidence" icon={<Award size={14} color={STATUS.green} />} T={T}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${T.border}` }}>
+                  <span style={{ fontSize: 12, color: T.textMuted }}>Last Updated</span>
+                  <span style={{ fontSize: 12, color: T.text, fontWeight: 500 }}>
+                    {new Date(enrichedData._raw?.enrichedAt || Date.now()).toLocaleDateString()}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0', borderBottom: `1px solid ${T.border}` }}>
+                  <span style={{ fontSize: 12, color: T.textMuted }}>Status</span>
+                  <span style={{ fontSize: 11, padding: '2px 9px', borderRadius: 6, background: `${STATUS.green}15`, color: STATUS.green, border: `1px solid ${STATUS.green}30`, fontWeight: 600 }}>
+                    {enrichedData.dataQuality.organization_status || 'Active'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
+                  <span style={{ fontSize: 12, color: T.textMuted }}>Source</span>
+                  <span style={{ fontSize: 12, color: T.text, fontWeight: 500 }}>Verified Data</span>
+                </div>
+              </div>
+            </Section>
           )}
 
-          {selectedPeopleToAdd.length > 0 && (
-            <button onClick={handleAddPeopleToCompany} disabled={addingPeopleToCompany}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 16px', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
-              {addingPeopleToCompany
-                ? <><Loader size={13} style={{ animation: 'spin 1s linear infinite' }} />Adding…</>
-                : <><UserPlus size={13} />Add {selectedPeopleToAdd.length} to {company.name}</>}
-            </button>
-          )}
-        </Section>
-
+        </div>
       </div>
 
       {/* ── Engage panel overlay ── */}

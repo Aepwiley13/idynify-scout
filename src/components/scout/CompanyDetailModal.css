@@ -1460,68 +1460,10 @@
   font-size: 0.8125rem;
 }
 
-/* Company Snapshot — 3 × 2 on desktop */
-.company-detail-overlay .cdm .snapshot-section {
-  background: linear-gradient(135deg, #eff6ff 0%, #f9fafb 100%);
-  border-color: rgba(59, 130, 246, 0.15);
-}
-
-.company-detail-overlay .cdm .snapshot-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1rem 1.5rem;
-}
-
-.company-detail-overlay .cdm .snapshot-item {
-  display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 0.625rem;
-}
-
-.company-detail-overlay .cdm .snapshot-icon {
-  width: 18px;
-  height: 18px;
-  margin-top: 1px;
-}
-
-.company-detail-overlay .cdm .snapshot-label {
-  font-size: 0.6875rem;
-  margin: 0 0 0.25rem 0;
-}
-
-.company-detail-overlay .cdm .snapshot-value {
-  font-size: 0.875rem;
-  overflow-wrap: break-word;
-}
-
-/* Company Overview — the paragraph spans the section's full width */
-.company-detail-overlay .cdm .company-overview-text {
-  max-width: none;
-  line-height: 1.65;
-  overflow-wrap: break-word;
-}
-
-/* Links — compact buttons side by side */
-.company-detail-overlay .cdm .links-container {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: wrap;
-  gap: 0.625rem;
-}
-
-.company-detail-overlay .cdm .link-button {
-  width: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.875rem;
-  border-radius: 9px;
-  font-size: 0.875rem;
-}
-
-.company-detail-overlay .cdm .link-button .ml-auto {
-  margin-left: 0.25rem;
+/* Company Snapshot, Overview and Links are shared components styled by
+   CompanyInfoSections.css; here they only take the modal's section spacing. */
+.company-detail-overlay .cdm .ci-section {
+  margin: 0 0 1rem 0;
 }
 
 /* Key Decision Makers — cards wrap, no horizontal scrolling */
@@ -1687,11 +1629,6 @@
 }
 
 /* Narrower windows: fewer columns */
-@media (max-width: 860px) {
-  .company-detail-overlay .cdm .snapshot-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
 
 @media (max-width: 600px) {
   .company-detail-overlay .cdm {
@@ -1710,7 +1647,8 @@
   }
 
   .company-detail-overlay .cdm .detail-section,
-  .company-detail-overlay .cdm .decision-makers-section {
+  .company-detail-overlay .cdm .decision-makers-section,
+  .company-detail-overlay .cdm .ci-section {
     padding: 1rem;
   }
 }
@@ -1748,10 +1686,6 @@
   .company-detail-overlay .cdm .close-button {
     width: 36px;
     height: 36px;
-  }
-
-  .company-detail-overlay .cdm .snapshot-grid {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -1876,50 +1810,6 @@ body.theme-dark .company-detail-overlay .cdm .error-message {
 body.theme-dark .company-detail-overlay .cdm .spinner,
 body.theme-dark .company-detail-overlay .cdm .error-hint {
   color: var(--cdm-accent) !important;
-}
-
-/* Company Snapshot */
-body.theme-dark .company-detail-overlay .cdm .snapshot-section {
-  background: linear-gradient(135deg, rgba(96, 165, 250, 0.10) 0%, rgba(96, 165, 250, 0.03) 100%), var(--cdm-surface);
-  border-color: rgba(96, 165, 250, 0.30);
-}
-
-body.theme-dark .company-detail-overlay .cdm .snapshot-label {
-  color: var(--cdm-muted);
-}
-
-body.theme-dark .company-detail-overlay .cdm .snapshot-value,
-body.theme-dark .company-detail-overlay .cdm .company-overview-text {
-  color: var(--cdm-text);
-}
-
-body.theme-dark .company-detail-overlay .cdm .snapshot-icon {
-  color: var(--cdm-accent);
-}
-
-/* Links */
-body.theme-dark .company-detail-overlay .cdm .link-button {
-  background: var(--cdm-inset);
-}
-
-body.theme-dark .company-detail-overlay .cdm .link-button.website {
-  color: var(--cdm-violet);
-  border-color: var(--cdm-violet-border);
-}
-
-body.theme-dark .company-detail-overlay .cdm .link-button.website:hover {
-  background: rgba(167, 139, 250, 0.14);
-  border-color: var(--cdm-violet);
-}
-
-body.theme-dark .company-detail-overlay .cdm .link-button.linkedin {
-  color: var(--cdm-accent);
-  border-color: var(--cdm-accent-border);
-}
-
-body.theme-dark .company-detail-overlay .cdm .link-button.linkedin:hover {
-  background: var(--cdm-accent-soft);
-  border-color: var(--cdm-accent);
 }
 
 /* Growth & Hiring Signals */

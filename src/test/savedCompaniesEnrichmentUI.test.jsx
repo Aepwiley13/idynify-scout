@@ -91,7 +91,9 @@ describe('the saved-company card while enrichment is pending', () => {
     expect(container.textContent).not.toContain(VERIFYING_LABEL);
     expect(container.textContent).toContain('Computer Software');
     expect(container.textContent).toContain('42');
-    expect(container.textContent).toContain('Lehi, Utah, United States');
+    // The card shows the short city/state; the detail view keeps the full address.
+    expect(container.textContent).toContain('Lehi, Utah');
+    expect(container.textContent).not.toContain('United States');
     expect(container.textContent).toContain('2012');
     expect(container.textContent).not.toContain('2,012');
   });

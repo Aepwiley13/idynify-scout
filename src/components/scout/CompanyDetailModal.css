@@ -1320,10 +1320,22 @@
    still use the unscoped rules above, untouched.
    ═══════════════════════════════════════════════════════════════════════════ */
 
+/* The overlay is rendered into <body>, above the whole app. The panel opens
+   below the app's top bar (--cdm-top-offset, measured on open) and gets only
+   the height left beneath it, so its header is never off-screen: centred when
+   there is room, top-aligned on short screens, its content scrolling inside. */
+.company-detail-overlay.cdm-overlay {
+  align-items: center;
+  padding-top: calc(var(--cdm-top-offset, 0px) + 16px);
+  padding-bottom: 16px;
+  box-sizing: border-box;
+}
+
 .company-detail-overlay .cdm {
   width: min(1080px, calc(100vw - 48px));
   max-width: none;
-  max-height: calc(100vh - 48px);
+  max-height: calc(100vh - var(--cdm-top-offset, 0px) - 32px);
+  max-height: calc(100dvh - var(--cdm-top-offset, 0px) - 32px);
   min-height: 0;
   box-sizing: border-box;
 }
@@ -1686,6 +1698,11 @@
 
 /* Phones: the bottom sheet from the rules above */
 @media (max-width: 480px) {
+  .company-detail-overlay.cdm-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+
   .company-detail-overlay .cdm {
     max-height: 92vh;
   }

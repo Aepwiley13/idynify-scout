@@ -12,8 +12,8 @@
  * scoped stylesheet's contract (panel width, grids that wrap rather than
  * overflow, nothing leaking out to other pages).
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent, within, cleanup } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -65,17 +65,23 @@ globalThis.ResizeObserver ??= class { observe() {} disconnect() {} };
 const { default: CompanyDetailModal } = await import('../components/scout/CompanyDetailModal.jsx');
 
 async function renderModal(props = {}) {
-  const view = render(
+  render(
     <MemoryRouter>
       <CompanyDetailModal company={companyDoc} onClose={() => {}} onFindMoreContacts={() => {}} {...props} />
     </MemoryRouter>,
   );
   await screen.findByText('Key Decision Makers');
-  return view;
+  // The modal renders into <body>, outside the render container.
+  return { container: document.body };
 }
 
 beforeEach(() => {
   globalThis.fetch = vi.fn();
+});
+
+afterEach(() => {
+  cleanup();
+  document.body.innerHTML = '';
 });
 
 describe('company detail modal structure', () => {
@@ -85,6 +91,41 @@ describe('company detail modal structure', () => {
     expect(panel).not.toBeNull();
     expect(panel.classList.contains('cdm')).toBe(true);
     expect(panel.querySelector('.company-detail-content')).not.toBeNull();
+  });
+
+  it('renders into <body>, outside the page that opens it, so the app shell cannot paint over it', async () => {
+    const host = document.createElement('div');
+    host.style.position = 'relative';
+    host.style.zIndex = '1';
+    document.body.appendChild(host);
+    render(
+      <MemoryRouter>
+        <CompanyDetailModal company={companyDoc} onClose={() => {}} onFindMoreContacts={() => {}} />
+      </MemoryRouter>,
+      { container: host },
+    );
+    await screen.findByText('Key Decision Makers');
+    const overlay = document.querySelector('.company-detail-overlay');
+    expect(overlay.parentElement).toBe(document.body);
+    expect(host.contains(overlay)).toBe(false);
+  });
+
+  it('opens below the app top bar: the overlay carries the bar\'s bottom edge as its top offset', async () => {
+    const bar = document.createElement('header');
+    bar.className = 'top-bar';
+    bar.getBoundingClientRect = () => ({ top: 0, bottom: 80, left: 0, right: 1200, width: 1200, height: 80 });
+    document.body.appendChild(bar);
+    try {
+      await renderModal();
+      expect(document.querySelector('.company-detail-overlay').style.getPropertyValue('--cdm-top-offset')).toBe('80px');
+    } finally {
+      bar.remove();
+    }
+  });
+
+  it('without an app top bar the offset is 0', async () => {
+    await renderModal();
+    expect(document.querySelector('.company-detail-overlay').style.getPropertyValue('--cdm-top-offset')).toBe('0px');
   });
 
   it('keeps the header to logo, name, industry, refresh and close', async () => {
@@ -160,6 +201,7 @@ describe('behaviour is unchanged', () => {
 // ── The scoped stylesheet ────────────────────────────────────────────────────
 
 const SCOPE = '.company-detail-overlay .cdm';
+const OVERLAY = '.company-detail-overlay.cdm-overlay';
 const cssText = fs.readFileSync(path.resolve(__dirname, '../components/scout/CompanyDetailModal.css'), 'utf8');
 
 /** Every rule in the scoped layer: selector, declarations and enclosing media query. */
@@ -185,7 +227,22 @@ describe('scoped layout stylesheet', () => {
   it('every .cdm rule is scoped to the modal, so pages that share class names are untouched', () => {
     const rules = scopedRules();
     expect(rules.length).toBeGreaterThan(20);
-    rules.forEach(r => expect(r.selector.startsWith(SCOPE)).toBe(true));
+    rules.forEach(r => expect(r.selector.startsWith(SCOPE) || r.selector === OVERLAY).toBe(true));
+  });
+
+  it('the panel opens below the app top bar and gets only the height left beneath it', () => {
+    const overlay = rule(OVERLAY);
+    expect(overlay['padding-top']).toBe('calc(var(--cdm-top-offset, 0px) + 16px)');
+    expect(overlay['align-items']).toBe('center');
+    // The last max-height wins in the browser; both subtract the offset.
+    expect(rule(SCOPE)['max-height']).toBe('calc(100dvh - var(--cdm-top-offset, 0px) - 32px)');
+    expect(cssText).toContain('max-height: calc(100vh - var(--cdm-top-offset, 0px) - 32px);');
+  });
+
+  it('phones keep the bottom sheet', () => {
+    const overlay = rule(OVERLAY, '(max-width: 480px)');
+    expect(overlay['align-items']).toBe('flex-end');
+    expect(overlay.padding).toBe('0');
   });
 
   it('no other component uses the cdm class', () => {

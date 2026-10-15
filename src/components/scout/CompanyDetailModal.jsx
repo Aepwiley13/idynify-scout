@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
 import { RECORD_STATUS } from '../../constants/statusModel';
@@ -29,6 +30,9 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
   const [hasScroll, setHasScroll] = useState(false);
   const contentRef = useRef(null);
   const headerRef = useRef(null);
+
+  // Where the app's top bar ends, so the panel opens below it rather than under it.
+  const [topOffset] = useState(appHeaderBottom);
 
   // Ghost-click guard: ignore overlay clicks for first 200ms after mount
   const [overlayReady, setOverlayReady] = useState(false);
@@ -443,8 +447,15 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
     }
   }
 
-  return (
-    <div className="company-detail-overlay" onClick={overlayReady ? onClose : undefined}>
+  // Rendered into <body>: the pages that open it sit in their own stacking
+  // context (Saved Companies is `position: relative; z-index: 1`), where the
+  // fixed sidebar and sticky top bar painted over the overlay and the panel.
+  return createPortal(
+    <div
+      className="company-detail-overlay cdm-overlay"
+      style={{ '--cdm-top-offset': `${topOffset}px` }}
+      onClick={overlayReady ? onClose : undefined}
+    >
       <div className="company-detail-container cdm" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div ref={headerRef} className={`company-detail-header ${isScrolled ? 'scrolled' : ''}`}>
@@ -948,6 +959,13 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
+}
+
+/** Bottom edge of the app's top bar in the viewport, or 0 where there is none. */
+function appHeaderBottom() {
+  const bar = typeof document !== 'undefined' ? document.querySelector('.top-bar') : null;
+  return bar ? Math.max(0, Math.round(bar.getBoundingClientRect().bottom)) : 0;
 }

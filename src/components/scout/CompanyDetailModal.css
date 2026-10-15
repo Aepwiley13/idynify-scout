@@ -1754,3 +1754,431 @@
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Dark themes
+
+   The rules above hard-code light backgrounds (the snapshot, header, CTA card,
+   selected card, growth and department cards, the disabled button and the
+   scroll fade) while the text follows the theme, so in a dark theme light
+   text landed on light backgrounds. Everything below applies only under
+   body.theme-dark (set by ThemeContext for the dark themes) and is scoped to
+   the modal; the light themes are untouched.
+
+   One set of modal tokens, built on each theme's own variables, colours every
+   section the same way.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+body.theme-dark .company-detail-overlay .cdm {
+  --cdm-bg: var(--bg-secondary);
+  --cdm-surface: var(--bg-card);
+  --cdm-inset: var(--bg-secondary);
+  --cdm-border: var(--border-2);
+  --cdm-text: var(--text-primary);
+  --cdm-muted: var(--text-secondary);
+  --cdm-accent: #60a5fa;
+  --cdm-accent-strong: #93c5fd;
+  --cdm-accent-soft: rgba(96, 165, 250, 0.14);
+  --cdm-accent-border: rgba(96, 165, 250, 0.45);
+  --cdm-hover: rgba(255, 255, 255, 0.06);
+  --cdm-focus: #93c5fd;
+  --cdm-control-border: rgba(255, 255, 255, 0.42);
+  --cdm-success: #047857;
+  --cdm-success-text: #6ee7b7;
+  --cdm-success-soft: rgba(16, 185, 129, 0.14);
+  --cdm-primary: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  --cdm-danger: #f87171;
+  --cdm-violet: #c4b5fd;
+  --cdm-violet-border: rgba(167, 139, 250, 0.5);
+
+  background: var(--cdm-bg);
+  color-scheme: dark;
+}
+
+/* Keyboard focus is clearly visible on every control */
+body.theme-dark .company-detail-overlay .cdm button:focus-visible,
+body.theme-dark .company-detail-overlay .cdm input:focus-visible {
+  outline: 2px solid var(--cdm-focus);
+  outline-offset: 2px;
+}
+
+/* Header — dark, separated from the body by a border */
+body.theme-dark .company-detail-overlay .cdm .company-detail-header {
+  background: var(--cdm-surface);
+  border-bottom-color: var(--cdm-border);
+}
+
+body.theme-dark .company-detail-overlay .cdm .company-detail-header.scrolled {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+body.theme-dark .company-detail-overlay .cdm .company-detail-name {
+  color: var(--cdm-text);
+}
+
+body.theme-dark .company-detail-overlay .cdm .company-detail-industry {
+  color: var(--cdm-accent);
+}
+
+body.theme-dark .company-detail-overlay .cdm .company-detail-logo-wrapper {
+  background: var(--cdm-inset);
+  border-color: var(--cdm-border);
+}
+
+body.theme-dark .company-detail-overlay .cdm .refresh-button {
+  background: var(--cdm-inset);
+  border-color: var(--cdm-border);
+  color: var(--cdm-muted);
+}
+
+body.theme-dark .company-detail-overlay .cdm .close-button {
+  background: var(--cdm-inset);
+  border-color: rgba(248, 113, 113, 0.45);
+  color: var(--cdm-danger);
+}
+
+body.theme-dark .company-detail-overlay .cdm .close-button:hover {
+  background: rgba(248, 113, 113, 0.14);
+  border-color: var(--cdm-danger);
+  color: #fca5a5;
+}
+
+/* Scroll fade follows the panel, not white */
+body.theme-dark .company-detail-overlay .cdm .company-detail-content::after {
+  background: linear-gradient(to top, var(--cdm-bg) 0%, transparent 100%);
+}
+
+/* Sections */
+body.theme-dark .company-detail-overlay .cdm .detail-section {
+  background: var(--cdm-surface);
+  border-color: var(--cdm-border);
+}
+
+body.theme-dark .company-detail-overlay .cdm .detail-section:has(> .contact-status-card) {
+  background: none;
+  border: none;
+}
+
+body.theme-dark .company-detail-overlay .cdm .section-title {
+  color: var(--cdm-text);
+}
+
+body.theme-dark .company-detail-overlay .cdm .section-subtitle {
+  color: var(--cdm-muted);
+}
+
+/* Loading and error states */
+body.theme-dark .company-detail-overlay .cdm .loading-state p,
+body.theme-dark .company-detail-overlay .cdm .error-message {
+  color: var(--cdm-muted) !important;
+}
+
+body.theme-dark .company-detail-overlay .cdm .spinner,
+body.theme-dark .company-detail-overlay .cdm .error-hint {
+  color: var(--cdm-accent) !important;
+}
+
+/* Company Snapshot */
+body.theme-dark .company-detail-overlay .cdm .snapshot-section {
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.10) 0%, rgba(96, 165, 250, 0.03) 100%), var(--cdm-surface);
+  border-color: rgba(96, 165, 250, 0.30);
+}
+
+body.theme-dark .company-detail-overlay .cdm .snapshot-label {
+  color: var(--cdm-muted);
+}
+
+body.theme-dark .company-detail-overlay .cdm .snapshot-value,
+body.theme-dark .company-detail-overlay .cdm .company-overview-text {
+  color: var(--cdm-text);
+}
+
+body.theme-dark .company-detail-overlay .cdm .snapshot-icon {
+  color: var(--cdm-accent);
+}
+
+/* Links */
+body.theme-dark .company-detail-overlay .cdm .link-button {
+  background: var(--cdm-inset);
+}
+
+body.theme-dark .company-detail-overlay .cdm .link-button.website {
+  color: var(--cdm-violet);
+  border-color: var(--cdm-violet-border);
+}
+
+body.theme-dark .company-detail-overlay .cdm .link-button.website:hover {
+  background: rgba(167, 139, 250, 0.14);
+  border-color: var(--cdm-violet);
+}
+
+body.theme-dark .company-detail-overlay .cdm .link-button.linkedin {
+  color: var(--cdm-accent);
+  border-color: var(--cdm-accent-border);
+}
+
+body.theme-dark .company-detail-overlay .cdm .link-button.linkedin:hover {
+  background: var(--cdm-accent-soft);
+  border-color: var(--cdm-accent);
+}
+
+/* Growth & Hiring Signals */
+body.theme-dark .company-detail-overlay .cdm .growth-card {
+  background: var(--cdm-inset);
+  border-color: var(--cdm-border);
+}
+
+body.theme-dark .company-detail-overlay .cdm .growth-card.positive {
+  background: var(--cdm-success-soft);
+  border-color: rgba(52, 211, 153, 0.5);
+}
+
+body.theme-dark .company-detail-overlay .cdm .growth-card.high {
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(251, 191, 36, 0.5);
+}
+
+body.theme-dark .company-detail-overlay .cdm .growth-card.medium {
+  background: var(--cdm-accent-soft);
+  border-color: var(--cdm-accent-border);
+}
+
+/* Primary text: muted text on the tinted cards falls under 4.5:1 in navy */
+body.theme-dark .company-detail-overlay .cdm .growth-label {
+  color: var(--cdm-text);
+}
+
+body.theme-dark .company-detail-overlay .cdm .growth-value,
+body.theme-dark .company-detail-overlay .cdm .job-postings-header {
+  color: var(--cdm-text);
+}
+
+body.theme-dark .company-detail-overlay .cdm .job-tag {
+  background: var(--cdm-accent-soft);
+  border-color: var(--cdm-accent-border);
+  color: var(--cdm-accent-strong);
+}
+
+/* Key Decision Makers */
+body.theme-dark .company-detail-overlay .cdm .decision-maker-card {
+  background: var(--cdm-inset);
+  border-color: var(--cdm-border);
+}
+
+body.theme-dark .company-detail-overlay .cdm .decision-maker-card:hover {
+  border-color: var(--cdm-accent);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+body.theme-dark .company-detail-overlay .cdm .decision-maker-card.selected {
+  background: var(--cdm-accent-soft);
+  border-color: var(--cdm-accent);
+  box-shadow: none;
+}
+
+body.theme-dark .company-detail-overlay .cdm .decision-maker-avatar {
+  background: var(--cdm-hover);
+}
+
+body.theme-dark .company-detail-overlay .cdm .decision-maker-avatar svg {
+  color: var(--cdm-muted);
+}
+
+body.theme-dark .company-detail-overlay .cdm .decision-maker-name {
+  color: var(--cdm-text);
+}
+
+body.theme-dark .company-detail-overlay .cdm .decision-maker-title {
+  color: var(--cdm-muted);
+}
+
+body.theme-dark .company-detail-overlay .cdm .decision-maker-dept {
+  background: var(--cdm-accent-soft);
+  color: var(--cdm-accent-strong);
+}
+
+body.theme-dark .company-detail-overlay .cdm .decision-maker-linkedin {
+  background: var(--cdm-accent-soft);
+  border-color: var(--cdm-accent-border);
+  color: var(--cdm-accent);
+}
+
+body.theme-dark .company-detail-overlay .cdm .decision-maker-linkedin:hover {
+  background: rgba(96, 165, 250, 0.24);
+  border-color: var(--cdm-accent);
+}
+
+body.theme-dark .company-detail-overlay .cdm .decision-maker-select-indicator .checkbox {
+  background: var(--cdm-surface);
+  border-color: var(--cdm-control-border);
+}
+
+body.theme-dark .company-detail-overlay .cdm .decision-maker-select-indicator .checkbox.checked {
+  background: #3b82f6;
+  border-color: var(--cdm-accent);
+  color: #ffffff;
+}
+
+body.theme-dark .company-detail-overlay .cdm .decision-makers-actions {
+  border-top-color: var(--cdm-border);
+}
+
+body.theme-dark .company-detail-overlay .cdm .btn-add-selected {
+  background: var(--cdm-primary);
+  box-shadow: none;
+}
+
+body.theme-dark .company-detail-overlay .cdm .btn-add-selected:disabled {
+  background: var(--cdm-hover);
+  border-color: var(--cdm-border);
+  color: var(--cdm-muted);
+}
+
+body.theme-dark .company-detail-overlay .cdm .btn-find-more {
+  background: var(--cdm-surface);
+  border-color: var(--cdm-accent);
+  color: var(--cdm-accent);
+}
+
+body.theme-dark .company-detail-overlay .cdm .btn-find-more:hover {
+  background: var(--cdm-accent-soft);
+  border-color: var(--cdm-accent-strong);
+  color: var(--cdm-accent-strong);
+  box-shadow: none;
+}
+
+/* Add Your Contacts */
+body.theme-dark .company-detail-overlay .cdm .people-search-input {
+  background: var(--cdm-inset);
+  border-color: var(--cdm-border);
+  color: var(--cdm-text);
+}
+
+body.theme-dark .company-detail-overlay .cdm .people-search-input::placeholder {
+  color: var(--cdm-muted);
+}
+
+body.theme-dark .company-detail-overlay .cdm .people-search-input:focus {
+  background: var(--cdm-inset);
+  border-color: var(--cdm-accent);
+  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.25);
+}
+
+body.theme-dark .company-detail-overlay .cdm .people-search-icon,
+body.theme-dark .company-detail-overlay .cdm .people-search-clear,
+body.theme-dark .company-detail-overlay .cdm .people-search-loading,
+body.theme-dark .company-detail-overlay .cdm .people-no-results,
+body.theme-dark .company-detail-overlay .cdm .people-result-meta {
+  color: var(--cdm-muted);
+}
+
+body.theme-dark .company-detail-overlay .cdm .people-search-clear:hover {
+  background: var(--cdm-hover);
+  color: var(--cdm-text);
+}
+
+body.theme-dark .company-detail-overlay .cdm .people-search-results {
+  background: var(--cdm-surface);
+  border-color: var(--cdm-border);
+}
+
+body.theme-dark .company-detail-overlay .cdm .people-result-item {
+  border-bottom-color: var(--cdm-border);
+}
+
+body.theme-dark .company-detail-overlay .cdm .people-result-item:hover:not(.already-linked) {
+  background: var(--cdm-hover);
+}
+
+body.theme-dark .company-detail-overlay .cdm .people-result-item.selected {
+  background: rgba(124, 58, 237, 0.22);
+}
+
+body.theme-dark .company-detail-overlay .cdm .people-result-avatar {
+  background: var(--cdm-hover);
+  color: var(--cdm-muted);
+}
+
+body.theme-dark .company-detail-overlay .cdm .people-result-name {
+  color: var(--cdm-text);
+}
+
+body.theme-dark .company-detail-overlay .cdm .people-already-linked-badge,
+body.theme-dark .company-detail-overlay .cdm .people-add-success {
+  background: var(--cdm-success-soft);
+  color: var(--cdm-success-text);
+}
+
+/* Department Breakdown */
+body.theme-dark .company-detail-overlay .cdm .dept-card {
+  background: var(--cdm-accent-soft);
+  border-color: var(--cdm-accent-border);
+}
+
+body.theme-dark .company-detail-overlay .cdm .dept-label {
+  color: var(--cdm-accent-strong);
+}
+
+body.theme-dark .company-detail-overlay .cdm .dept-value {
+  color: var(--cdm-text);
+}
+
+/* Tech Stack */
+body.theme-dark .company-detail-overlay .cdm .tech-card {
+  background: var(--cdm-inset);
+  border-color: var(--cdm-border);
+}
+
+body.theme-dark .company-detail-overlay .cdm .tech-card:hover {
+  background: var(--cdm-hover);
+  border-color: var(--cdm-control-border);
+}
+
+body.theme-dark .company-detail-overlay .cdm .tech-name {
+  color: var(--cdm-text);
+}
+
+body.theme-dark .company-detail-overlay .cdm .tech-category,
+body.theme-dark .company-detail-overlay .cdm .tech-icon {
+  color: var(--cdm-muted);
+}
+
+/* Data Confidence */
+body.theme-dark .company-detail-overlay .cdm .data-quality-section {
+  background: var(--cdm-surface);
+}
+
+body.theme-dark .company-detail-overlay .cdm .data-quality-label {
+  color: var(--cdm-muted);
+}
+
+body.theme-dark .company-detail-overlay .cdm .data-quality-value {
+  color: var(--cdm-text);
+}
+
+body.theme-dark .company-detail-overlay .cdm .data-quality-badge {
+  background: var(--cdm-success);
+  color: #ffffff;
+}
+
+body.theme-dark .company-detail-overlay .cdm .data-quality-badge.inactive {
+  background: #4b5563;
+}
+
+/* Ready to Connect */
+body.theme-dark .company-detail-overlay .cdm .contact-status-card {
+  background: var(--cdm-surface);
+  border-color: var(--cdm-border);
+}
+
+body.theme-dark .company-detail-overlay .cdm .contact-badge-inline {
+  background: var(--cdm-success);
+  color: #ffffff;
+  box-shadow: none;
+}
+
+body.theme-dark .company-detail-overlay .cdm .find-contacts-btn {
+  background: var(--cdm-primary);
+  color: #ffffff;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+}

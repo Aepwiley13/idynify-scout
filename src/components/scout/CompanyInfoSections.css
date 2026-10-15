@@ -1,0 +1,210 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   Company Snapshot, Company Overview and Links (CompanyInfoSections.jsx)
+
+   One look for both places that show them: the company detail modal and the
+   company profile page. Every class is prefixed `ci-` so no page stylesheet in
+   the global bundle reaches them. Sizes and colours follow the theme variables;
+   dark themes are under body.theme-dark at the end.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.ci-section {
+  margin: 0;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  text-align: left;
+  box-sizing: border-box;
+  min-width: 0;
+  /* The snapshot grid picks its columns from the section's own width, so it
+     fits the modal and the wider page alike. */
+  container-type: inline-size;
+}
+
+.ci-section * {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.ci-title {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  color: var(--text-primary);
+  text-align: left;
+}
+
+/* Company Snapshot — 3 × 2, then 2 and 1 columns as the section narrows.
+   The same surface as Overview and Links; the blue border and icons set it
+   apart without turning it into a blue banner. */
+.ci-snapshot {
+  background: var(--bg-card);
+  border-color: rgba(59, 130, 246, 0.15);
+}
+
+.ci-snapshot-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem 1.5rem;
+}
+
+@container (max-width: 706px) {
+  .ci-snapshot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container (max-width: 400px) {
+  .ci-snapshot-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.ci-snapshot-item {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.625rem;
+}
+
+.ci-snapshot-icon {
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  flex-shrink: 0;
+  color: #3b82f6;
+}
+
+.ci-snapshot-label {
+  margin: 0 0 0.25rem 0;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.ci-snapshot-value {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--text-primary);
+  overflow-wrap: break-word;
+}
+
+/* Company Overview — the paragraph spans the section */
+.ci-overview-text {
+  margin: 0;
+  max-width: none;
+  font-size: 0.875rem;
+  line-height: 1.65;
+  color: var(--text-primary);
+  overflow-wrap: break-word;
+}
+
+.ci-overview-placeholder {
+  color: var(--text-faint);
+  font-style: italic;
+}
+
+/* Links — compact buttons side by side */
+.ci-links {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 0.625rem;
+}
+
+.ci-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: auto;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid;
+  border-radius: 9px;
+  background: var(--bg-card);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.5;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ci-link-external {
+  margin-left: 0.25rem;
+}
+
+.ci-link--website {
+  border-color: rgba(139, 92, 246, 0.3);
+  color: #a78bfa;
+}
+
+.ci-link--website:hover {
+  background: rgba(139, 92, 246, 0.1);
+  border-color: #a78bfa;
+}
+
+.ci-link--linkedin {
+  border-color: rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
+}
+
+.ci-link--linkedin:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: #60a5fa;
+}
+
+/* ── Dark themes ── */
+
+body.theme-dark .ci-section {
+  background: var(--bg-card);
+  border-color: var(--border-2);
+}
+
+body.theme-dark .ci-snapshot {
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.10) 0%, rgba(96, 165, 250, 0.03) 100%), var(--bg-card);
+  border-color: rgba(96, 165, 250, 0.30);
+}
+
+body.theme-dark .ci-snapshot-icon {
+  color: #60a5fa;
+}
+
+body.theme-dark .ci-overview-placeholder {
+  color: var(--text-secondary);
+}
+
+body.theme-dark .ci-link {
+  background: var(--bg-secondary);
+}
+
+body.theme-dark .ci-link--website {
+  color: #c4b5fd;
+  border-color: rgba(167, 139, 250, 0.5);
+}
+
+body.theme-dark .ci-link--website:hover {
+  background: rgba(167, 139, 250, 0.14);
+  border-color: #c4b5fd;
+}
+
+body.theme-dark .ci-link--linkedin {
+  color: #60a5fa;
+  border-color: rgba(96, 165, 250, 0.45);
+}
+
+body.theme-dark .ci-link--linkedin:hover {
+  background: rgba(96, 165, 250, 0.14);
+  border-color: #60a5fa;
+}
+
+body.theme-dark .ci-link:focus-visible {
+  outline: 2px solid #93c5fd;
+  outline-offset: 2px;
+}

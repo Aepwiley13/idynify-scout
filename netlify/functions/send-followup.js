@@ -10,6 +10,7 @@
 
 const admin = require('firebase-admin');
 const { google } = require('googleapis');
+const { encodeHeaderValue } = require('./utils/emailHeaders.js');
 
 // Fetch user's Gmail signature and return as plain text (non-blocking)
 async function getGmailSignature(gmail) {
@@ -98,7 +99,7 @@ exports.handler = async (event) => {
     // Create email
     const emailLines = [
       `To: ${toEmail}`,
-      `Subject: ${subject}`,
+      `Subject: ${encodeHeaderValue(subject)}`,
       'Content-Type: text/plain; charset=utf-8',
       '',
       bodyWithSignature

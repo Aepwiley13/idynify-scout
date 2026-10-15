@@ -15,6 +15,10 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getGmailSignatureHtml, appendSignatureHtml } from './utils/gmailSignature.js';
 import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
+import { encodeHeaderValue, formatAddress } from './utils/emailHeaders.js';
+
+// Re-exported: existing tests and callers import these from here.
+export { encodeHeaderValue, formatAddress };
 
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {
@@ -77,45 +81,11 @@ export function prepareAttachment(attachment) {
 }
 
 /**
- * RFC 2047 encoding for a header value.
- *
- * Header lines in the raw RFC 2822 message must be 7-bit ASCII. The subject
- * used to be written raw, so "tomorrow — People Pitch" went out as the em
- * dash's three UTF-8 bytes in an undeclared header; Gmail read them as Latin-1
- * and the recipient saw "tomorrow Ã¢Â€Â” People Pitch". Any value containing a
- * non-ASCII character is now sent as one or more =?UTF-8?B?…?= encoded words,
- * split on whole characters and kept under the 75-character word limit.
- * Pure-ASCII values are returned unchanged. Exported for testing.
- */
-/**
  * Version of the raw-message format this function builds. Returned with every
  * successful send, so a Send Test can prove it was handled by a deploy that
  * RFC 2047-encodes the subject. Absent in responses from older deploys.
  */
 export const EMAIL_FORMAT_VERSION = 'rfc2047-1';
-
-export function encodeHeaderValue(value) {
-  const text = String(value ?? '').replace(/[\r\n]+/g, ' ');
-  if (/^[\x20-\x7E]*$/.test(text)) return text;
-  const words = [];
-  let chunk = '';
-  let bytes = 0;
-  for (const ch of text) {
-    const size = Buffer.byteLength(ch, 'utf8');
-    if (chunk && bytes + size > 45) { words.push(chunk); chunk = ''; bytes = 0; }
-    chunk += ch;
-    bytes += size;
-  }
-  if (chunk) words.push(chunk);
-  return words.map((w) => `=?UTF-8?B?${Buffer.from(w, 'utf8').toString('base64')}?=`).join(' ');
-}
-
-/** `Name <email>` with the display name encoded when it is not plain ASCII. Exported for testing. */
-export function formatAddress(name, email) {
-  if (!name || name === email) return email;
-  const display = /^[\x20-\x7E]*$/.test(name) ? name : encodeHeaderValue(name);
-  return `${display} <${email}>`;
-}
 
 /**
  * Bare http(s) URLs become links, so a registration link is clickable in every

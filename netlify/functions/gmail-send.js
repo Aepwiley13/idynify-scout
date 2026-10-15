@@ -3,6 +3,7 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
+import { buildPlainTextEmail } from './utils/emailHeaders.js';
 
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {
@@ -146,14 +147,7 @@ export const handler = async (event) => {
     const bodyWithSignature = appendSignature(body, signature);
 
     // Create email in RFC 2822 format
-    const email = [
-      `To: ${toName} <${toEmail}>`,
-      `Subject: ${subject}`,
-      'Content-Type: text/plain; charset=utf-8',
-      'MIME-Version: 1.0',
-      '',
-      bodyWithSignature
-    ].join('\n');
+    const email = buildPlainTextEmail({ toName, toEmail, subject, body: bodyWithSignature });
 
     // Encode email in base64url format (required by Gmail API)
     const encodedEmail = Buffer.from(email)

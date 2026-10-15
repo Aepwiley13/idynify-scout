@@ -14,6 +14,7 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
 import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
+import { buildPlainTextEmail } from './utils/emailHeaders.js';
 
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {
@@ -176,15 +177,9 @@ export const handler = async (event) => {
           `${recipient.firstName || ''} ${recipient.lastName || ''}`.trim() ||
           recipient.email;
 
-        const emailLines = [
-          `To: ${displayName} <${recipient.email}>`,
-          `Subject: ${subject}`,
-          'Content-Type: text/plain; charset=utf-8',
-          'MIME-Version: 1.0',
-          '',
-          bodyWithSignature
-        ];
-        const rawEmail = emailLines.join('\n');
+        const rawEmail = buildPlainTextEmail({
+          toName: displayName, toEmail: recipient.email, subject, body: bodyWithSignature,
+        });
 
         const encodedEmail = Buffer.from(rawEmail)
           .toString('base64')

@@ -445,7 +445,7 @@ export default function CompanyDetailModal({ company, onClose, onFindMoreContact
 
   return (
     <div className="company-detail-overlay" onClick={overlayReady ? onClose : undefined}>
-      <div className="company-detail-container" onClick={(e) => e.stopPropagation()}>
+      <div className="company-detail-container cdm" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div ref={headerRef} className={`company-detail-header ${isScrolled ? 'scrolled' : ''}`}>
           <div className="header-content">

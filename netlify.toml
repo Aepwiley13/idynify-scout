@@ -143,6 +143,11 @@
 [functions."analyze-website"]
   timeout = 26
 
+# captureExtract reads a card photo with an extractor under its own 22 s
+# deadline (one retry included); the rest is for Firestore and the response.
+[functions."captureExtract"]
+  timeout = 26
+
 [dev]
   framework = "#custom"
   command = "npm run dev"

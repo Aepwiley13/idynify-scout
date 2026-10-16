@@ -14,6 +14,11 @@
  * and the operation store). They do not import src/capture either, and the
  * list of capture server files below is pinned so the next endpoint is added
  * deliberately.
+ *
+ * PR 6 adds captureExtract and its server modules. Exactly one of them, the
+ * assembler, uses the PR 2 building blocks: it is the trust boundary every
+ * extractor's output passes through. The endpoint and the orchestrator know
+ * an extractor only through its interface; extractors.js alone names one.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
@@ -48,7 +53,9 @@ const isCapture = path => path.startsWith('src/capture/');
 
 /** Offline scripts approved, in review, to use the capture building blocks. Never shipped code. */
 const APPROVED_OFFLINE_CONSUMERS = ['scripts/auditBusinessCardRecords.mjs'];
-const isApproved = path => APPROVED_OFFLINE_CONSUMERS.includes(path);
+/** The one server module approved to use them (PR 6): CardReading → CardExtraction. */
+const APPROVED_SERVER_CONSUMERS = ['netlify/functions/utils/capture/assembleExtraction.js'];
+const isApproved = path => APPROVED_OFFLINE_CONSUMERS.includes(path) || APPROVED_SERVER_CONSUMERS.includes(path);
 
 /** Production paths: everything that is not a test and not the capture modules themselves. */
 const PRODUCTION = sources(['src', 'netlify', 'functions', 'scripts', 'public'])
@@ -118,11 +125,19 @@ describe('no production path uses the capture foundation yet', () => {
     }
   });
 
-  // PR 4 adds the rollout switch, the config endpoint and the operation store,
-  // and nothing else: no endpoint that extracts, previews or saves a card yet.
-  // A later PR adds its endpoint to this list on purpose, in review.
+  // PR 4 adds the rollout switch, the config endpoint and the operation store.
+  // PR 6 adds the extraction endpoint and its modules: no endpoint that
+  // previews or saves a card yet. A later PR adds its files on purpose, in review.
   const APPROVED_CAPTURE_SERVER_FILES = [
     'netlify/functions/captureConfig.js',
+    'netlify/functions/captureExtract.js',
+    'netlify/functions/utils/capture/assembleExtraction.js',
+    'netlify/functions/utils/capture/captureLog.js',
+    'netlify/functions/utils/capture/cardReading.js',
+    'netlify/functions/utils/capture/errors.js',
+    'netlify/functions/utils/capture/extractors.js',
+    'netlify/functions/utils/capture/fakeExtractor.js',
+    'netlify/functions/utils/capture/orchestrator.js',
     'netlify/functions/utils/captureFlags.js',
     'netlify/functions/utils/captureOperations.js',
   ];
@@ -135,5 +150,45 @@ describe('no production path uses the capture foundation yet', () => {
   it('CAPTURE_MODE is read in one place', () => {
     const flagged = PRODUCTION.filter(([, src]) => /\bCAPTURE_MODE\b/.test(src)).map(([path]) => path);
     expect(flagged).toEqual(['netlify/functions/utils/captureFlags.js']);
+  });
+});
+
+describe('the extraction endpoint (PR 6)', () => {
+  const server = sources(['netlify/functions']).filter(([path]) => /capture/i.test(path));
+  const src = path => server.find(([p]) => p === path)[1];
+  const imports = text => [...text.matchAll(/(?:from\s+|import\s*\(\s*)['"]([^'"]+)['"]/g)].map(m => m[1]);
+  const CAPTURE_DIR = 'netlify/functions/utils/capture/';
+
+  it('only the assembler and the endpoint (for the image check) use src/capture', () => {
+    const users = server.filter(([, text]) => imports(text).some(spec => spec.includes('/src/capture/'))).map(([path]) => path).sort();
+    expect(users).toEqual(['netlify/functions/captureExtract.js', 'netlify/functions/utils/capture/assembleExtraction.js']);
+    expect(imports(src('netlify/functions/captureExtract.js')).filter(spec => spec.includes('/src/capture/'))).toEqual(['../../src/capture/preparedImage.js']);
+  });
+
+  it('only the orchestrator builds a CardExtraction: no extractor and not the endpoint', () => {
+    const builders = server.filter(([, text]) => imports(text).some(spec => /assembleExtraction(\.js)?$/.test(spec))).map(([path]) => path);
+    expect(builders).toEqual([`${CAPTURE_DIR}orchestrator.js`]);
+  });
+
+  it('the endpoint, orchestrator and assembler are extractor-agnostic', () => {
+    for (const path of ['netlify/functions/captureExtract.js', `${CAPTURE_DIR}orchestrator.js`, `${CAPTURE_DIR}assembleExtraction.js`, `${CAPTURE_DIR}cardReading.js`]) {
+      const text = src(path);
+      expect(text, path).not.toMatch(/anthropic|claude|google|vision|openai/i);
+      expect(imports(text).filter(spec => /Extractor(\.js)?$/.test(spec)), path).toEqual([]);
+    }
+  });
+
+  it('extractors are named in one place: the registry', () => {
+    const naming = server.filter(([, text]) => imports(text).some(spec => /\/fakeExtractor(\.js)?$|^\.\/\w+Extractor(\.js)?$/.test(spec))).map(([path]) => path);
+    expect(naming).toEqual([`${CAPTURE_DIR}extractors.js`]);
+  });
+
+  it('capture server code logs only through captureLog', () => {
+    const direct = server
+      .filter(([path]) => path.startsWith(CAPTURE_DIR) || path === 'netlify/functions/captureExtract.js')
+      .filter(([path]) => path !== `${CAPTURE_DIR}captureLog.js`)
+      .filter(([, text]) => /\bconsole\s*\./.test(text))
+      .map(([path]) => path);
+    expect(direct).toEqual([]);
   });
 });

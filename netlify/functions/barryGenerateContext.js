@@ -3,6 +3,7 @@ import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { LEGACY_SONNET_4_5 } from './utils/models.js';
+import { readClaudeText } from './utils/claudeResponse.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -212,13 +213,13 @@ Generate the contextual layer now. Respond ONLY with valid JSON.`;
       ]
     });
 
-    const responseText = claudeResponse.content[0].text;
-
     console.log('🐻 Barry context generated');
 
     // Parse Claude's response
     let barryContext;
     try {
+      const responseText = readClaudeText(claudeResponse);
+
       // Extract JSON from response (in case Claude added any extra text)
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {

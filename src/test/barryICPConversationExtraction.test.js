@@ -22,7 +22,7 @@ function fakeAnthropic(responseObj) {
   return {
     messages: {
       create: vi.fn(async () => ({
-        content: [{ text: JSON.stringify(responseObj) }],
+        content: [{ type: 'text', text: JSON.stringify(responseObj) }],
       })),
     },
   };
@@ -66,6 +66,41 @@ describe('barryICPConversation extraction functions are exported and reusable', 
     expect(result.barryResponse.understood.industries).toEqual(['Computer Software']);
     expect(result.barryResponse.understood.locations).toEqual(['Utah']);
     expect(anthropic.messages.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('processInitialInput reads a reply whose first block is thinking (#699)', async () => {
+    // The response shape Sonnet 5.5 can return; content[0].text would be undefined.
+    const anthropic = {
+      messages: {
+        create: vi.fn(async () => ({
+          stop_reason: 'end_turn',
+          content: [
+            { type: 'thinking', thinking: '', signature: 'sig' },
+            { type: 'text', text: JSON.stringify({
+              understood: { industries: ['Computer Software'], companySizes: [], locations: ['Utah'], targetTitles: [], companyKeywords: ['saas'] },
+              mappingExplanation: 'Got it.', needsLookalike: false, lookalikeSuggestions: null,
+              needsClarification: false, followUpQuestion: null, followUpType: null,
+              searchStrategy: 'industry_only', confidenceScore: 0.9, isAmbiguous: false, ambiguityDetails: null,
+            }) },
+          ],
+        })),
+      },
+    };
+
+    const result = await processInitialInput(anthropic, 'SaaS companies in Utah', null);
+    expect(result.barryResponse.understood.locations).toEqual(['Utah']);
+  });
+
+  it('processInitialInput rejects a reply cut off at max_tokens instead of parsing it (#699)', async () => {
+    const anthropic = {
+      messages: {
+        create: vi.fn(async () => ({
+          stop_reason: 'max_tokens',
+          content: [{ type: 'text', text: '{"understood": {"industries": ["Computer Software"]}}' }],
+        })),
+      },
+    };
+    await expect(processInitialInput(anthropic, 'SaaS companies in Utah', null)).rejects.toThrow(/incomplete/);
   });
 
   it('processFollowup still returns the existing barryResponse/step contract', async () => {

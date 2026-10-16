@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { LEGACY_SONNET_4_5 } from './utils/models.js';
+import { readClaudeText } from './utils/claudeResponse.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 
 // Initialize Firebase Admin (only once)
@@ -199,7 +200,7 @@ BODY:
           messages: [{ role: 'user', content: prompt }]
         });
 
-        const text = response.content[0].text;
+        const text = readClaudeText(response);
         const subjectMatch = text.match(/SUBJECT:\s*(.+)/);
         const bodyMatch = text.match(/BODY:\s*([\s\S]+)/);
 

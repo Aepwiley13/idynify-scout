@@ -1,0 +1,87 @@
+name: Sonnet migration checks
+
+# Run by hand (Actions tab → "Sonnet migration checks" → Run workflow), for #699.
+#
+#   key-check  Calls anthropicKeyCheck on the production site: does the
+#              ANTHROPIC_API_KEY Netlify injects into production functions
+#              work, which Sonnet models can it reach, and which model is
+#              Barry configured to call. Free; needs no secret here.
+#   compare    Runs scripts/sonnet-compare against the Anthropic API with the
+#              ANTHROPIC_API_KEY repository secret. ~99 calls, cost ceiling
+#              about $2. Inputs are synthetic; the report is printed to the
+#              log and kept as an artifact for 14 days.
+#
+# Neither job changes production.
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: What to run
+        type: choice
+        options: [key-check, compare]
+        default: key-check
+      variants:
+        description: compare only — comma-separated variants
+        type: string
+        default: sonnet-4.5,sonnet-5.5-between-tools,sonnet-5.5-low
+      sites:
+        description: compare only — comma-separated call sites (blank = all)
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  key-check:
+    if: inputs.task == 'key-check'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Production Anthropic key check
+        run: |
+          set -euo pipefail
+          body=$(curl -sSL --max-time 60 https://idynify.netlify.app/.netlify/functions/anthropicKeyCheck)
+          echo "$body" | jq .
+          {
+            echo '### Production Anthropic key check'
+            echo '```json'
+            echo "$body" | jq .
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          [ "$(echo "$body" | jq -r .key)" = ok ] || { echo "::error::production key is not ok: $(echo "$body" | jq -r .key)"; exit 1; }
+
+  compare:
+    if: inputs.task == 'compare'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install
+      - name: Run the comparison
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          VARIANTS: ${{ inputs.variants }}
+          SITES: ${{ inputs.sites }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ANTHROPIC_API_KEY}" ]; then echo "::error::the ANTHROPIC_API_KEY repository secret is not set"; exit 1; fi
+          # Inputs reach the script only as validated arguments.
+          case "$VARIANTS" in *[!a-z0-9.,-]*) echo "::error::bad variants"; exit 1;; esac
+          case "$SITES" in *[!a-z0-9,-]*) echo "::error::bad sites"; exit 1;; esac
+          args=(--run --print=all --concurrency=2 --variants="$VARIANTS" --out=.sonnet-compare/ci)
+          [ -n "$SITES" ] && args+=(--sites="$SITES")
+          node scripts/sonnet-compare/compare.mjs "${args[@]}"
+          sed -n '1,/^## Replies/p' .sonnet-compare/ci/report.md >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sonnet-compare-report
+          path: .sonnet-compare/ci/
+          retention-days: 14
+          if-no-files-found: ignore

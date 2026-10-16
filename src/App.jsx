@@ -49,6 +49,7 @@ import AdminDashboard from './pages/Admin/AdminDashboard';
 import UserDetail from './pages/Admin/UserDetail';
 import AdminICPEditor from './pages/Admin/AdminICPEditor';
 import AdminPingTest from './pages/Admin/AdminPingTest';
+import CaptureLab from './components/capture/CaptureLab';
 import ApiActivity from './pages/Admin/ApiActivity';
 import AuditLogs from './pages/Admin/AuditLogs';
 import EmailInsights from './pages/Admin/EmailInsights';
@@ -678,6 +679,15 @@ function App() {
           element={
             <ProtectedAdminRoute>
               <EmailInsights />
+            </ProtectedAdminRoute>
+          }
+        />
+        {/* Relationship Capture test surface: read-only, internal (docs/capture/capture-lab.md) */}
+        <Route
+          path="/admin/capture-lab"
+          element={
+            <ProtectedAdminRoute>
+              <CaptureLab />
             </ProtectedAdminRoute>
           }
         />

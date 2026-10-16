@@ -142,7 +142,7 @@ vi.mock('@anthropic-ai/sdk', () => ({
       this.messages = {
         create: vi.fn(async (req) => {
           CALLS.push(req);
-          return { content: [{ text: JSON.stringify(extractionReply) }] };
+          return { content: [{ type: 'text', text: JSON.stringify(extractionReply) }] };
         }),
       };
     }

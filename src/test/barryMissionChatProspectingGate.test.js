@@ -30,14 +30,14 @@ vi.mock('@anthropic-ai/sdk', () => ({
           CALLS.push(req);
           // The classifier call always carries a `system` prompt of its own.
           if (req.system && req.system.includes('You classify one sentence into exactly one of nine categories')) {
-            return { content: [{ text: JSON.stringify(classifierReply) }] };
+            return { content: [{ type: 'text', text: JSON.stringify(classifierReply) }] };
           }
           // Extraction calls (processInitialInput/processFollowup) carry no
           // `system` field — the whole prompt is the one user message. Both
           // functions' prompts mention "Ideal Customer Profile" ("...define..."
           // vs "...refine..."), so match on that common phrase.
           if (!req.system && req.messages?.[0]?.content?.includes('Ideal Customer Profile')) {
-            return { content: [{ text: JSON.stringify(extractionReply) }] };
+            return { content: [{ type: 'text', text: JSON.stringify(extractionReply) }] };
           }
           // Everything else is the normal Mission Control conversation call.
           return {

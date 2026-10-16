@@ -33,10 +33,10 @@ vi.mock('@anthropic-ai/sdk', () => ({
         create: vi.fn(async (req) => {
           CALLS.push(req);
           if (req.system && req.system.includes('You classify one sentence into exactly one of nine categories')) {
-            return { content: [{ text: JSON.stringify(classifierReply) }] };
+            return { content: [{ type: 'text', text: JSON.stringify(classifierReply) }] };
           }
           if (!req.system && req.messages?.[0]?.content?.includes('Ideal Customer Profile')) {
-            return { content: [{ text: JSON.stringify(extractionReply) }] };
+            return { content: [{ type: 'text', text: JSON.stringify(extractionReply) }] };
           }
           return {
             usage: null,

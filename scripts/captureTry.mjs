@@ -169,6 +169,23 @@ export function preparePhoto(path, { platform = process.platform } = {}) {
 
 // ─── Running it ─────────────────────────────────────────────────────────────
 
+/**
+ * The environment one local run builds its extractor from: yours, plus the
+ * extractor, model, effort and fake scenario chosen on the command line. The
+ * capture mode is internal only so that the fake can be tried; it reaches no
+ * deploy. Shared with captureBenchmark.
+ */
+export function extractorEnv({ extractor = 'claude-vision', model, effort, scenario } = {}, env = process.env) {
+  return {
+    ...env,
+    CAPTURE_MODE: 'internal',
+    CAPTURE_EXTRACTOR: extractor,
+    ...(model ? { CAPTURE_EXTRACT_MODEL: model } : {}),
+    ...(effort ? { CAPTURE_EXTRACT_EFFORT: effort } : {}),
+    ...(scenario ? { CAPTURE_FAKE_SCENARIO: scenario } : {}),
+  };
+}
+
 export function estimateCost(modelId, usage) {
   const price = PRICES[modelId];
   if (!price || usage.inputTokens === null || usage.outputTokens === null) return null;
@@ -211,17 +228,9 @@ export async function main(argv = process.argv.slice(2), { out = console.log, en
   }
   if (options.savePrepared) writeFileSync(options.savePrepared, prepared.jpeg);
 
-  const runEnv = {
-    ...env,
-    CAPTURE_MODE: 'internal',
-    CAPTURE_EXTRACTOR: options.extractor,
-    ...(options.model ? { CAPTURE_EXTRACT_MODEL: options.model } : {}),
-    ...(options.effort ? { CAPTURE_EXTRACT_EFFORT: options.effort } : {}),
-    ...(options.scenario ? { CAPTURE_FAKE_SCENARIO: options.scenario } : {}),
-  };
   let extractor;
   try {
-    extractor = resolveExtractor(runEnv);
+    extractor = resolveExtractor(extractorEnv(options, env));
   } catch {
     out(options.extractor === 'claude-vision' && !env.ANTHROPIC_API_KEY
       ? 'captureTry: ANTHROPIC_API_KEY is not set in this environment (try --env-file=.env)'

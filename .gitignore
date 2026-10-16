@@ -30,3 +30,7 @@ dist-ssr
 
 # Sonnet comparison reports (scripts/sonnet-compare)
 .sonnet-compare/
+
+# Relationship Capture pilot (scripts/captureBenchmark.mjs): real card photos,
+# labels and per-card results. Never committed; only aggregate summaries leave it.
+/capture-pilot/

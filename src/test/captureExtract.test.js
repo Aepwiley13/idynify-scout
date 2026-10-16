@@ -1,3 +1,4 @@
+// @vitest-environment node
 /**
  * captureExtract end to end, through the real orchestrator, assembler,
  * operation store logic and fake extractor.
@@ -147,7 +148,10 @@ function expectNoValues(text) {
   for (const value of CARD_VALUES) expect(text, `"${value}" leaked`).not.toContain(value);
 }
 
-const ENV_KEYS = ['CAPTURE_MODE', 'CAPTURE_EXTRACTOR', 'CAPTURE_FAKE_SCENARIO', 'CAPTURE_FAKE_DELAY_MS', 'CAPTURE_WITNESS', 'CAPTURE_REPORTS'];
+const ENV_KEYS = [
+  'CAPTURE_MODE', 'CAPTURE_EXTRACTOR', 'CAPTURE_FAKE_SCENARIO', 'CAPTURE_FAKE_DELAY_MS', 'CAPTURE_WITNESS', 'CAPTURE_REPORTS',
+  'ANTHROPIC_API_KEY', 'ANTHROPIC_BASE_URL', 'ANTHROPIC_LOG', 'CAPTURE_EXTRACT_MODEL', 'CAPTURE_EXTRACT_EFFORT',
+];
 const savedEnv = Object.fromEntries(ENV_KEYS.map(k => [k, process.env[k]]));
 function setEnv(env) {
   for (const key of ENV_KEYS) delete process.env[key];
@@ -177,6 +181,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.unstubAllGlobals();
   vi.restoreAllMocks();
   setEnv(Object.fromEntries(Object.entries(savedEnv).filter(([, v]) => v !== undefined)));
 });
@@ -252,7 +257,7 @@ describe('captureExtract: who capture is on for', () => {
     nothingStarted();
   });
 
-  it.each([undefined, 'claude-vision', 'FAKE'])('CAPTURE_EXTRACTOR=%s is a config_error, before any operation', async (id) => {
+  it.each([undefined, 'other-extractor', 'FAKE'])('CAPTURE_EXTRACTOR=%s is a config_error, before any operation', async (id) => {
     setEnv({ CAPTURE_MODE: 'internal', ...(id ? { CAPTURE_EXTRACTOR: id } : {}) });
     expect(await call()).toMatchObject({ status: 503, body: { error: 'config_error' } });
     nothingStarted();
@@ -563,5 +568,95 @@ describe('captureExtract: logs are value-free', () => {
       'state', 'status', 'totalMs', 'userOverrode', 'validateMs', 'warnings', 'widthPx',
     ]);
     expect(line).toMatchObject({ stage: 'extract', status: 'ok', fields: 12, providerId: 'fake', modelId: 'fake-v1', attempts: 1, warnings: [] });
+  });
+});
+
+// ─── The claude-vision extractor, end to end (recorded response, no network) ─
+
+describe('captureExtract with claude-vision', () => {
+  const t = (text, confidence = 0.97) => ({ text, confidence });
+  const blank = { text: '', confidence: 0 };
+  const ANSWER = {
+    textFound: true,
+    person: {
+      fullName: t('Avery Quinn', 0.98), givenName: t('Avery'), middleName: blank, familyName: t('Quinn'), suffix: blank,
+      title: t('Director of Partnerships', 0.93), emails: [t('avery.quinn@example.com')],
+      phones: [{ ...t('+1 (415) 555-0142', 0.95), label: 'mobile' }], linkedinUrl: blank,
+    },
+    company: { name: { ...t('Example Robotics', 0.96), onlyInLogo: false }, website: t('www.example.com', 0.96), address: blank, linkedinUrl: blank },
+  };
+  const reply = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+  const answered = (over = {}) => reply(200, {
+    id: 'msg_test', type: 'message', role: 'assistant', model: 'claude-opus-5-5',
+    content: [{ type: 'text', text: JSON.stringify(ANSWER) }], stop_reason: 'end_turn', stop_sequence: null,
+    usage: { input_tokens: 3912, output_tokens: 744 }, ...over,
+  });
+
+  /** Stub the network: every request is recorded and answered in turn. */
+  function anthropic(...replies) {
+    const requests = [];
+    vi.stubGlobal('fetch', async (url, init) => {
+      requests.push({ url: String(url), headers: Object.fromEntries(new Headers(init.headers)), body: JSON.parse(init.body) });
+      return replies[Math.min(requests.length - 1, replies.length - 1)]();
+    });
+    return requests;
+  }
+
+  const enrolled = () => setEnv({ CAPTURE_MODE: 'beta', CAPTURE_EXTRACTOR: 'claude-vision', ANTHROPIC_API_KEY: 'sk-test-not-a-key' });
+
+  it('without an API key it is a config_error, before any operation', async () => {
+    setEnv({ CAPTURE_MODE: 'beta', CAPTURE_EXTRACTOR: 'claude-vision' });
+    const requests = anthropic(() => answered());
+    expect(await call({ token: 'tok_SECRET_beta', userId: ENROLLED })).toMatchObject({ status: 503, body: { error: 'config_error' } });
+    expect(requests).toEqual([]);
+    expect(store.writes).toEqual([]);
+  });
+
+  it('an enrolled user gets a CardExtraction read by Claude; nothing personal is logged or stored', async () => {
+    enrolled();
+    const requests = anthropic(() => answered());
+    const image = imageOf(jpeg({ metadata: [...EXIF] }));
+    const { status, body } = await call({ token: 'tok_SECRET_beta', userId: ENROLLED, image });
+    expect(status).toBe(200);
+    expect(validateCardExtraction(body.extraction)).toEqual({ ok: true, errors: [] });
+    expect(body.extraction.capture.provider).toEqual({ id: 'claude-vision', adapterVersion: '1', modelId: 'claude-opus-5-5', promptVersion: 'card-claude/v1' });
+    expect(body.extraction.capture.usage).toEqual({ inputTokens: 3912, outputTokens: 744 });
+    expect(body.extraction.person.fullName).toMatchObject({ value: 'Avery Quinn', extraction: { level: 'confirmed' } });
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0].url).toBe('https://api.anthropic.com/v1/messages?beta=true');
+    expect(requests[0].headers['anthropic-beta']).toBe('server-side-fallback-2026-07-01');
+    const sent = decodeBase64(requests[0].body.messages[0].content[0].source.data);
+    expect(hasJpegMetadata(sent)).toBe(false);
+
+    expect(store.docs.get(opPath(ENROLLED)).extraction).toEqual({
+      status: 'ok', provider: 'claude-vision', model: 'claude-opus-5-5', promptVersion: 'card-claude/v1', ms: expect.any(Number), fieldCount: 9,
+    });
+    const [, operation, outcome, options] = logApiUsage.mock.calls[0];
+    expect([operation, outcome]).toEqual(['captureExtract', 'success']);
+    expect(options).toMatchObject({ provider: 'anthropic', model: 'claude-opus-5-5', inputTokens: 3912, outputTokens: 744 });
+
+    expectNoValues(logs.join('\n'));
+    expectNoValues(JSON.stringify(store.writes));
+    expectNoValues(JSON.stringify(logApiUsage.mock.calls));
+    expect(logs.join('\n')).not.toContain('sk-test-not-a-key');
+  });
+
+  it('overloaded twice → 503, retryable, the scan left open, the status code in the log', async () => {
+    enrolled();
+    const requests = anthropic(() => reply(529, { type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } }));
+    expect(await call({ token: 'tok_SECRET_beta', userId: ENROLLED })).toMatchObject({ status: 503, body: { error: 'unavailable', retryable: true } });
+    expect(requests).toHaveLength(2);
+    expect(store.docs.get(opPath(ENROLLED)).state).toBe('created');
+    expect(logs.some(line => line.includes('"detail":"http_529"'))).toBe(true);
+  });
+
+  it('a refusal → 400 image_rejected, not retried, and the scan fails', async () => {
+    enrolled();
+    const requests = anthropic(() => answered({ stop_reason: 'refusal', content: [] }));
+    expect(await call({ token: 'tok_SECRET_beta', userId: ENROLLED })).toMatchObject({ status: 400, body: { error: 'image_rejected', reason: 'rejected_by_extractor' } });
+    expect(requests).toHaveLength(1);
+    expect(store.docs.get(opPath(ENROLLED))).toMatchObject({ state: 'failed', errorCode: 'image_rejected' });
+    expect(logs.some(line => line.includes('"detail":"refusal"'))).toBe(true);
   });
 });

@@ -126,14 +126,16 @@ describe('no production path uses the capture foundation yet', () => {
   });
 
   // PR 4 adds the rollout switch, the config endpoint and the operation store.
-  // PR 6 adds the extraction endpoint and its modules: no endpoint that
-  // previews or saves a card yet. A later PR adds its files on purpose, in review.
+  // PR 6 adds the extraction endpoint and its modules, PR 7 the claude-vision
+  // extractor: no endpoint that previews or saves a card yet. A later PR adds
+  // its files on purpose, in review.
   const APPROVED_CAPTURE_SERVER_FILES = [
     'netlify/functions/captureConfig.js',
     'netlify/functions/captureExtract.js',
     'netlify/functions/utils/capture/assembleExtraction.js',
     'netlify/functions/utils/capture/captureLog.js',
     'netlify/functions/utils/capture/cardReading.js',
+    'netlify/functions/utils/capture/claudeVisionExtractor.js',
     'netlify/functions/utils/capture/errors.js',
     'netlify/functions/utils/capture/extractors.js',
     'netlify/functions/utils/capture/fakeExtractor.js',
@@ -148,8 +150,12 @@ describe('no production path uses the capture foundation yet', () => {
   });
 
   it('CAPTURE_MODE is read in one place', () => {
-    const flagged = PRODUCTION.filter(([, src]) => /\bCAPTURE_MODE\b/.test(src)).map(([path]) => path);
-    expect(flagged).toEqual(['netlify/functions/utils/captureFlags.js']);
+    // scripts/captureTry.mjs (PR 7) only sets it, in the environment of its
+    // own local run, so the fake extractor can be tried from a terminal.
+    const flagged = PRODUCTION.filter(([, src]) => /\bCAPTURE_MODE\b/.test(src)).map(([path]) => path).sort();
+    expect(flagged).toEqual(['netlify/functions/utils/captureFlags.js', 'scripts/captureTry.mjs']);
+    const [[, tool]] = PRODUCTION.filter(([path]) => path === 'scripts/captureTry.mjs');
+    expect([...tool.matchAll(/\bCAPTURE_MODE\b.*/g)].map(m => m[0])).toEqual(["CAPTURE_MODE: 'internal',"]);
   });
 });
 

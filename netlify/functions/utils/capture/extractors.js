@@ -3,8 +3,11 @@
  * server setting, never the client's choice.
  *
  *   CAPTURE_EXTRACTOR   the id of a registered extractor
- *                         fake   the deterministic fake (fakeExtractor.js);
- *                                internal mode only, never beta or on
+ *                         claude-vision   Claude, vision + structured outputs
+ *                                         (claudeVisionExtractor.js)
+ *                         fake            the deterministic fake
+ *                                         (fakeExtractor.js); internal mode
+ *                                         only, never beta or on
  *                       Unset or unknown is a config_error: there is no
  *                       default extractor.
  *
@@ -36,12 +39,14 @@ import process from 'node:process';
 import { CAPTURE_MODES, captureMode } from '../captureFlags.js';
 import { CaptureExtractorError, EXTRACTOR_ERRORS } from './errors.js';
 import { createFakeExtractor } from './fakeExtractor.js';
+import { createClaudeVisionExtractor } from './claudeVisionExtractor.js';
 
 /** The same token format the operation record accepts. */
 export const EXTRACTOR_TOKEN = /^[a-z0-9][a-z0-9._:/-]{0,63}$/;
 
 /** id → factory(env). */
 const REGISTRY = Object.freeze({
+  'claude-vision': createClaudeVisionExtractor,
   fake: createFakeExtractor,
 });
 

@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
-import { LEGACY_SONNET_4_5 } from './utils/models.js';
+import { MODEL_BARRY_SONNET } from './utils/models.js';
 import { readClaudeText } from './utils/claudeResponse.js';
 
 /**
@@ -218,7 +218,7 @@ Generate the sequence plan now. Respond ONLY with valid JSON.`;
 
     // Call Claude API
     const claudeResponse = await anthropic.messages.create({
-      model: LEGACY_SONNET_4_5,
+      model: MODEL_BARRY_SONNET,
       max_tokens: 1800,
       messages: [
         {
@@ -274,7 +274,7 @@ Generate the sequence plan now. Respond ONLY with valid JSON.`;
     const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'barryGenerateMissionSequence', 'success', {
       provider: 'anthropic',
-      model: LEGACY_SONNET_4_5,
+      model: MODEL_BARRY_SONNET,
       usage: claudeResponse?.usage,
       responseTime,
       metadata: {
@@ -320,7 +320,7 @@ Generate the sequence plan now. Respond ONLY with valid JSON.`;
         const responseTime = Date.now() - startTime;
         await logApiUsage(userId, 'barryGenerateMissionSequence', 'error', {
           provider: 'anthropic',
-          model: LEGACY_SONNET_4_5,
+          model: MODEL_BARRY_SONNET,
           responseTime,
           errorCode: error.message,
           metadata: {}

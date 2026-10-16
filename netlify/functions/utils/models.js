@@ -57,7 +57,7 @@ export const MODEL_DEEP = process.env.BARRY_MODEL_DEEP || 'claude-sonnet-4-6';
 
 // ─── Model lifecycle ─────────────────────────────────────────────────────────
 //
-// Verified 2026-08-08 against Anthropic's published deprecation history:
+// Verified 2026-10-16 against Anthropic's published deprecation history:
 //   https://platform.claude.com/docs/en/about-claude/model-deprecations
 //
 // Idynify calls the Anthropic Claude API directly (@anthropic-ai/sdk +
@@ -65,13 +65,16 @@ export const MODEL_DEEP = process.env.BARRY_MODEL_DEEP || 'claude-sonnet-4-6';
 // so that page is the governing lifecycle — partner platforms publish their own
 // schedules and their dates do not apply here.
 //
+//   claude-sonnet-5-5          Active — retirement not sooner than 2027-09-28
 //   claude-sonnet-4-6          Active — retirement not sooner than 2027-02-17
 //   claude-haiku-4-5-20251001  Active — retirement not sooner than 2026-10-15
-//   claude-sonnet-4-5-20250929 Active — retirement not sooner than 2026-09-29 ⚠
+//   claude-sonnet-4-5-20250929 Deprecated 2026-09-30 — RETIRES 2026-11-30 ⚠
+//                              Recommended replacement: claude-sonnet-5-5
 //
-// The 4-5 floor is ~7 weeks out and 8 modules still use it. Recorded, not acted
-// on: model routing is frozen until the baseline report. Re-verify all three at
-// the start of the tier-correction PR.
+// The Sonnet 4.5 retirement overrides the routing freeze for the endpoints on
+// it (#699); see MODEL_BARRY_SONNET below. The Haiku 4.5 floor date has passed
+// with the model still Active; Anthropic gives at least 60 days' notice before
+// a retirement, so it is a watch item, not a deadline.
 //
 // Removed because the provider retired them. Every one of these was still being
 // called in production after its retirement date:
@@ -91,21 +94,59 @@ export const MODEL_DEEP = process.env.BARRY_MODEL_DEEP || 'claude-sonnet-4-6';
 // recollection, whatever the sentence around it says. Full account:
 // docs/audits/P0B_MODEL_INVENTORY.md §8.
 
+// ─── The Sonnet model behind the Barry endpoints (#699) ──────────────────────
+//
+// Nine endpoints (eleven calls) run on one Sonnet model: sequence, ICP,
+// context, contact-validation and campaign/follow-up/engagement generation.
+// It was pinned to claude-sonnet-4-5-20250929, which retires 2026-11-30. The
+// choice now lives here, with the migration path written down beside it:
+//
+//   SONNET_4_5           current production model, and the default
+//   SONNET_5_5           primary candidate, the provider's named replacement
+//   SONNET_4_6           fallback if the candidate does not pass validation;
+//                        retirement not sooner than 2027-02-17, so it buys
+//                        about three months and a second migration
+//
+// BARRY_MODEL_SONNET overrides the default, so switching, or rolling back, is
+// a Netlify environment-variable change plus a redeploy of the same commit:
+// Netlify applies a changed variable on the next deploy, with no code change.
+//
+// The default stays SONNET_4_5 until the side-by-side validation passes and
+// it is changed here deliberately. Do not point the override at SONNET_5_5
+// before then: these calls send no thinking or effort settings yet, and Sonnet
+// 5.5 thinks by default (#699, migration risks 1 and 2).
+
+/** Current production model. Deprecated; retires 2026-11-30. */
+export const SONNET_4_5 = 'claude-sonnet-4-5-20250929';
+
+/** Primary migration candidate. Active; retirement not sooner than 2027-09-28. */
+export const SONNET_5_5 = 'claude-sonnet-5-5';
+
+/** Fallback if the candidate fails validation. Active; not sooner than 2027-02-17. */
+export const SONNET_4_6 = 'claude-sonnet-4-6';
+
+/**
+ * The model the Barry Sonnet endpoints call: BARRY_MODEL_SONNET when set to a
+ * non-empty value, otherwise SONNET_4_5. Exported for testing.
+ *
+ * @param {Record<string, string|undefined>} env
+ * @returns {string}
+ */
+export function resolveBarrySonnetModel(env = process.env) {
+  const override = typeof env.BARRY_MODEL_SONNET === 'string' ? env.BARRY_MODEL_SONNET.trim() : '';
+  return override || SONNET_4_5;
+}
+
+export const MODEL_BARRY_SONNET = resolveBarrySonnetModel();
+
 // ─── Dated snapshots still pinned by pre-policy endpoints ────────────────────
 //
-// Both are Active per the verification above. They collapse onto MODEL_DEEP /
-// MODEL_FAST at Step 3, after the baseline. Do not remove either while an
-// import remains — 16 endpoints resolve their model through these.
+// Active per the verification above. It collapses onto MODEL_FAST at Step 3,
+// after the baseline. Do not remove it while an import remains — 10 endpoints
+// resolve their model through it.
 
 /**
- * Active; retirement not sooner than 2026-09-29 (verified 2026-08-08).
- * Sequence, ICP, and campaign generation — 8 modules.
- * Nearest retirement floor in the codebase; see the ⚠ note above.
- */
-export const LEGACY_SONNET_4_5 = 'claude-sonnet-4-5-20250929';
-
-/**
- * Active; retirement not sooner than 2026-10-15 (verified 2026-08-08).
+ * Active; retirement not sooner than 2026-10-15 (verified 2026-10-16).
  * The dated snapshot of the same model MODEL_FAST names. Kept as a distinct
  * literal so Step 1 changed nothing on the ten endpoints that pin it.
  */

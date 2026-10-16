@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { LEGACY_SONNET_4_5 } from './utils/models.js';
+import { readClaudeText } from './utils/claudeResponse.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -118,13 +119,13 @@ Respond ONLY with valid JSON in this exact format:
       ]
     });
 
-    const responseText = claudeResponse.content[0].text;
-
-    console.log('🐻 Barry response:', responseText);
-
     // Parse Claude's response
     let barryDecision;
     try {
+      const responseText = readClaudeText(claudeResponse);
+
+      console.log('🐻 Barry response:', responseText);
+
       // Extract JSON from response (in case Claude added any extra text)
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {

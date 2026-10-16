@@ -45,6 +45,7 @@ import { verifyAuthToken } from './utils/verifyAuthToken.js';
 import { extractAuthToken } from './utils/extractAuthToken.js';
 import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
 import { CONVERSATION_STATES } from '../../src/types/conversationState.js';
+import { encodeHeaderValue } from './utils/emailHeaders.js';
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -170,7 +171,7 @@ export function buildReplySubject(subject) {
  * Exported for testing.
  */
 export function buildReplyMime({ toEmail, subject, bodyText, inReplyTo }) {
-  const lines = [`To: ${sanitizeHeader(toEmail)}`, `Subject: ${sanitizeHeader(subject)}`];
+  const lines = [`To: ${sanitizeHeader(toEmail)}`, `Subject: ${encodeHeaderValue(sanitizeHeader(subject))}`];
 
   if (inReplyTo) {
     const messageId = sanitizeHeader(inReplyTo);

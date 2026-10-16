@@ -13,6 +13,7 @@
 const admin = require('firebase-admin');
 const Anthropic = require('@anthropic-ai/sdk');
 const { LEGACY_SONNET_4_5 } = require('./utils/models.js');
+const { readClaudeText } = require('./utils/claudeResponse.js');
 
 // Initialize Firebase Admin (if not already initialized)
 if (!admin.apps.length) {
@@ -97,7 +98,7 @@ Generate the follow-up email body:`;
       ]
     });
 
-    const followUpBody = message.content[0].text;
+    const followUpBody = readClaudeText(message);
 
     return {
       statusCode: 200,

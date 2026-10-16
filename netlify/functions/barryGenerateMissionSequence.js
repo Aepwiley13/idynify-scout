@@ -3,6 +3,7 @@ import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { LEGACY_SONNET_4_5 } from './utils/models.js';
+import { readClaudeText } from './utils/claudeResponse.js';
 
 /**
  * BARRY MISSION SEQUENCE GENERATOR (Step 4 → Step 5 Upgrade)
@@ -227,12 +228,12 @@ Generate the sequence plan now. Respond ONLY with valid JSON.`;
       ]
     });
 
-    const responseText = claudeResponse.content[0].text;
     console.log('🐻 Barry sequence generated');
 
     // Parse response
     let microSequence;
     try {
+      const responseText = readClaudeText(claudeResponse);
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         microSequence = JSON.parse(jsonMatch[0]);

@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { LEGACY_SONNET_4_5 } from './utils/models.js';
+import { readClaudeText } from './utils/claudeResponse.js';
 import { APOLLO_INDUSTRIES, COMPANY_SIZE_OPTIONS, US_STATES } from '../../src/constants/targetingCanon.js';
 import { sanitizeCompanyKeywords } from '../../src/utils/companyKeywordsResidue.js';
 
@@ -502,7 +503,7 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     messages: [{ role: 'user', content: prompt }]
   });
 
-  const responseText = response.content[0].text;
+  const responseText = readClaudeText(response);
   const jsonMatch = responseText.match(/\{[\s\S]*\}/);
 
   if (!jsonMatch) {
@@ -718,7 +719,7 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     messages: [{ role: 'user', content: prompt }]
   });
 
-  const responseText = response.content[0].text;
+  const responseText = readClaudeText(response);
   const jsonMatch = responseText.match(/\{[\s\S]*\}/);
 
   if (!jsonMatch) {
@@ -859,7 +860,7 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     messages: [{ role: 'user', content: prompt }]
   });
 
-  const responseText = response.content[0].text;
+  const responseText = readClaudeText(response);
   const jsonMatch = responseText.match(/\{[\s\S]*\}/);
 
   if (!jsonMatch) {
@@ -955,7 +956,7 @@ RESPOND IN JSON:
     messages: [{ role: 'user', content: prompt }]
   });
 
-  const responseText = response.content[0].text;
+  const responseText = readClaudeText(response);
   const jsonMatch = responseText.match(/\{[\s\S]*\}/);
 
   if (!jsonMatch) {

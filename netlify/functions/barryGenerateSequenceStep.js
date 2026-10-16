@@ -5,6 +5,7 @@ import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 import { LEGACY_SONNET_4_5 } from './utils/models.js';
+import { readClaudeText } from './utils/claudeResponse.js';
 
 /**
  * User scope — the one line of it these surfaces need.
@@ -310,12 +311,12 @@ Respond ONLY with valid JSON.`;
       ]
     });
 
-    const responseText = claudeResponse.content[0].text;
     console.log('🐻 Barry step content generated');
 
     // Parse response
     let generatedContent;
     try {
+      const responseText = readClaudeText(claudeResponse);
       const jsonMatch = responseText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         generatedContent = JSON.parse(jsonMatch[0]);

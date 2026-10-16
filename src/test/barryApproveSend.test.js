@@ -1,3 +1,4 @@
+/* global Buffer, process */
 /**
  * barry-approve-send — Sprint 3 Team Alpha
  *
@@ -265,6 +266,18 @@ describe('buildReplyMime', () => {
     });
     expect(mime).not.toContain('In-Reply-To');
     expect(mime).not.toContain('References');
+  });
+
+  it('RFC 2047-encodes a non-ASCII subject so it round-trips byte for byte (#685)', () => {
+    const subject = 'Re: Hope you can make it tomorrow — People Pitch';
+    const mime = buildReplyMime({ toEmail: 'a@b.com', subject, bodyText: 'x', inReplyTo: null });
+    const headers = mime.split('\n\n')[0];
+    expect(/^[\n\x20-\x7E]*$/.test(headers)).toBe(true);
+    const line = headers.split('\n').find((l) => l.startsWith('Subject: '));
+    const decoded = line.slice(9)
+      .replace(/\?=\s+=\?/g, '?==?')
+      .replace(/=\?UTF-8\?B\?([^?]+)\?=/gi, (_, b64) => Buffer.from(b64, 'base64').toString('utf8'));
+    expect(decoded).toBe(subject);
   });
 
   it('converts blank-line-separated text into paragraphs', () => {

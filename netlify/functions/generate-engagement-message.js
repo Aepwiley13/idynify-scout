@@ -7,6 +7,7 @@ import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { checkRelationshipGuardrail, getGuardrailPromptModifier } from './utils/barryGuardrail.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 import { LEGACY_SONNET_4_5 } from './utils/models.js';
+import { readClaudeText } from './utils/claudeResponse.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 
 /**
@@ -514,12 +515,14 @@ Generate the messages now. Respond ONLY with valid JSON.`;
       messages: [{ role: 'user', content: prompt }]
     });
 
-    const responseText = claudeResponse.content[0].text;
     console.log('✅ Claude response received');
 
-    // Parse the JSON response — two-stage fallback to handle control characters and markdown fences
+    // Parse the JSON response — two-stage fallback to handle control characters and markdown fences.
+    // An unusable reply fails stage 1 and, with no text, stage 2, so it ends in the same 500.
+    let responseText = '';
     let result;
     try {
+      responseText = readClaudeText(claudeResponse);
       // Stage 1: direct parse after stripping common control characters that break V8's JSON.parse
       const sanitized = responseText.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
       const jsonMatch = sanitized.match(/\{[\s\S]*\}/);

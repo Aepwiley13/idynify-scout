@@ -55,6 +55,17 @@ export const MODEL_FAST = process.env.BARRY_MODEL_FAST || 'claude-haiku-4-5';
 /** Reasoning, long structured output, or anything persisted and reused. */
 export const MODEL_DEEP = process.env.BARRY_MODEL_DEEP || 'claude-sonnet-4-6';
 
+// ─── Relationship Capture ────────────────────────────────────────────────────
+
+/**
+ * Reading a business-card photo (vision + structured output), outside Barry's
+ * two tiers. The claude-vision extractor takes CAPTURE_EXTRACT_MODEL from the
+ * environment it is built with over this default, so a deploy or a pilot run
+ * can switch models without a commit. The 50-card pilot decides which model
+ * moves forward (docs/capture/claude-vision.md).
+ */
+export const MODEL_CAPTURE_DEFAULT = 'claude-opus-5-5';
+
 // ─── Model lifecycle ─────────────────────────────────────────────────────────
 //
 // Verified 2026-10-16 against Anthropic's published deprecation history:

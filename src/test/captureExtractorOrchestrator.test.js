@@ -277,8 +277,8 @@ describe('the fake extractor', () => {
 describe('resolveExtractor', () => {
   const configError = expect.objectContaining({ name: 'CaptureExtractorError', code: 'config_error' });
 
-  it('registers only the fake so far', () => {
-    expect(EXTRACTOR_IDS).toEqual(['fake']);
+  it('registers claude-vision and the fake', () => {
+    expect(EXTRACTOR_IDS).toEqual(['claude-vision', 'fake']);
   });
 
   it('builds the fake in internal mode', () => {
@@ -289,7 +289,7 @@ describe('resolveExtractor', () => {
     expect(() => resolveExtractor({ CAPTURE_MODE: mode, CAPTURE_EXTRACTOR: 'fake' })).toThrow(configError);
   });
 
-  it.each([undefined, '', 'claude-vision', 'Fake', '__proto__', 'toString', 'constructor'])('has no default and no unknown extractor (%s)', (id) => {
+  it.each([undefined, '', 'other-extractor', 'Fake', '__proto__', 'toString', 'constructor'])('has no default and no unknown extractor (%s)', (id) => {
     expect(() => resolveExtractor({ CAPTURE_MODE: 'internal', CAPTURE_EXTRACTOR: id })).toThrow(configError);
   });
 

@@ -138,7 +138,7 @@ Limits: 22 s for the whole extraction, measured from the start of the request (t
 | Variable | Values | Default |
 |---|---|---|
 | `CAPTURE_MODE` | `off` / `internal` / `beta` / `on` (docs/capture/capture-mode.md) | off. Pinned off for branch deploys and deploy previews |
-| `CAPTURE_EXTRACTOR` | a registered id: `fake` | none: `config_error` |
+| `CAPTURE_EXTRACTOR` | a registered id: `claude-vision` (docs/capture/claude-vision.md) or `fake` | none: `config_error` |
 | `CAPTURE_FAKE_SCENARIO` | see below | `card` |
 | `CAPTURE_FAKE_DELAY_MS` | 0–15000 | 0 |
 

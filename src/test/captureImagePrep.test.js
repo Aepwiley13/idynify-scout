@@ -282,7 +282,7 @@ describe('Use anyway', () => {
 });
 
 describe('not wired into the app yet', () => {
-  it('nothing outside src/components/capture imports image preparation until the Capture Lab', () => {
+  it('nothing outside src/components/capture imports image preparation (the Capture Lab lives there)', () => {
     const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
     const importers = [];
     const walk = (dir) => {

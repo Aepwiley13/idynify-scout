@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
-import { LEGACY_SONNET_4_5 } from './utils/models.js';
+import { MODEL_BARRY_SONNET } from './utils/models.js';
 import { readClaudeText } from './utils/claudeResponse.js';
 import { APOLLO_INDUSTRIES, COMPANY_SIZE_OPTIONS, US_STATES } from '../../src/constants/targetingCanon.js';
 import { sanitizeCompanyKeywords } from '../../src/utils/companyKeywordsResidue.js';
@@ -317,7 +317,7 @@ export const handler = async (event) => {
 
     // Log API usage
     const responseTime = Date.now() - startTime;
-    await logApiUsage(userId, 'barryICPConversation', 'success', { provider: 'anthropic', model: LEGACY_SONNET_4_5,
+    await logApiUsage(userId, 'barryICPConversation', 'success', { provider: 'anthropic', model: MODEL_BARRY_SONNET,
       responseTime,
       metadata: { action, currentStep }
     });
@@ -343,7 +343,7 @@ export const handler = async (event) => {
         const responseTime = Date.now() - startTime;
         await logApiUsage(userId, 'barryICPConversation', 'error', {
           provider: 'anthropic',
-          model: LEGACY_SONNET_4_5,
+          model: MODEL_BARRY_SONNET,
           responseTime,
           errorCode: error.message,
           metadata: {}
@@ -498,7 +498,7 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
 }`;
 
   const response = await anthropic.messages.create({
-    model: LEGACY_SONNET_4_5,
+    model: MODEL_BARRY_SONNET,
     max_tokens: 1500,
     messages: [{ role: 'user', content: prompt }]
   });
@@ -714,7 +714,7 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
 }`;
 
   const response = await anthropic.messages.create({
-    model: LEGACY_SONNET_4_5,
+    model: MODEL_BARRY_SONNET,
     max_tokens: 1500,
     messages: [{ role: 'user', content: prompt }]
   });
@@ -855,7 +855,7 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
 }`;
 
   const response = await anthropic.messages.create({
-    model: LEGACY_SONNET_4_5,
+    model: MODEL_BARRY_SONNET,
     max_tokens: 1500,
     messages: [{ role: 'user', content: prompt }]
   });
@@ -951,7 +951,7 @@ RESPOND IN JSON:
 }`;
 
   const response = await anthropic.messages.create({
-    model: LEGACY_SONNET_4_5,
+    model: MODEL_BARRY_SONNET,
     max_tokens: 500,
     messages: [{ role: 'user', content: prompt }]
   });

@@ -27,7 +27,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { getStaleContacts } from './utils/contactUtils.js';
 import { buildCapabilityBlock, computeReconState } from './utils/reconCapability.js';
-import { LEGACY_HAIKU_4_5, LEGACY_SONNET_4_5 } from './utils/models.js';
+import { LEGACY_HAIKU_4_5, MODEL_BARRY_SONNET } from './utils/models.js';
 import { processInitialInput, processFollowup } from './barryICPConversation.js';
 import { normalizeClassification, INTENT_PROSPECTING } from '../../src/utils/firstExperienceIntent.js';
 
@@ -1376,7 +1376,7 @@ Return valid JSON only:
 
           await logApiUsage(userId, 'barryMissionChat', 'success', {
             provider: 'anthropic',
-            model: LEGACY_SONNET_4_5,
+            model: MODEL_BARRY_SONNET,
             traceId,
             responseTime: Date.now() - startTime,
             metadata: { type: 'prospecting_targeting_extraction', readyToConfirm },

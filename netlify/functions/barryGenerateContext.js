@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
-import { LEGACY_SONNET_4_5 } from './utils/models.js';
+import { MODEL_BARRY_SONNET } from './utils/models.js';
 import { readClaudeText } from './utils/claudeResponse.js';
 
 export const handler = async (event) => {
@@ -203,7 +203,7 @@ Generate the contextual layer now. Respond ONLY with valid JSON.`;
 
     // Call Claude API using SDK
     const claudeResponse = await anthropic.messages.create({
-      model: LEGACY_SONNET_4_5,
+      model: MODEL_BARRY_SONNET,
       max_tokens: 1500,
       messages: [
         {
@@ -246,7 +246,7 @@ Generate the contextual layer now. Respond ONLY with valid JSON.`;
     const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'barryGenerateContext', 'success', {
       provider: 'anthropic',
-      model: LEGACY_SONNET_4_5,
+      model: MODEL_BARRY_SONNET,
       usage: claudeResponse?.usage,
       responseTime,
       metadata: {
@@ -282,7 +282,7 @@ Generate the contextual layer now. Respond ONLY with valid JSON.`;
         const responseTime = Date.now() - startTime;
         await logApiUsage(userId, 'barryGenerateContext', 'error', {
           provider: 'anthropic',
-          model: LEGACY_SONNET_4_5,
+          model: MODEL_BARRY_SONNET,
           responseTime,
           errorCode: error.message,
           metadata: {}

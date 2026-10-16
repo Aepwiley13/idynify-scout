@@ -4,7 +4,7 @@ import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
-import { LEGACY_SONNET_4_5 } from './utils/models.js';
+import { MODEL_BARRY_SONNET } from './utils/models.js';
 import { readClaudeText } from './utils/claudeResponse.js';
 
 /**
@@ -301,7 +301,7 @@ Respond ONLY with valid JSON.`;
     });
 
     const claudeResponse = await anthropic.messages.create({
-      model: LEGACY_SONNET_4_5,
+      model: MODEL_BARRY_SONNET,
       max_tokens: 1000,
       messages: [
         {
@@ -341,7 +341,7 @@ Respond ONLY with valid JSON.`;
     const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'barryGenerateSequenceStep', 'success', {
       provider: 'anthropic',
-      model: LEGACY_SONNET_4_5,
+      model: MODEL_BARRY_SONNET,
       usage: claudeResponse?.usage,
       responseTime,
       metadata: {
@@ -380,7 +380,7 @@ Respond ONLY with valid JSON.`;
         const responseTime = Date.now() - startTime;
         await logApiUsage(userId, 'barryGenerateSequenceStep', 'error', {
           provider: 'anthropic',
-          model: LEGACY_SONNET_4_5,
+          model: MODEL_BARRY_SONNET,
           responseTime,
           errorCode: error.message,
           metadata: {}

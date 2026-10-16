@@ -96,10 +96,16 @@ describe('no production path uses the capture foundation yet', () => {
     expect(importers).toEqual(['src/capture/validators.js']);
   });
 
+  it('preparedImage.js imports nothing: the browser and the server run the same file', () => {
+    const [[, src]] = sources(['src/capture']).filter(([path]) => path === 'src/capture/preparedImage.js');
+    expect([...src.matchAll(/(?:from\s+|import\s*\(\s*|require\s*\(\s*)['"]([^'"]+)['"]/g)].map(m => m[1])).toEqual([]);
+  });
+
   it('the capture modules import only each other, identityNormalization and tldts', () => {
     const capture = sources(['src/capture']);
     expect(capture.map(([path]) => path).sort()).toEqual([
-      'src/capture/confidence.js', 'src/capture/contract.js', 'src/capture/safeguards.js', 'src/capture/validators.js',
+      'src/capture/confidence.js', 'src/capture/contract.js', 'src/capture/preparedImage.js',
+      'src/capture/safeguards.js', 'src/capture/validators.js',
     ]);
     for (const [path, src] of capture) {
       const specifiers = [...src.matchAll(/from\s+['"]([^'"]+)['"]/g)].map(m => m[1]);

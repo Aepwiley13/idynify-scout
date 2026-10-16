@@ -10,7 +10,7 @@
  */
 
 const ALLOWED = Object.freeze(new Set([
-  'operationId', 'outcome', 'stage', 'httpStatus', 'errorCode', 'reason', 'retryable', 'state', 'previousState',
+  'operationId', 'outcome', 'stage', 'httpStatus', 'errorCode', 'reason', 'detail', 'retryable', 'state', 'previousState',
   'providerId', 'adapterVersion', 'modelId', 'promptVersion', 'attempts',
   'providerMs', 'validateMs', 'totalMs', 'prepMs',
   'inputTokens', 'outputTokens',

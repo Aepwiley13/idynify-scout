@@ -146,8 +146,17 @@ describe('runExtraction: the reading is checked, not trusted', () => {
       () => { throw new TypeError('Avery Quinn'); },
     ]);
     const result = await run(extractor);
-    expect(result).toMatchObject({ ok: false, code: 'unavailable', attempts: 2 });
+    expect(result).toMatchObject({ ok: false, code: 'unavailable', reason: 'unmapped_error', attempts: 2 });
     expect(JSON.stringify(result)).not.toMatch(/Avery|example\.com|upstream/);
+  });
+
+  it('an extractor\'s diagnostic code becomes the reason; a timeout says which deadline', async () => {
+    const coded = scripted([() => { throw new CaptureExtractorError('unavailable', { detail: 'http_529' }); }, raise('rate_limited')]);
+    expect(await run(coded.extractor)).toMatchObject({ ok: false, code: 'rate_limited', reason: null });
+    const once = scripted([() => { throw new CaptureExtractorError('config_error', { detail: 'http_401' }); }]);
+    expect(await run(once.extractor)).toMatchObject({ ok: false, code: 'config_error', reason: 'http_401' });
+    const slow = scripted([hang(), hang()]);
+    expect(await run(slow.extractor)).toMatchObject({ ok: false, code: 'timeout', reason: 'attempt_deadline' });
   });
 });
 
@@ -324,11 +333,15 @@ describe('the error vocabulary', () => {
     for (const code of Object.values(EXTRACTOR_ERRORS)) expect(RESPONSE_STATUS[code], code).toBeDefined();
   });
 
-  it('carries a code and token counts, nothing else', () => {
-    const error = new CaptureExtractorError('rate_limited', { usage: { inputTokens: 12, outputTokens: 'Avery' }, body: 'Avery Quinn' });
-    expect(error).toMatchObject({ code: 'rate_limited', message: 'rate_limited', retryable: true, usage: { inputTokens: 12, outputTokens: null } });
-    expect(Object.keys(error).sort()).toEqual(['code', 'name', 'usage']);
-    expect(new CaptureExtractorError('Avery Quinn said no')).toMatchObject({ code: 'unavailable', message: 'unavailable' });
+  it('carries a code, token counts and a diagnostic code, nothing else', () => {
+    const error = new CaptureExtractorError('rate_limited', { usage: { inputTokens: 12, outputTokens: 'Avery' }, detail: 'http_429', body: 'Avery Quinn' });
+    expect(error).toMatchObject({ code: 'rate_limited', message: 'rate_limited', retryable: true, detail: 'http_429', usage: { inputTokens: 12, outputTokens: null } });
+    expect(Object.keys(error).sort()).toEqual(['code', 'detail', 'name', 'usage']);
+    expect(new CaptureExtractorError('Avery Quinn said no')).toMatchObject({ code: 'unavailable', message: 'unavailable', detail: null });
+  });
+
+  it.each(['Avery Quinn', 'avery@example.com', 'Refusal', 'x'.repeat(41), '', 42])('drops a detail that is not a short code (%s)', (detail) => {
+    expect(new CaptureExtractorError('unavailable', { detail }).detail).toBeNull();
   });
 });
 

@@ -14,7 +14,8 @@
  *     assembled into a CardExtraction that must pass validateCardExtraction.
  *
  * Returns { ok: true, extraction, … } or { ok: false, code, reason, … }; never
- * throws for an extractor failure. `reason` is a path or a code, never a value.
+ * throws for an extractor failure. `reason` is a path or a diagnostic code
+ * (the extractor error's detail), never a value.
  */
 import { CaptureExtractorError, EXTRACTOR_ERRORS, isRetryable } from './errors.js';
 import { validateCardReading } from './cardReading.js';
@@ -33,7 +34,7 @@ async function attempt(extractor, input, ms) {
   const timeout = new Promise((_, reject) => {
     timer = setTimeout(() => {
       controller.abort();
-      reject(new CaptureExtractorError(EXTRACTOR_ERRORS.TIMEOUT));
+      reject(new CaptureExtractorError(EXTRACTOR_ERRORS.TIMEOUT, { detail: 'attempt_deadline' }));
     }, ms);
   });
   try {
@@ -44,8 +45,8 @@ async function attempt(extractor, input, ms) {
     return { ok: true, result };
   } catch (error) {
     // Anything that is not a mapped extractor error is an outage, by code only.
-    if (error instanceof CaptureExtractorError) return { ok: false, code: error.code, usage: error.usage };
-    return { ok: false, code: EXTRACTOR_ERRORS.UNAVAILABLE, usage: null };
+    if (error instanceof CaptureExtractorError) return { ok: false, code: error.code, usage: error.usage, detail: error.detail };
+    return { ok: false, code: EXTRACTOR_ERRORS.UNAVAILABLE, usage: null, detail: 'unmapped_error' };
   } finally {
     clearTimeout(timer);
   }
@@ -83,6 +84,7 @@ export async function runExtraction({ extractor, image, operationId, startedAt, 
     let reason = null;
     if (budget <= 0) {
       code = EXTRACTOR_ERRORS.TIMEOUT;
+      reason = 'deadline';
     } else {
       attempts += 1;
       const t0 = clock();
@@ -101,6 +103,7 @@ export async function runExtraction({ extractor, image, operationId, startedAt, 
       } else {
         addUsage(usage, outcome.usage);
         code = outcome.code;
+        reason = outcome.detail;
       }
     }
     const canRetry = isRetryable(code) && attempts > 0 && attempts < MAX_ATTEMPTS && deadline - clock() >= minRetryMs;

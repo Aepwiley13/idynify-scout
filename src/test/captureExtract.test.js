@@ -547,6 +547,13 @@ describe('captureExtract: logs are value-free', () => {
     expectNoValues(JSON.stringify(store.writes));
   });
 
+  it('a failure line carries the extractor\'s diagnostic code', async () => {
+    setEnv({ CAPTURE_MODE: 'internal', CAPTURE_EXTRACTOR: 'fake', CAPTURE_FAKE_SCENARIO: 'invalid_output' });
+    await call();
+    const line = JSON.parse(logs.find(l => l.includes('"stage":"extract"')));
+    expect(line).toMatchObject({ outcome: 'invalid_output', detail: 'reading:company', reason: 'reading:company', attempts: 2 });
+  });
+
   it('a success line carries codes, counts, sizes and timings', async () => {
     await call();
     const line = JSON.parse(logs.find(l => l.includes('"outcome":"ok"')));

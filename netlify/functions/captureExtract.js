@@ -162,7 +162,7 @@ export const handler = async (event) => {
       metadata: { operationId, attempts: result.attempts, extractor: extractor.id, promptVersion: extractor.promptVersion },
     });
 
-    const log = { ...provider, ...usageLog, ...imageLog, state: operation.state };
+    const log = { ...provider, ...usageLog, ...imageLog, state: operation.state, detail: result.ok ? undefined : result.reason };
     if (errorCode) {
       if (isRetryable(errorCode)) {
         // The state is left as it is: the client retries with the same operationId.

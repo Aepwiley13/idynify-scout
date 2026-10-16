@@ -47,19 +47,24 @@ export const RESPONSE_STATUS = Object.freeze({
 
 const tokenCount = v => (Number.isInteger(v) && v >= 0 ? v : null);
 
+/** A diagnostic code such as http_529, refusal or max_tokens: lower-case, no spaces, short. */
+const DETAIL = /^[a-z0-9][a-z0-9_.:-]{0,39}$/;
+
 /**
  * An extractor failure. `code` is one of EXTRACTOR_ERRORS (anything else
  * becomes unavailable). Besides the code it carries only token counts, for a
- * call that was billed before it failed: never a vendor's message or response
- * body, so neither can reach a log or a response.
+ * call that was billed before it failed, and an optional diagnostic `detail`
+ * code for logs (anything that is not code-shaped is dropped): never a
+ * vendor's message or response body, so neither can reach a log or a response.
  */
 export class CaptureExtractorError extends Error {
-  constructor(code, { usage } = {}) {
+  constructor(code, { usage, detail } = {}) {
     const known = KNOWN.has(code) ? code : EXTRACTOR_ERRORS.UNAVAILABLE;
     super(known);
     this.name = 'CaptureExtractorError';
     this.code = known;
     this.usage = { inputTokens: tokenCount(usage?.inputTokens), outputTokens: tokenCount(usage?.outputTokens) };
+    this.detail = typeof detail === 'string' && DETAIL.test(detail) ? detail : null;
   }
 
   get retryable() {

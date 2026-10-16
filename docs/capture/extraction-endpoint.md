@@ -62,7 +62,7 @@ The server checks `image` again with `checkPreparedImage`: shape and limits, rea
 - `reading` is a card-reading/v1 (`cardReading.js`): for each field, the printed text (`raw`, or null when not printed) and a 0–1 `score`. Phones also carry a printed `label`, and the company name carries `fromLogo`. There is no place for a level, a check, a source or a company domain. Extra keys make the reading invalid.
 - `usage` is `{ inputTokens, outputTokens }`, nulls when unknown.
 - `modelId`, when present, names the model that actually served the call (for example a fallback model); it is recorded only if it is a well-formed token.
-- Failures throw `CaptureExtractorError(code, { usage })`, with a code from the table below. Nothing else is carried: no vendor message, body or card text.
+- Failures throw `CaptureExtractorError(code, { usage, detail })`, with a code from the table below. `detail` is an optional diagnostic code for logs (`http_529`, `refusal`, `max_tokens`; anything not code-shaped is dropped). Nothing else is carried: no vendor message, body or card text.
 
 ### Adding an extractor (PR 7)
 
@@ -168,7 +168,7 @@ An unknown scenario or delay is a `config_error`.
 
 Every log line from this endpoint is one JSON object written by `captureLog` (`evt: 'capture'`). Keys outside an allowlist are dropped, strings are cut to 64 characters, and arrays keep only short code strings. The import guard fails the build if capture server code calls `console` directly.
 
-**Logged:** `operationId`, outcome and error codes, HTTP status, operation state, extractor id, adapter version, model id, prompt version, attempts, timings (`providerMs`, `validateMs`, `totalMs`), token counts, image size (`bytes`, `widthPx`, `heightPx`), how many metadata segments were removed, preflight warning codes and the override flag, extraction status, and field counts by level.
+**Logged:** `operationId`, outcome and error codes, the extractor's diagnostic `detail` code, HTTP status, operation state, extractor id, adapter version, model id, prompt version, attempts, timings (`providerMs`, `validateMs`, `totalMs`), token counts, image size (`bytes`, `widthPx`, `heightPx`), how many metadata segments were removed, preflight warning codes and the override flag, extraction status, and field counts by level.
 
 **Never logged:** the image or its base64, any name, email, phone, title, company, website, address or LinkedIn URL, OCR or card text, any extracted or normalized value, the ID token, or the user ID. (The existing `logApiUsage` call records the user ID on its usage row, as it does for every endpoint, with provider, model, tokens, timing, error code, and `{ operationId, attempts, extractor, promptVersion }`.)
 

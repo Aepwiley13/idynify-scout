@@ -6,7 +6,7 @@ import { createMessageWithRetry } from './utils/anthropicRetry.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { checkRelationshipGuardrail, getGuardrailPromptModifier } from './utils/barryGuardrail.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
-import { LEGACY_SONNET_4_5 } from './utils/models.js';
+import { MODEL_BARRY_SONNET } from './utils/models.js';
 import { readClaudeText } from './utils/claudeResponse.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 
@@ -510,7 +510,7 @@ Generate the messages now. Respond ONLY with valid JSON.`;
     console.log('🤖 Calling Claude API...');
 
     const claudeResponse = await createMessageWithRetry(anthropic, {
-      model: LEGACY_SONNET_4_5,
+      model: MODEL_BARRY_SONNET,
       max_tokens: 4096,
       messages: [{ role: 'user', content: prompt }]
     });
@@ -558,7 +558,7 @@ Generate the messages now. Respond ONLY with valid JSON.`;
     const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'generate-engagement-message', 'success', {
       provider: 'anthropic',
-      model: LEGACY_SONNET_4_5,
+      model: MODEL_BARRY_SONNET,
       usage: claudeResponse?.usage,
       responseTime,
       metadata: {
@@ -608,7 +608,7 @@ Generate the messages now. Respond ONLY with valid JSON.`;
         const responseTime = Date.now() - startTime;
         await logApiUsage(userId, 'generate-engagement-message', 'error', {
           provider: 'anthropic',
-          model: LEGACY_SONNET_4_5,
+          model: MODEL_BARRY_SONNET,
           responseTime,
           errorCode: error.message,
           metadata: {}

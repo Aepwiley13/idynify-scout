@@ -7,8 +7,9 @@
  * scripts imports them yet. Tests may. When a later PR wires capture in, it
  * updates the allow-list below on purpose, in review.
  *
- * Approved so far: one offline, read-only script (PR 3's historical audit),
- * which no shipped code imports. It changes no application behaviour.
+ * Approved so far: two offline scripts that no shipped code imports and that
+ * change no application behaviour: PR 3's read-only historical audit, and
+ * PR 8's local pilot benchmark, which scores readings with the same keys.
  *
  * PR 4 adds the first capture server files (the rollout switch, captureConfig
  * and the operation store). They do not import src/capture either, and the
@@ -52,7 +53,7 @@ const isTest = path => path.startsWith('src/test/');
 const isCapture = path => path.startsWith('src/capture/');
 
 /** Offline scripts approved, in review, to use the capture building blocks. Never shipped code. */
-const APPROVED_OFFLINE_CONSUMERS = ['scripts/auditBusinessCardRecords.mjs'];
+const APPROVED_OFFLINE_CONSUMERS = ['scripts/auditBusinessCardRecords.mjs', 'scripts/captureBenchmark.mjs'];
 /** The one server module approved to use them (PR 6): CardReading → CardExtraction. */
 const APPROVED_SERVER_CONSUMERS = ['netlify/functions/utils/capture/assembleExtraction.js'];
 const isApproved = path => APPROVED_OFFLINE_CONSUMERS.includes(path) || APPROVED_SERVER_CONSUMERS.includes(path);

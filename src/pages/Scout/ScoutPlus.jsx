@@ -11,6 +11,7 @@ import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS } from '../../theme/tokens';
 import { contactDisplayName, nameParts } from '../../utils/contactDisplayName';
 import CaptureFlow from '../../components/capture/CaptureFlow';
+import CaptureSavePanel from '../../components/capture/CaptureSavePanel';
 import { useCaptureAvailability } from '../../components/capture/captureAvailability';
 
 export default function ScoutPlus() {
@@ -80,6 +81,17 @@ export default function ScoutPlus() {
       returnTo: '/scout?tab=scout-plus',
       displayMode: DISPLAY_MODES.PAGE,
     });
+  };
+
+  /** A scan saved: open the person (one card is one person today). */
+  const handleCaptureSaved = (saved) => {
+    if (saved.length === 1) {
+      openSavedContact(saved[0].contactId);
+      return;
+    }
+    setAddedItems(saved.map(s => ({ id: s.contactId })));
+    setLastUploadType('leads');
+    setCurrentView('success');
   };
 
   /**
@@ -283,7 +295,11 @@ export default function ScoutPlus() {
         )}
 
         {currentView === 'capture' && capture === 'available' && (
-          <CaptureFlow />
+          <CaptureFlow
+            renderActions={({ operationId, people }) => (
+              <CaptureSavePanel operationId={operationId} people={people} onSaved={handleCaptureSaved} T={T} />
+            )}
+          />
         )}
 
         {currentView === 'success' && (

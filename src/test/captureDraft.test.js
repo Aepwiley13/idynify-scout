@@ -1,0 +1,149 @@
+/**
+ * Review drafts: what the person checks after a card is read.
+ *
+ * Pins that a capture becomes a LIST of people (one today), that nothing is
+ * invented (a field not printed is empty), and that every phone keeps the
+ * type the card printed, mapped with the approved table, and is "Type not
+ * set" whenever the card does not say: never a guess.
+ */
+import { describe, it, expect, beforeAll } from 'vitest';
+import { draftsFromExtraction, emptyDraft, phoneFromExtraction, printedPhoneLabel } from '../components/capture/captureDraft.js';
+import { encodeBase64 } from '../capture/preparedImage.js';
+import { runExtraction } from '../../netlify/functions/utils/capture/orchestrator.js';
+import { createFakeExtractor } from '../../netlify/functions/utils/capture/fakeExtractor.js';
+
+const seg = (m, p) => [0xFF, m, (p.length + 2) >> 8, (p.length + 2) & 0xFF, ...p];
+const JPEG = new Uint8Array([0xFF, 0xD8, ...seg(0xE0, [74, 70, 73, 70, 0, 1, 1, 0, 0, 1, 0, 1, 0, 0]), ...seg(0xC0, [8, 0x04, 0x77, 0x07, 0xD0, 3, 1, 0x11, 0, 2, 0x11, 1, 3, 0x11, 1]), ...seg(0xDA, [3, 1, 0, 2, 0x11, 3, 0x11, 0, 63, 0]), 0x5A, 0xFF, 0xD9]);
+const image = () => ({
+  version: 'card-image/v1', mimeType: 'image/jpeg', data: encodeBase64(JPEG), bytes: JPEG.length, widthPx: 2000, heightPx: 1143,
+  preflight: { blur: 142.5, brightness: 131.2, glareRatio: 0.004, warnings: [], userOverrode: false },
+});
+
+async function read(scenario) {
+  const result = await runExtraction({
+    extractor: createFakeExtractor(scenario ? { CAPTURE_FAKE_SCENARIO: scenario } : {}),
+    image: image(), operationId: 'cap_3f2a9c1e-5b7d-4e8a-9c21-7d4e5f6a8b90', startedAt: Date.now(),
+  });
+  return result.extraction;
+}
+
+/** An extracted phone as the assembler shapes it: the printed text, the number, its kind and extension. */
+const extracted = (raw, { value = raw.replace(/^[a-z][a-z ./&'-]{0,24}?\s*:?\s*(?=[+(\d])/i, ''), kind = null, extension = null } = {}) => ({
+  raw, value, extension, kind: { value: kind },
+});
+
+let card;
+beforeAll(async () => { card = await read(); });
+
+describe('a capture is a list of people', () => {
+  it('the fictional card: one person, every printed detail, nothing more', () => {
+    const people = draftsFromExtraction(card);
+    expect(people).toHaveLength(1);
+    const [person] = people;
+    expect(person).toMatchObject({
+      key: 'person-1',
+      name: 'Avery Quinn',
+      title: 'Director of Partnerships',
+      company: 'Example Robotics',
+      email: 'avery.quinn@example.com',
+      otherEmails: [],
+      linkedinUrl: 'linkedin.com/in/avery-quinn-example',
+      website: 'www.example.com',
+      toCheck: [],
+    });
+    expect(person.phones.map(p => [p.label, p.value, p.extension, p.labelSource, p.observedLabel])).toEqual([
+      ['mobile', '+1 (415) 555-0142', null, 'card', null],        // the extractor's own "mobile", no printed word
+      ['unknown', '+1 (415) 555-0100', '12', null, 'T'],         // "T:" says phone, not whose: Type not set
+    ]);
+    expect(person.phones[0].normalized).toBe('+14155550142');
+  });
+
+  it('company details only (partial): the person fields are empty, not guessed', async () => {
+    const [person] = draftsFromExtraction(await read('partial'));
+    expect(person).toMatchObject({ name: '', title: '', email: '', linkedinUrl: '', company: 'Example Robotics', website: 'www.example.com' });
+    expect(person.phones).toEqual([]);
+  });
+
+  it('low confidence: the fields the reader was unsure of are marked to check', async () => {
+    const [person] = draftsFromExtraction(await read('low_confidence'));
+    expect(person.name).toBe('Avery Quinn');
+    expect(person.toCheck.length).toBeGreaterThan(0);
+    expect(person.toCheck.every(key => ['name', 'title', 'company', 'email', 'linkedinUrl', 'website', 'phones'].includes(key))).toBe(true);
+  });
+
+  it('a name read only in parts is joined; other emails are kept beside the first', () => {
+    const [person] = draftsFromExtraction({
+      ...card,
+      person: {
+        ...card.person,
+        fullName: { ...card.person.fullName, value: null },
+        emails: [card.person.emails[0], { ...card.person.emails[0], value: 'avery@personal.example' }],
+      },
+    });
+    expect(person.name).toBe('Avery Quinn');
+    expect(person.email).toBe('avery.quinn@example.com');
+    expect(person.otherEmails).toEqual(['avery@personal.example']);
+  });
+
+  it('no extraction is no people; by hand starts from an empty person', () => {
+    expect(draftsFromExtraction(null)).toEqual([]);
+    expect(emptyDraft()).toMatchObject({ name: '', company: '', email: '', phones: [], toCheck: [] });
+  });
+});
+
+describe('phone types are what the card printed (approved table)', () => {
+  it.each([
+    ['Main: 801-555-1000', 'main', 'Main'],
+    ['Main Line: 801-555-1000', 'main', 'Main Line'],
+    ['Main Office 801-555-1000', 'main', 'Main Office'],
+    ['Switchboard: 801-555-1000', 'main', 'Switchboard'],
+    ['Direct: 801-555-1234', 'direct', 'Direct'],
+    ['D 801-555-1234', 'direct', 'D'],
+    ['DD: 801-555-1234', 'direct', 'DD'],
+    ['Direct Line 801-555-1234', 'direct', 'Direct Line'],
+    ['Mobile: 801-555-5678', 'mobile', 'Mobile'],
+    ['M. 801-555-5678', 'mobile', 'M.'],
+    ['Cell 801-555-5678', 'mobile', 'Cell'],
+    ['C: 801-555-5678', 'mobile', 'C'],
+    ['Office: 801-555-2000', 'work', 'Office'],
+    ['O 801-555-2000', 'work', 'O'],
+    ['Work: 801-555-2000', 'work', 'Work'],
+    ['W: 801-555-2000', 'work', 'W'],
+    ['Fax: 801-555-1001', 'fax', 'Fax'],
+    ['F 801-555-1001', 'fax', 'F'],
+  ])('%s → %s', (raw, label, observed) => {
+    const phone = phoneFromExtraction(extracted(raw, { kind: 'office' }), 0);
+    expect(phone).toMatchObject({ label, labelSource: 'card', observedLabel: observed });
+    expect(phone.value).toMatch(/^801-555-\d{4}$/);
+  });
+
+  it.each(['Tel: 801-555-1000', 'T 801-555-1000', 'Phone: 801-555-1000', 'P. 801-555-1000', 'Ph: 801-555-1000', 'Toll Free: 801-555-1000'])(
+    '%s → Type not set, with the printed word kept',
+    (raw) => {
+      const phone = phoneFromExtraction(extracted(raw, { kind: 'office' }), 0);
+      expect(phone).toMatchObject({ label: 'unknown', labelSource: null, value: '801-555-1000' });
+      expect(phone.observedLabel).toBe(printedPhoneLabel(raw));
+    },
+  );
+
+  it('with no printed word, only an exact kind is kept: office and none are Type not set', () => {
+    const kinds = ['mobile', 'direct', 'fax', 'office', 'unknown', null];
+    expect(kinds.map(kind => phoneFromExtraction(extracted('801-555-1000', { kind }), 0).label))
+      .toEqual(['mobile', 'direct', 'fax', 'unknown', 'unknown', 'unknown']);
+  });
+
+  it('a printed word wins over the extractor: "Tel" stays Type not set even if read as mobile', () => {
+    expect(phoneFromExtraction(extracted('Tel: 801-555-1000', { kind: 'mobile' }), 0).label).toBe('unknown');
+  });
+
+  it('keeps the extension apart; an unreadable number keeps its text without the label word', () => {
+    expect(phoneFromExtraction(extracted('D: 801-555-1234 x204', { value: '801-555-1234', extension: '204' }), 0))
+      .toMatchObject({ label: 'direct', value: '801-555-1234', extension: '204', normalized: '8015551234' });
+    expect(phoneFromExtraction(extracted('C: 555-AB12', { value: 'C: 555-AB12' }), 0))
+      .toMatchObject({ label: 'mobile', value: '555-AB12', normalized: null });
+  });
+
+  it('never home: a card cannot say a number is someone\'s home line', () => {
+    expect(phoneFromExtraction(extracted('Home: 801-555-3000'), 0).label).toBe('unknown');
+  });
+});

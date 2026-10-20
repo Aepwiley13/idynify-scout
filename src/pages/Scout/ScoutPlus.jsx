@@ -10,6 +10,8 @@ import CadencePickerModal from '../../components/cadences/CadencePickerModal';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS } from '../../theme/tokens';
 import { contactDisplayName, nameParts } from '../../utils/contactDisplayName';
+import CaptureFlow from '../../components/capture/CaptureFlow';
+import { useCaptureAvailability } from '../../components/capture/captureAvailability';
 
 export default function ScoutPlus() {
   const navigate = useNavigate();
@@ -19,6 +21,8 @@ export default function ScoutPlus() {
   // 'business-card' is deliberately absent: it was the last way into the legacy
   // scanner, whose endpoint is deprecated. The "Coming soon" card below is
   // display-only. See docs/deprecations/legacy-business-card-endpoint.md.
+  // The new capture flow ('capture') is not deep-linkable either: only the
+  // card opens it, and only when capture is on for this account.
   const validViews = ['menu', 'manual', 'csv', 'linkedin-link', 'company-search'];
   const initialView = validViews.includes(location.state?.initialView) ? location.state.initialView : 'menu';
   const [currentView, setCurrentView] = useState(initialView); // 'menu', 'manual', 'csv', 'linkedin-link', 'company-search', 'success'
@@ -27,6 +31,9 @@ export default function ScoutPlus() {
   // CSV contact imports only: { batchId, tag, created, updated, failed }
   const [importResult, setImportResult] = useState(null);
   const [showCadencePicker, setShowCadencePicker] = useState(false);
+  // Scan Business Card opens only when the server says capture is on for this
+  // account (capture mode internal: admins only). Everyone else keeps "Coming soon".
+  const capture = useCaptureAvailability();
 
   const handleBack = () => {
     setCurrentView('menu');
@@ -130,6 +137,7 @@ export default function ScoutPlus() {
             {currentView === 'csv' && 'Upload CSV'}
             {currentView === 'linkedin-link' && 'LinkedIn Link'}
             {currentView === 'company-search' && 'Company Search'}
+            {currentView === 'capture' && 'Scan Business Card'}
             {currentView === 'success' && (importResult ? 'Import Complete' : lastUploadType === 'companies' ? 'Companies Added Successfully!' : 'Contact Added Successfully!')}
           </h2>
         </div>
@@ -211,27 +219,50 @@ export default function ScoutPlus() {
               </div>
             </button>
 
-            {/* Coming soon group — kept below the working options so the live
-                add paths are the first thing a user reaches. */}
-            <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 12 }}>
-              Coming soon
-            </div>
+            {capture === 'available' ? (
+              /* Business Card Capture — internal: capture is on for this account */
+              <button
+                onClick={() => setCurrentView('capture')}
+                style={{ width: '100%', background: T.cardBg, border: `2px solid ${T.border}`, borderRadius: 14, padding: 24, textAlign: 'left', cursor: 'pointer', transition: 'border-color 0.15s', position: 'relative', marginTop: 12 }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = '#7c3aed'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = T.border}
+              >
+                <div style={{ position: 'absolute', top: 12, right: 14, background: '#7c3aed', color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6, letterSpacing: 0.5 }}>INTERNAL</div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+                  <div style={{ width: 48, height: 48, background: '#f3e8ff', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <Camera className="w-6 h-6 text-purple-600" />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 4 }}>Scan Business Card</h3>
+                    <p style={{ fontSize: 13, color: T.textMuted, margin: 0 }}>Take a photo of a card, check the details, and add the person.</p>
+                  </div>
+                </div>
+              </button>
+            ) : (
+              <>
+                {/* Coming soon group — kept below the working options so the live
+                    add paths are the first thing a user reaches. */}
+                <div style={{ fontSize: 11, fontWeight: 700, color: T.textMuted, letterSpacing: 0.8, textTransform: 'uppercase', marginTop: 12 }}>
+                  Coming soon
+                </div>
 
-            {/* Business Card Capture — Coming Soon */}
-            <div
-              style={{ width: '100%', background: T.cardBg, border: `2px solid ${T.border}`, borderRadius: 14, padding: 24, textAlign: 'left', opacity: 0.55, cursor: 'default', position: 'relative' }}
-            >
-              <div style={{ position: 'absolute', top: 12, right: 14, background: '#f59e0b', color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6, letterSpacing: 0.5 }}>COMING SOON</div>
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
-                <div style={{ width: 48, height: 48, background: '#f3e8ff', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-                  <Camera className="w-6 h-6 text-purple-600" />
+                {/* Business Card Capture — Coming Soon */}
+                <div
+                  style={{ width: '100%', background: T.cardBg, border: `2px solid ${T.border}`, borderRadius: 14, padding: 24, textAlign: 'left', opacity: 0.55, cursor: 'default', position: 'relative' }}
+                >
+                  <div style={{ position: 'absolute', top: 12, right: 14, background: '#f59e0b', color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 8px', borderRadius: 6, letterSpacing: 0.5 }}>COMING SOON</div>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16 }}>
+                    <div style={{ width: 48, height: 48, background: '#f3e8ff', borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                      <Camera className="w-6 h-6 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 4 }}>Scan Business Card</h3>
+                      <p style={{ fontSize: 13, color: T.textMuted, margin: 0 }}>Capture contacts from business cards. Available soon.</p>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <h3 style={{ fontSize: 16, fontWeight: 700, color: T.text, marginBottom: 4 }}>Scan Business Card</h3>
-                  <p style={{ fontSize: 13, color: T.textMuted, margin: 0 }}>Capture contacts from business cards. Available soon.</p>
-                </div>
-              </div>
-            </div>
+              </>
+            )}
           </div>
         )}
 
@@ -249,6 +280,10 @@ export default function ScoutPlus() {
 
         {currentView === 'company-search' && (
           <CompanySearch onCompanyAdded={handleContactAdded} />
+        )}
+
+        {currentView === 'capture' && capture === 'available' && (
+          <CaptureFlow />
         )}
 
         {currentView === 'success' && (

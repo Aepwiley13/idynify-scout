@@ -16,6 +16,7 @@ import { doc, getDoc, updateDoc, arrayUnion, increment } from 'firebase/firestor
 import { db, auth } from '../firebase/config';
 import { logTimelineEvent, ACTORS } from './timelineLogger';
 import { updateContactStatus, STATUS_TRIGGERS } from './contactStateMachine';
+import { readContactPhones, primaryPhone, textablePhone } from './contactPhones';
 
 // Result types for clear UX messaging
 export const SEND_RESULT = {
@@ -115,7 +116,7 @@ export async function resolveSendMethod(channel, userId, contact) {
       return { method: 'native' };
 
     case CHANNELS.CALL:
-      if (!contact.phone) {
+      if (!callNumber(contact)) {
         return { method: 'disabled', reason: 'No phone number' };
       }
       // Always use native tel: links
@@ -259,10 +260,24 @@ export function openNativeEmail({ contact, subject, body, ccRecipients }) {
 }
 
 /**
+ * The number a text goes to: a mobile, else a number whose type isn't set.
+ * Never a main, work, direct, home or fax line. '' when there is none, and the
+ * SMS app opens with the recipient blank.
+ */
+export function textNumber(contact) {
+  return textablePhone(readContactPhones(contact))?.value ?? '';
+}
+
+/** The number to call: mobile, then direct, main, work, home, other, unset. Never a fax. */
+export function callNumber(contact) {
+  return primaryPhone(readContactPhones(contact))?.value ?? '';
+}
+
+/**
  * OPTION B: Open native SMS app
  */
 export function openNativeSMS({ contact, body }) {
-  const phone = contact.phone || contact.phone_mobile || '';
+  const phone = textNumber(contact);
   // Build SMS link - if no phone number, opens SMS app with blank "To" field
   const recipient = phone ? encodeURIComponent(phone) : '';
   const smsUrl = `sms:${recipient}?body=${encodeURIComponent(body || '')}`;
@@ -287,7 +302,7 @@ export function openNativeSMS({ contact, body }) {
  * OPTION B: Open native phone dialer
  */
 export function openNativeCall({ contact }) {
-  const phone = contact.phone || contact.phone_mobile;
+  const phone = callNumber(contact);
   window.location.href = `tel:${encodeURIComponent(phone)}`;
 
   return {

@@ -12,6 +12,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   resolveBarrySonnetModel,
+  barrySonnetOptions,
+  BARRY_SONNET_5_5_SETTINGS,
   SONNET_4_5,
   SONNET_5_5,
   SONNET_4_6,
@@ -44,6 +46,43 @@ describe('resolveBarrySonnetModel', () => {
     for (const value of ['', '   ', undefined]) {
       expect(resolveBarrySonnetModel({ BARRY_MODEL_SONNET: value })).toBe(SONNET_4_5);
     }
+  });
+});
+
+describe('barrySonnetOptions: Sonnet 5.5 settings per call site', () => {
+  const SITES = Object.keys(BARRY_SONNET_5_5_SETTINGS);
+
+  it('covers the eleven Barry Sonnet calls', () => {
+    expect(SITES).toHaveLength(11);
+  });
+
+  it('on Sonnet 5.5: low effort for icp-example-company and engagement-message, thinking off for the rest', () => {
+    for (const site of SITES) {
+      const expected = ['icp-example-company', 'engagement-message'].includes(site)
+        ? { output_config: { effort: 'low' } }
+        : { thinking: { type: 'between_tools' } };
+      expect(barrySonnetOptions(site, SONNET_5_5), site).toEqual(expected);
+    }
+  });
+
+  it('on any other model: nothing, so the request is what it was before', () => {
+    for (const model of [SONNET_4_5, SONNET_4_6, 'claude-sonnet-5-5-preview', '']) {
+      for (const site of SITES) expect(barrySonnetOptions(site, model)).toEqual({});
+    }
+  });
+
+  it('follows MODEL_BARRY_SONNET by default, which is Sonnet 4.5', () => {
+    expect(barrySonnetOptions('context')).toEqual({});
+  });
+
+  it('returns a fresh object each call, so a request cannot change the settings', () => {
+    const a = barrySonnetOptions('context', SONNET_5_5);
+    a.thinking.type = 'adaptive';
+    expect(barrySonnetOptions('context', SONNET_5_5)).toEqual({ thinking: { type: 'between_tools' } });
+  });
+
+  it('throws on an unknown call site rather than silently sending nothing', () => {
+    expect(() => barrySonnetOptions('mission-sequnce', SONNET_5_5)).toThrow(/Unknown Barry Sonnet call site/);
   });
 });
 

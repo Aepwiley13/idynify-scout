@@ -4,8 +4,8 @@ import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
-import { MODEL_BARRY_SONNET } from './utils/models.js';
-import { readClaudeText } from './utils/claudeResponse.js';
+import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
+import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
 
 /**
  * User scope — the one line of it these surfaces need.
@@ -303,6 +303,7 @@ Respond ONLY with valid JSON.`;
     const claudeResponse = await anthropic.messages.create({
       model: MODEL_BARRY_SONNET,
       max_tokens: 1000,
+      ...barrySonnetOptions('sequence-step'),
       messages: [
         {
           role: 'user',
@@ -334,7 +335,7 @@ Respond ONLY with valid JSON.`;
 
     } catch (parseError) {
       console.error('Error parsing Barry step content response:', parseError);
-      throw new Error('Failed to generate step content');
+      throw new Error('Failed to generate step content', { cause: parseError });
     }
 
     // Log API usage
@@ -382,7 +383,7 @@ Respond ONLY with valid JSON.`;
           provider: 'anthropic',
           model: MODEL_BARRY_SONNET,
           responseTime,
-          errorCode: error.message,
+          errorCode: claudeErrorCode(error),
           metadata: {}
         });
       }

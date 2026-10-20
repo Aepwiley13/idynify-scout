@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
-import { MODEL_BARRY_SONNET } from './utils/models.js';
-import { readClaudeText } from './utils/claudeResponse.js';
+import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
+import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -111,6 +111,7 @@ Respond ONLY with valid JSON in this exact format:
     const claudeResponse = await anthropic.messages.create({
       model: MODEL_BARRY_SONNET,
       max_tokens: 500,
+      ...barrySonnetOptions('validate-contact'),
       messages: [
         {
           role: 'user',
@@ -121,6 +122,7 @@ Respond ONLY with valid JSON in this exact format:
 
     // Parse Claude's response
     let barryDecision;
+    let fallbackReason = null;
     try {
       const responseText = readClaudeText(claudeResponse);
 
@@ -135,7 +137,9 @@ Respond ONLY with valid JSON in this exact format:
       }
     } catch (parseError) {
       console.error('Error parsing Barry response:', parseError);
-      // Fallback to top match
+      // Fallback to top match. The call still succeeds, so the reason is kept
+      // in the usage row rather than lost.
+      fallbackReason = claudeErrorCode(parseError);
       barryDecision = {
         selected_index: 1,
         confidence: 'medium',
@@ -156,7 +160,8 @@ Respond ONLY with valid JSON in this exact format:
       metadata: {
         resultsCount: results.length,
         selectedIndex: barryDecision.selected_index,
-        confidence: barryDecision.confidence
+        confidence: barryDecision.confidence,
+        fallbackReason
       }
     });
 
@@ -188,7 +193,7 @@ Respond ONLY with valid JSON in this exact format:
           provider: 'anthropic',
           model: MODEL_BARRY_SONNET,
           responseTime,
-          errorCode: error.message,
+          errorCode: claudeErrorCode(error),
           metadata: {}
         });
       }

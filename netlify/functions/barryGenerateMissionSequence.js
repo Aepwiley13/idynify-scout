@@ -2,8 +2,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
-import { MODEL_BARRY_SONNET } from './utils/models.js';
-import { readClaudeText } from './utils/claudeResponse.js';
+import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
+import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
 
 /**
  * BARRY MISSION SEQUENCE GENERATOR (Step 4 → Step 5 Upgrade)
@@ -219,7 +219,10 @@ Generate the sequence plan now. Respond ONLY with valid JSON.`;
     // Call Claude API
     const claudeResponse = await anthropic.messages.create({
       model: MODEL_BARRY_SONNET,
-      max_tokens: 1800,
+      // 3000, not 1800: Sonnet 5.5 used up to 1672 tokens for two contacts in
+      // the #699 comparison, and a reply cut off here fails the whole request.
+      max_tokens: 3000,
+      ...barrySonnetOptions('mission-sequence'),
       messages: [
         {
           role: 'user',
@@ -267,7 +270,7 @@ Generate the sequence plan now. Respond ONLY with valid JSON.`;
 
     } catch (parseError) {
       console.error('Error parsing Barry sequence response:', parseError);
-      throw new Error('Failed to generate valid mission sequence');
+      throw new Error('Failed to generate valid mission sequence', { cause: parseError });
     }
 
     // Log API usage
@@ -322,7 +325,7 @@ Generate the sequence plan now. Respond ONLY with valid JSON.`;
           provider: 'anthropic',
           model: MODEL_BARRY_SONNET,
           responseTime,
-          errorCode: error.message,
+          errorCode: claudeErrorCode(error),
           metadata: {}
         });
       }

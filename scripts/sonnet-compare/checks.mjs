@@ -82,9 +82,24 @@ export const CHECKS = {
     return { ok: false, note: `missing ${[!subject && 'SUBJECT:', !body && 'BODY:'].filter(Boolean).join(' and ')} (handler falls back to defaults)` };
   },
 
-  // generate-followup.js: any text is the follow-up body
-  followup: () => ({ ok: true, note: '' }),
+  // generate-followup.js: any text becomes the draft body, so this checks what
+  // the user would see: the email and nothing else (#699).
+  followup: (text) => {
+    const problem = FOLLOWUP_META.find(([pattern]) => pattern.test(text));
+    return problem ? { ok: false, note: `draft is not just the email: ${problem[1]}` } : { ok: true, note: '' };
+  },
 };
+
+/** What, seen in a follow-up draft, means the model wrote about the email instead of only writing it. */
+export const FOLLOWUP_META = [
+  [/\[[^\]\n]{1,80}\]/, 'bracketed placeholder'],
+  [/^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/m, 'separator before extra text'],
+  [/^\s*\**\s*(?:note|version|option|alternative)\b[^:\n]{0,60}:/im, 'note or alternative version'],
+  [/\bI (?:can(?:'|’)t|cannot|can not) write\b/i, 'says it cannot write the email'],
+  [/\b(?:don(?:'|’)t|do not|didn(?:'|’)t|did not) have (?:access to )?[\w'’ ]{0,30}\b(?:reply|response)\b/i, 'says the reply is missing'],
+  [/\b(?:their|his|her|the) (?:actual )?(?:reply|response) (?:isn(?:'|’)t|is not|wasn(?:'|’)t|was not) (?:included|provided|available|shared)\b/i, 'says the reply is missing'],
+  [/\b(?:paste|send me|share) (?:his|her|their|the) (?:actual )?(?:reply|response)\b/i, 'asks for the reply'],
+];
 
 /** Endpoints whose output a person reads; their replies are printed for tone review. */
 export const MESSAGE_WRITERS = ['sequence-step', 'campaign-message', 'followup', 'engagement-message'];

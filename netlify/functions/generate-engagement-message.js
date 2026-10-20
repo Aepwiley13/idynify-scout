@@ -6,8 +6,8 @@ import { createMessageWithRetry } from './utils/anthropicRetry.js';
 import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { checkRelationshipGuardrail, getGuardrailPromptModifier } from './utils/barryGuardrail.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
-import { MODEL_BARRY_SONNET } from './utils/models.js';
-import { readClaudeText } from './utils/claudeResponse.js';
+import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
+import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 
 /**
@@ -512,6 +512,7 @@ Generate the messages now. Respond ONLY with valid JSON.`;
     const claudeResponse = await createMessageWithRetry(anthropic, {
       model: MODEL_BARRY_SONNET,
       max_tokens: 4096,
+      ...barrySonnetOptions('engagement-message'),
       messages: [{ role: 'user', content: prompt }]
     });
 
@@ -535,7 +536,18 @@ Generate the messages now. Respond ONLY with valid JSON.`;
         if (!fenceMatch) throw new Error('No JSON block found');
         result = JSON.parse(fenceMatch[1].trim());
       } catch (secondErr) {
-        console.error('❌ Failed to parse Claude response (both stages):', secondErr.message);
+        // A refusal, truncation or empty reply fails stage 1 with the reader's
+        // reason; stage 2 then fails only for lack of text, so log stage 1's.
+        const errorCode = claudeErrorCode(firstErr);
+        console.error('❌ Failed to parse Claude response (both stages):', errorCode, secondErr.message);
+        await logApiUsage(userId, 'generate-engagement-message', 'error', {
+          provider: 'anthropic',
+          model: MODEL_BARRY_SONNET,
+          usage: claudeResponse?.usage,
+          responseTime: Date.now() - startTime,
+          errorCode,
+          metadata: {}
+        });
         return {
           statusCode: 500,
           headers: { 'Content-Type': 'application/json' },
@@ -547,6 +559,14 @@ Generate the messages now. Respond ONLY with valid JSON.`;
     // Validate structure
     if (!result.messages || !Array.isArray(result.messages) || result.messages.length < 3) {
       console.error('❌ Invalid response structure — missing messages array');
+      await logApiUsage(userId, 'generate-engagement-message', 'error', {
+        provider: 'anthropic',
+        model: MODEL_BARRY_SONNET,
+        usage: claudeResponse?.usage,
+        responseTime: Date.now() - startTime,
+        errorCode: 'fewer than 3 messages',
+        metadata: {}
+      });
       return {
         statusCode: 500,
         headers: { 'Content-Type': 'application/json' },
@@ -610,7 +630,7 @@ Generate the messages now. Respond ONLY with valid JSON.`;
           provider: 'anthropic',
           model: MODEL_BARRY_SONNET,
           responseTime,
-          errorCode: error.message,
+          errorCode: claudeErrorCode(error),
           metadata: {}
         });
       }

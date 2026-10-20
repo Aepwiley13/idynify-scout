@@ -7,9 +7,11 @@ name: Sonnet migration checks
 #              work, which Sonnet models can it reach, and which model is
 #              Barry configured to call. Free; needs no secret here.
 #   compare    Runs scripts/sonnet-compare against the Anthropic API with the
-#              ANTHROPIC_API_KEY repository secret. ~99 calls, cost ceiling
-#              about $2. Inputs are synthetic; the report is printed to the
-#              log and kept as an artifact for 14 days.
+#              ANTHROPIC_API_KEY repository secret. By default: 110 synthetic
+#              cases × Sonnet 4.5, Sonnet 5.5 as production would call it, and
+#              Sonnet 4.6 = 330 calls, cost ceiling about $8 (real spend about
+#              $3). The report is printed to the log and kept as an artifact
+#              for 14 days.
 #
 # Neither job changes production.
 
@@ -24,7 +26,7 @@ on:
       variants:
         description: compare only — comma-separated variants
         type: string
-        default: sonnet-4.5,sonnet-5.5-between-tools,sonnet-5.5-low
+        default: sonnet-4.5,sonnet-5.5-barry,sonnet-4.6
       sites:
         description: compare only — comma-separated call sites (blank = all)
         type: string
@@ -55,7 +57,7 @@ jobs:
   compare:
     if: inputs.task == 'compare'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

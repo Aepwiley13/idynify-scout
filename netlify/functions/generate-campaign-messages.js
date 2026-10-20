@@ -1,8 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { MODEL_BARRY_SONNET } from './utils/models.js';
-import { readClaudeText } from './utils/claudeResponse.js';
+import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
+import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 
 // Initialize Firebase Admin (only once)
@@ -197,6 +197,7 @@ BODY:
         const response = await anthropic.messages.create({
           model: MODEL_BARRY_SONNET,
           max_tokens: 1024,
+          ...barrySonnetOptions('campaign-message'),
           messages: [{ role: 'user', content: prompt }]
         });
 
@@ -221,7 +222,7 @@ BODY:
         };
 
       } catch (contactError) {
-        console.error(`❌ Failed to generate message for ${contact.name}:`, contactError);
+        console.error(`❌ Failed to generate message for ${contact.name}:`, claudeErrorCode(contactError), contactError);
 
         // Return fallback message
         return {

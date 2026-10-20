@@ -123,9 +123,11 @@ export const MODEL_CAPTURE_DEFAULT = 'claude-opus-5-5';
 // Netlify applies a changed variable on the next deploy, with no code change.
 //
 // The default stays SONNET_4_5 until the side-by-side validation passes and
-// it is changed here deliberately. Do not point the override at SONNET_5_5
-// before then: these calls send no thinking or effort settings yet, and Sonnet
-// 5.5 thinks by default (#699, migration risks 1 and 2).
+// it is changed here deliberately. Before the override is pointed at
+// SONNET_5_5, the comparison's default run (sonnet-4.5, sonnet-5.5-barry,
+// sonnet-4.6) should pass. Each call sends the Sonnet 5.5 settings below only
+// when the model is SONNET_5_5, so moving the override to 5.5, back to 4.5,
+// or on to 4.6 needs no code change.
 
 /** Current production model. Deprecated; retires 2026-11-30. */
 export const SONNET_4_5 = 'claude-sonnet-4-5-20250929';
@@ -149,6 +151,57 @@ export function resolveBarrySonnetModel(env = process.env) {
 }
 
 export const MODEL_BARRY_SONNET = resolveBarrySonnetModel();
+
+// ─── Sonnet 5.5 request settings per Barry call site (#699) ──────────────────
+//
+// Sonnet 5.5 thinks by default; Sonnet 4.5 and 4.6 do not. Each call site
+// picks how 5.5 should run, from the side-by-side comparison (Actions run
+// 39467017652; scripts/sonnet-compare):
+//
+//   thinking off  { thinking: { type: 'between_tools' } } — closest to 4.5,
+//                 predictable cost and latency. Only Sonnet 5.5 accepts it.
+//   low effort    { output_config: { effort: 'low' } } — adaptive thinking
+//                 held down; it did better on the two sites marked below.
+//
+// The settings are sent only when the model is SONNET_5_5. On any other model
+// the request is exactly what it was before, so a rollback through
+// BARRY_MODEL_SONNET never sends a field the older model would reject.
+//
+// The keys are the call-site names scripts/sonnet-compare uses.
+
+const THINKING_OFF = 'thinking_off';
+const LOW_EFFORT = 'low_effort';
+
+export const BARRY_SONNET_5_5_SETTINGS = Object.freeze({
+  'mission-sequence': THINKING_OFF,
+  'icp-initial': THINKING_OFF,
+  'icp-followup': THINKING_OFF,
+  'icp-example-company': LOW_EFFORT, // thinking off added an unneeded confirmation turn
+  'icp-summary': THINKING_OFF,
+  context: THINKING_OFF,
+  'sequence-step': THINKING_OFF,
+  'validate-contact': THINKING_OFF,
+  'campaign-message': THINKING_OFF,
+  followup: THINKING_OFF,
+  'engagement-message': LOW_EFFORT, // lowest p95 (11.3 s vs 13.7 s), same quality
+});
+
+/**
+ * The extra request fields a Barry Sonnet call sends: its Sonnet 5.5 setting
+ * when `model` is Sonnet 5.5, otherwise nothing. Spread it into the request.
+ *
+ * @param {keyof typeof BARRY_SONNET_5_5_SETTINGS} site
+ * @param {string} [model]
+ * @returns {{thinking?: {type: string}, output_config?: {effort: string}}}
+ */
+export function barrySonnetOptions(site, model = MODEL_BARRY_SONNET) {
+  const setting = BARRY_SONNET_5_5_SETTINGS[site];
+  if (!setting) throw new Error(`Unknown Barry Sonnet call site: ${site}`);
+  if (model !== SONNET_5_5) return {};
+  return setting === LOW_EFFORT
+    ? { output_config: { effort: 'low' } }
+    : { thinking: { type: 'between_tools' } };
+}
 
 // ─── Dated snapshots still pinned by pre-policy endpoints ────────────────────
 //

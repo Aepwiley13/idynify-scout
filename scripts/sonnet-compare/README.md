@@ -19,8 +19,9 @@ node scripts/sonnet-compare/compare.mjs --run      # send the requests and write
 `--run` needs `ANTHROPIC_API_KEY` (or `ANTHROPIC_AUTH_TOKEN`) in the shell.
 The SDK reads it; the script never prints or saves it.
 
-The default run is 33 requests × 3 variants = 99 calls. The dry run prints an
-upper bound on cost (every reply at `max_tokens`), currently about $2.
+The default run is 110 requests (10 per call site) × 3 variants = 330 calls.
+The dry run prints an upper bound on cost (every reply at `max_tokens`),
+currently about $8; real spend is about $3.
 
 Useful options (`--help` lists them all):
 
@@ -39,13 +40,15 @@ Each variant is the endpoint's own request with only these fields changed:
 | Variant | Request |
 |---|---|
 | `sonnet-4.5` (default) | `model: claude-sonnet-4-5-20250929` — production today |
-| `sonnet-5.5-between-tools` (default) | `model: claude-sonnet-5-5`, `thinking: { type: 'between_tools' }` — thinking off |
-| `sonnet-5.5-low` (default) | `model: claude-sonnet-5-5`, `output_config: { effort: 'low' }` — adaptive thinking, low effort |
+| `sonnet-5.5-barry` (default) | `model: claude-sonnet-5-5` plus that call site's setting from `BARRY_SONNET_5_5_SETTINGS` in `models.js` — exactly what production sends once `BARRY_MODEL_SONNET=claude-sonnet-5-5` |
+| `sonnet-4.6` (default) | `model: claude-sonnet-4-6` — the fallback named in `models.js`, and the rollback target after 4.5 retires |
+| `sonnet-5.5-between-tools` | `model: claude-sonnet-5-5`, `thinking: { type: 'between_tools' }` — thinking off everywhere |
+| `sonnet-5.5-low` | `model: claude-sonnet-5-5`, `output_config: { effort: 'low' }` — adaptive thinking, low effort everywhere |
 | `sonnet-5.5-default` | `model: claude-sonnet-5-5` only — the plain swap #699 warns against |
-| `sonnet-4.6` | `model: claude-sonnet-4-6` — the fallback named in `models.js` |
 
-Prompts and `max_tokens` are never edited. The point is to see how each model
-does with the requests production sends today.
+Prompts and `max_tokens` are never edited by the tool: each variant replaces
+only the model and the thinking/effort fields, so the comparison is of the
+requests production sends.
 
 ## How the requests are built
 
@@ -68,7 +71,7 @@ Then `compare.mjs` sends each captured request to each variant with the real SDK
 For every request × variant:
 
 - **reply read** through the shared `readClaudeText` (`netlify/functions/utils/claudeResponse.js`): thinking blocks ignored; refusal, truncation (`max_tokens`) and empty replies recorded by kind;
-- **endpoint check** (`checks.mjs`): does the text pass the same parsing its handler does — e.g. five required keys for context, `SUBJECT:`/`BODY:` for campaign messages, three messages for engagement. A failure here means the endpoint would have errored or fallen back;
+- **endpoint check** (`checks.mjs`): does the text pass the same parsing its handler does — e.g. five required keys for context, `SUBJECT:`/`BODY:` for campaign messages, three messages for engagement. A failure here means the endpoint would have errored or fallen back. The follow-up check is stricter, because its text goes straight into the user's draft: a note, a placeholder like `[Your Name]`, or a reply that talks about the email instead of being it fails;
 - **latency** (wall clock, no SDK retries, so an overload shows up as an API error rather than a slow call);
 - **tokens** in/out and an estimated cost at list prices;
 - **stop reason** and the model that actually answered.
@@ -88,20 +91,21 @@ has everything, including the captured requests.
 - p95 latency well inside the function's Netlify timeout (thinking adds latency);
 - for the four message writers, a person reads the replies side by side and is happy with the tone.
 
-Pick the thinking setting per endpoint from the two 5.5 variants. If Sonnet 5.5
-can't pass by 2026-11-16, run `--variants=sonnet-4.5,sonnet-4.6` and move to
-the fallback instead.
+The per-endpoint setting was chosen from the `sonnet-5.5-between-tools` and
+`sonnet-5.5-low` variants (Actions run 39467017652) and lives in
+`BARRY_SONNET_5_5_SETTINGS`; `sonnet-5.5-barry` checks that choice. The default
+run also checks `sonnet-4.6`, the rollback target once 4.5 retires.
 
 ## Data
 
 All inputs are fictional: invented people and companies, `example.com`/`.org`
 addresses. Replies are printed to your terminal and written under
 `.sonnet-compare/`, which git ignores. Nothing is read from production or
-written to it, and no usage rows are logged.
+written to it; usage rows a handler logs during capture stay in memory.
 
 ## Adding cases
 
-There are three cases per call site; #699 suggests about ten. Add to `CASES` in
+There are ten cases per call site, as #699 suggests. Add to `CASES` in
 `fixtures.mjs`, keeping them fictional and on-topic: the ICP conversation answers
 off-topic input itself without calling Claude, and capture stops with a list of
 any case that sent nothing.
@@ -111,3 +115,9 @@ any case that sent nothing.
 `node scripts/sonnet-compare/compare.mjs --run --fake-api` runs the whole
 tool against a fake client (thinking-first replies, refusals, truncation,
 malformed text) and sends nothing. Use it after changing the tool.
+
+`node scripts/sonnet-compare/capture-json.mjs out.json` writes the captured
+requests, with what each handler returned and logged, to a file. Set
+`BARRY_MODEL_SONNET` to capture another model's requests, or
+`SONNET_COMPARE_REPLY=truncated|refusal|malformed|empty` to have the stub SDK
+return that failure. `src/test/barrySonnetRequests.test.js` uses both.

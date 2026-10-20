@@ -69,3 +69,34 @@ instead.
 **Verified by:** `src/test/contactIdentityService.test.js` (30 tests),
 `scripts/verifyWritePaths.mjs`. Historical duplicates are counted, never merged,
 by `scripts/detectDuplicateContacts.mjs`.
+
+---
+
+## Amendment — phone numbers are person-level or shared (2026-10)
+
+Step 5 assumed a phone number belongs to one person. A business card often
+prints three: the company's main line, the person's direct line and their
+mobile. Coworkers share the main line, and matching on it merges them.
+
+**Only a person's own number identifies them.** Phone labels are defined in
+`src/utils/phoneLabels.js`. A contact's typed list is `phones[]`, maintained by
+`src/utils/contactPhones.js`. On a record with that list, step 5 uses only a
+`mobile`, `direct` or `home` number (`PERSON_PHONE_LABELS`). A `main`, `work`,
+`fax`, `other` or `unknown` number never merges two people. A record whose
+list has no person-level number has no phone identity at all; email and
+LinkedIn still match it.
+
+- `phone_normalized` on a typed record is its person-level number, or null.
+  `extractIdentifiers` reads such a record from its list and never falls back
+  to `phone`, which may hold the shared line as the number to call.
+- A query hit on `phone_normalized` or `phone` counts for a typed record only
+  when the searched number is its identity number.
+- Records without `phones[]` (untyped) keep the original step 5 until their
+  numbers are typed. That is a deliberate, scoped decision: changing phone
+  dedup for manual add, CSV and imports is its own change.
+- A merge keeps `phone` and `phone_normalized` on the same number. It used to
+  move the key to the incoming number while keeping the record's `phone`. On a
+  typed record a merge writes no phone field; the list owns them.
+
+**Verified by:** `src/test/identityPhones.test.js`, including coworkers who
+share a main or work line staying separate, and `src/test/contactPhones.test.js`.

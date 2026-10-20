@@ -147,6 +147,11 @@ export const primaryPhone = list => firstBy(list, CALL_ORDER);
  * older records that is the only number, and it may well be a mobile; the
  * person sending knows). Never a main, work, direct, home or fax line: a
  * switchboard, a desk phone or a fax can't take a text.
+ *
+ * TEMPORARY COMPATIBILITY: the fallback to an unset number exists only so
+ * that older records, whose one number was never typed, keep prefilling a
+ * text as they did before typed phones. It is not the long-term rule; once
+ * numbers carry their types, texting should go to a mobile only.
  */
 export const textablePhone = list => list.find(p => p.label === 'mobile') ?? list.find(p => p.label === 'unknown') ?? null;
 

@@ -43,9 +43,16 @@ export const CONTACT_SCHEMA = {
   company_id: 'string',                // FK → users/{uid}/companies/{companyId}
   email: 'string | null',
   work_email: 'string | null',
-  phone: 'string | null',
+  // Phones: `phones[]` is the canonical list (src/utils/contactPhones.js). When
+  // it is written, the single fields below are derived from it.
+  phones: 'Array<{ id, value, extension, label, labelSource, observedLabel, normalized }>',
+  //   label: 'mobile' | 'direct' | 'main' | 'work' | 'fax' | 'home' | 'other' | 'unknown'
+  phone: 'string | null',              // the number to call (never a fax)
   phone_mobile: 'string | null',
   phone_direct: 'string | null',
+  phone_work: 'string | null',
+  phone_home: 'string | null',
+  phone_normalized: 'string | null',   // identity: a mobile, direct or home number only
   linkedin_url: 'string | null',
   photo_url: 'string | null',
 

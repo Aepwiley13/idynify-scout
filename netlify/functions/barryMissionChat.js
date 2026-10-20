@@ -28,6 +28,7 @@ import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { getStaleContacts } from './utils/contactUtils.js';
 import { buildCapabilityBlock, computeReconState } from './utils/reconCapability.js';
 import { LEGACY_HAIKU_4_5, MODEL_BARRY_SONNET } from './utils/models.js';
+import { claudeErrorCode } from './utils/claudeResponse.js';
 import { processInitialInput, processFollowup } from './barryICPConversation.js';
 import { normalizeClassification, INTENT_PROSPECTING } from '../../src/utils/firstExperienceIntent.js';
 
@@ -1343,7 +1344,7 @@ Return valid JSON only:
             ? await processFollowup(anthropic, message, icpExtractionStep, conversationHistory, pendingICP)
             : await processInitialInput(anthropic, message, null);
         } catch (extractErr) {
-          console.warn('[barryMissionChat] Targeting extraction failed:', extractErr.message);
+          console.warn('[barryMissionChat] Targeting extraction failed:', claudeErrorCode(extractErr));
           extraction = null;
         }
 

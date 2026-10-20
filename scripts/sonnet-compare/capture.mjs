@@ -44,17 +44,21 @@ function installStubs() {
   return () => { for (const name of set) delete process.env[name]; };
 }
 
-/** Run `fn` with console output held back, so handler logs don't flood the report. */
-async function quietly(fn, verbose) {
+/** Run `fn` with console output held back, so handler logs don't flood the report. Errors and warnings are kept in `problems`. */
+async function quietly(fn, verbose, problems) {
   if (verbose) return fn();
   const saved = { log: console.log, warn: console.warn, error: console.error, info: console.info };
-  console.log = console.warn = console.error = console.info = () => {};
+  const keep = (...parts) => problems.push(parts.map((p) => (p instanceof Error ? p.message : typeof p === 'string' ? p : JSON.stringify(p))).join(' '));
+  console.log = console.info = () => {};
+  console.warn = console.error = keep;
   try { return await fn(); } finally { Object.assign(console, saved); }
 }
 
 /**
  * @param {{ verbose?: boolean, only?: string[] }} options
- * @returns {Promise<Array<{ site, file, label, request }>>} one entry per Claude request
+ * @returns {Promise<Array<{ site, file, label, request, response, usage, problems }>>} one entry per
+ *   Claude request, with what its case's handler returned, the usage rows it logged and the
+ *   errors and warnings it printed
  */
 export async function captureRequests({ verbose = false, only = null } = {}) {
   const removePlaceholders = installStubs();
@@ -69,10 +73,14 @@ export async function captureRequests({ verbose = false, only = null } = {}) {
       const handler = mod.handler ?? mod.default?.handler;
       const state = captureState();
       const before = state.requests.length;
-      await quietly(() => handler({ httpMethod: 'POST', headers: {}, body: JSON.stringify(c.body) }), verbose);
+      const usageBefore = state.usage.length;
+      const problems = [];
+      const result = await quietly(() => handler({ httpMethod: 'POST', headers: {}, body: JSON.stringify(c.body) }), verbose, problems);
       const sent = state.requests.slice(before);
+      const usage = state.usage.slice(usageBefore);
+      const response = result ? { statusCode: result.statusCode, body: result.body } : null;
       if (sent.length === 0) missing.push(`${c.site} / ${c.label}`);
-      for (const request of sent) captured.push({ site: c.site, file: c.file, label: c.label, request });
+      for (const request of sent) captured.push({ site: c.site, file: c.file, label: c.label, request, response, usage, problems });
     }
   } finally {
     globalThis.fetch = realFetch;

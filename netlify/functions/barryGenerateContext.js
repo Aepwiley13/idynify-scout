@@ -2,8 +2,8 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
-import { MODEL_BARRY_SONNET } from './utils/models.js';
-import { readClaudeText } from './utils/claudeResponse.js';
+import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
+import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -205,6 +205,7 @@ Generate the contextual layer now. Respond ONLY with valid JSON.`;
     const claudeResponse = await anthropic.messages.create({
       model: MODEL_BARRY_SONNET,
       max_tokens: 1500,
+      ...barrySonnetOptions('context'),
       messages: [
         {
           role: 'user',
@@ -239,7 +240,7 @@ Generate the contextual layer now. Respond ONLY with valid JSON.`;
 
     } catch (parseError) {
       console.error('Error parsing Barry response:', parseError);
-      throw new Error('Failed to generate valid context');
+      throw new Error('Failed to generate valid context', { cause: parseError });
     }
 
     // Log API usage
@@ -284,7 +285,7 @@ Generate the contextual layer now. Respond ONLY with valid JSON.`;
           provider: 'anthropic',
           model: MODEL_BARRY_SONNET,
           responseTime,
-          errorCode: error.message,
+          errorCode: claudeErrorCode(error),
           metadata: {}
         });
       }

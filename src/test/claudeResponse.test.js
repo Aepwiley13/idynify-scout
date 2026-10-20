@@ -11,7 +11,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { readClaudeText, ClaudeResponseError } from '../../netlify/functions/utils/claudeResponse.js';
+import { readClaudeText, ClaudeResponseError, findClaudeResponseError, claudeErrorCode } from '../../netlify/functions/utils/claudeResponse.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -90,6 +90,41 @@ describe('readClaudeText', () => {
   it('other completed stop reasons read normally', () => {
     expect(readClaudeText(reply([text('done')], 'stop_sequence'))).toBe('done');
     expect(readClaudeText({ content: [text('no stop_reason field')] })).toBe('no stop_reason field');
+  });
+});
+
+describe('claudeErrorCode: the reason a failed reply is logged under', () => {
+  const thrown = (response) => {
+    try { readClaudeText(response); } catch (err) { return err; }
+    throw new Error('expected readClaudeText to throw');
+  };
+
+  it('names each readClaudeText failure', () => {
+    expect(claudeErrorCode(thrown(reply([text('{"a"')], 'max_tokens')))).toBe('claude_truncated:max_tokens');
+    expect(claudeErrorCode(thrown(reply([], 'refusal', { stop_details: { category: 'cyber' } })))).toBe('claude_refusal:cyber');
+    expect(claudeErrorCode(thrown(reply([], 'refusal', { stop_details: null })))).toBe('claude_refusal');
+    expect(claudeErrorCode(thrown(null))).toBe('claude_malformed');
+    expect(claudeErrorCode(thrown(reply([thinking()])))).toBe('claude_empty:end_turn');
+  });
+
+  it('finds the reason through a user-facing wrapper', () => {
+    const inner = thrown(reply([text('{')], 'max_tokens'));
+    const wrapped = new Error('Failed to generate valid mission sequence', { cause: inner });
+    expect(findClaudeResponseError(wrapped)).toBe(inner);
+    expect(claudeErrorCode(wrapped)).toBe('claude_truncated:max_tokens');
+  });
+
+  it('recognizes a copy of the class from another module instance', () => {
+    const copy = Object.assign(new Error('incomplete'), { name: 'ClaudeResponseError', reason: 'truncated', stopReason: 'max_tokens' });
+    expect(claudeErrorCode(copy)).toBe('claude_truncated:max_tokens');
+  });
+
+  it('keeps any other error as its message, with what it wraps', () => {
+    expect(claudeErrorCode(new Error('API key not configured'))).toBe('API key not configured');
+    const parse = new SyntaxError('Unexpected end of JSON input');
+    expect(claudeErrorCode(new Error('Failed to generate valid context', { cause: parse })))
+      .toBe('Failed to generate valid context: Unexpected end of JSON input');
+    expect(claudeErrorCode('plain string')).toBe('plain string');
   });
 });
 

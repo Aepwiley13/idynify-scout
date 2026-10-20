@@ -1,8 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
-import { MODEL_BARRY_SONNET } from './utils/models.js';
-import { readClaudeText } from './utils/claudeResponse.js';
+import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
+import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
 import { APOLLO_INDUSTRIES, COMPANY_SIZE_OPTIONS, US_STATES } from '../../src/constants/targetingCanon.js';
 import { sanitizeCompanyKeywords } from '../../src/utils/companyKeywordsResidue.js';
 
@@ -345,7 +345,7 @@ export const handler = async (event) => {
           provider: 'anthropic',
           model: MODEL_BARRY_SONNET,
           responseTime,
-          errorCode: error.message,
+          errorCode: claudeErrorCode(error),
           metadata: {}
         });
       }
@@ -500,6 +500,7 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
   const response = await anthropic.messages.create({
     model: MODEL_BARRY_SONNET,
     max_tokens: 1500,
+    ...barrySonnetOptions('icp-initial'),
     messages: [{ role: 'user', content: prompt }]
   });
 
@@ -716,6 +717,7 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
   const response = await anthropic.messages.create({
     model: MODEL_BARRY_SONNET,
     max_tokens: 1500,
+    ...barrySonnetOptions('icp-followup'),
     messages: [{ role: 'user', content: prompt }]
   });
 
@@ -857,6 +859,7 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
   const response = await anthropic.messages.create({
     model: MODEL_BARRY_SONNET,
     max_tokens: 1500,
+    ...barrySonnetOptions('icp-example-company'),
     messages: [{ role: 'user', content: prompt }]
   });
 
@@ -953,6 +956,7 @@ RESPOND IN JSON:
   const response = await anthropic.messages.create({
     model: MODEL_BARRY_SONNET,
     max_tokens: 500,
+    ...barrySonnetOptions('icp-summary'),
     messages: [{ role: 'user', content: prompt }]
   });
 

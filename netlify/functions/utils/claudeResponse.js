@@ -73,3 +73,35 @@ export function readClaudeText(response) {
 
   return text;
 }
+
+/**
+ * The ClaudeResponseError behind `error`, looking through `cause` for handlers
+ * that wrap it in a user-facing message, or null.
+ */
+export function findClaudeResponseError(error) {
+  // Matched by name rather than instanceof: generate-followup.js is CommonJS
+  // and can hold its own copy of the class.
+  for (let e = error, depth = 0; e && depth < 5; e = e.cause, depth += 1) {
+    if (e.name === 'ClaudeResponseError' && typeof e.reason === 'string') return e;
+  }
+  return null;
+}
+
+/**
+ * The errorCode a handler logs for a failed Claude call. A readClaudeText
+ * failure keeps its reason, e.g. `claude_truncated:max_tokens`,
+ * `claude_refusal:cyber`, `claude_malformed`, so it can be counted; any other
+ * error keeps its message, with the message of the error it wraps after it.
+ *
+ * @param {unknown} error
+ * @returns {string}
+ */
+export function claudeErrorCode(error) {
+  const failure = findClaudeResponseError(error);
+  if (failure) {
+    const detail = failure.reason === 'refusal' ? failure.category : failure.stopReason;
+    return detail ? `claude_${failure.reason}:${detail}` : `claude_${failure.reason}`;
+  }
+  const message = error?.message ?? String(error);
+  return error?.cause?.message ? `${message}: ${error.cause.message}` : message;
+}

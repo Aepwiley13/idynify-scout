@@ -12,8 +12,8 @@
 
 const admin = require('firebase-admin');
 const Anthropic = require('@anthropic-ai/sdk');
-const { MODEL_BARRY_SONNET } = require('./utils/models.js');
-const { readClaudeText } = require('./utils/claudeResponse.js');
+const { MODEL_BARRY_SONNET, barrySonnetOptions } = require('./utils/models.js');
+const { readClaudeText, claudeErrorCode } = require('./utils/claudeResponse.js');
 
 // Initialize Firebase Admin (if not already initialized)
 if (!admin.apps.length) {
@@ -74,7 +74,10 @@ ${originalMessage}
 FOLLOW-UP GUIDANCE:
 ${outcome === 'no_response'
   ? '- They did not respond to the original message\n- Add new value or different angle\n- Keep it brief and respectful\n- Give them an easy way to respond'
-  : '- They replied (check their email for context)\n- This is to continue the conversation\n- Reference their response\n- Move toward next step'
+  // The reply's text is not sent to this endpoint, so the prompt must not
+  // claim it is available: asked to reference it, the model writes notes and
+  // placeholders into the draft instead (#699 comparison).
+  : '- They replied to the original message. Their reply is not included here, so you do not know what it said\n- Thank them for replying and continue the conversation\n- Do not quote, summarize, or guess at what they said\n- Move toward next step'
 }
 
 REQUIREMENTS:
@@ -84,12 +87,15 @@ REQUIREMENTS:
 - Include clear call-to-action
 - Do not use excessive formatting or emojis
 - Use their first name: ${contactData.firstName}
+- Output only the email itself: no notes, explanations, disclaimers, alternative versions, or any text before or after it
+- No placeholders or bracketed text to fill in, such as [Your Name] or [detail]; end with a short sign-off such as "Best," and no name
 
 Generate the follow-up email body:`;
 
     const message = await anthropic.messages.create({
       model: MODEL_BARRY_SONNET,
       max_tokens: 1000,
+      ...barrySonnetOptions('followup'),
       messages: [
         {
           role: 'user',
@@ -106,7 +112,7 @@ Generate the follow-up email body:`;
     };
 
   } catch (error) {
-    console.error('❌ Generate follow-up error:', error);
+    console.error('❌ Generate follow-up error:', claudeErrorCode(error), error);
     return {
       statusCode: 500,
       body: JSON.stringify({ error: error.message })

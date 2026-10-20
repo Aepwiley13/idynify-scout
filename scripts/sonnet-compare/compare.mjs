@@ -15,23 +15,39 @@ import Anthropic from '@anthropic-ai/sdk';
 import { captureRequests } from './capture.mjs';
 import { CHECKS, MESSAGE_WRITERS } from './checks.mjs';
 import { readClaudeText, ClaudeResponseError } from '../../netlify/functions/utils/claudeResponse.js';
-import { SONNET_4_5, SONNET_5_5, SONNET_4_6 } from '../../netlify/functions/utils/models.js';
+import { SONNET_4_5, SONNET_5_5, SONNET_4_6, barrySonnetOptions } from '../../netlify/functions/utils/models.js';
 
 // ─── What is compared ───────────────────────────────────────────────────────
 
-/** Each variant is the captured request with these fields replaced. */
+/**
+ * Each variant is the captured request with these fields replaced. A variant
+ * with `perSite` also gets that call site's own Sonnet 5.5 setting from
+ * models.js, which is exactly what production sends on that model.
+ */
 const VARIANTS = {
   'sonnet-4.5': { model: SONNET_4_5 },
+  // What production sends once BARRY_MODEL_SONNET is claude-sonnet-5-5.
+  'sonnet-5.5-barry': { model: SONNET_5_5, perSite: true },
   // Thinking off: Sonnet 5.5's replacement for {type: 'disabled'}. Effort stays at its default (high).
   'sonnet-5.5-between-tools': { model: SONNET_5_5, thinking: { type: 'between_tools' } },
   // Adaptive thinking (the default) held down by effort.
   'sonnet-5.5-low': { model: SONNET_5_5, output_config: { effort: 'low' } },
   // Not run by default: a plain model swap, the shape #699 warns against.
   'sonnet-5.5-default': { model: SONNET_5_5 },
-  // Not run by default: the fallback named in models.js.
+  // The fallback named in models.js, and the rollback target after 4.5 retires.
   'sonnet-4.6': { model: SONNET_4_6 },
 };
-const DEFAULT_VARIANTS = ['sonnet-4.5', 'sonnet-5.5-between-tools', 'sonnet-5.5-low'];
+const DEFAULT_VARIANTS = ['sonnet-4.5', 'sonnet-5.5-barry', 'sonnet-4.6'];
+
+/** The fields a variant decides. A captured request may carry them if capture ran with BARRY_MODEL_SONNET set. */
+const MODEL_SETTINGS = ['thinking', 'output_config'];
+
+function variantRequest(request, variant, site) {
+  const params = { ...request };
+  for (const field of MODEL_SETTINGS) delete params[field];
+  const { perSite, ...fields } = VARIANTS[variant];
+  return { ...params, ...fields, ...(perSite ? barrySonnetOptions(site, fields.model) : {}) };
+}
 
 /** List prices per million tokens [input, output], from #699 and the pricing docs (2026-10). Re-check before relying on totals. */
 const PRICES = { [SONNET_4_5]: [3, 15], [SONNET_4_6]: [3, 15], [SONNET_5_5]: [2, 10] };
@@ -111,7 +127,7 @@ console.log(`\nReport: ${outDir}/report.md\nRaw:    ${outDir}/results.json${args
 // ─── One request ────────────────────────────────────────────────────────────
 
 async function runOne(client, job) {
-  const params = { ...job.request, ...VARIANTS[job.variant] };
+  const params = variantRequest(job.request, job.variant, job.site);
   const row = {
     site: job.site, label: job.label, index: job.index, variant: job.variant,
     modelRequested: params.model, modelAnswered: null, maxTokens: params.max_tokens,

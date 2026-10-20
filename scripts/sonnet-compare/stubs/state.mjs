@@ -3,6 +3,6 @@
  * the CommonJS stubs and the ESM stubs are separate module instances.
  */
 export function captureState() {
-  globalThis.__sonnetCompare ??= { docs: new Map(), requests: [] };
+  globalThis.__sonnetCompare ??= { docs: new Map(), requests: [], usage: [] };
   return globalThis.__sonnetCompare;
 }

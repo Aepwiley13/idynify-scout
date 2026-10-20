@@ -3,6 +3,7 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
 import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
+import { OUTBOUND_COPY_RULES } from './utils/outboundCopyRules.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 
 // Initialize Firebase Admin (only once)
@@ -98,8 +99,8 @@ export const handler = async (event) => {
     // NEW: Tone mapping based on engagement intent (defaults to cold if not provided)
     const toneMap = {
       cold: 'professional, value-driven, establish credibility without being pushy',
-      warm: 'friendly but professional, reference shared context or connections',
-      hot: 'direct and conversational, assume rapport and get to the point',
+      warm: 'friendly but professional; mention shared context or connections only if they are given here',
+      hot: 'direct and conversational, get to the point',
       followup: 'persistent but respectful, add new value or perspective'
     };
     const selectedTone = toneMap[engagementIntent] || toneMap.cold; // DEFAULT: cold if missing
@@ -184,6 +185,8 @@ REQUIREMENTS:
 - Do NOT use buzzwords like "game-changer", "revolutionize", or "cutting-edge"
 - Be conversational and genuine
 - Match the ${engagementIntent || 'cold'} intent appropriately
+
+${OUTBOUND_COPY_RULES}
 
 Generate:
 1. Subject line (50 chars max)

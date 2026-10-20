@@ -8,6 +8,7 @@ import { checkRelationshipGuardrail, getGuardrailPromptModifier } from './utils/
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
 import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
+import { OUTBOUND_COPY_RULES } from './utils/outboundCopyRules.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 
 /**
@@ -385,7 +386,7 @@ BARRY'S EXISTING ANALYSIS OF THIS CONTACT:
     // Map engagement intent to tone guidance
     const intentToneMap = {
       prospect: 'This is a NEW contact - be professional, establish credibility, spark curiosity without being pushy',
-      warm: 'This is someone the user ALREADY KNOWS - be warm, reference shared context, conversational tone',
+      warm: 'This is someone the user ALREADY KNOWS - be warm, reference shared context only if it is given below, conversational tone',
       customer: 'This is an EXISTING CUSTOMER - be helpful, service-oriented, assume rapport',
       partner: 'This is a BUSINESS PARTNER - be collaborative, peer-to-peer, mutual value focused'
     };
@@ -433,7 +434,7 @@ ${structuredContext.strategic_value ? `- Strategic Value: ${structuredContext.st
 
 Calibrate messaging accordingly:
 - Cold contacts: Zero familiarity, no assumptions about shared context
-- Warm contacts: Can reference shared context, more conversational
+- Warm contacts: Can reference shared context that is given below, more conversational
 - Hot contacts: Precision matters, be specific and relevant
 - High-value contacts: Extra care on tone, subject lines, and personalization
 - Delegate contacts: Orient around the decision-maker they represent
@@ -504,6 +505,8 @@ STYLE GUIDELINES:
 - Match the relationship context (${engagementIntent || 'prospect'})
 - Keep messages between 3-6 sentences unless user specified otherwise
 - For the Humor-Driven option: be witty, self-aware, or playfully irreverent — NOT cheesy or forced. Think "clever subject line that earns the open" not "dad joke". The humor should serve the goal, not distract from it.
+
+${OUTBOUND_COPY_RULES}
 
 Generate the messages now. Respond ONLY with valid JSON.`;
 

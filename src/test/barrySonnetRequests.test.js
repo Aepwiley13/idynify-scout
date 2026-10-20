@@ -17,6 +17,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SONNET_4_5, SONNET_5_5, SONNET_4_6, BARRY_SONNET_5_5_SETTINGS } from '../../netlify/functions/utils/models.js';
 import { CHECKS } from '../../scripts/sonnet-compare/checks.mjs';
+import { OUTBOUND_COPY_RULES } from '../../netlify/functions/utils/outboundCopyRules.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const work = mkdtempSync(join(tmpdir(), 'barry-sonnet-'));
@@ -128,6 +129,42 @@ describe('the follow-up prompt', () => {
     for (const prompt of [...prompts('replied'), ...prompts('no_response')]) {
       expect(prompt).toContain('Output only the email itself: no notes, explanations, disclaimers, alternative versions, or any text before or after it');
       expect(prompt).toContain('No placeholders or bracketed text to fill in');
+    }
+  });
+});
+
+describe('the sequence-step, campaign-message and engagement-message prompts', () => {
+  const WRITERS = ['sequence-step', 'campaign-message', 'engagement-message'];
+
+  it.each(WRITERS)('%s: every prompt ends with the outbound-copy rules', (site) => {
+    const prompts = onDefault.filter((c) => c.site === site).map((c) => c.request.messages[0].content);
+    expect(prompts.length).toBeGreaterThanOrEqual(10);
+    for (const prompt of prompts) {
+      expect(prompt).toContain(OUTBOUND_COPY_RULES);
+      // After the endpoint's own requirements, so they override them.
+      expect(prompt.indexOf(OUTBOUND_COPY_RULES)).toBeGreaterThan(prompt.search(/^(?:REQUIREMENTS|RULES|STYLE GUIDELINES):$/m));
+      expect(prompt.search(/^(?:REQUIREMENTS|RULES|STYLE GUIDELINES):$/m)).toBeGreaterThan(0);
+    }
+  });
+
+  it('the rules forbid each thing the 330-call comparison found', () => {
+    for (const phrase of ['[Your Name]', '[calendar link]', 'end emails with "Best," and no name', 'Never sign as Barry',
+      'Do not invent meetings, calls, prior conversations, attachments', 'dates, times, customer outcomes, metrics, proof points or product capabilities',
+      'is a goal, not a result', 'Do not say or imply that you have spoken, met or been in touch before']) {
+      expect(OUTBOUND_COPY_RULES).toContain(phrase);
+    }
+  });
+
+  it('no tone instruction asks for shared context or rapport the input does not show', () => {
+    for (const { site, label, request } of onDefault.filter((c) => WRITERS.includes(c.site))) {
+      const prompt = request.messages[0].content;
+      expect(prompt, `${site} / ${label}`).not.toMatch(/assume rapport and get to the point|reference shared context or connections|reference shared context, conversational|Can reference shared context, more/);
+    }
+  });
+
+  it('the follow-up prompt is unchanged by this: it keeps its own rules', () => {
+    for (const { request } of onDefault.filter((c) => c.site === 'followup')) {
+      expect(request.messages[0].content).not.toContain(OUTBOUND_COPY_RULES);
     }
   });
 });

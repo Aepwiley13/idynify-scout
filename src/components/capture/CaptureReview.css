@@ -1,0 +1,9 @@
+/*
+ * Review shows each number whole, to check it against the card. The profile's
+ * phone rows cut a long number to one line; here it wraps instead.
+ */
+.capture-review .idc-entry-val {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+}

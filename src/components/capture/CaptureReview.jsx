@@ -10,6 +10,7 @@
 import { AlertTriangle } from 'lucide-react';
 import ContactPhones from '../contacts/ContactPhones';
 import '../contacts/IdentityCard.css';
+import './CaptureReview.css';
 
 const FIELDS = Object.freeze([
   { key: 'name', label: 'Name', autoComplete: 'off' },
@@ -93,7 +94,7 @@ function PersonDraft({ draft, index, count, onChange, T }) {
  */
 export default function CaptureReview({ people, onChange, T }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div className="capture-review" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {people.map((draft, index) => (
         <PersonDraft
           key={draft.key}

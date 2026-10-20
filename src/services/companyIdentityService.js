@@ -165,7 +165,7 @@ export async function findCompanyByName(userId, name) {
     if (hits.length === 0) return null;
     if (hits.length > 1) {
       console.warn('[company-identity] name maps to several companies — refusing to choose', {
-        name: trimmed, companyIds: hits.map(d => d.id),
+        companyIds: hits.map(d => d.id),
       });
       return null;
     }
@@ -265,7 +265,7 @@ export async function findCompanyByDomain(userId, domain) {
     if (hits.length === 0) return null;
     if (hits.length > 1) {
       console.warn('[company-identity] domain maps to several companies — refusing to choose', {
-        domain: target, companyIds: hits.map(d => d.id),
+        companyIds: hits.map(d => d.id),
       });
       return null;
     }
@@ -299,7 +299,7 @@ export async function resolveCompany(userId, candidate = {}, { source = 'unknown
   if (name) {
     const hit = await findCompanyByName(userId, name);
     if (hit) {
-      console.info('[company-identity] matched existing company on name', { source, companyId: hit.id, name });
+      console.info('[company-identity] matched existing company on name', { source, companyId: hit.id });
       return { companyId: hit.id, existing: hit, signal: 'name' };
     }
   }
@@ -310,12 +310,12 @@ export async function resolveCompany(userId, candidate = {}, { source = 'unknown
   if (domain) {
     const hit = await findCompanyByDomain(userId, domain);
     if (hit) {
-      console.info('[company-identity] matched existing company on domain', { source, companyId: hit.id, domain });
+      console.info('[company-identity] matched existing company on domain', { source, companyId: hit.id });
       return { companyId: hit.id, existing: hit, signal: 'domain' };
     }
   }
 
-  console.info('[company-identity] no match — new company', { source, apolloOrgId, name, domain });
+  console.info('[company-identity] no match — new company', { source, apolloOrgId });
   return { companyId: null, existing: null, signal: null };
 }
 
@@ -443,7 +443,7 @@ export async function ensureCompanyForContact(userId, candidate = {}, { source =
     apolloEnriched: false,
   }));
   console.info('[company-identity] created company for contact', {
-    source, companyId, name: derivedName, derivedFromDomain: !givenName,
+    source, companyId, derivedFromDomain: !givenName,
     signals: { domain: Boolean(domain), apolloOrgId: Boolean(apolloOrgId), linkedin: Boolean(linkedinUrl) },
   });
 

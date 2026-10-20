@@ -248,6 +248,27 @@ describe('retries never make a second person', () => {
     expect(contacts()[0].company_id).toBe(companies()[0].id);
   });
 
+  it('a reload after the save, before the profile opened: scanning the card again finds the person and writes nothing', async () => {
+    await lookAndSave(draft());
+    const writes = store.writes.length;
+    // The page reloaded: the scan on screen is gone, so this is a new scan of the same card.
+    const { shown, result } = await lookAndSave(draft(), { op: OP2 });
+    expect(shown.person).toMatchObject({ status: 'existing', contactId: `${OP}_p1` });
+    expect(result).toMatchObject({ status: 'saved', contactId: `${OP}_p1`, outcome: 'updated' });
+    expect(store.writes.length).toBe(writes);
+    expect(contacts()).toHaveLength(1);
+    expect(companies()).toHaveLength(1);
+  });
+
+  it('a reload with a name-and-company-only card: the saved person comes back as a possible match to confirm', async () => {
+    const nameOnly = draft({ email: '', linkedinUrl: '', phones: [] });
+    await lookAndSave(nameOnly);
+    const shown = await previewCapturePerson(UID, { operationId: OP2, index: 0, draft: nameOnly });
+    expect(shown.person).toMatchObject({ status: 'review', candidates: [expect.objectContaining({ contactId: `${OP}_p1` })] });
+    await saveCapturePerson(UID, { operationId: OP2, index: 0, draft: nameOnly, shown: shown.person, choices: { person: `${OP}_p1` } });
+    expect(contacts()).toHaveLength(1);
+  });
+
   it('a different scan of the same card finds the person it already saved', async () => {
     await lookAndSave(draft());
     const { shown, result } = await lookAndSave(draft(), { op: OP2 });
@@ -477,5 +498,47 @@ describe('it decides nothing on its own', () => {
       'firebase/firestore',
     ]);
     expect(src).not.toMatch(/capture_operations|addDoc|setDoc|deleteDoc|writeBatch/);
+  });
+});
+
+describe('the browser console gets no card value', () => {
+  // What a card says, in every form the matchers have printed: name, email,
+  // phone, LinkedIn, company name and website domain.
+  const CARD_VALUES = ['Avery', 'Quinn', 'avery.quinn', 'example.com', '4155550142', '415-555', 'linkedin.com/in', 'Robotics', 'Example Corp'];
+
+  function captureConsole() {
+    const lines = [];
+    for (const level of ['log', 'info', 'warn', 'error', 'debug']) {
+      vi.spyOn(console, level).mockImplementation((...args) => lines.push(JSON.stringify(args)));
+    }
+    return lines;
+  }
+
+  it('across a new person, an existing match, a possible match and a company match, only codes and ids are printed', async () => {
+    const lines = captureConsole();
+    await lookAndSave(draft());                                                         // new person, new company
+    await lookAndSave(draft(), { op: OP2 });                                            // existing match on email
+    putContact('c_weak', { name: 'Jordan Lee', company_name: 'Example Robotics' });
+    await lookAndSave(draft({ name: 'Jordan Lee', email: '', linkedinUrl: '', phones: [] }), {
+      op: 'cap_0b1c2d3e-4f5a-4b6c-8d7e-8f9a0b1c2d3e', choices: { person: 'new' },
+    });                                                                                 // possible match
+    putCompany('co_corp', { name: 'Example Corp', domain: 'example.org', status: 'accepted' });
+    await lookAndSave(draft({ name: 'Riley Park', email: 'riley@example.org', company: 'Example Corporation', website: 'www.example.org', linkedinUrl: '', phones: [] }), {
+      op: 'cap_1c2d3e4f-5a6b-4c7d-9e8f-9a0b1c2d3e4f',
+    });                                                                                 // possible company (same domain)
+
+    expect(lines.length).toBeGreaterThan(0);                                            // the matchers did report
+    expect(lines.filter(line => CARD_VALUES.some(v => line.includes(v)) || /Jordan|Riley|example\.org/.test(line))).toEqual([]);
+  });
+
+  it('a failed lookup reports the field and the error code, not the value looked up', async () => {
+    const lines = captureConsole();
+    // Every query fails: the store cannot be read.
+    const realGet = store.docs.keys.bind(store.docs);
+    store.docs.keys = () => { throw Object.assign(new Error('unavailable'), { code: 'unavailable' }); };
+    await expect(previewCapturePerson(UID, { operationId: OP, index: 0, draft: draft() })).rejects.toThrow('unavailable');
+    store.docs.keys = realGet;
+    expect(lines.some(line => line.includes('lookup failed'))).toBe(true);
+    expect(lines.filter(line => CARD_VALUES.some(v => line.includes(v)))).toEqual([]);
   });
 });

@@ -81,4 +81,11 @@ Save resolves the person again. If the match changed since it was shown (for exa
 
 ## Logging
 
-The flow sends no card value to any server log. The shared identity and company resolvers write their usual match lines to the browser console, as Add Manually does; nothing captures or ships those lines.
+The flow sends no card value to any server log, and none to the browser console. The shared matchers' console lines carry codes and record IDs only: the match signal, the source, contact and company IDs, and an error's field and code. Their in-memory resolution log, used by tests and never printed, still holds the identifiers.
+
+## Reloads and connection loss
+
+- **New person.** The create is a Firestore transaction. It needs a connection and is either committed or not, so a reload cannot leave it queued or half-written.
+- **Existing person.** The update is a single additive write. With the app's offline persistence, a pending update survives a reload and is sent later; applying it late is harmless.
+- **Company.** It is linked or created before the person. A reload between the two leaves the company in place, and the next save of that card finds it and links it.
+- **After a reload.** The scan on screen is gone, so scanning the card again starts a new scan. An exact identifier (email, LinkedIn, a mobile, direct or home number) brings back "Already in IDYNIFY", and saving writes nothing new. A card with only a name and company brings the saved person back as a possible match to confirm.

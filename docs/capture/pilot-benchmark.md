@@ -2,7 +2,7 @@
 
 The pilot answers one question with real cards: does IDYNIFY read the person and company off a business card well enough to build Review → Match → Save Person on top of it? It also picks the model and prompt version that move forward. `scripts/captureBenchmark.mjs` runs it on your machine, through the same path as the endpoint: photo preparation, the extractor, the orchestrator and the assembler.
 
-Everything stays local. Photos, labels and per-card results live in `capture-pilot/`, which is git-ignored. The script refuses to write card data anywhere git would track. Only each run's `summary.json` (counts, rates, timings, cost, versions) is safe to share or commit.
+Everything stays local. Photos, labels and per-card results live in `capture-pilot/`, which is git-ignored. The script refuses to write card data anywhere git would track. Only each run's `summary.json` (counts, rates, timings, cost, versions) and `report.json` (counts by level, warning, swap and phone country) are safe to share or commit.
 
 ## 1. The 50 cards
 
@@ -94,7 +94,25 @@ What the app would show counts: a value that is not `unknown`.
 | Latency | Extraction time per card (preparation excluded): p50, p95, max. The endpoint adds network and Firestore time on top. |
 | Cost | From the tokens used and the model that actually answered. |
 
-## 5. The gate: when we move on to Review → Match → Save Person
+## 5. The report: where the misses are
+
+```
+node scripts/captureBenchmark.mjs report                              # every run so far
+node scripts/captureBenchmark.mjs report capture-pilot/runs/<run>     # one run
+```
+
+`report` reads the per-card results that a run already wrote and adds what the gate doesn't show. It reads no photos, calls no API (no key needed), and leaves `summary.json` and `results.jsonl` as they were. It writes `report.json` beside them, holding counts only, and prints it:
+
+| Section | What it counts |
+|---|---|
+| Levels by field | For name, title, company, website, LinkedIn, each email and each phone: how many were `confirmed`, `likely`, `possible` and `unknown`, and how many of each were right. Right means the value is what is printed; for `unknown` (shown empty), right means nothing is printed there. For emails and phones, `not read` counts printed values that no read value matched. |
+| Warnings | Each warning code (every check that isn't a pass, such as `WEAK_COMPANY_TEXT` or `phone_country_unresolved`): how many fields carried it, on how many cards, and where (`company.name`, `company.safeguards`, `person.phones` and so on). Only codes from the contract's own list are named; anything else is counted as `other`. |
+| Role swaps by pair | `printed → read as`, for the six pairs among name, title and company. "title → company" means the printed title was read as the company. A card can count in more than one pair. Same test as the gate's role-swap rate. |
+| Phone country | Each read phone: `resolved` (a country is known), `unresolved` (national digits only, no country) or `invalid`. |
+
+A value counts as right exactly when the gate counts it right. The report scores each card against its label **as it is now**. If a label was corrected after the run, the report says how many cards now score differently from that run's `summary.json`; the gate figures in `summary.json` stay as they were.
+
+## 6. The gate: when we move on to Review → Match → Save Person
 
 On the 50 labelled cards:
 

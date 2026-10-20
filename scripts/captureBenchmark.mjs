@@ -10,6 +10,10 @@
  *   run            read every finished label's photo with each --config and
  *                  score it: accuracy, invented values, latency, cost, gate
  *   compare        the aggregate summaries of earlier runs, side by side
+ *   report         for runs that already exist: confidence levels and the
+ *                  accuracy within each, warning codes, role swaps by pair and
+ *                  phone-country resolution. Reads results.jsonl, calls no API,
+ *                  writes report.json (aggregates only) beside summary.json
  *
  *   --dir <path>           the pilot folder (default ./capture-pilot)
  *   --config <m[:effort]>  model and effort, repeatable or comma-separated
@@ -38,7 +42,8 @@ import process from 'node:process';
 import { preparePhoto, estimateCost, extractorEnv } from './captureTry.mjs';
 import { resolveExtractor } from '../netlify/functions/utils/capture/extractors.js';
 import { runExtraction } from '../netlify/functions/utils/capture/orchestrator.js';
-import { validateEmail, validateLinkedInPerson, domainKey, personNameKey } from '../src/capture/validators.js';
+import { CHECKS, validateEmail, validateLinkedInPerson, domainKey, personNameKey } from '../src/capture/validators.js';
+import { KNOWN_CHECKS } from '../src/capture/contract.js';
 import { nameKey, normalizeCapturePhone } from '../src/utils/identityNormalization.js';
 
 export const LABEL_VERSION = 'capture-label/v1';
@@ -66,7 +71,7 @@ export const PILOT_GATE = Object.freeze([
 
 // ─── Arguments ──────────────────────────────────────────────────────────────
 
-const COMMANDS = ['draft-labels', 'check-labels', 'run', 'compare'];
+const COMMANDS = ['draft-labels', 'check-labels', 'run', 'compare', 'report'];
 
 export function parseArgs(argv) {
   const [command, ...rest] = argv;
@@ -87,7 +92,7 @@ export function parseArgs(argv) {
       if (!Number.isInteger(n) || n < 1) throw new Error(`${arg} needs a whole number of at least 1`);
       options[arg.slice(2)] = n;
     } else if (arg.startsWith('--')) throw new Error(`unknown option ${arg}`);
-    else if (command === 'compare') options.runs.push(arg);
+    else if (command === 'compare' || command === 'report') options.runs.push(arg);
     else throw new Error(`unexpected argument ${arg}`);
   }
   if (!options.configs.length) options.configs.push(options.extractor === 'fake' ? 'fake' : DEFAULT_CONFIG);
@@ -381,6 +386,207 @@ export function printSummary(summary, out) {
   for (const r of summary.gate.results) out(`    ${r.pass ? '✓' : '✗'} ${pad(r.label, 26)} ${pad(formatGateValue(r.id, r.value), 10)} target ${r.target}`);
 }
 
+// ─── The report: levels, warnings, swap pairs, phone country ─────────────────
+//
+// Reporting only. Everything below reads a run's results.jsonl after the fact
+// and counts; nothing here reads a photo, builds an extractor or changes how a
+// card is scored for the gate. It reuses scoreSingle, KEYS and samePhone so a
+// value counts as right exactly when the gate counts it right.
+
+export const REPORT_VERSION = 'capture-benchmark-report/v1';
+export const REPORT_LEVELS = Object.freeze(['confirmed', 'likely', 'possible', 'unknown']);
+export const REPORT_FIELDS = Object.freeze(['name', 'title', 'company', 'website', 'linkedin', 'email', 'phone']);
+const ROLES = ['name', 'title', 'company'];
+/** "title → company": the printed title was read into the company field. */
+export const SWAP_PAIRS = Object.freeze(ROLES.flatMap(printed => ROLES.filter(f => f !== printed).map(f => `${printed} → ${f}`)));
+
+const SINGLE_FIELDS = {
+  name: ['person', 'fullName'], title: ['person', 'title'], linkedin: ['person', 'linkedinUrl'],
+  company: ['company', 'name'], website: ['company', 'website'],
+};
+
+/** Codes that report a check passing. Every other code a field carries is a warning. */
+const PASS_CHECKS = new Set([
+  CHECKS.EMAIL_SYNTAX_OK, CHECKS.HOST_OK, CHECKS.URL_OK, CHECKS.LINKEDIN_PERSON_OK, CHECKS.LINKEDIN_COMPANY_OK, CHECKS.PHONE_OK,
+]);
+
+/** Only codes from the contract's closed set are reported by name; anything else is "other". */
+const codeName = code => (typeof code === 'string' && KNOWN_CHECKS.has(code) ? code : 'other');
+
+const levelOf = f => (f && f.value !== null && REPORT_LEVELS.includes(f.extraction?.level) ? f.extraction.level : 'unknown');
+
+/**
+ * Where each printed or read value of one card landed: [field, level, right].
+ * For confirmed, likely and possible, right means the value is what is printed.
+ * For unknown (shown empty), right means nothing is printed there. `notRead`
+ * counts printed emails and phones that no read value matched at all.
+ */
+export function levelOutcomes(label, extraction) {
+  const outcomes = [];
+  for (const [field, [section, key]] of Object.entries(SINGLE_FIELDS)) {
+    const truth = section === 'person' ? label.person[key] : label.company[key];
+    const read = extraction[section]?.[key];
+    const level = levelOf(read);
+    if (level === 'unknown') outcomes.push([field, level, !present(truth)]);
+    else outcomes.push([field, level, scoreSingle(truth, read, KEYS[field]).correct]);
+  }
+  const notRead = {};
+  for (const [field, truths, items, key, same] of [
+    ['email', label.person.emails, extraction.person?.emails ?? [], KEYS.email, undefined],
+    ['phone', label.person.phones, extraction.person?.phones ?? [], KEYS.phone, samePhone],
+  ]) {
+    const match = same ?? ((a, b) => a === b);
+    const remaining = truths.filter(present).map(key);
+    const take = (value) => {
+      const k = key(value);
+      const i = remaining.findIndex(t => match(t, k));
+      if (i < 0) return false;
+      remaining.splice(i, 1);
+      return true;
+    };
+    // Shown values first, in order, as scoreList pairs them for the gate.
+    for (const item of items.filter(shown)) outcomes.push([field, item.extraction.level, take(item.value)]);
+    // A value read but left unknown is wrong when it is one of the printed ones.
+    for (const item of items.filter(i => i && !shown(i))) outcomes.push([field, 'unknown', !(typeof item.value === 'string' && take(item.value))]);
+    notRead[field] = remaining.length;
+  }
+  return { outcomes, notRead };
+}
+
+/** Which printed role landed in which field, as SWAP_PAIRS names. The same test as the gate's roleSwap. */
+export function swapPairs(label, extraction) {
+  const k = personNameKey;
+  const truth = { name: k(label.person.fullName ?? ''), title: k(label.person.title ?? ''), company: k(label.company.name ?? '') };
+  const got = {
+    name: shown(extraction.person.fullName) ? k(extraction.person.fullName.value) : null,
+    title: shown(extraction.person.title) ? k(extraction.person.title.value) : null,
+    company: shown(extraction.company.name) ? k(extraction.company.name.value) : null,
+  };
+  const pairs = [];
+  for (const [field, value] of Object.entries(got)) {
+    if (!value || value === truth[field]) continue;
+    for (const [printed, t] of Object.entries(truth)) if (printed !== field && t && t === value) pairs.push(`${printed} → ${field}`);
+  }
+  return pairs;
+}
+
+/** Every field of an extraction with a schema path (never a value) for where it sits. */
+function* fieldsWithPaths(extraction) {
+  const p = extraction.person ?? {};
+  const c = extraction.company ?? {};
+  for (const key of ['fullName', 'givenName', 'middleName', 'familyName', 'suffix', 'title', 'linkedinUrl']) yield [`person.${key}`, p[key]];
+  for (const email of p.emails ?? []) yield ['person.emails', email];
+  for (const phone of p.phones ?? []) yield ['person.phones', phone];
+  for (const key of ['name', 'domain', 'website', 'address', 'linkedinUrl']) yield [`company.${key}`, c[key]];
+}
+
+/** Warning codes on one card: [code, where] for each field carrying one, plus the company's safeguards. */
+export function cardWarnings(extraction) {
+  const found = [];
+  for (const [path, f] of fieldsWithPaths(extraction)) {
+    for (const code of f?.extraction?.checks ?? []) if (!PASS_CHECKS.has(code)) found.push([codeName(code), path]);
+  }
+  for (const code of extraction.company?.safeguards ?? []) found.push([codeName(code), 'company.safeguards']);
+  return found;
+}
+
+/** Each read phone: resolved (a country is known), unresolved (national digits only) or invalid. */
+export function phoneCountry(extraction) {
+  const counts = { resolved: 0, unresolved: 0, invalid: 0 };
+  for (const phone of extraction.person?.phones ?? []) {
+    const checks = phone?.extraction?.checks ?? [];
+    if (checks.includes(CHECKS.PHONE_COUNTRY_UNRESOLVED)) counts.unresolved += 1;
+    else if (checks.includes(CHECKS.PHONE_OK)) counts.resolved += 1;
+    else counts.invalid += 1;
+  }
+  return counts;
+}
+
+/**
+ * The report over one run. `entries` are { label, result }: the card's label
+ * as it is now (null when missing, a draft or malformed) and its results.jsonl
+ * line. Counts only; no value, photo name or label text is kept.
+ */
+export function buildReport(entries) {
+  const cell = () => ({ count: 0, right: 0, accuracy: null });
+  const levels = Object.fromEntries(REPORT_FIELDS.map(f => [f, Object.fromEntries(REPORT_LEVELS.map(l => [l, cell()]))]));
+  const notRead = { email: 0, phone: 0 };
+  const warnings = {};
+  const pairs = Object.fromEntries(SWAP_PAIRS.map(p => [p, 0]));
+  const phones = { resolved: 0, unresolved: 0, invalid: 0 };
+  const cards = { inRun: entries.length, scored: 0, failedReads: 0, withoutFinishedLabel: 0, scoredDifferentlyNow: 0 };
+  let swapCards = 0;
+
+  for (const { label, result } of entries) {
+    const extraction = result?.ok ? result.extraction : null;
+    if (!extraction) { cards.failedReads += 1; continue; }
+    if (!label) { cards.withoutFinishedLabel += 1; continue; }
+    cards.scored += 1;
+    // The run scored this card against its label then; a different score now
+    // means the label was corrected since, and this report uses the new one.
+    if (result.score && JSON.stringify(scoreCard(label, extraction)) !== JSON.stringify(result.score)) cards.scoredDifferentlyNow += 1;
+
+    const { outcomes, notRead: missing } = levelOutcomes(label, extraction);
+    for (const [field, level, right] of outcomes) {
+      levels[field][level].count += 1;
+      if (right) levels[field][level].right += 1;
+    }
+    notRead.email += missing.email;
+    notRead.phone += missing.phone;
+
+    const seen = new Set();
+    for (const [code, where] of cardWarnings(extraction)) {
+      warnings[code] ??= { fields: 0, cards: 0, where: {} };
+      if (where !== 'company.safeguards') warnings[code].fields += 1;
+      warnings[code].where[where] = (warnings[code].where[where] ?? 0) + 1;
+      if (!seen.has(code)) { seen.add(code); warnings[code].cards += 1; }
+    }
+
+    const cardPairs = swapPairs(label, extraction);
+    if (cardPairs.length) swapCards += 1;
+    for (const pair of new Set(cardPairs)) pairs[pair] += 1;
+
+    const country = phoneCountry(extraction);
+    for (const key of Object.keys(phones)) phones[key] += country[key];
+  }
+
+  for (const byLevel of Object.values(levels)) for (const c of Object.values(byLevel)) c.accuracy = ratio(c.right, c.count);
+  const sortedWarnings = Object.fromEntries(Object.entries(warnings).sort(([a, x], [b, y]) => y.cards - x.cards || a.localeCompare(b)));
+  return {
+    report: REPORT_VERSION,
+    cards,
+    levels,
+    notRead,
+    warnings: sortedWarnings,
+    roleSwaps: { cards: swapCards, pairs },
+    phoneCountry: phones,
+  };
+}
+
+export function printReport(report, out) {
+  const r = report;
+  out(`\n${r.run} · prompt ${r.promptVersion ?? '–'} · ${r.cards.scored} cards scored`
+    + `${r.cards.failedReads ? ` · ${r.cards.failedReads} failed reads` : ''}`
+    + `${r.cards.withoutFinishedLabel ? ` · ${r.cards.withoutFinishedLabel} without a finished label` : ''}`);
+  if (r.cards.scoredDifferentlyNow) out(`  note: ${r.cards.scoredDifferentlyNow} cards score differently against today's labels than when this run was made; this report uses today's`);
+  const cellText = c => (c.count ? `${c.count} · ${pct(c.accuracy)}` : '–');
+  out(`  ${pad('levels', 10)} ${REPORT_LEVELS.map(l => pad(l, 15)).join(' ')}  (count · % right)`);
+  for (const field of REPORT_FIELDS) {
+    const extra = field in r.notRead && r.notRead[field] ? `  not read ${r.notRead[field]}` : '';
+    out(`  ${pad(field, 10)} ${REPORT_LEVELS.map(l => pad(cellText(r.levels[field][l]), 15)).join(' ')}${extra}`);
+  }
+  out('             right = the value is what is printed; for unknown, nothing is printed there');
+  const warnings = Object.entries(r.warnings);
+  out(`  warnings   ${warnings.length ? '(fields · cards)' : 'none'}`);
+  for (const [code, w] of warnings) {
+    const where = Object.entries(w.where).map(([path, n]) => `${path} ${n}`).join(' · ');
+    out(`    ${pad(code, 26)} ${pad(`${w.fields} · ${w.cards}`, 10)} ${where}`);
+  }
+  out(`  role swaps ${r.roleSwaps.cards} cards  (printed → read as)`);
+  out(`    ${SWAP_PAIRS.map(p => `${p} ${r.roleSwaps.pairs[p]}`).join(' · ')}`);
+  out(`  phones     country resolved ${r.phoneCountry.resolved} · unresolved ${r.phoneCountry.unresolved} · invalid ${r.phoneCountry.invalid}`);
+}
+
 // ─── Commands ───────────────────────────────────────────────────────────────
 
 async function pool(items, size, fn) {
@@ -524,6 +730,57 @@ function compare(options, out) {
   return 0;
 }
 
+/** The card's label as it is now, when it is finished and well-formed; else null. */
+function finishedLabel(labelsDir, photo) {
+  if (typeof photo !== 'string') return null;
+  const path = join(labelsDir, `${basename(photo, extname(photo))}.json`);
+  if (!existsSync(path)) return null;
+  try {
+    const label = JSON.parse(readFileSync(path, 'utf8'));
+    return checkLabel(label, photo).length === 0 && label.status === 'done' ? label : null;
+  } catch {
+    return null;
+  }
+}
+
+/** report.json for each run that has per-card results. Reads local files only: no API, no photos. */
+function report(options, out) {
+  const { runs: runsDir, labels: labelsDir } = pilotPaths(options.dir);
+  const dirs = options.runs.length ? options.runs : (existsSync(runsDir) ? readdirSync(runsDir).sort().map(d => join(runsDir, d)) : []);
+  const withResults = dirs.filter(d => existsSync(join(d, 'results.jsonl')));
+  if (!withResults.length) { out('no runs with per-card results yet: run first, then report'); return 1; }
+  for (const dir of withResults) {
+    assertLocal(dir);
+    let unreadableLines = 0;
+    const entries = readFileSync(join(dir, 'results.jsonl'), 'utf8').split('\n').filter(Boolean).flatMap((line) => {
+      try {
+        const result = JSON.parse(line);
+        return [{ result, label: finishedLabel(labelsDir, result.photo) }];
+      } catch {
+        unreadableLines += 1;                                   // an interrupted run's last line
+        return [];
+      }
+    });
+    const summaryPath = join(dir, 'summary.json');
+    const summary = existsSync(summaryPath) ? JSON.parse(readFileSync(summaryPath, 'utf8')) : null;
+    const { report: version, cards, ...counts } = buildReport(entries);
+    const built = {
+      report: version,
+      run: basename(dir),
+      config: summary?.config ?? null,
+      promptVersion: summary?.extractor?.promptVersion ?? null,
+      commit: summary?.commit ?? null,
+      createdAt: new Date().toISOString(),
+      cards: { ...cards, unreadableLines },
+      ...counts,
+    };
+    writeFileSync(join(dir, 'report.json'), `${JSON.stringify(built, null, 2)}\n`);
+    printReport(built, out);
+    out(`  written: ${join(dir, 'report.json')}`);
+  }
+  return 0;
+}
+
 export async function main(argv = process.argv.slice(2), { out = console.log, env = process.env } = {}) {
   let options;
   try {
@@ -537,6 +794,7 @@ export async function main(argv = process.argv.slice(2), { out = console.log, en
     if (options.command === 'draft-labels') return await draftLabels(options, env, out);
     if (options.command === 'check-labels') return checkLabels(options, out);
     if (options.command === 'run') return await run(options, env, out);
+    if (options.command === 'report') return report(options, out);
     return compare(options, out);
   } catch (error) {
     out(`captureBenchmark: ${error.message}`);

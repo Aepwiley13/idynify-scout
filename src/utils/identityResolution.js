@@ -320,12 +320,19 @@ async function findByLinkedIn(adapter, normalized, raw) {
 async function findByPhone(adapter, normalized) {
   if (!normalized) return null;
 
+  // A record with a typed phone list answers to its own mobile, direct or home
+  // number only. Its `phone` field can hold a shared main or work line, and a
+  // query on that field would otherwise match it, so a typed record a query
+  // finds is kept only when that is its identity number. Untyped records are
+  // matched as before.
+  const own = docs => docs.filter(d => !Array.isArray(d.phones) || extractIdentifiers(d).phone === normalized);
+
   const byNormalizedField = await adapter.findByField('phone_normalized', normalized);
-  const hit = single('phone', normalized, byNormalizedField);
+  const hit = single('phone', normalized, own(byNormalizedField));
   if (hit) return hit;
 
   const byRaw = await adapter.findByField('phone', normalized);
-  const rawHit = single('phone', normalized, byRaw);
+  const rawHit = single('phone', normalized, own(byRaw));
   if (rawHit) return rawHit;
 
   return single('phone', normalized, await scanFor(adapter, 'phone', normalized));
@@ -488,6 +495,9 @@ const IDENTIFIER_FIELDS = Object.freeze([
   'twitter_url', 'facebook_url', 'photo_url', 'location', 'department', 'seniority',
 ]);
 
+/** Single phone fields derived from a typed `phones[]` list; a merge leaves them to it. */
+const LIST_OWNED_PHONE_FIELDS = Object.freeze(['phone', 'phone_normalized', 'phone_mobile']);
+
 /**
  * Canonical fields a merge may FILL when the record has no value — never
  * overwrite when it does.
@@ -546,9 +556,20 @@ export function mergeIdentifiers(existingContact = {}, newSource = {}) {
       patch.linkedin_url_normalized = incoming.linkedinUrl;
     }
   }
-  if (incoming.phone) {
+  // A record with a typed phone list owns its numbers: the list decides which
+  // one identifies the person, and a merge does not write around it.
+  const typedPhones = Array.isArray(existingContact.phones);
+  if (incoming.phone && !typedPhones) {
     put('phone', newSource.phone ?? incoming.phone);
-    if (existingContact.phone_normalized !== incoming.phone) patch.phone_normalized = incoming.phone;
+    // The identity key follows the record's own number. It used to take the
+    // incoming one whenever the two differed while `phone` kept the record's,
+    // so a contact showed one number and was matched on another.
+    if ('phone' in patch) {
+      patch.phone_normalized = incoming.phone;
+    } else if (!existingContact.phone_normalized) {
+      const ownPhone = extractIdentifiers(existingContact).phone;
+      if (ownPhone) patch.phone_normalized = ownPhone;
+    }
   }
 
   put('apollo_person_id', incoming.apolloPersonId);
@@ -558,6 +579,7 @@ export function mergeIdentifiers(existingContact = {}, newSource = {}) {
   // here rather than in a second loop — `put` is what enforces the difference.
   for (const field of [...IDENTIFIER_FIELDS, ...FILLABLE_CANONICAL_FIELDS]) {
     if (field in patch) continue;
+    if (typedPhones && LIST_OWNED_PHONE_FIELDS.includes(field)) continue;
     put(field, newSource[field]);
   }
 

@@ -11,12 +11,14 @@
  * Deliberately dependency-free. No Firestore, no React, no firebase-admin.
  * `scripts/detectDuplicateContacts.mjs` runs under Node with the Admin SDK and
  * `src/services/contactIdentityService.js` runs in the browser with the web
- * SDK; the only way both can share this code is if it imports neither.
+ * SDK; the only way both can share this code is if it imports neither. Its one
+ * import, phoneLabels.js, is a list of constants that imports nothing.
  *
  * Every function is total: any input, including null and the wrong type,
  * returns either a normalized string or null. A normalizer that throws on a
  * malformed record would take down a save, and malformed records exist.
  */
+import { PERSON_PHONE_LABELS } from './phoneLabels.js';
 
 /**
  * Normalize an email for matching: lowercase, trim.
@@ -78,6 +80,24 @@ export function normalizeLoose(value) {
 }
 
 /**
+ * The number in a typed phone list that identifies the person: the first
+ * mobile, then direct, then home number (PERSON_PHONE_LABELS), without its
+ * extension. Null when the list has none, whatever else it holds. The same
+ * choice as contactPhones.identityPhone, so a record's stored
+ * `phone_normalized` and what this reads agree.
+ */
+function personPhone(phones) {
+  for (const label of PERSON_PHONE_LABELS) {
+    for (const entry of phones) {
+      if (entry?.label !== label || typeof entry.value !== 'string') continue;
+      const value = entry.value.replace(PHONE_EXTENSION, '').trim();
+      if (normalizePhone(value)) return value;
+    }
+  }
+  return null;
+}
+
+/**
  * Pull the identifiers out of whatever shape a contact-ish record happens to
  * hold.
  *
@@ -100,14 +120,21 @@ export function extractIdentifiers(candidate = {}) {
     ?? null
   );
 
-  const phoneSource =
-    candidate.phone_normalized
-    ?? candidate.phone
-    ?? candidate.phone_mobile
-    ?? candidate.mobile_phone
-    ?? candidate.phone_numbers?.[0]?.sanitized_number
-    ?? candidate.phone_numbers?.[0]
-    ?? null;
+  // A record with a typed phone list (`phones[]`) is identified only by a
+  // number of the person's own: mobile, direct or home. A main, work, fax,
+  // other or unknown line can be shared by everyone at a company, and matching
+  // on it would merge two coworkers. Such a record never falls back to `phone`,
+  // which may hold exactly that shared line. A record without the list keeps
+  // the older fields until its numbers are typed.
+  const phoneSource = Array.isArray(candidate.phones)
+    ? personPhone(candidate.phones)
+    : candidate.phone_normalized
+      ?? candidate.phone
+      ?? candidate.phone_mobile
+      ?? candidate.mobile_phone
+      ?? candidate.phone_numbers?.[0]?.sanitized_number
+      ?? candidate.phone_numbers?.[0]
+      ?? null;
 
   return {
     contactId: candidate.contactId ?? candidate.contact_id ?? null,

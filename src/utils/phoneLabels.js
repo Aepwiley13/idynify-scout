@@ -59,8 +59,9 @@ const printedKey = text => text.toLowerCase().replace(/[.:]/g, '').replace(/\s+/
 
 /**
  * The label for a label printed beside a number on a card ("C", "Main Line:").
- * Not used by Capture yet: Capture keeps its own table until the change that
- * moves it here, after the 50-card pilot.
+ * The Scan Business Card review uses it for the word printed before each
+ * number (components/capture/captureDraft.js). Capture's extraction keeps its
+ * own table until the change that moves it here, after the 50-card pilot.
  *
  * @param {string|null|undefined} observed
  * @returns {string} one of CONTACT_PHONE_LABELS

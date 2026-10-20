@@ -1,7 +1,8 @@
 /**
- * The Capture Lab's only two calls: is capture on for me (captureConfig), and
- * read this prepared photo (captureExtract). Both are read-only: nothing is
- * matched or saved, and neither touches contacts, companies or relationships.
+ * The Capture Lab's only two calls, also used by Scan Business Card in Scout+:
+ * is capture on for me (captureConfig), and read this prepared photo
+ * (captureExtract). Both are read-only: nothing is matched or saved, and
+ * neither touches contacts, companies or relationships.
  *
  * Always as the signed-in user themselves (auth.currentUser), never an
  * impersonated user: captureExtract accepts only the token's own user.

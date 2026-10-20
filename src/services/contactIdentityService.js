@@ -122,7 +122,7 @@ export function createWebAdapter(userId) {
         const snap = await getDocs(query(contactsRef(userId), where(field, '==', value), limit(5)));
         return snap.docs.map(d => ({ id: d.id, ...d.data() }));
       } catch (err) {
-        console.error('[contact-identity] lookup failed', { field, value, code: err?.code, message: err?.message });
+        console.error('[contact-identity] lookup failed', { field, code: err?.code, message: err?.message });
         throw err;
       }
     },

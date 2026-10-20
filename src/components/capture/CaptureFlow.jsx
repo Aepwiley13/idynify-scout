@@ -9,9 +9,10 @@
  * the signed-in user, with one new scan (operationId) per photo and a retry of
  * the same scan only when the endpoint says the failure is retryable.
  *
- * This step saves nothing. The only record a scan leaves is captureExtract's
- * own values-free operation record. The photo stays in memory on this screen
- * and is never stored or logged.
+ * Reading saves nothing: the only record a scan leaves is captureExtract's
+ * own values-free operation record. Saving the reviewed people is the
+ * caller's `renderActions` (Scout+ passes CaptureSavePanel). The photo stays
+ * in memory on this screen and is never stored or logged.
  */
 import { useState } from 'react';
 import { Camera, ImagePlus, RotateCcw, Loader, PencilLine } from 'lucide-react';
@@ -59,7 +60,7 @@ function PhotoButtons({ onPhoto, primaryLabel = 'Take photo', T }) {
 /**
  * @param {object}   props
  * @param {Function} [props.prepare]  the photo preparation (injectable for tests)
- * @param {Function} [props.renderActions]  ({ people, setPeople, startOver }) => node, shown under review
+ * @param {Function} [props.renderActions]  ({ operationId, people, setPeople, startOver }) => node, shown under review
  */
 export default function CaptureFlow({ prepare = prepareCardImage, renderActions = null }) {
   const T = useT();
@@ -212,7 +213,7 @@ export default function CaptureFlow({ prepare = prepareCardImage, renderActions 
             T={T}
           />
           {renderActions
-            ? renderActions({ people, setPeople, startOver })
+            ? renderActions({ operationId, people, setPeople, startOver })
             : <p style={muted}>Saving from this screen is not switched on yet.</p>}
           <button type="button" style={{ ...button, alignSelf: 'flex-start' }} onClick={startOver}>
             <RotateCcw size={16} /> Start over with a new photo

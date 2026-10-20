@@ -208,15 +208,17 @@ function logResolution(entry) {
   RESOLUTION_LOG.push(entry);
   if (RESOLUTION_LOG.length > RESOLUTION_LOG_LIMIT) RESOLUTION_LOG.shift();
 
-  const { outcome, signal, source, contactId, identifiers } = entry;
+  // Codes and record ids only. The identifiers (email, phone, LinkedIn, name,
+  // company) and candidates' names stay in RESOLUTION_LOG, which is never printed.
+  const { outcome, signal, source, contactId } = entry;
   const prefix = '[contact-identity]';
 
   if (outcome === RESOLUTION.MATCHED) {
-    console.info(`${prefix} matched existing contact on ${signal}`, { source, contactId, identifiers });
+    console.info(`${prefix} matched existing contact on ${signal}`, { source, contactId });
   } else if (outcome === RESOLUTION.REVIEW) {
-    console.warn(`${prefix} weak match — creating anyway, flagged for review`, { source, candidates: entry.candidates, identifiers });
+    console.warn(`${prefix} weak match — creating anyway, flagged for review`, { source, candidateIds: (entry.candidates ?? []).map(c => c.id) });
   } else {
-    console.info(`${prefix} no match — new contact`, { source, identifiers });
+    console.info(`${prefix} no match — new contact`, { source });
   }
 }
 

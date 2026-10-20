@@ -6,6 +6,7 @@ import { assembleBarryContext } from './utils/barryContextAssembler.js';
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
 import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
+import { OUTBOUND_COPY_RULES } from './utils/outboundCopyRules.js';
 
 /**
  * User scope — the one line of it these surfaces need.
@@ -292,6 +293,8 @@ RULES:
 7. Never use sales jargon, buzzwords, or generic filler.
 8. If this is a follow_up step, reference the previous outreach naturally.
 9. End with a clear but appropriate CTA aligned with the outcome_goal.
+
+${OUTBOUND_COPY_RULES}
 
 Respond ONLY with valid JSON.`;
 

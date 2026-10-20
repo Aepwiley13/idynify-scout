@@ -160,7 +160,7 @@ async function runOne(client, job) {
     row.note = error.reason === 'refusal' ? `category: ${error.category ?? 'none'}` : `stop_reason: ${error.stopReason ?? 'none'}`;
     return row;
   }
-  const check = CHECKS[job.site](row.text);
+  const check = CHECKS[job.site](row.text, job.request);
   row.outcome = check.ok ? 'ok' : 'check_failed';
   row.note = check.note;
   return row;

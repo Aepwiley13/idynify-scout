@@ -26,6 +26,7 @@ import { updateContactStatus, STATUS_TRIGGERS } from '../../utils/contactStateMa
 import { updateContactMemory } from '../../services/barryMemoryService';
 import './PersistentEngageBar.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { readContactPhones, primaryPhone, textablePhone } from '../../utils/contactPhones';
 
 // ── Engagement state derived from timeline ───────────────
 
@@ -123,15 +124,17 @@ const ENGAGE_STATES = {
 
 const CHANNELS = [
   { id: 'email', icon: Mail, label: 'Email', field: 'email', altField: 'work_email' },
-  { id: 'phone', icon: Phone, label: 'Call', field: 'phone_mobile', altField: 'phone_direct' },
+  { id: 'phone', icon: Phone, label: 'Call', phones: primaryPhone },
   { id: 'linkedin', icon: Linkedin, label: 'LinkedIn', field: 'linkedin_url', altField: null },
-  { id: 'text', icon: MessageSquare, label: 'Text', field: 'phone_mobile', altField: 'phone' },
+  { id: 'text', icon: MessageSquare, label: 'Text', phones: textablePhone },
   { id: 'calendar', icon: Calendar, label: 'Meeting', field: null, altField: null }
 ];
 
 function getChannelAvailability(contact, channelId) {
   const ch = CHANNELS.find(c => c.id === channelId);
   if (!ch) return 'unavailable';
+  // Call: any number but a fax. Text: a mobile, or a number whose type isn't set.
+  if (ch.phones) return ch.phones(readContactPhones(contact)) ? 'available' : 'unavailable';
   if (!ch.field) return 'available'; // calendar always available
   const has = !!(contact[ch.field] || (ch.altField && contact[ch.altField]));
   return has ? 'available' : 'unavailable';

@@ -147,7 +147,7 @@ describe('choosing a number', () => {
     makePhone({ id: '4', value: '801-555-1001', label: 'fax', labelSource: 'card' }),
   ];
 
-  it('call: mobile first; text: mobile only; identity: mobile, direct or home', () => {
+  it('call: mobile first; text: mobile; identity: mobile, direct or home', () => {
     expect(primaryPhone(card).value).toBe('801-555-5678');
     expect(textablePhone(card).value).toBe('801-555-5678');
     expect(identityPhone(card).value).toBe('801-555-5678');
@@ -155,6 +155,15 @@ describe('choosing a number', () => {
     expect(primaryPhone(noMobile).value).toBe('801-555-1234');
     expect(textablePhone(noMobile)).toBeNull();
     expect(identityPhone(noMobile).value).toBe('801-555-1234');
+  });
+
+  it('text goes to a mobile, else a number whose type isn\'t set; never main, work, direct, home or fax', () => {
+    const unset = makePhone({ id: '5', value: '801-555-4444' });
+    expect(textablePhone([unset, card[2]]).value).toBe('801-555-5678');               // mobile first
+    expect(textablePhone([card[0], unset]).value).toBe('801-555-4444');
+    for (const label of ['main', 'work', 'direct', 'home', 'fax', 'other']) {
+      expect(textablePhone([makePhone({ value: '801-555-1000', label, labelSource: 'user' })]), label).toBeNull();
+    }
   });
 
   it('a main, work, fax, other or unknown number never identifies the person', () => {

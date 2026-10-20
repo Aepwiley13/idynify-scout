@@ -39,6 +39,8 @@ import { BRAND } from '../../theme/tokens';
 import { getUniqueTags } from '../../services/peopleService';
 import './IdentityCard.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import ContactPhones from './ContactPhones';
+import { readContactPhones, primaryPhone, buildPhoneWrite } from '../../utils/contactPhones';
 
 // ─── Color maps for classification chips ─────────────────────────────────────
 
@@ -337,9 +339,8 @@ export default function IdentityCard({
   const [copiedField, setCopiedField] = useState(null);
   const inputRef = useRef(null);
 
-  // Multi-field lists (email / phone)
+  // Multi-field list (email). Phones are read straight from the contact by ContactPhones.
   const [emailsList, setEmailsList] = useState([]);
-  const [phonesList, setPhonesList] = useState([]);
 
   // Photo menu
   const [photoMenuOpen, setPhotoMenuOpen] = useState(false);
@@ -377,7 +378,7 @@ export default function IdentityCard({
   const effectiveStageId = resolveContactStage(contact);
   const currentStage = effectiveStageId ? STAGE_MAP[effectiveStageId] : null;
   const email = emailsList[0]?.value || contact.email || contact.work_email;
-  const phone = phonesList[0]?.value || contact.phone_mobile || contact.phone_direct || contact.phone;
+  const phone = primaryPhone(readContactPhones(contact))?.value ?? null;
   const emailVerified = contact.email_status === 'verified';
   const emailLikely = contact.email_status === 'likely';
 
@@ -428,16 +429,6 @@ export default function IdentityCard({
     } else {
       const primary = contact.email || contact.work_email;
       setEmailsList(primary ? [{ id: '0', value: primary, label: 'work' }] : []);
-    }
-  }, [contact.id]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Sync phone list from contact data
-  useEffect(() => {
-    if (contact.phones && contact.phones.length > 0) {
-      setPhonesList(contact.phones.map((p, i) => ({ ...p, id: p.id || String(i) })));
-    } else {
-      const primary = contact.phone_mobile || contact.phone_direct || contact.phone;
-      setPhonesList(primary ? [{ id: '0', value: primary, label: 'mobile' }] : []);
     }
   }, [contact.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -496,7 +487,6 @@ export default function IdentityCard({
     };
     // Keep primary single-value field in sync for backward compat
     if (fieldName === 'emails') updateData.email = list[0]?.value || null;
-    if (fieldName === 'phones') updateData.phone = list[0]?.value || null;
     onUpdate?.({ ...contact, ...updateData });
     try {
       await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), updateData);
@@ -521,19 +511,23 @@ export default function IdentityCard({
     setEmailsList(prev => [...prev, newEntry]);
   }
 
-  function handlePhoneUpdate(updated) {
-    const next = phonesList.map(p => p.id === updated.id ? updated : p);
-    setPhonesList(next);
-    persistFields('phones', next);
-  }
-  function handlePhoneDelete(id) {
-    const next = phonesList.filter(p => p.id !== id);
-    setPhonesList(next);
-    persistFields('phones', next);
-  }
-  function handleAddPhone() {
-    const newEntry = { id: Date.now().toString(), value: '', label: 'mobile' };
-    setPhonesList(prev => [...prev, newEntry]);
+  /**
+   * Save the whole phone list. buildPhoneWrite also sets phone / phone_mobile /
+   * phone_direct / phone_work / phone_home from it (so a removed number does
+   * not linger in an old field) and phone_normalized from a mobile, direct or
+   * home number only.
+   */
+  async function savePhones(list) {
+    const user = getEffectiveUser();
+    if (!user) return;
+    const updateData = { ...buildPhoneWrite(list), updated_at: new Date().toISOString() };
+    onUpdate?.({ ...contact, ...updateData });
+    try {
+      await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), updateData);
+    } catch (err) {
+      console.error('[IdentityCard] Save phones failed:', err);
+      onUpdate?.(contact);
+    }
   }
 
   async function saveManualPhotoUrl() {
@@ -1194,34 +1188,8 @@ export default function IdentityCard({
             </button>
           </div>
 
-          {/* Phones — multi-entry, iOS style */}
-          <div className="idc-multi-section">
-            <div className="idc-multi-header">
-              <div className="idc-detail-icon" style={{ background: '#10b98112', color: '#10b981' }}>
-                <Phone size={13} />
-              </div>
-              <span className="idc-multi-label" style={{ color: T.textMuted }}>Phone</span>
-            </div>
-            <div className="idc-multi-entries">
-              {phonesList.map(entry => (
-                <ContactFieldEntry
-                  key={entry.id}
-                  entry={entry}
-                  type="phone"
-                  onUpdate={handlePhoneUpdate}
-                  onDelete={() => handlePhoneDelete(entry.id)}
-                  T={T}
-                />
-              ))}
-            </div>
-            <button
-              className="idc-add-entry"
-              style={{ color: T.textFaint }}
-              onClick={handleAddPhone}
-            >
-              <Plus size={12} /><span>add phone</span>
-            </button>
-          </div>
+          {/* Phones — each with its type: Mobile, Direct, Main, Work… */}
+          <ContactPhones contact={contact} onSave={savePhones} T={T} />
 
           {/* LinkedIn */}
           {contact.linkedin_url && (

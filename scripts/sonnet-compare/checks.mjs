@@ -157,6 +157,19 @@ const WEEKDAY = /\b(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)s
 const CALENDAR_DATE = /\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sept?(?:ember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)\.? \d{1,2}(?:st|nd|rd|th)?\b/g;
 const ATTACHMENT = /\b(?:attached|attachment|enclosed|I(?:'|’)ve included (?:a|the) (?:pdf|deck|file|one-pager|summary))\b/i;
 
+/** A resource the draft points to: it must be one the input gave, exactly. */
+const URL = /\bhttps?:\/\/[^\s)>\]]+|\bwww\.[^\s)>\]]+/gi;
+const FILE_NAME = /\b[\w-]+\.(?:pdf|docx?|pptx?|xlsx?|csv|key|zip)\b/gi;
+const LINK_REFERENCE = /\b(?:link|url) (?:below|above|here)\b|\bhere(?:'|’)s the link\b|\b(?:click|use) the link\b/i;
+
+/** The draft explains to the recipient why a resource is missing instead of just offering it. */
+const RESOURCE_EXCUSE = [
+  /\bcan(?:'|’)t confirm\b/i,
+  /\bI(?:'|’)d planned to (?:send|share|attach|include)\b/i,
+  /\b(?:it|that|this|the (?:page|summary|one-pager|document|case study|checklist|deck|file|report|resource|guide))\s+(?:isn(?:'|’)t|is not|wasn(?:'|’)t|was not)\s+(?:quite\s+|yet\s+)?(?:ready|available|finalized|finished|done)\b/i,
+  /\b(?:numbers|results|figures|data) I can(?:'|’)t (?:back up|stand behind|verify)\b/i,
+];
+
 /** Wording that says the two people have already spoken, met or corresponded beyond the outreach itself. */
 const PRIOR_CONVERSATION = [
   /\b(?:following|follow) up on (?:our|the) (?:earlier |last |recent |previous )?(?:conversation|call|chat|meeting|discussion|talk)\b/i,
@@ -205,6 +218,16 @@ export function outboundCopyProblems(draft, prompt = '') {
     for (const m of draft.match(pattern) ?? []) if (!supplied(m)) problems.push(`invented date or time "${m}"`);
   }
   if (ATTACHMENT.test(draft) && !/\battach/i.test(prompt)) problems.push('mentions an attachment');
+  for (const m of draft.match(URL) ?? []) {
+    const url = m.replace(/[.,;:!?]+$/, '');
+    if (!supplied(url)) problems.push(`invented link "${url}"`);
+  }
+  for (const m of draft.match(FILE_NAME) ?? []) if (!supplied(m)) problems.push(`invented file "${m}"`);
+  if (LINK_REFERENCE.test(draft) && !(draft.match(URL) ?? []).some((u) => supplied(u.replace(/[.,;:!?]+$/, '')))) {
+    problems.push('refers to a link it does not give');
+  }
+  const excuse = RESOURCE_EXCUSE.map((p) => draft.match(p)).find(Boolean);
+  if (excuse) problems.push(`explains a missing resource ("${excuse[0]}")`);
 
   if (!PRIOR_CONTACT_SUPPLIED.test(prompt)) {
     const hit = PRIOR_CONVERSATION.map((p) => draft.match(p)).find(Boolean);

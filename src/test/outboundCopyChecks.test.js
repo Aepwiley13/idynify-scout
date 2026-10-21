@@ -179,3 +179,48 @@ describe('each message writer applies the check to what the user sends', () => {
     expect(CHECKS['engagement-message']('{"messages": []}', request).note).toBe('fewer than 3 messages');
   });
 });
+
+describe('resource steps: share what exists, offer what does not', () => {
+  const LINK = 'https://harborlight.example.com/holiday-produce-checklist.pdf';
+  const WITH_RESOURCE = `${COLD_PROMPT}\n- Action: Share our holiday-quarter produce forecasting checklist: ${LINK}`;
+  const WITHOUT_RESOURCE = `${COLD_PROMPT}\n- Action: Share a one-page result from a similar co-op`;
+
+  describe('the resource exists', () => {
+    it('sharing it exactly as given passes', () => {
+      const draft = `Hi Maria,\n\nHere's our holiday-quarter produce forecasting checklist: ${LINK}\n\nWould a short call help? What time suits you?\n\nBest,`;
+      expect(fails(draft, WITH_RESOURCE)).toEqual([]);
+    });
+
+    it('a different link, or a file name it was not given, fails', () => {
+      expect(fails('Here it is: https://harborlight.example.com/checklist-v2.pdf', WITH_RESOURCE))
+        .toContain('invented link "https://harborlight.example.com/checklist-v2.pdf"');
+      expect(fails('I\'ve put it in Holiday_Checklist_Final.pdf for you.', WITH_RESOURCE))
+        .toContain('invented file "Holiday_Checklist_Final.pdf"');
+    });
+  });
+
+  describe('the resource is missing', () => {
+    it('the Sonnet 5.5 draft that explained the missing page fails (run 39493385088)', () => {
+      const draft = "Hi Dev,\n\nI'd planned to send a one-page result from a similar co-op, but I can't confirm that page is ready to attach to this email, and I don't want to hand you numbers I can't back up. I'll send it over separately once it's in hand.\n\nBest,";
+      expect(fails(draft, WITHOUT_RESOURCE).join()).toMatch(/explains a missing resource/);
+    });
+
+    it.each([
+      ['Attached is a one-page summary from a similar co-op.', 'mentions an attachment'],
+      ['You can read the case study at the link below.', 'refers to a link it does not give'],
+      ['Here it is: https://harborlight.example.com/coop-results', 'invented link "https://harborlight.example.com/coop-results"'],
+      ['I put the numbers in CoOp_Results.pdf.', 'invented file "CoOp_Results.pdf"'],
+      ['The summary isn\'t ready yet, so I\'ll hold it for now.', 'explains a missing resource'],
+      ['I\'ll send the summary over on Friday.', 'invented date or time "Friday"'],
+    ])('%s', (draft, problem) => {
+      expect(fails(draft, WITHOUT_RESOURCE).join('\n')).toContain(problem);
+    });
+
+    it.each([
+      'If it would help, I can send you a one-page summary from a similar co-op.',
+      'Happy to share a short write-up from a co-op your size if that would be useful.',
+    ])('a plain offer to send it passes: %s', (draft) => {
+      expect(fails(`Hi Dev,\n\n${draft}\n\nBest,`, WITHOUT_RESOURCE)).toEqual([]);
+    });
+  });
+});

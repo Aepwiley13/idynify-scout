@@ -40,6 +40,8 @@ import { getUniqueTags } from '../../services/peopleService';
 import './IdentityCard.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import ContactPhones from './ContactPhones';
+import ContactIdentityViewer from './ContactIdentityViewer';
+import { hasRealContactPhoto, resolveContactPhotoSources, contactDisplayName } from '../../utils/contactPhoto';
 import { readContactPhones, primaryPhone, buildPhoneWrite } from '../../utils/contactPhones';
 
 // ─── Color maps for classification chips ─────────────────────────────────────
@@ -91,13 +93,6 @@ function getTagColor(tag) {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function isPlaceholderPhoto(url) {
-  if (!url) return true;
-  const lower = url.toLowerCase();
-  return ['ghost-person', 'ghost_person', 'default-avatar', 'no-photo',
-    'placeholder', '/static.licdn.com/sc/h/', 'data:image'].some(p => lower.includes(p));
-}
 
 function getInitials(name) {
   if (!name) return '?';
@@ -331,6 +326,8 @@ export default function IdentityCard({
 }) {
   const T = useT();
   const [imgBroken, setImgBroken] = useState(false);
+  const [identityOpen, setIdentityOpen] = useState(false);
+  const photoButtonRef = useRef(null);
 
   // Inline editing
   const [editingField, setEditingField] = useState(null);
@@ -372,7 +369,8 @@ export default function IdentityCard({
   const tagInputRef = useRef(null);
   const tagWrapRef = useRef(null);
 
-  const hasRealPhoto = !!contact.photo_url && !isPlaceholderPhoto(contact.photo_url) && !imgBroken;
+  const hasRealPhoto = hasRealContactPhoto(contact) && !imgBroken;
+  const photoThumb = resolveContactPhotoSources(contact).thumbnail;
   const canSearch = !!contact.linkedin_url || (!!contact.name && !!contact.company_name);
   const currentBrigade = contact.brigade ? BRIGADE_MAP[contact.brigade] : null;
   const effectiveStageId = resolveContactStage(contact);
@@ -746,26 +744,41 @@ export default function IdentityCard({
       <div className="idc-avatar-row">
         {/* Avatar */}
         <div className="idc-photo-wrap" ref={photoMenuRef}>
-          <div
-            className={`idc-photo${!hasRealPhoto ? ' idc-photo--click' : ''}`}
-            style={{ border: `4px solid ${T.cardBg}` }}
-            onClick={() => !hasRealPhoto && !photoRefreshLoading && setPhotoMenuOpen(v => !v)}
-          >
-            {hasRealPhoto ? (
-              <img src={contact.photo_url} alt={contact.name} onError={() => setImgBroken(true)} />
-            ) : (
-              <>
-                <div className="idc-initials" style={{ background: getAvatarColor(contact.name) }}>
-                  {getInitials(contact.name)}
-                </div>
-                <div className="idc-photo-overlay">
-                  {photoRefreshLoading
-                    ? <Loader size={20} className="idc-spin" />
-                    : <Camera size={20} />}
-                </div>
-              </>
-            )}
-          </div>
+          {hasRealPhoto ? (
+            <button
+              ref={photoButtonRef}
+              type="button"
+              className="idc-photo idc-photo--view"
+              style={{ border: `4px solid ${T.cardBg}` }}
+              onClick={() => setIdentityOpen(true)}
+              aria-haspopup="dialog"
+              aria-label={`View ${contactDisplayName(contact) || 'contact'}'s profile`}
+            >
+              <img src={photoThumb} alt="" onError={() => setImgBroken(true)} />
+            </button>
+          ) : (
+            <div
+              className="idc-photo idc-photo--click"
+              style={{ border: `4px solid ${T.cardBg}` }}
+              onClick={() => !photoRefreshLoading && setPhotoMenuOpen(v => !v)}
+            >
+              <div className="idc-initials" style={{ background: getAvatarColor(contact.name) }}>
+                {getInitials(contact.name)}
+              </div>
+              <div className="idc-photo-overlay">
+                {photoRefreshLoading
+                  ? <Loader size={20} className="idc-spin" />
+                  : <Camera size={20} />}
+              </div>
+            </div>
+          )}
+
+          <ContactIdentityViewer
+            contact={contact}
+            open={identityOpen && hasRealPhoto}
+            onClose={() => setIdentityOpen(false)}
+            returnFocusRef={photoButtonRef}
+          />
 
           {/* Activity status dot — bottom-right of avatar */}
           {(() => {

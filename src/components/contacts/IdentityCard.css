@@ -116,6 +116,33 @@
     0 8px 24px rgba(0, 0, 0, 0.28);
 }
 
+/* Real photo: a button that opens ContactIdentityViewer */
+.idc-photo--view {
+  display: block;
+  padding: 0;
+  cursor: zoom-in;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.idc-photo--view:hover {
+  transform: scale(1.02);
+  box-shadow:
+    0 0 0 4px rgba(255,255,255,0.22),
+    0 10px 36px rgba(0, 0, 0, 0.32),
+    0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+.idc-photo--view:focus-visible {
+  outline: 2px solid #e8197d;
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .idc-photo--view:hover {
+    transform: none;
+  }
+}
+
 .idc-initials {
   width: 100%;
   height: 100%;

@@ -1,6 +1,14 @@
 /* ════════════════════════════════════════════════════════════════
    ContactIdentityViewer — photo, name, quiet metadata, one action.
    Always dark: it is a media viewer over a dimmed page, in any theme.
+
+   The viewer's size comes from the screen, not the photo:
+     phone   (≤600px)       full width, 16px margins
+     tablet  (601–1024px)   min(480px, 100vw − 64px)
+     desktop (1025–1599px)  min(520px, 90vw)
+     large   (≥1600px)      560px
+   The photo fills that width unless the source is too small to (see
+   MAX_UPSCALE in ContactIdentityViewer.jsx).
    ════════════════════════════════════════════════════════════════ */
 
 .civ-backdrop {
@@ -20,8 +28,8 @@
 
 .civ-panel {
   position: relative;
-  width: min(var(--civ-photo-w, 280px), calc(100vw - 48px));
-  max-height: calc(100dvh - 48px);
+  width: min(520px, 90vw);
+  max-height: 85vh;
   overflow-y: auto;
   border-radius: 20px;
   background: #121217;
@@ -36,14 +44,24 @@
 /* ── Photo ──────────────────────────────────────────────────────── */
 .civ-photo {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Full card width even when max-height clamps it; without this the
+     aspect-ratio would shrink the width to match. */
+  width: 100%;
   aspect-ratio: 1 / 1;
-  max-height: 62dvh;
+  /* Leave room for the identity block inside the panel's 85vh. */
+  max-height: min(62dvh, calc(85vh - 240px));
+  min-height: 240px;
   background: #1b1b22;
   border-radius: 19px 19px 0 0;
   overflow: hidden;
 }
 
-.civ-photo img {
+/* Sharp photo: fills the frame, capped inline at MAX_UPSCALE × its size. */
+.civ-photo-img {
+  position: relative;
   display: block;
   width: 100%;
   height: 100%;
@@ -52,7 +70,19 @@
   transition: opacity 180ms ease;
 }
 
-.civ-photo--ready img {
+/* Blurred copy behind it, seen only where a small photo doesn't reach. */
+.civ-photo-fill {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(28px) brightness(0.5) saturate(1.3);
+  transform: scale(1.15); /* hide blurred edges */
+  pointer-events: none;
+}
+
+.civ-photo--ready .civ-photo-img {
   opacity: 1;
 }
 
@@ -70,6 +100,7 @@
 
 .civ-close {
   position: absolute;
+  z-index: 1;
   top: 12px;
   right: 12px;
   width: 36px;
@@ -164,6 +195,54 @@
   outline-offset: 2px;
 }
 
+/* ── Tablet and up: a larger, more confident identity block ─────── */
+@media (min-width: 601px) {
+  .civ-close {
+    top: 14px;
+    right: 14px;
+    width: 40px;
+    height: 40px;
+  }
+
+  .civ-body {
+    padding: 22px 26px 26px;
+  }
+
+  .civ-name {
+    font-size: 26px;
+    letter-spacing: -0.015em;
+  }
+
+  .civ-title {
+    margin-top: 6px;
+    font-size: 15px;
+  }
+
+  .civ-company {
+    margin-top: 8px;
+    font-size: 14px;
+  }
+
+  .civ-action {
+    height: 46px;
+    margin-top: 22px;
+    border-radius: 12px;
+    font-size: 14px;
+  }
+}
+
+@media (min-width: 601px) and (max-width: 1024px) {
+  .civ-panel {
+    width: min(480px, calc(100vw - 64px));
+  }
+}
+
+@media (min-width: 1600px) {
+  .civ-panel {
+    width: 560px;
+  }
+}
+
 /* ── Mobile: near full screen ───────────────────────────────────── */
 @media (max-width: 600px) {
   .civ-backdrop {
@@ -173,6 +252,11 @@
   .civ-panel {
     width: 100%;
     max-height: calc(100dvh - 32px);
+  }
+
+  .civ-photo {
+    max-height: 62dvh;
+    min-height: 0;
   }
 
   .civ-close {

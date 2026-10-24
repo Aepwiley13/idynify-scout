@@ -1,0 +1,203 @@
+/* ════════════════════════════════════════════════════════════════
+   ContactIdentityViewer — photo, name, quiet metadata, one action.
+   Always dark: it is a media viewer over a dimmed page, in any theme.
+   ════════════════════════════════════════════════════════════════ */
+
+.civ-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(6, 6, 10, 0.74);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  overscroll-behavior: contain;
+  animation: civ-fade 160ms ease-out;
+}
+
+.civ-panel {
+  position: relative;
+  width: min(var(--civ-photo-w, 280px), calc(100vw - 48px));
+  max-height: calc(100dvh - 48px);
+  overflow-y: auto;
+  border-radius: 20px;
+  background: #121217;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 24px 80px rgba(0, 0, 0, 0.55),
+    0 2px 8px rgba(0, 0, 0, 0.3);
+  color: #f4f4f6;
+  animation: civ-rise 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* ── Photo ──────────────────────────────────────────────────────── */
+.civ-photo {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  max-height: 62dvh;
+  background: #1b1b22;
+  border-radius: 19px 19px 0 0;
+  overflow: hidden;
+}
+
+.civ-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 180ms ease;
+}
+
+.civ-photo--ready img {
+  opacity: 1;
+}
+
+.civ-initials {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 64px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.4);
+  user-select: none;
+}
+
+.civ-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  background: rgba(10, 10, 14, 0.55);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.civ-close:hover {
+  background: rgba(10, 10, 14, 0.8);
+}
+
+/* ── Identity ───────────────────────────────────────────────────── */
+.civ-body {
+  padding: 18px 20px 20px;
+}
+
+.civ-name {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+
+.civ-title {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.civ-company {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.civ-company span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.civ-company svg {
+  flex-shrink: 0;
+}
+
+.civ-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  margin-top: 18px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.civ-action:hover {
+  background: rgba(255, 255, 255, 0.11);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.civ-action-arrow {
+  opacity: 0.55;
+}
+
+.civ-close:focus-visible,
+.civ-action:focus-visible {
+  outline: 2px solid #e8197d;
+  outline-offset: 2px;
+}
+
+/* ── Mobile: near full screen ───────────────────────────────────── */
+@media (max-width: 600px) {
+  .civ-backdrop {
+    padding: 16px;
+  }
+
+  .civ-panel {
+    width: 100%;
+    max-height: calc(100dvh - 32px);
+  }
+
+  .civ-close {
+    width: 40px;
+    height: 40px;
+  }
+
+  .civ-action {
+    height: 44px;
+  }
+}
+
+@keyframes civ-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes civ-rise {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .civ-backdrop,
+  .civ-panel {
+    animation: none;
+  }
+}

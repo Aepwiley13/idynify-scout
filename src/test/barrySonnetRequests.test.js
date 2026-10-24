@@ -150,7 +150,9 @@ describe('the sequence-step, campaign-message and engagement-message prompts', (
   it('the rules forbid each thing the 330-call comparison found', () => {
     for (const phrase of ['[Your Name]', '[calendar link]', 'end emails with "Best," and no name', 'Never sign as Barry',
       'Do not invent meetings, calls, prior conversations, attachments', 'dates, times, customer outcomes, metrics, proof points or product capabilities',
-      'is a goal, not a result', 'Do not say or imply that you have spoken, met or been in touch before']) {
+      'is a goal, not a result', 'Do not say or imply that you have spoken, met or been in touch before',
+      'share it only if it is given above, exactly as given', 'don\'t say or imply it is attached, included, linked or already available',
+      'simply offer to send it, without naming a file, link or date']) {
       expect(OUTBOUND_COPY_RULES).toContain(phrase);
     }
   });
@@ -159,6 +161,15 @@ describe('the sequence-step, campaign-message and engagement-message prompts', (
     for (const { site, label, request } of onDefault.filter((c) => WRITERS.includes(c.site))) {
       const prompt = request.messages[0].content;
       expect(prompt, `${site} / ${label}`).not.toMatch(/assume rapport and get to the point|reference shared context or connections|reference shared context, conversational|Can reference shared context, more/);
+    }
+  });
+
+  it('sequence-step covers a resource step both with and without the resource', () => {
+    const resourcePrompt = (label) => onDefault.find((c) => c.site === 'sequence-step' && c.label === label).request.messages[0].content;
+    expect(resourcePrompt('resource share, link given')).toContain('https://harborlight.example.com/holiday-produce-checklist.pdf');
+    expect(resourcePrompt('resource share, nothing given')).not.toMatch(/https?:\/\//);
+    for (const label of ['resource share, link given', 'resource share, nothing given']) {
+      expect(resourcePrompt(label)).toContain('share it only if it is given above, exactly as given');
     }
   });
 

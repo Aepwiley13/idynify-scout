@@ -5,11 +5,12 @@
  * Pins which photos count as a real face (placeholders, company logos and
  * non-http URLs do not), that a real photo opens the viewer and a missing or
  * placeholder one keeps the Search LinkedIn / Paste photo URL menu, that Esc,
- * the backdrop and X close it, that focus returns to the avatar, and that page
- * scroll is locked only while it is open.
+ * the backdrop and X close it, that focus returns to the avatar, that page
+ * scroll is locked only while it is open, and that a small source is not
+ * stretched past 1.5× its own size.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import ContactIdentityViewer from '../components/contacts/ContactIdentityViewer';
 import IdentityCard from '../components/contacts/IdentityCard';
@@ -169,6 +170,18 @@ describe('ContactIdentityViewer', () => {
     rerender(<ContactIdentityViewer contact={{ ...JIMMY, linkedin_url: null }} open onClose={vi.fn()} />);
     expect(screen.getByRole('dialog', { name: 'Jimmy Choi' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /View LinkedIn/ })).toBeNull();
+  });
+
+  it('fills the viewer with a photo, but never enlarges a small source more than 1.5×', () => {
+    render(<ContactIdentityViewer contact={JIMMY} open onClose={vi.fn()} />);
+    const img = screen.getByRole('img', { name: 'Profile photo of Jimmy Choi' });
+    Object.defineProperty(img, 'naturalWidth', { value: 160 });
+    Object.defineProperty(img, 'naturalHeight', { value: 200 });
+    fireEvent.load(img);
+
+    expect(img).toHaveStyle({ maxWidth: '240px', maxHeight: '300px' });
+    expect(img.closest('.civ-photo')).toHaveStyle({ aspectRatio: '160 / 200' });
+    expect(img.closest('.civ-photo').querySelector('.civ-photo-fill')).toHaveAttribute('aria-hidden', 'true');
   });
 
   it('renders nothing, and leaves scroll alone, for a contact without a real photo', () => {

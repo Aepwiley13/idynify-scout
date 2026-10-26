@@ -28,10 +28,11 @@ import { X, Building2, Linkedin, ArrowUpRight } from 'lucide-react';
 import { resolveContactPhotoSources, contactDisplayName, getInitials } from '../../utils/contactPhoto';
 import './ContactIdentityViewer.css';
 
-// Shown at the image's own width within these bounds: small sources are not
-// blown up to fill the screen, large ones do not dominate it.
-const MIN_PHOTO_WIDTH = 280;
-const MAX_PHOTO_WIDTH = 440;
+// The viewer's size is set by the screen (ContactIdentityViewer.css); the
+// photo fills it unless that would enlarge the source past this factor. A
+// small source is then shown sharp at its capped size over a blurred fill of
+// itself, instead of being stretched soft across the frame.
+const MAX_UPSCALE = 1.5;
 
 const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
@@ -105,9 +106,10 @@ function IdentityDialog({ contact, full, thumbnail, onClose, returnFocusRef }) {
   const company = contact.company_name || contact.company || null;
   const linkedinUrl = contact.linkedin_url || null;
 
-  const photoWidth = natural
-    ? Math.min(MAX_PHOTO_WIDTH, Math.max(MIN_PHOTO_WIDTH, natural.w))
-    : MIN_PHOTO_WIDTH;
+  const known = !!(natural?.w && natural?.h);
+  const photoCap = known
+    ? { maxWidth: `${Math.round(natural.w * MAX_UPSCALE)}px`, maxHeight: `${Math.round(natural.h * MAX_UPSCALE)}px` }
+    : undefined;
 
   function handleImgError() {
     if (src !== thumbnail && thumbnail) setSrc(thumbnail);
@@ -135,21 +137,29 @@ function IdentityDialog({ contact, full, thumbnail, onClose, returnFocusRef }) {
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        style={{ '--civ-photo-w': `${photoWidth}px` }}
       >
         <div
           className={`civ-photo${natural ? ' civ-photo--ready' : ''}`}
-          style={natural ? { aspectRatio: `${natural.w} / ${natural.h}` } : undefined}
+          style={known ? { aspectRatio: `${natural.w} / ${natural.h}` } : undefined}
         >
           {failed ? (
             <div className="civ-initials" aria-hidden="true">{getInitials(name)}</div>
           ) : (
-            <img
-              src={src}
-              alt={`Profile photo of ${name}`}
-              onLoad={(e) => setNatural({ w: e.currentTarget.naturalWidth || MIN_PHOTO_WIDTH, h: e.currentTarget.naturalHeight || MIN_PHOTO_WIDTH })}
-              onError={handleImgError}
-            />
+            <>
+              {natural && <img src={src} alt="" aria-hidden="true" className="civ-photo-fill" />}
+              <img
+                src={src}
+                alt={`Profile photo of ${name}`}
+                className="civ-photo-img"
+                style={photoCap}
+                onLoad={(e) => {
+                  // 0×0 when the browser can't tell (e.g. some SVGs): shown, uncapped.
+                  const { naturalWidth: w, naturalHeight: h } = e.currentTarget;
+                  setNatural({ w, h });
+                }}
+                onError={handleImgError}
+              />
+            </>
           )}
           <button
             ref={closeRef}

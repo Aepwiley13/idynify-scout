@@ -17,6 +17,7 @@ const ALLOWED = Object.freeze(new Set([
   'bytes', 'widthPx', 'heightPx', 'metadataRemoved', 'warnings', 'userOverrode',
   'status', 'fields', 'confirmed', 'likely', 'possible',
   'captureMode',
+  'candidates', 'sources',
 ]));
 
 const MAX_STRING = 64;

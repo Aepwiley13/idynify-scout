@@ -1,8 +1,11 @@
 /**
- * The Capture Lab's only two calls, also used by Scan Business Card in Scout+:
- * is capture on for me (captureConfig), and read this prepared photo
- * (captureExtract). Both are read-only: nothing is matched or saved, and
- * neither touches contacts, companies or relationships.
+ * The capture calls. The Capture Lab makes only the first two; Scan Business
+ * Card in Scout+ makes all three:
+ *   captureConfig     is capture on for me
+ *   captureExtract    read this prepared photo
+ *   captureLinkedIn   likely LinkedIn profiles for a person just saved
+ * All three are read-only: none of them saves, matches or changes a contact,
+ * company or relationship.
  *
  * Always as the signed-in user themselves (auth.currentUser), never an
  * impersonated user: captureExtract accepts only the token's own user.
@@ -47,5 +50,18 @@ export async function extractCard({ operationId, image }) {
     return { ...result, ms: Math.round(performance.now() - startedAt) };
   } catch {
     return { status: 0, body: { error: 'network', retryable: true }, ms: Math.round(performance.now() - startedAt) };
+  }
+}
+
+/**
+ * Likely LinkedIn profiles for a person: { status, body: { candidates } |
+ * { error, reason? } }. `person` is { name, company, title, domain, email,
+ * location }, from the saved contact.
+ */
+export async function findLinkedInProfiles(person) {
+  try {
+    return await post('captureLinkedIn', { person });
+  } catch {
+    return { status: 0, body: { error: 'network' } };
   }
 }

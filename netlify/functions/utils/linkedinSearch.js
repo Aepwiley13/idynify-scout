@@ -7,6 +7,8 @@
  * Returns LinkedIn URL if found with high confidence.
  */
 
+import process from 'node:process';
+
 const GOOGLE_SEARCH_API = 'https://www.googleapis.com/customsearch/v1';
 
 /**
@@ -142,6 +144,83 @@ export async function searchLinkedInProfile({ name, company, title, emailDomain 
     confidence: 'none',
     searchQuery: searchStrategies[0]?.query || null,
     message: 'No confident LinkedIn profile match found'
+  };
+}
+
+/**
+ * Likely LinkedIn profiles for one person: several, for a person to choose
+ * from, where searchLinkedInProfile above returns the first confident one.
+ *
+ * The name is always paired with the strongest signals there are (company,
+ * then domain, then title); a search on the name alone runs only when there is
+ * nothing else. At most `maxQueries` searches.
+ *
+ * SILENT: it writes no log line, so a caller that keeps names out of its logs
+ * (Scan Business Card) can use it. `text` (the result's title and snippet) is
+ * for the caller's matching and is not meant to be shown or stored.
+ *
+ * @returns {Promise<{ configured: boolean, failed: boolean, results: Array<{
+ *   linkedinUrl: string, name: string|null, headline: string|null,
+ *   location: string|null, photoUrl: string|null, text: string }> }>}
+ *   `failed` is true only when every search that ran errored.
+ */
+export async function searchLinkedInCandidates({
+  name, company, title, domain, maxQueries = 2, limit = 5, env = process.env, fetchImpl = fetch,
+} = {}) {
+  const apiKey = env.GOOGLE_CUSTOM_SEARCH_API_KEY || env.GOOGLE_SEARCH_API_KEY;
+  const searchEngineId = env.GOOGLE_CUSTOM_SEARCH_ENGINE_ID || env.GOOGLE_SEARCH_ENGINE_ID;
+  if (!apiKey || !searchEngineId) return { configured: false, failed: false, results: [] };
+  if (!name) return { configured: true, failed: false, results: [] };
+
+  const queries = [];
+  if (company) queries.push(`"${name}" "${company}" site:linkedin.com/in/`);
+  if (domain) queries.push(`"${name}" ${domain} site:linkedin.com/in/`);
+  if (title) queries.push(`"${name}" "${title}" site:linkedin.com/in/`);
+  if (queries.length === 0) queries.push(`"${name}" site:linkedin.com/in/`);
+
+  const found = new Map();
+  let ran = 0;
+  let failures = 0;
+  for (const query of queries.slice(0, maxQueries)) {
+    if (found.size >= limit) break;
+    ran += 1;
+    try {
+      const url = new URL(GOOGLE_SEARCH_API);
+      url.searchParams.append('key', apiKey);
+      url.searchParams.append('cx', searchEngineId);
+      url.searchParams.append('q', query);
+      url.searchParams.append('num', '5');
+      const response = await fetchImpl(url.toString());
+      if (!response.ok) { failures += 1; continue; }
+      const data = await response.json();
+      for (const item of data.items || []) {
+        const linkedinUrl = extractLinkedInProfileUrl(item.link || '');
+        if (linkedinUrl && !found.has(linkedinUrl)) found.set(linkedinUrl, describeSearchResult(item, linkedinUrl));
+      }
+    } catch {
+      failures += 1;
+    }
+  }
+  return { configured: true, failed: ran > 0 && failures === ran, results: [...found.values()].slice(0, limit) };
+}
+
+/**
+ * What a LinkedIn search result says about its profile. LinkedIn titles read
+ * "Kristin Sokol - Instructional Matchmaker - Acme | LinkedIn"; snippets
+ * sometimes carry "Location: Utah".
+ */
+export function describeSearchResult(item, linkedinUrl) {
+  const pageTitle = item.pagemap?.metatags?.[0]?.['og:title'] || item.title || '';
+  const parts = pageTitle.replace(/\s*[|·–—-]\s*LinkedIn\s*$/i, '').split(/\s+[-–—|]\s+/).map(s => s.trim()).filter(Boolean);
+  const snippet = item.snippet || '';
+  const location = snippet.match(/Location:\s*([^·\n]+?)\s*(?:·|$)/i)?.[1]?.trim() || null;
+  return {
+    linkedinUrl,
+    name: parts[0] || null,
+    headline: parts.slice(1).join(' · ') || null,
+    location,
+    photoUrl: extractPhotoFromSearchResult(item),
+    text: `${item.title || ''} ${snippet}`.trim(),
   };
 }
 

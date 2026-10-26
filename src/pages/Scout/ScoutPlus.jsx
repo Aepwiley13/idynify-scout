@@ -12,6 +12,7 @@ import { BRAND, STATUS } from '../../theme/tokens';
 import { contactDisplayName, nameParts } from '../../utils/contactDisplayName';
 import CaptureFlow from '../../components/capture/CaptureFlow';
 import CaptureSavePanel from '../../components/capture/CaptureSavePanel';
+import FindLinkedIn from '../../components/capture/FindLinkedIn';
 import { useCaptureAvailability } from '../../components/capture/captureAvailability';
 
 export default function ScoutPlus() {
@@ -35,8 +36,11 @@ export default function ScoutPlus() {
   // Scan Business Card opens only when the server says capture is on for this
   // account (capture mode internal: admins only). Everyone else keeps "Coming soon".
   const capture = useCaptureAvailability();
+  // The person a scan just saved: Find LinkedIn is offered before their profile opens.
+  const [capturedContactId, setCapturedContactId] = useState(null);
 
   const handleBack = () => {
+    setCapturedContactId(null);
     setCurrentView('menu');
   };
 
@@ -83,10 +87,13 @@ export default function ScoutPlus() {
     });
   };
 
-  /** A scan saved: open the person (one card is one person today). */
+  /**
+   * A scan saved. One card is one person today: offer Find LinkedIn for them
+   * (it opens their profile straight away when they already have one).
+   */
   const handleCaptureSaved = (saved) => {
     if (saved.length === 1) {
-      openSavedContact(saved[0].contactId);
+      setCapturedContactId(saved[0].contactId);
       return;
     }
     setAddedItems(saved.map(s => ({ id: s.contactId })));
@@ -294,7 +301,11 @@ export default function ScoutPlus() {
           <CompanySearch onCompanyAdded={handleContactAdded} />
         )}
 
-        {currentView === 'capture' && capture === 'available' && (
+        {currentView === 'capture' && capture === 'available' && capturedContactId && (
+          <FindLinkedIn contactId={capturedContactId} onDone={openSavedContact} T={T} />
+        )}
+
+        {currentView === 'capture' && capture === 'available' && !capturedContactId && (
           <CaptureFlow
             renderActions={({ operationId, people }) => (
               <CaptureSavePanel operationId={operationId} people={people} onSaved={handleCaptureSaved} T={T} />

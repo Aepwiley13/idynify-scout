@@ -21,6 +21,20 @@
  * yield a usable value. Set a Firestore TTL policy on oauth_states.expiresAt
  * so abandoned attempts are cleaned up.
  *
+ * IDENTITY. The ID token is verified as an OIDC JWT with `jose`: RS256
+ * signature against LinkedIn's published keys (LINKEDIN_JWKS_URL), issuer
+ * exactly LINKEDIN_ISSUER, audience our client id, not expired, with a
+ * subject. userinfo must then name the same subject.
+ *
+ * NONCE. Every authorization request carries a fresh nonce, and a nonce in
+ * the ID token must match it exactly — a mismatch always fails. LinkedIn does
+ * not document echoing the nonce in this flow, so LINKEDIN_NONCE_POLICY is
+ * MATCH_IF_PRESENT: a token with no nonce is accepted, because the
+ * single-use, browser-bound state already ties the code to this attempt.
+ * The callback logs whether LinkedIn echoed it ("nonce: matched" / "nonce:
+ * absent", never the value). If production shows LinkedIn always echoes it,
+ * set the policy to REQUIRED.
+ *
  * TOKENS ARE NOT STORED. The access token is used once, server-side, to read
  * the member's identity, and discarded. Nothing in this milestone calls
  * LinkedIn again; when something does, it should add token storage then.
@@ -38,11 +52,23 @@
 import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import process from 'node:process';
+import { createRemoteJWKSet, jwtVerify } from 'jose';
 
 export const LINKEDIN_AUTHORIZE_URL = 'https://www.linkedin.com/oauth/v2/authorization';
 export const LINKEDIN_TOKEN_URL = 'https://www.linkedin.com/oauth/v2/accessToken';
 export const LINKEDIN_USERINFO_URL = 'https://api.linkedin.com/v2/userinfo';
-export const LINKEDIN_ISSUER = 'https://www.linkedin.com/oauth';
+export const LINKEDIN_JWKS_URL = 'https://www.linkedin.com/oauth/openid/jwks';
+export const LINKEDIN_ISSUER = 'https://www.linkedin.com';
+export const ID_TOKEN_ALGORITHMS = ['RS256'];
+export const ID_TOKEN_CLOCK_TOLERANCE_S = 60;
+
+export const NONCE_POLICY = Object.freeze({
+  /** The ID token must carry the nonce, and it must match. */
+  REQUIRED: 'required',
+  /** A nonce in the ID token must match; a token without one is accepted. */
+  MATCH_IF_PRESENT: 'match_if_present',
+});
+export const LINKEDIN_NONCE_POLICY = NONCE_POLICY.MATCH_IF_PRESENT;
 export const LINKEDIN_SCOPES = ['openid', 'profile', 'email'];
 
 export const STATE_TTL_MS = 10 * 60 * 1000;
@@ -226,35 +252,58 @@ export async function exchangeCodeForTokens({ code, config, fetchImpl = fetch })
   return body;
 }
 
-export function decodeIdTokenClaims(idToken) {
-  const parts = typeof idToken === 'string' ? idToken.split('.') : [];
-  if (parts.length !== 3) throw new LinkedInOAuthError(OUTCOMES.IDENTITY_FAILED, 'Malformed ID token');
-  try {
-    return JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
-  } catch {
-    throw new LinkedInOAuthError(OUTCOMES.IDENTITY_FAILED, 'Unreadable ID token');
-  }
+// One key set per warm function instance. jose caches LinkedIn's keys and
+// refetches when a token names a key it has not seen (rotation).
+let linkedInJwks = null;
+export function getLinkedInJwks() {
+  if (!linkedInJwks) linkedInJwks = createRemoteJWKSet(new URL(LINKEDIN_JWKS_URL));
+  return linkedInJwks;
 }
 
 /**
- * Checks the ID token's claims. Its signature is not verified: it came
- * straight from LinkedIn's token endpoint over TLS, authenticated by our
- * client secret, which OpenID Connect Core §3.1.3.7 accepts in place of a
- * signature check.
- *
- * The nonce is checked when LinkedIn echoes it; LinkedIn's documentation does
- * not promise that it does, and the single-use, browser-bound state already
- * ties the code to this attempt. A nonce that is present and different fails.
+ * Applies the nonce policy. Returns 'matched' or 'absent'; throws on a
+ * mismatch (always) or, under REQUIRED, on a missing nonce.
  */
-export function validateIdTokenClaims(claims, { clientId, nonce, now = Date.now() }) {
-  const fail = (why) => { throw new LinkedInOAuthError(OUTCOMES.IDENTITY_FAILED, why); };
-  if (claims.iss !== LINKEDIN_ISSUER) fail('Unexpected issuer');
-  const aud = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-  if (!aud.includes(clientId)) fail('ID token not issued to this app');
-  if (!(typeof claims.exp === 'number' && claims.exp * 1000 > now)) fail('ID token expired');
-  if (claims.nonce !== undefined && claims.nonce !== nonce) fail('Nonce mismatch');
-  if (!claims.sub) fail('ID token has no subject');
-  return claims;
+export function checkNonce(claims, expectedNonce, policy = LINKEDIN_NONCE_POLICY) {
+  if (Object.prototype.hasOwnProperty.call(claims, 'nonce')) {
+    if (!expectedNonce || claims.nonce !== expectedNonce) {
+      throw new LinkedInOAuthError(OUTCOMES.IDENTITY_FAILED, 'ID token nonce does not match this attempt');
+    }
+    return 'matched';
+  }
+  if (policy === NONCE_POLICY.REQUIRED) {
+    throw new LinkedInOAuthError(OUTCOMES.IDENTITY_FAILED, 'ID token has no nonce');
+  }
+  return 'absent';
+}
+
+/**
+ * Verifies LinkedIn's ID token as an OIDC JWT and applies the nonce policy.
+ * Returns { claims, nonceCheck }. `keySet` defaults to LinkedIn's JWKS.
+ */
+export async function verifyLinkedInIdToken(idToken, {
+  clientId, nonce, keySet = getLinkedInJwks(), noncePolicy = LINKEDIN_NONCE_POLICY, currentDate,
+}) {
+  let claims;
+  try {
+    ({ payload: claims } = await jwtVerify(idToken, keySet, {
+      algorithms: ID_TOKEN_ALGORITHMS,
+      issuer: LINKEDIN_ISSUER,
+      audience: clientId,
+      requiredClaims: ['sub', 'exp'],
+      clockTolerance: ID_TOKEN_CLOCK_TOLERANCE_S,
+      ...(currentDate && { currentDate }),
+    }));
+  } catch (err) {
+    // jose's code and message name the failed check (e.g. an unexpected "iss"
+    // claim value); neither contains the token.
+    throw new LinkedInOAuthError(OUTCOMES.IDENTITY_FAILED, `ID token rejected: ${err.code || err.name}: ${err.message}`);
+  }
+  if (typeof claims.sub !== 'string' || !claims.sub) {
+    throw new LinkedInOAuthError(OUTCOMES.IDENTITY_FAILED, 'ID token has no subject');
+  }
+  const nonceCheck = checkNonce(claims, nonce, noncePolicy);
+  return { claims, nonceCheck };
 }
 
 export async function fetchUserInfo({ accessToken, fetchImpl = fetch }) {
@@ -279,15 +328,20 @@ function parseBoolean(value) {
   return null;
 }
 
-/** Token exchange → ID token checks → userinfo, which must name the same member. */
-export async function resolveLinkedInIdentity({ code, nonce, config, fetchImpl = fetch, now = Date.now() }) {
+/**
+ * Token exchange → verified ID token → userinfo, which must name the same
+ * member. Returns { identity, nonceCheck }.
+ */
+export async function resolveLinkedInIdentity({ code, nonce, config, fetchImpl = fetch, keySet }) {
   const tokens = await exchangeCodeForTokens({ code, config, fetchImpl });
-  const claims = validateIdTokenClaims(decodeIdTokenClaims(tokens.id_token), { clientId: config.clientId, nonce, now });
+  const { claims, nonceCheck } = await verifyLinkedInIdToken(tokens.id_token, {
+    clientId: config.clientId, nonce, ...(keySet && { keySet }),
+  });
   const info = await fetchUserInfo({ accessToken: tokens.access_token, fetchImpl });
   if (info.sub !== claims.sub) {
     throw new LinkedInOAuthError(OUTCOMES.IDENTITY_FAILED, 'Userinfo subject does not match ID token');
   }
-  return {
+  return { nonceCheck, identity: {
     sub: claims.sub,
     name: info.name || [info.given_name, info.family_name].filter(Boolean).join(' ') || null,
     givenName: info.given_name || null,
@@ -296,7 +350,7 @@ export async function resolveLinkedInIdentity({ code, nonce, config, fetchImpl =
     emailVerified: parseBoolean(info.email_verified),
     pictureUrl: info.picture || null,
     locale: info.locale || null,
-  };
+  } };
 }
 
 // ─── Persistence ─────────────────────────────────────────────────────────────

@@ -7,15 +7,22 @@
  * Pins the security properties: state is random, never the uid, stored only
  * as a hash, bound to the browser that asked for it, and accepted once —
  * missing, unknown, reused, expired or cross-browser states are refused. Also
- * pins the scopes, the token exchange, the identity checks (nonce, audience,
- * userinfo subject), that no LinkedIn token is stored, that one LinkedIn
- * account maps to one Idynify user, and that every outcome returns to
- * Settings rather than a raw response.
+ * pins the scopes, the token exchange, the ID token verification (RS256
+ * signature against LinkedIn's JWKS, exact issuer, audience, expiry, subject),
+ * the nonce policy (a mismatch always fails; a missing nonce is accepted only
+ * under MATCH_IF_PRESENT), that userinfo must name the same member, that no
+ * LinkedIn token is stored, that one LinkedIn account maps to one Idynify
+ * user, and that every outcome returns to Settings rather than a raw response.
+ *
+ * ID tokens here are real JWTs signed with a test RSA key, and LinkedIn's
+ * JWKS URL is served by the mocked fetch, so the production verification
+ * path runs unchanged.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { createHash } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import process from 'node:process';
+import { generateKeyPair, exportJWK, SignJWT, createLocalJWKSet } from 'jose';
 
 // ─── In-memory Firestore (the subset the Admin SDK calls here use) ──────────
 const store = new Map();
@@ -60,8 +67,10 @@ vi.mock('../../netlify/functions/firebase-admin.js', () => ({
 const { handler: init } = await import('../../netlify/functions/linkedin-oauth-init.js');
 const { handler: callback } = await import('../../netlify/functions/linkedin-oauth-callback.js');
 const { handler: disconnect } = await import('../../netlify/functions/linkedin-disconnect.js');
-const { STATE_TTL_MS, BINDING_COOKIE, LINKEDIN_TOKEN_URL, LINKEDIN_USERINFO_URL } =
-  await import('../../netlify/functions/utils/linkedinOAuth.js');
+const {
+  STATE_TTL_MS, BINDING_COOKIE, LINKEDIN_TOKEN_URL, LINKEDIN_USERINFO_URL, LINKEDIN_JWKS_URL, LINKEDIN_ISSUER,
+  LINKEDIN_NONCE_POLICY, NONCE_POLICY, verifyLinkedInIdToken, checkNonce,
+} = await import('../../netlify/functions/utils/linkedinOAuth.js');
 
 const CLIENT_ID = 'li-client-id';
 const CLIENT_SECRET = 'li-client-secret-DO-NOT-LEAK';
@@ -70,22 +79,35 @@ const sha256 = (s) => createHash('sha256').update(s).digest('hex');
 
 // ─── Mock LinkedIn ──────────────────────────────────────────────────────────
 const b64url = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
-const idToken = (claims) => `${b64url({ alg: 'RS256' })}.${b64url(claims)}.sig`;
+const KID = 'linkedin-test-key';
+const linkedInKeys = await generateKeyPair('RS256');
+const attackerKeys = await generateKeyPair('RS256');
+const JWKS = { keys: [{ ...(await exportJWK(linkedInKeys.publicKey)), kid: KID, alg: 'RS256', use: 'sig' }] };
+
+/** A signed ID token. `claims` override the defaults; an undefined value drops that claim. */
+async function idToken(claims = {}, { key = linkedInKeys.privateKey, alg = 'RS256' } = {}) {
+  const payload = {
+    iss: LINKEDIN_ISSUER, aud: CLIENT_ID, sub: 'member-1',
+    iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 3600, ...claims,
+  };
+  for (const k of Object.keys(payload)) if (payload[k] === undefined) delete payload[k];
+  return new SignJWT(payload).setProtectedHeader({ alg, kid: KID }).sign(key);
+}
+
+let jwksFetches = 0;
 
 /** LinkedIn's token and userinfo endpoints for member `sub`. Overrides change one answer. */
-function mockLinkedIn({ sub = 'member-1', tokenStatus = 200, claims = {}, userinfo = {}, userinfoStatus = 200 } = {}) {
-  const fetchMock = vi.fn(async (url, init) => {
+function mockLinkedIn({ sub = 'member-1', tokenStatus = 200, claims = {}, signWith = {}, rawIdToken, userinfo = {}, userinfoStatus = 200 } = {}) {
+  const fetchMock = vi.fn(async (input, init) => {
+    const url = String(input);
+    if (url === LINKEDIN_JWKS_URL) {
+      jwksFetches += 1;
+      return new Response(JSON.stringify(JWKS), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
     if (url === LINKEDIN_TOKEN_URL) {
       if (tokenStatus !== 200) return { ok: false, status: tokenStatus, json: async () => ({ error: 'invalid_request' }) };
-      const nonce = fetchMock.nonce;
-      return {
-        ok: true, status: 200,
-        json: async () => ({
-          access_token: 'li-access-token',
-          expires_in: 5184000,
-          id_token: idToken({ iss: 'https://www.linkedin.com/oauth', aud: CLIENT_ID, sub, nonce, exp: Math.floor(Date.now() / 1000) + 3600, ...claims }),
-        }),
-      };
+      const token = rawIdToken ?? await idToken({ sub, nonce: fetchMock.nonce, ...claims }, signWith);
+      return { ok: true, status: 200, json: async () => ({ access_token: 'li-access-token', expires_in: 5184000, id_token: token }) };
     }
     if (url === LINKEDIN_USERINFO_URL) {
       expect(init.headers.Authorization).toBe('Bearer li-access-token');
@@ -125,6 +147,8 @@ async function connect(uid, linkedIn = {}) {
 }
 
 const stateDocs = () => [...store.keys()].filter(k => k.startsWith('oauth_states/'));
+/** Calls to LinkedIn's token and userinfo endpoints (the key set is cached across tests). */
+const linkedInCalls = (fetchMock) => fetchMock.mock.calls.filter(([u]) => String(u) !== LINKEDIN_JWKS_URL);
 
 beforeEach(() => {
   store.clear();
@@ -201,7 +225,7 @@ describe('linkedin-oauth-callback', () => {
     expect(outcome).toBe('connected');
     expect(res.headers['Set-Cookie']).toMatch(new RegExp(`^${BINDING_COOKIE}=; .*Max-Age=0$`));
 
-    const [tokenUrl, tokenInit] = fetchMock.mock.calls[0];
+    const [tokenUrl, tokenInit] = linkedInCalls(fetchMock)[0];
     expect(tokenUrl).toBe(LINKEDIN_TOKEN_URL);
     const form = new URLSearchParams(tokenInit.body);
     expect(Object.fromEntries(form)).toEqual({
@@ -259,7 +283,7 @@ describe('linkedin-oauth-callback', () => {
     expect(first.outcome).toBe('connected');
     const again = await returnFromLinkedIn({ state: first.state, cookie: first.cookie, code: 'replayed-code' });
     expect(again.outcome).toBe('invalid_state');
-    expect(first.fetchMock).toHaveBeenCalledTimes(2);              // token + userinfo, once
+    expect(linkedInCalls(first.fetchMock)).toHaveLength(2);        // token + userinfo, once
   });
 
   it('rejects a valid state from a different browser (no or wrong binding cookie), and burns it', async () => {
@@ -296,24 +320,58 @@ describe('linkedin-oauth-callback', () => {
     expect(store.has('users/A/integrations/linkedin')).toBe(false);
   });
 
+  it('verifies the ID token against LinkedIn\'s published JWKS', async () => {
+    expect((await connect('A')).outcome).toBe('connected');
+    expect(jwksFetches).toBeGreaterThan(0);                        // fetched from LINKEDIN_JWKS_URL (then cached)
+    expect(LINKEDIN_JWKS_URL).toBe('https://www.linkedin.com/oauth/openid/jwks');
+    expect(LINKEDIN_ISSUER).toBe('https://www.linkedin.com');
+  });
+
+  const unsigned = (claims) => `${b64url({ alg: 'none', kid: KID })}.${b64url({ iss: LINKEDIN_ISSUER, aud: CLIENT_ID, sub: 'member-1', exp: Math.floor(Date.now() / 1000) + 3600, ...claims })}.`;
+  const hs256 = () => new SignJWT({ iss: LINKEDIN_ISSUER, aud: CLIENT_ID, sub: 'member-1', exp: Math.floor(Date.now() / 1000) + 3600 })
+    .setProtectedHeader({ alg: 'HS256', kid: KID }).sign(new TextEncoder().encode('a-guessable-hmac-secret-0123456789'));
+
   it.each([
-    ['a nonce from another attempt', { claims: { nonce: 'someone-elses-nonce' } }],
-    ['an ID token with no subject', { claims: { sub: '' } }],
+    ['an ID token signed by someone else\'s key', { signWith: { key: attackerKeys.privateKey } }],
+    ['an unsigned (alg "none") ID token', { rawIdToken: unsigned({}) }],
+    ['an HS256 ID token (algorithm confusion)', { rawIdToken: 'HS256' }],
+    ['a malformed ID token', { rawIdToken: 'not.a.jwt' }],
     ['an ID token for another app', { claims: { aud: 'other-client' } }],
     ['an ID token from another issuer', { claims: { iss: 'https://evil.example' } }],
-    ['an expired ID token', { claims: { exp: 1 } }],
+    ['an ID token with the discovery-path issuer (must be exact)', { claims: { iss: 'https://www.linkedin.com/oauth' } }],
+    ['an expired ID token', { claims: { exp: Math.floor(Date.now() / 1000) - 3600 } }],
+    ['an ID token with no expiry', { claims: { exp: undefined } }],
+    ['an ID token with no subject', { claims: { sub: undefined } }],
+    ['an ID token with an empty subject', { claims: { sub: '' } }],
+    ['a nonce from another attempt', { claims: { nonce: 'someone-elses-nonce' } }],
+    ['an empty nonce', { claims: { nonce: '' } }],
     ['userinfo naming another member', { userinfo: { sub: 'member-2' } }],
     ['a userinfo failure', { userinfoStatus: 500 }],
   ])('%s returns "identity_failed" and saves nothing', async (_name, linkedIn) => {
-    const { outcome } = await connect('A', linkedIn);
+    const opts = linkedIn.rawIdToken === 'HS256' ? { ...linkedIn, rawIdToken: await hs256() } : linkedIn;
+    const { outcome } = await connect('A', opts);
     expect(outcome).toBe('identity_failed');
     expect(store.has('users/A/integrations/linkedin')).toBe(false);
   });
 
-  it('an ID token without a nonce is accepted (LinkedIn may not echo it); email_verified may be a string', async () => {
+  it('nonce: an echoed nonce that matches connects, and the log says "nonce: matched" without the value', async () => {
+    const lines = [];
+    vi.spyOn(console, 'log').mockImplementation((...a) => lines.push(a.join(' ')));
+    const { outcome, nonce } = await connect('A');
+    expect(outcome).toBe('connected');
+    const line = lines.find(l => l.includes('connected for user'));
+    expect(line).toContain('nonce: matched');
+    expect(line).not.toContain(nonce);
+  });
+
+  it('nonce: LinkedIn not echoing it is accepted under the MATCH_IF_PRESENT policy, and logged as "absent"', async () => {
+    expect(LINKEDIN_NONCE_POLICY).toBe(NONCE_POLICY.MATCH_IF_PRESENT);
+    const lines = [];
+    vi.spyOn(console, 'log').mockImplementation((...a) => lines.push(a.join(' ')));
     const { outcome } = await connect('A', { claims: { nonce: undefined }, userinfo: { email_verified: 'true' } });
     expect(outcome).toBe('connected');
-    expect(store.get('users/A/integrations/linkedin').emailVerified).toBe(true);
+    expect(lines.find(l => l.includes('connected for user'))).toContain('nonce: absent');
+    expect(store.get('users/A/integrations/linkedin').emailVerified).toBe(true);      // string form accepted
   });
 
   it('a LinkedIn account already connected to another user is refused', async () => {
@@ -351,6 +409,41 @@ describe('linkedin-oauth-callback', () => {
     for (const secret of [ok.state, 'auth-code', 'li-access-token', CLIENT_SECRET, ok.nonce, ok.cookie.split('=')[1]]) {
       expect(logged).not.toContain(secret);
     }
+  });
+});
+
+// ─── ID token verification, directly ────────────────────────────────────────
+
+describe('verifyLinkedInIdToken and the nonce policy', () => {
+  const keySet = createLocalJWKSet(JWKS);
+
+  it('returns the verified claims for a valid token', async () => {
+    const { claims, nonceCheck } = await verifyLinkedInIdToken(await idToken({ nonce: 'n1' }), { clientId: CLIENT_ID, nonce: 'n1', keySet });
+    expect(claims).toMatchObject({ iss: 'https://www.linkedin.com', aud: CLIENT_ID, sub: 'member-1' });
+    expect(nonceCheck).toBe('matched');
+  });
+
+  it('a mismatched nonce fails under every policy', async () => {
+    for (const noncePolicy of Object.values(NONCE_POLICY)) {
+      await expect(verifyLinkedInIdToken(await idToken({ nonce: 'n1' }), { clientId: CLIENT_ID, nonce: 'n2', keySet, noncePolicy }))
+        .rejects.toMatchObject({ outcome: 'identity_failed' });
+    }
+    expect(() => checkNonce({ nonce: 'n1' }, undefined, NONCE_POLICY.MATCH_IF_PRESENT)).toThrow(/nonce/);
+  });
+
+  it('a missing nonce passes MATCH_IF_PRESENT and fails REQUIRED', async () => {
+    const token = await idToken();
+    await expect(verifyLinkedInIdToken(token, { clientId: CLIENT_ID, nonce: 'n1', keySet, noncePolicy: NONCE_POLICY.MATCH_IF_PRESENT }))
+      .resolves.toMatchObject({ nonceCheck: 'absent' });
+    await expect(verifyLinkedInIdToken(token, { clientId: CLIENT_ID, nonce: 'n1', keySet, noncePolicy: NONCE_POLICY.REQUIRED }))
+      .rejects.toMatchObject({ outcome: 'identity_failed', message: 'ID token has no nonce' });
+  });
+
+  it('a rejection names the failed check, not the token', async () => {
+    const token = await idToken({ iss: 'https://evil.example' });
+    const err = await verifyLinkedInIdToken(token, { clientId: CLIENT_ID, nonce: undefined, keySet }).catch(e => e);
+    expect(err.message).toMatch(/ERR_JWT_CLAIM_VALIDATION_FAILED.*iss/);
+    expect(err.message).not.toContain(token.split('.')[1]);
   });
 });
 

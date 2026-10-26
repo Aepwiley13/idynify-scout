@@ -57,14 +57,18 @@ export const handler = async (event) => {
     if (stateError) throw stateError;
     if (!params.code) throw new LinkedInOAuthError(OUTCOMES.MISSING_CODE, 'No authorization code');
 
-    const identity = await resolveLinkedInIdentity({ code: params.code, nonce: consumed.nonce, config });
+    const { identity, nonceCheck } = await resolveLinkedInIdentity({ code: params.code, nonce: consumed.nonce, config });
     await saveLinkedInIntegration(db, { uid, identity });
 
-    console.log('[linkedin-oauth-callback] connected for user:', uid);
+    // nonceCheck is 'matched' or 'absent' — whether LinkedIn echoed the nonce
+    // (see LINKEDIN_NONCE_POLICY), never the value.
+    console.log('[linkedin-oauth-callback] connected for user:', uid, `nonce: ${nonceCheck}`);
     return backToSettings(OUTCOMES.CONNECTED);
   } catch (err) {
     const outcome = err instanceof LinkedInOAuthError ? err.outcome : OUTCOMES.ERROR;
-    console.error('[linkedin-oauth-callback] failed:', outcome, uid ? `user: ${uid}` : '', err instanceof LinkedInOAuthError ? '' : err.message);
+    // LinkedInOAuthError messages are written to be loggable: they name the
+    // failed check or an HTTP status, never a code, state, token or secret.
+    console.error('[linkedin-oauth-callback] failed:', outcome, uid ? `user: ${uid}` : '', err.message);
     return backToSettings(outcome);
   }
 };

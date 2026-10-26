@@ -253,6 +253,38 @@ const CAPTURE_CASES = [
 const firstCaptureCase = CASES.length + 1;
 CASES.push(...CAPTURE_CASES.map(([name, expect, run], i) => [`${firstCaptureCase + i}  ${name}`, expect, run]));
 
+// ── Connect LinkedIn: server-written ──────────────────────────────────────
+// integrations/linkedin is written only by the linkedin-oauth-* functions
+// after LinkedIn confirms the identity; its owner may read it, nothing more.
+// oauth_states and linkedin_member_claims are server-only. Other integration
+// documents (gmail, googleCalendar) keep their existing owner access.
+await env.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, `users/${U}/integrations/linkedin`), { provider: 'linkedin', status: 'connected', linkedinMemberId: 'm1' });
+  await setDoc(doc(db, `users/${U}/integrations/gmail`), { status: 'connected' });
+  await setDoc(doc(db, 'oauth_states/h1'), { provider: 'linkedin', uid: U });
+  await setDoc(doc(db, 'linkedin_member_claims/c1'), { uid: U });
+});
+
+const LINKEDIN_CASES = [
+  ['integrations/linkedin  owner reads', 'ALLOW', () => getDoc(doc(me, `users/${U}/integrations/linkedin`))],
+  ['integrations/linkedin  owner marks itself connected', 'DENY', () => updateDoc(doc(me, `users/${U}/integrations/linkedin`), { linkedinMemberId: 'someone-else' })],
+  ['integrations/linkedin  owner deletes', 'DENY', () => deleteDoc(doc(me, `users/${U}/integrations/linkedin`))],
+  ['integrations/linkedin  owner writes beneath', 'DENY', () => setDoc(doc(me, `users/${U}/integrations/linkedin/x/y`), { a: 1 })],
+  ['integrations/linkedin  OTHER reads', 'DENY', () => getDoc(doc(other, `users/${U}/integrations/linkedin`))],
+  ['integrations/linkedin  new user creates one', 'DENY', () => setDoc(doc(other, 'users/OTHER/integrations/linkedin'), { status: 'connected' })],
+  ['integrations/gmail     owner update still allowed', 'ALLOW', () => updateDoc(doc(me, `users/${U}/integrations/gmail`), { status: 'connected' })],
+  ['oauth_states           reads one', 'DENY', () => getDoc(doc(me, 'oauth_states/h1'))],
+  ['oauth_states           forges one', 'DENY', () => setDoc(doc(me, 'oauth_states/h2'), { provider: 'linkedin', uid: 'OTHER' })],
+  ['oauth_states           deletes one', 'DENY', () => deleteDoc(doc(me, 'oauth_states/h1'))],
+  ['linkedin_member_claims reads one', 'DENY', () => getDoc(doc(me, 'linkedin_member_claims/c1'))],
+  ['linkedin_member_claims takes one', 'DENY', () => setDoc(doc(other, 'linkedin_member_claims/c1'), { uid: 'OTHER' })],
+  ['admin sdk  writes integrations/linkedin', 'ALLOW', asAdminSdk(db => setDoc(doc(db, `users/${U}/integrations/linkedin`), { status: 'connected' }))],
+  ['admin sdk  writes an oauth state', 'ALLOW', asAdminSdk(db => setDoc(doc(db, 'oauth_states/h3'), { uid: U }))],
+];
+const firstLinkedInCase = CASES.length + 1;
+CASES.push(...LINKEDIN_CASES.map(([name, expect, run], i) => [`${firstLinkedInCase + i}  ${name}`, expect, run]));
+
 let pass = 0, fail = 0;
 const failures = [];
 for (const [name, expect, run] of CASES) {

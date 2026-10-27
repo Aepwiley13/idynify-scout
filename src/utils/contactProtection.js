@@ -64,15 +64,23 @@ export function differenceSuggestions(contact, { title, company }) {
 
 /** Apollo's phone_numbers as canonical phones[] entries, labelled by Apollo's stated type, else unknown. */
 function phonesFromProvider(phoneNumbers) {
+  return providerEntries(phoneNumbers).map(({ phone }) => phone);
+}
+
+/** Each usable provider entry with the canonical phone made from it. */
+function providerEntries(phoneNumbers) {
   return (Array.isArray(phoneNumbers) ? phoneNumbers : [])
-    .map((p, i) => makePhone({
-      id: `enrichment-${i + 1}`,
-      value: p?.sanitized_number || p?.raw_number || p?.number || '',
-      label: labelFromProviderType(p?.type),
-      labelSource: 'enrichment',
-      observedLabel: typeof p?.type === 'string' ? p.type : null,
+    .map((p, i) => ({
+      entry: p,
+      phone: makePhone({
+        id: `enrichment-${i + 1}`,
+        value: p?.sanitized_number || p?.raw_number || p?.number || '',
+        label: labelFromProviderType(p?.type),
+        labelSource: 'enrichment',
+        observedLabel: typeof p?.type === 'string' ? p.type : null,
+      }),
     }))
-    .filter(Boolean);
+    .filter(({ phone }) => phone);
 }
 
 const SINGLE_PHONE_FIELDS = Object.freeze(['phone', 'phone_mobile', 'phone_direct', 'phone_work', 'phone_home', 'phone_normalized']);
@@ -109,7 +117,7 @@ function sameNumber(a, b) {
  * @returns {{ patch: object, added: object[] }}  an empty patch when nothing is new
  */
 export function mergeFoundPhones(contact, phoneNumbers) {
-  const found = phonesFromProvider(phoneNumbers);
+  const found = providerEntries(phoneNumbers);
   if (found.length === 0) return { patch: {}, added: [] };
 
   const existing = readContactPhones(contact);
@@ -117,10 +125,12 @@ export function mergeFoundPhones(contact, phoneNumbers) {
   if (Array.isArray(contact.phones)) known.push(...phonesFromProvider(contact.phone_numbers));
 
   const added = [];
-  for (const phone of found) {
+  const addedEntries = [];
+  for (const { entry, phone } of found) {
     if (known.some(other => sameNumber(other, phone))) continue;
     known.push(phone);
     added.push({ ...phone, id: `enrichment-${digitsOf(phone)}` });
+    addedEntries.push(entry);
   }
   if (added.length === 0) return { patch: {}, added };
 
@@ -130,7 +140,16 @@ export function mergeFoundPhones(contact, phoneNumbers) {
     if (field === 'phone' && existing.length > 0) continue;
     if (isBlank(contact[field]) && write[field]) patch[field] = write[field];
   }
-  if (!hasItems(contact.phone_numbers)) patch.phone_numbers = phoneNumbers;
+  // The provider's numbers are remembered in phone_numbers, so one the user
+  // later removes is not added back: the whole list on the first run, then
+  // each number a later run adds, once.
+  if (!hasItems(contact.phone_numbers)) {
+    patch.phone_numbers = phoneNumbers;
+  } else {
+    const history = phonesFromProvider(contact.phone_numbers);
+    const newEntries = addedEntries.filter((entry, i) => !history.some(other => sameNumber(other, added[i])));
+    if (newEntries.length) patch.phone_numbers = [...contact.phone_numbers, ...newEntries];
+  }
   return { patch, added };
 }
 

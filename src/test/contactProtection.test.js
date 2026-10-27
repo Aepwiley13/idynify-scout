@@ -18,6 +18,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import process from 'node:process';
 import { enrichmentPatch, differenceSuggestions, sameText, mergeFoundPhones } from '../utils/contactProtection';
+import { readContactPhones, buildPhoneWrite } from '../utils/contactPhones';
 
 const APOLLO_PERSON = {
   id: 'apollo-1',
@@ -220,6 +221,26 @@ describe('mergeFoundPhones: Apollo\'s numbers next to the contact\'s own', () =>
     const numbers = [{ sanitized_number: '+18015550199', type: 'mobile' }];
     const once = { ...MAIN_ONLY, ...mergeFoundPhones(MAIN_ONLY, numbers).patch };
     expect(mergeFoundPhones(once, numbers)).toEqual({ patch: {}, added: [] });
+  });
+
+  it('a number added on a later run, then removed by the user, is not added back', () => {
+    const A = { sanitized_number: '+18015551234', type: 'mobile' };
+    const B = { sanitized_number: '+13855550000', type: 'work_hq' };
+    const run = (contact, numbers) => ({ ...contact, ...mergeFoundPhones(contact, numbers).patch });
+    const digits = c => c.phone_numbers.map(p => (p.sanitized_number || p.raw_number).replace(/\D/g, ''));
+
+    // 1. The first Enrich adds A.
+    let contact = run({ name: 'A', phones: [] }, [A]);
+    expect(readContactPhones(contact).map(p => p.value)).toEqual(['+18015551234']);
+    // 2. A later Enrich adds B; A, written without its country code, is neither a new number nor new history.
+    contact = run(contact, [{ raw_number: '801-555-1234', type: 'mobile' }, B]);
+    expect(readContactPhones(contact).map(p => p.value)).toEqual(['+18015551234', '+13855550000']);
+    expect(digits(contact)).toEqual(['18015551234', '13855550000']);
+    // 3. The user removes B.
+    contact = { ...contact, ...buildPhoneWrite(readContactPhones(contact).filter(p => p.value !== '+13855550000')) };
+    // 4. Another Enrich receives A (as +1 and without it) and B again: nothing comes back, history unchanged.
+    expect(mergeFoundPhones(contact, [A, { raw_number: '801-555-1234', type: 'mobile' }, B])).toEqual({ patch: {}, added: [] });
+    expect(digits(contact)).toEqual(['18015551234', '13855550000']);
   });
 });
 

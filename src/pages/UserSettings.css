@@ -251,6 +251,16 @@
   margin-top: 0.25rem;
 }
 
+/* ── inline success ── */
+.us-inline-success {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: #34d399;
+  margin-top: 0.25rem;
+}
+
 /* ── status chip ── */
 .us-status-chip {
   display: inline-flex;

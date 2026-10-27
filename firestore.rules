@@ -98,6 +98,11 @@ service cloud.firestore {
         && data.monthlyCredits == data.credits;
     }
 
+    // Integration documents only the server may write (see the users block).
+    function serverOwnedIntegration(coll, docId) {
+      return coll == 'integrations' && docId == 'linkedin';
+    }
+
     match /users/{userId} {
       allow read: if owns(userId);
       allow create: if owns(userId)
@@ -117,12 +122,18 @@ service cloud.firestore {
       //
       // capture_operations is server-only: the capture endpoints read and
       // write it through the Admin SDK, and no client may touch it.
+      //
+      // integrations/linkedin is read-only to its owner: only the Connect
+      // LinkedIn functions write it, after LinkedIn confirms the identity. A
+      // client that could write it could mark any LinkedIn member as its own.
       match /{coll}/{docId} {
         allow read:   if owns(userId) && coll != 'capture_operations';
-        allow create: if owns(userId) && coll != 'capture_operations';
+        allow create: if owns(userId) && coll != 'capture_operations'
+                      && !serverOwnedIntegration(coll, docId);
         allow update, delete: if owns(userId)
                               && coll != 'lineageEvents'
-                              && coll != 'capture_operations';
+                              && coll != 'capture_operations'
+                              && !serverOwnedIntegration(coll, docId);
       }
 
       // One level inside an ICP profile: criteriaVersions is append-only,
@@ -145,7 +156,8 @@ service cloud.firestore {
         allow write: if owns(userId)
                      && coll != 'icpProfiles'
                      && coll != 'lineageEvents'
-                     && coll != 'capture_operations';
+                     && coll != 'capture_operations'
+                     && !serverOwnedIntegration(coll, docId);
       }
     }
 
@@ -188,6 +200,18 @@ service cloud.firestore {
       allow read, write: if false;
     }
     match /capture_enrollment/{userId} {
+      allow read, write: if false;
+    }
+
+    // Connect LinkedIn, server-only. oauth_states holds single-use OAuth
+    // states (hashed) for ten minutes; a client that could write one could
+    // forge a state for another user. linkedin_member_claims records which
+    // user holds each LinkedIn account; a client that could write it could
+    // take someone else's.
+    match /oauth_states/{stateHash} {
+      allow read, write: if false;
+    }
+    match /linkedin_member_claims/{memberHash} {
       allow read, write: if false;
     }
   }

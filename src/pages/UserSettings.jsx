@@ -35,12 +35,13 @@ import {
   Volume2, VolumeX, Mail, CheckCircle, AlertTriangle,
   Loader, LogOut, Lock, Smartphone, BarChart3, Calendar,
   Key, Zap, ExternalLink, Layers, Briefcase, Plus, Star as StarIcon,
-  RefreshCw, Star, MessageSquare, Share2,
+  RefreshCw, Star, MessageSquare,
   Palette, Check, Clock,
 } from 'lucide-react';
 import { db, auth } from '../firebase/config';
 import { useMissionSounds } from '../hooks/useMissionSounds';
 import { useGmailSyncHealth } from '../hooks/useGmailSyncHealth';
+import LinkedInIntegrationCard from '../components/settings/LinkedInIntegrationCard';
 import {
   isMfaEnrolled,
   getEnrolledFactors,
@@ -98,7 +99,6 @@ const INTEGRATION_STUBS = [
   { id: 'salesforce', name: 'Salesforce',  desc: 'Enterprise CRM pipeline integration',   color: '#38bdf8', icon: Star        },
   { id: 'slack',      name: 'Slack',       desc: 'Mission alerts and team notifications',  color: '#a78bfa', icon: MessageSquare },
   { id: 'zapier',     name: 'Zapier',      desc: 'Connect 5000+ apps via automation',     color: '#f59e0b', icon: Zap         },
-  { id: 'linkedin',   name: 'LinkedIn',    desc: 'Export contacts and track engagement',   color: '#0ea5e9', icon: Share2      },
 ];
 
 const HUNTER_STUBS = [
@@ -1251,6 +1251,8 @@ export default function UserSettings() {
                   )}
                 </div>
               </div>
+
+              <LinkedInIntegrationCard user={user} />
             </section>
 
             <section className="us-section">

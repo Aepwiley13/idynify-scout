@@ -17,6 +17,11 @@
  * changing which company the person belongs to.
  *
  * Never overwritten: name, email, phones, company, website.
+ *
+ * Never written here: a LinkedIn URL. A profile enrichment finds is only a
+ * candidate; it is attached when the user confirms it through Find
+ * LinkedIn's confirm (src/components/capture/linkedinConfirm.js), which
+ * checks no other contact has it and runs the exact lookup.
  */
 import { hasRealContactPhoto } from './contactPhoto.js';
 import { readContactPhones, makePhone, buildPhoneWrite } from './contactPhones.js';
@@ -57,17 +62,95 @@ export function differenceSuggestions(contact, { title, company }) {
   return suggestions;
 }
 
-/** Apollo's phone_numbers as canonical phones[] entries, labelled as enrichment. */
+/** Apollo's phone_numbers as canonical phones[] entries, labelled by Apollo's stated type, else unknown. */
 function phonesFromProvider(phoneNumbers) {
+  return providerEntries(phoneNumbers).map(({ phone }) => phone);
+}
+
+/** Each usable provider entry with the canonical phone made from it. */
+function providerEntries(phoneNumbers) {
   return (Array.isArray(phoneNumbers) ? phoneNumbers : [])
-    .map((p, i) => makePhone({
-      id: `enrichment-${i + 1}`,
-      value: p?.sanitized_number || p?.raw_number || p?.number || '',
-      label: labelFromProviderType(p?.type),
-      labelSource: 'enrichment',
-      observedLabel: typeof p?.type === 'string' ? p.type : null,
+    .map((p, i) => ({
+      entry: p,
+      phone: makePhone({
+        id: `enrichment-${i + 1}`,
+        value: p?.sanitized_number || p?.raw_number || p?.number || '',
+        label: labelFromProviderType(p?.type),
+        labelSource: 'enrichment',
+        observedLabel: typeof p?.type === 'string' ? p.type : null,
+      }),
     }))
-    .filter(Boolean);
+    .filter(({ phone }) => phone);
+}
+
+const SINGLE_PHONE_FIELDS = Object.freeze(['phone', 'phone_mobile', 'phone_direct', 'phone_work', 'phone_home', 'phone_normalized']);
+
+const digitsOf = p => String(p?.normalized ?? p?.value ?? '').replace(/\D/g, '');
+
+/**
+ * One number, written with or without its country code: a card's
+ * "801-555-1234" and a provider's "+18015551234". Only for not adding a
+ * number twice; matching people stays with normalizePhone.
+ */
+function sameNumber(a, b) {
+  const x = digitsOf(a);
+  const y = digitsOf(b);
+  if (!x || !y) return false;
+  if (x === y) return true;
+  const [short, long] = x.length < y.length ? [x, y] : [y, x];
+  return short.length >= 10 && long.length - short.length <= 3 && long.endsWith(short);
+}
+
+/**
+ * The provider's numbers added next to the contact's own.
+ *
+ * Every number the contact has stays, with its label. A provider number is
+ * added only when the contact has no number that is the same (with or
+ * without a country code),
+ * labelled by the provider's stated type (unknown when it states none we
+ * trust, and an unknown number never identifies the person). A number the
+ * provider gave before and the user has since removed from the list is not
+ * added back. The single fields keep their values: only empty ones are
+ * filled, and the number to call (`phone`) is set only on a contact that had
+ * no number at all.
+ *
+ * @returns {{ patch: object, added: object[] }}  an empty patch when nothing is new
+ */
+export function mergeFoundPhones(contact, phoneNumbers) {
+  const found = providerEntries(phoneNumbers);
+  if (found.length === 0) return { patch: {}, added: [] };
+
+  const existing = readContactPhones(contact);
+  const known = [...existing];
+  if (Array.isArray(contact.phones)) known.push(...phonesFromProvider(contact.phone_numbers));
+
+  const added = [];
+  const addedEntries = [];
+  for (const { entry, phone } of found) {
+    if (known.some(other => sameNumber(other, phone))) continue;
+    known.push(phone);
+    added.push({ ...phone, id: `enrichment-${digitsOf(phone)}` });
+    addedEntries.push(entry);
+  }
+  if (added.length === 0) return { patch: {}, added };
+
+  const write = buildPhoneWrite([...existing, ...added]);
+  const patch = { phones: write.phones };
+  for (const field of SINGLE_PHONE_FIELDS) {
+    if (field === 'phone' && existing.length > 0) continue;
+    if (isBlank(contact[field]) && write[field]) patch[field] = write[field];
+  }
+  // The provider's numbers are remembered in phone_numbers, so one the user
+  // later removes is not added back: the whole list on the first run, then
+  // each number a later run adds, once.
+  if (!hasItems(contact.phone_numbers)) {
+    patch.phone_numbers = phoneNumbers;
+  } else {
+    const history = phonesFromProvider(contact.phone_numbers);
+    const newEntries = addedEntries.filter((entry, i) => !history.some(other => sameNumber(other, added[i])));
+    if (newEntries.length) patch.phone_numbers = [...contact.phone_numbers, ...newEntries];
+  }
+  return { patch, added };
 }
 
 /**
@@ -75,8 +158,10 @@ function phonesFromProvider(phoneNumbers) {
  *
  * Every field is written only when the contact's own is empty; location is
  * filled as one unit (never a city from one source beside a state from
- * another); phones are written only to a contact with no number at all, as
- * one canonical list. Title and company differences become suggestions.
+ * another); the provider's numbers are added next to the contact's own
+ * (mergeFoundPhones). Title and company differences become suggestions, and
+ * so does an email found on a company website. A LinkedIn URL is never
+ * written here.
  * `enrichment_provenance` keeps every existing entry and adds one for each
  * field written here.
  *
@@ -103,28 +188,29 @@ export function enrichmentPatch(contact, found, { provenance = {}, phoneNumbers 
     if (hasItems(value) && !hasItems(contact[field])) { patch[field] = value; record(field, source); }
   };
 
-  // Email: the contact's own address, or none, decides.
+  // Email: the contact's own address, or none, decides. One found on a
+  // company website may be a shared inbox: offered, never filled.
+  let websiteEmail = null;
   if (text(found.email) && isBlank(contact.email)) {
-    patch.email = text(found.email);
-    if (found.email_status != null) patch.email_status = found.email_status;
-    if (found.email_confidence != null) patch.email_confidence = found.email_confidence;
-    if (found.emailSource != null) patch.emailSource = found.emailSource;
-    record('email', provenance.email);
-  }
-
-  // Phones: only onto a contact with no number at all, as one canonical list.
-  // The provider's raw phone_numbers go with it and only then (Enrich used to
-  // rewrite them on every run).
-  if (readContactPhones(contact).length === 0) {
-    const phones = phonesFromProvider(phoneNumbers);
-    if (phones.length) {
-      Object.assign(patch, buildPhoneWrite(phones));
-      patch.phone_numbers = phoneNumbers;
-      record('phone', provenance.phone ?? 'apollo_match');
+    if (provenance.email === 'website_scrape' || found.emailSource === 'website') {
+      websiteEmail = text(found.email);
+    } else {
+      patch.email = text(found.email);
+      if (found.email_status != null) patch.email_status = found.email_status;
+      if (found.email_confidence != null) patch.email_confidence = found.email_confidence;
+      if (found.emailSource != null) patch.emailSource = found.emailSource;
+      record('email', provenance.email);
     }
   }
 
-  for (const field of ['linkedin_url', 'twitter_url', 'facebook_url', 'seniority', 'headline']) fillText(field, found[field]);
+  // Phones: the provider's numbers next to the contact's own, never instead.
+  const phones = mergeFoundPhones(contact, phoneNumbers);
+  if (phones.added.length) {
+    Object.assign(patch, phones.patch);
+    record('phone', provenance.phone ?? 'apollo_match');
+  }
+
+  for (const field of ['twitter_url', 'facebook_url', 'seniority', 'headline']) fillText(field, found[field]);
   for (const field of ['departments', 'functions', 'employment_history', 'education']) fillList(field, found[field]);
 
   // Title and company: filled when empty; a different value is a suggestion.
@@ -185,6 +271,7 @@ export function enrichmentPatch(contact, found, { provenance = {}, phoneNumbers 
     title: text(person?.title) ?? text(person?.employment_history?.[0]?.title),
     company: text(person?.organization_name) ?? text(person?.organization?.name) ?? text(person?.employment_history?.[0]?.organization_name),
   });
+  if (websiteEmail) suggestions.push({ field: 'email', current: null, suggested: websiteEmail, actionable: true, source: 'website' });
 
   patch.enrichment_provenance = { ...(contact.enrichment_provenance ?? {}), ...sources };
   return { patch, filled, suggestions };

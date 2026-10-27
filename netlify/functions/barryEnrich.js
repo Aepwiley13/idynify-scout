@@ -21,15 +21,28 @@
  * - Location is filled as one unit; person-level beats company-level
  * - Every written field gets a source tag in enrichment_provenance
  *
- * Last updated: January 2026
+ * WHO THE PERSON IS (the same rules as Find LinkedIn, #731/#732)
+ * ─────────────────────────────────────────────────────────────
+ * Person details come only from an exact Apollo match: the contact's own
+ * Apollo id or its own LinkedIn URL. A LinkedIn profile Barry finds any other
+ * way (Apollo's people search, Google, or the LinkedIn on the matched record)
+ * is never written and its record is never read: it comes back in
+ * `linkedinCandidates`, ranked by Find LinkedIn's rules, for the user to
+ * confirm through Find LinkedIn's confirm (the duplicate check, then the
+ * exact lookup).
+ *
+ * Logs carry step names, statuses and counts: never a name, email, phone,
+ * company, title or URL.
  */
 
+import process from 'node:process';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
 import { logApolloError } from './utils/apolloErrorLogger.js';
 import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } from './utils/scoutContactContract.js';
 import { googleBusinessLookup } from './utils/googleBusinessLookup.js';
-import { searchLinkedInProfile, searchLinkedInPhoto, extractEmailDomain } from './utils/linkedinSearch.js';
+import { searchLinkedInCandidates, searchLinkedInPhoto } from './utils/linkedinSearch.js';
+import { rankLinkedInCandidates, readPerson, candidateFromApolloPerson } from './utils/capture/linkedinCandidates.js';
 import { enrichmentPatch } from '../../src/utils/contactProtection.js';
 import { load } from 'cheerio';
 
@@ -44,13 +57,13 @@ export const handler = async (event) => {
   }
 
   try {
-    const { userId, authToken, contact } = JSON.parse(event.body);
+    const { userId, authToken, contact, person: requestedPerson } = JSON.parse(event.body);
 
     if (!userId || !authToken || !contact) {
       throw new Error('Missing required parameters');
     }
 
-    console.log('🐻 Barry Enrichment starting for:', contact.name);
+    console.log('🐻 Barry Enrichment starting');
 
     // Validate Apollo API key
     getApolloApiKey();
@@ -84,6 +97,17 @@ export const handler = async (event) => {
     // ─── Assess what's missing before we start ───
     const initialMissing = assessMissingData(contact);
     console.log('📋 Missing fields:', initialMissing);
+
+    // Who to look for on LinkedIn: the details the browser sent (Find
+    // LinkedIn's search person), else the contact's own name, company and
+    // title. Only when the contact has no LinkedIn of its own.
+    const hasOwnLinkedIn = Boolean(contact.linkedin_url);
+    const searchPerson = hasOwnLinkedIn ? null : (readPerson(requestedPerson) ?? readPerson({
+      name: typeof contact.name === 'string' ? contact.name : null,
+      company: [contact.company_name, contact.company].find(v => typeof v === 'string' && v.trim()) ?? null,
+      title: typeof contact.title === 'string' ? contact.title : null,
+    }));
+    const profilesFound = [];
 
     // Track enrichment steps + provenance
     const steps = [];
@@ -174,6 +198,10 @@ export const handler = async (event) => {
             apolloFields.fieldsFound.forEach(f => { provenance[f] = 'apollo_match'; });
             step1a.status = 'success';
 
+            // Its LinkedIn is still only a profile to confirm.
+            const candidate = searchPerson ? candidateFromApolloPerson(person) : null;
+            if (candidate) profilesFound.push(candidate);
+
             console.log(`✅ Step 1a: Found ${apolloFields.fieldsFound.length} fields`);
           } else {
             step1a.status = 'no_data';
@@ -193,13 +221,13 @@ export const handler = async (event) => {
       steps.push(step1a);
     }
 
-    // Step 1b: Apollo PEOPLE_SEARCH (fuzzy fallback — only if no Apollo ID)
-    const postApolloMissing = assessMissingData({ ...contact, ...enrichedData });
-    // Check for company in all possible field names (company_name, company, organization_name)
+    // Step 1b: Apollo PEOPLE_SEARCH: profiles to offer, never details to copy.
+    // A search by name and company can return a namesake; its LinkedIn is a
+    // candidate for the user to confirm, and nothing else of it is used.
     const hasNameAndCompany = (contact.name || enrichedData.name) &&
       (contact.company_name || contact.company || enrichedData.current_company_name || contact.organization_name);
 
-    if (postApolloMissing.length > 0 && hasNameAndCompany && !hasApolloId) {
+    if (searchPerson && hasNameAndCompany && !hasApolloId) {
       const step1b = {
         source: 'apollo_search',
         status: 'running',
@@ -213,44 +241,20 @@ export const handler = async (event) => {
         // Check for company in all possible field names (CSV uses "company", others use "company_name")
         const company = contact.company_name || contact.company || enrichedData.current_company_name || contact.organization_name || '';
 
-        console.log('🔍 Step 1b: Apollo PEOPLE_SEARCH for', name, 'at', company);
-
-        const searchBody = {
-          q_keywords: `${name} ${company}`,
-          page: 1,
-          per_page: 3
-        };
+        console.log('🔍 Step 1b: Apollo PEOPLE_SEARCH for LinkedIn profiles');
 
         const searchResponse = await fetch(APOLLO_ENDPOINTS.PEOPLE_SEARCH, {
           method: 'POST',
           headers: getApolloHeaders(),
-          body: JSON.stringify(searchBody)
+          body: JSON.stringify({ q_keywords: `${name} ${company}`, page: 1, per_page: 3 })
         });
 
         if (searchResponse.ok) {
           const searchData = await searchResponse.json();
-          const people = searchData.people || [];
-
-          if (people.length > 0) {
-            const bestMatch = findBestMatch(people, name, company);
-
-            if (bestMatch) {
-              if (!apolloRawData) apolloRawData = bestMatch;
-              const supplementalFields = extractSupplementalFields(bestMatch, { ...contact, ...enrichedData });
-              enrichedData = mergeWithPrecedence(enrichedData, supplementalFields.data, contact);
-              step1b.fieldsFound = supplementalFields.fieldsFound;
-              supplementalFields.fieldsFound.forEach(f => { provenance[f] = 'apollo_search'; });
-              step1b.status = 'success';
-
-              console.log(`✅ Step 1b: Supplemented ${supplementalFields.fieldsFound.length} fields`);
-            } else {
-              step1b.status = 'no_match';
-              step1b.message = 'No confident match in search results';
-            }
-          } else {
-            step1b.status = 'no_results';
-            step1b.message = 'Apollo search returned no results';
-          }
+          const people = (searchData.people || []).map(candidateFromApolloPerson).filter(Boolean);
+          profilesFound.push(...people);
+          step1b.status = people.length > 0 ? 'success' : 'no_results';
+          step1b.message = people.length > 0 ? `${people.length} possible LinkedIn profile(s) to confirm` : 'Apollo search returned no profiles';
         } else {
           await logApolloError(searchResponse, {}, 'barryEnrich-step1b');
           step1b.status = 'error';
@@ -266,13 +270,12 @@ export const handler = async (event) => {
     }
 
     // ═══════════════════════════════════════════════════
-    // STEP 1c: LinkedIn Search Fallback — if Apollo failed
+    // STEP 1c: LinkedIn search — profiles to confirm, never attached
     // ═══════════════════════════════════════════════════
-    const postApolloData = { ...contact, ...enrichedData };
-    const hasLinkedInUrl = !!(postApolloData.linkedin_url || enrichedData.linkedin_url);
-
-    // Only run LinkedIn search if Apollo didn't find a LinkedIn URL
-    if (!hasLinkedInUrl) {
+    // The same Google search Find LinkedIn uses. A profile found here is not
+    // the person until the user says so: no URL is written, no record is read
+    // for it, and no photo is taken from it.
+    if (searchPerson) {
       const step1c = {
         source: 'linkedin_search',
         status: 'running',
@@ -282,76 +285,26 @@ export const handler = async (event) => {
       };
 
       try {
-        const searchName = contact.name || enrichedData.name || '';
-        const searchCompany = contact.company_name || contact.company || enrichedData.current_company_name || contact.organization_name || '';
-        const searchTitle = contact.title || enrichedData.current_position_title || '';
-        const emailDomain = extractEmailDomain(contact.email || contact.work_email || '');
+        console.log('🔍 Step 1c: LinkedIn search for profiles to confirm');
 
-        console.log('🔍 Step 1c: LinkedIn Search fallback for', searchName);
-
-        const linkedinResult = await searchLinkedInProfile({
-          name: searchName,
-          company: searchCompany,
-          title: searchTitle,
-          emailDomain
+        const search = await searchLinkedInCandidates({
+          name: searchPerson.name,
+          company: searchPerson.company,
+          title: searchPerson.title,
+          domain: searchPerson.domain,
+          env: process.env,
         });
+        profilesFound.push(...search.results.map(result => ({ ...result, source: 'search' })));
 
-        if (linkedinResult.success && linkedinResult.linkedinUrl) {
-          enrichedData.linkedin_url = linkedinResult.linkedinUrl;
-          step1c.fieldsFound = ['linkedin_url'];
-          step1c.status = 'success';
-          step1c.message = linkedinResult.message;
-          provenance.linkedin_url = 'linkedin_search';
-
-          // Also capture photo from Google's indexed LinkedIn data
-          if (linkedinResult.photoUrl && !contact.photo_url && !enrichedData.photo_url) {
-            enrichedData.photo_url = linkedinResult.photoUrl;
-            step1c.fieldsFound.push('photo_url');
-            provenance.photo_url = 'linkedin_search';
-            console.log(`📷 Step 1c: Found photo from LinkedIn: ${linkedinResult.photoUrl}`);
-          }
-
-          console.log(`✅ Step 1c: Found LinkedIn profile: ${linkedinResult.linkedinUrl}`);
-
-          // Now that we have LinkedIn URL, try Apollo PEOPLE_MATCH again
-          if (linkedinResult.linkedinUrl && linkedinResult.confidence !== 'low') {
-            console.log('🔄 Re-running Apollo with discovered LinkedIn URL...');
-
-            try {
-              const reMatchResponse = await fetch(APOLLO_ENDPOINTS.PEOPLE_MATCH, {
-                method: 'POST',
-                headers: getApolloHeaders(),
-                body: JSON.stringify({ linkedin_url: linkedinResult.linkedinUrl })
-              });
-
-              if (reMatchResponse.ok) {
-                const reMatchData = await reMatchResponse.json();
-                const person = reMatchData.person;
-
-                if (person) {
-                  console.log('✅ Apollo re-match successful with LinkedIn URL');
-                  apolloRawData = person;
-
-                  const apolloFields = extractApolloFields(person, { ...contact, ...enrichedData });
-                  enrichedData = mergeWithPrecedence(enrichedData, apolloFields.data, contact);
-
-                  // Update provenance for newly found fields
-                  apolloFields.fieldsFound.forEach(f => {
-                    if (!provenance[f]) provenance[f] = 'apollo_match';
-                  });
-
-                  step1c.fieldsFound = [...new Set([...step1c.fieldsFound, ...apolloFields.fieldsFound])];
-                  step1c.message = `LinkedIn found, Apollo enriched ${apolloFields.fieldsFound.length} additional fields`;
-                }
-              }
-            } catch (reMatchErr) {
-              console.error('Apollo re-match failed:', reMatchErr.message);
-            }
-          }
+        if (!search.configured) {
+          step1c.status = 'skipped';
+          step1c.message = 'LinkedIn search not configured';
+        } else if (search.failed) {
+          step1c.status = 'error';
+          step1c.message = 'LinkedIn search failed';
         } else {
-          step1c.status = linkedinResult.message?.includes('not configured') ? 'skipped' : 'no_match';
-          step1c.message = linkedinResult.message;
-          console.log(`⚠️ Step 1c: ${linkedinResult.message}`);
+          step1c.status = search.results.length > 0 ? 'success' : 'no_match';
+          step1c.message = search.results.length > 0 ? `${search.results.length} possible LinkedIn profile(s) to confirm` : 'No LinkedIn profile found';
         }
       } catch (err) {
         step1c.status = 'error';
@@ -362,10 +315,13 @@ export const handler = async (event) => {
       steps.push(step1c);
     }
 
+    // The profiles to offer, best first, by Find LinkedIn's rules.
+    const linkedinCandidates = searchPerson ? rankLinkedInCandidates(searchPerson, profilesFound) : [];
+
     // ═══════════════════════════════════════════════════
     // STEP 1d: LinkedIn Photo Search — if we have LinkedIn URL but no photo
     // ═══════════════════════════════════════════════════
-    const currentLinkedInUrl = enrichedData.linkedin_url || contact.linkedin_url;
+    const currentLinkedInUrl = contact.linkedin_url;
     const currentPhotoUrl = enrichedData.photo_url || contact.photo_url;
 
     if (currentLinkedInUrl && !currentPhotoUrl) {
@@ -392,11 +348,11 @@ export const handler = async (event) => {
           step1d.message = photoResult.message;
           provenance.photo_url = 'linkedin_photo_search';
 
-          console.log(`✅ Step 1d: Found photo: ${photoResult.photoUrl}`);
+          console.log('✅ Step 1d: Found photo');
         } else {
           step1d.status = 'no_data';
           step1d.message = photoResult.message;
-          console.log(`⚠️ Step 1d: ${photoResult.message}`);
+          console.log('⚠️ Step 1d: no photo');
         }
       } catch (err) {
         step1d.status = 'error';
@@ -426,7 +382,7 @@ export const handler = async (event) => {
       };
 
       try {
-        console.log('🌐 Step 1e: Website scrape fallback for email at', websiteForScrape);
+        console.log('🌐 Step 1e: Website scrape fallback for email');
 
         const scrapeResult = await scrapeWebsiteForEmail(websiteForScrape);
 
@@ -437,7 +393,7 @@ export const handler = async (event) => {
           step1e.status = 'success';
           step1e.message = `Found email on ${scrapeResult.foundOn}`;
           provenance.email = 'website_scrape';
-          console.log(`✅ Step 1e: Found email via website scrape: ${scrapeResult.email}`);
+          console.log('✅ Step 1e: Found an email on the website');
         } else {
           step1e.status = 'no_data';
           step1e.message = 'No email found on website';
@@ -474,7 +430,7 @@ export const handler = async (event) => {
       };
 
       try {
-        console.log('🌐 Step 2: Google Places for', companyName);
+        console.log('🌐 Step 2: Google Places for the company');
 
         const googleResult = await googleBusinessLookup({
           companyName,
@@ -548,8 +504,8 @@ export const handler = async (event) => {
         confidence,
         total_steps: steps.length,
         sources_used: [...new Set(Object.values(provenance))],
-        // Flag to indicate if manual LinkedIn URL input is needed
-        needs_manual_linkedin: !enrichedData.linkedin_url && !contact.linkedin_url,
+        // No LinkedIn and none found: the profile offers a pasted link instead
+        needs_manual_linkedin: !contact.linkedin_url && linkedinCandidates.length === 0,
         // Enrichment quality assessment
         enrichment_quality: Object.keys(provenance).length >= 5 ? 'complete' :
                            Object.keys(provenance).length >= 2 ? 'partial' : 'minimal'
@@ -563,14 +519,22 @@ export const handler = async (event) => {
       } : contact._raw_apollo_data || null
     };
 
+    // A company filled where the contact had none: the browser links it
+    // through the shared company resolver, with the matched organization.
+    const company = filled.includes('company_name') ? {
+      name: patch.company_name,
+      apollo_organization_id: apolloRawData?.organization_id || apolloRawData?.organization?.id || null,
+      domain: apolloRawData?.organization?.primary_domain || null,
+    } : null;
+
     // Log API usage
     const responseTime = Date.now() - startTime;
     await logApiUsage(userId, 'barryEnrich', 'success', {
       responseTime,
       metadata: {
-        contactName: contact.name,
         stepsCompleted: steps.length,
         fieldsEnriched: Object.keys(provenance).length,
+        linkedinCandidates: linkedinCandidates.length,
         confidence
       }
     });
@@ -587,6 +551,8 @@ export const handler = async (event) => {
         success: true,
         enrichedData: finalEnrichedData,
         suggestions,
+        linkedinCandidates,
+        company,
         steps,
         provenance,
         summary: finalEnrichedData.enrichment_summary
@@ -724,10 +690,7 @@ function extractApolloFields(person, existingContact) {
     data.email_confidence = person.email_confidence || null;
     fieldsFound.push('email');
   }
-  if (person.linkedin_url && !existingContact.linkedin_url) {
-    data.linkedin_url = person.linkedin_url;
-    fieldsFound.push('linkedin_url');
-  }
+  // A LinkedIn URL is never copied: the user confirms it (linkedinCandidates).
   if (person.twitter_url && !existingContact.twitter_url) {
     data.twitter_url = person.twitter_url;
     fieldsFound.push('twitter_url');
@@ -780,44 +743,6 @@ function extractApolloFields(person, existingContact) {
   return { data, fieldsFound };
 }
 
-/**
- * Extract only supplemental fields not already present.
- */
-function extractSupplementalFields(person, existingData) {
-  const data = {};
-  const fieldsFound = [];
-
-  if (!existingData.email && person.email) {
-    data.email = person.email;
-    data.email_status = person.email_status;
-    fieldsFound.push('email');
-  }
-  if (!existingData.linkedin_url && person.linkedin_url) {
-    data.linkedin_url = person.linkedin_url;
-    fieldsFound.push('linkedin_url');
-  }
-  if (!existingData.seniority && person.seniority) {
-    data.seniority = person.seniority;
-    fieldsFound.push('seniority');
-  }
-  if ((!existingData.city && !existingData.state) && (person.city || person.state)) {
-    data.city = person.city;
-    data.state = person.state;
-    data.country = person.country;
-    fieldsFound.push('location');
-  }
-  if (!existingData.headline && person.headline) {
-    data.headline = person.headline;
-    fieldsFound.push('headline');
-  }
-  if (!existingData.photo_url && person.photo_url) {
-    data.photo_url = person.photo_url;
-    fieldsFound.push('photo_url');
-  }
-
-  return { data, fieldsFound };
-}
-
 // A location is one fact: its parts are taken together from one source, or
 // not at all, so a city from one source never sits beside a state from another.
 const LOCATION_GROUPS = [
@@ -866,38 +791,6 @@ function mergeWithPrecedence(enrichedData, newData, originalContact) {
   }
 
   return merged;
-}
-
-/**
- * Find best matching person from search results.
- * Score-based — name + company match required.
- */
-function findBestMatch(people, targetName, targetCompany) {
-  const normalize = (s) => (s || '').toLowerCase().trim();
-  const targetNameNorm = normalize(targetName);
-  const targetCompanyNorm = normalize(targetCompany);
-
-  let bestScore = 0;
-  let bestMatch = null;
-
-  for (const person of people) {
-    let score = 0;
-    const personName = normalize(person.name || `${person.first_name} ${person.last_name}`);
-    const personCompany = normalize(person.organization_name || person.organization?.name || '');
-
-    if (personName === targetNameNorm) score += 3;
-    else if (personName.includes(targetNameNorm) || targetNameNorm.includes(personName)) score += 1;
-
-    if (personCompany === targetCompanyNorm) score += 2;
-    else if (personCompany.includes(targetCompanyNorm) || targetCompanyNorm.includes(personCompany)) score += 1;
-
-    if (score > bestScore) {
-      bestScore = score;
-      bestMatch = person;
-    }
-  }
-
-  return bestScore >= 3 ? bestMatch : null;
 }
 
 /**

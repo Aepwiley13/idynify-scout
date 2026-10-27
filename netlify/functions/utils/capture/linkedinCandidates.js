@@ -15,6 +15,9 @@
  *
  * A profile whose name does not carry every part of the contact's name is not
  * offered at all.
+ *
+ * Shared by Find LinkedIn (captureLinkedIn) and Barry Enrich (barryEnrich), so
+ * both offer the same profiles for the same reasons.
  */
 import { normalizeLinkedInUrl } from '../../../../src/utils/identityNormalization.js';
 
@@ -79,6 +82,44 @@ const reasonsOf = found => REASON_ORDER.filter(key => found[key]);
 export function canonicalProfileUrl(url) {
   const key = normalizeLinkedInUrl(url)?.replace(/^[a-z]{2,3}\.(?=linkedin\.com\/)/, '');
   return key && /^linkedin\.com\/in\/[^/]+$/.test(key) ? `https://www.${key}` : null;
+}
+
+const PERSON_FIELDS = Object.freeze(['name', 'company', 'title', 'domain', 'email', 'location']);
+const MAX_FIELD = 300;
+
+/**
+ * The person to look for, from a request: short strings only, and a name.
+ * Null for anything else.
+ */
+export function readPerson(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const person = {};
+  for (const key of PERSON_FIELDS) {
+    const value = raw[key];
+    if (value === undefined || value === null) { person[key] = null; continue; }
+    if (typeof value !== 'string' || value.length > MAX_FIELD) return null;
+    person[key] = value.replace(/\s+/g, ' ').trim() || null;
+  }
+  return person.name ? person : null;
+}
+
+/**
+ * An Apollo person record as a profile to offer, or null when it has no
+ * LinkedIn URL. Shared by Find LinkedIn and Barry Enrich.
+ */
+export function candidateFromApolloPerson(person) {
+  if (!person?.linkedin_url) return null;
+  return {
+    source: 'apollo',
+    linkedinUrl: person.linkedin_url,
+    name: person.name || [person.first_name, person.last_name].filter(Boolean).join(' ') || null,
+    headline: person.headline || person.title || null,
+    company: person.organization?.name || person.organization_name || null,
+    companyDomain: person.organization?.primary_domain || null,
+    location: [person.city, person.state].filter(Boolean).join(', ') || person.country || null,
+    photoUrl: person.photo_url || null,
+    text: [person.title, person.headline].filter(Boolean).join(' '),
+  };
 }
 
 /** One profile per LinkedIn URL; Apollo's details (a verified person record) win over a search snippet's. */

@@ -56,7 +56,7 @@ export async function googleBusinessLookup({ companyName, domain, city, state })
       query += ` ${state}`;
     }
 
-    console.log('🔍 Google Places: Searching for:', query);
+    console.log('🔍 Google Places: searching');
 
     // Step 1: Find Place from Text
     const findPlaceUrl = `https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input=${encodeURIComponent(query)}&inputtype=textquery&fields=place_id,name,formatted_address,business_status&key=${apiKey}`;
@@ -142,7 +142,7 @@ export async function googleBusinessLookup({ companyName, domain, city, state })
       data.business_status = place.business_status; // OPERATIONAL, CLOSED_TEMPORARILY, etc.
     }
 
-    console.log(`✅ Google Places: Found ${fieldsFound.length} fields for "${companyName}"`);
+    console.log(`✅ Google Places: Found ${fieldsFound.length} fields`);
 
     return {
       data,

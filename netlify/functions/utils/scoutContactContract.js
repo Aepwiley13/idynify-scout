@@ -158,7 +158,7 @@ export function logValidationErrors(validationResult, contact, functionName) {
   console.warn('├─────────────────────────────────────────────────');
   console.warn('│ Contact data:');
   console.warn(`│   ID: ${contact?.id || '(missing)'}`);
-  console.warn(`│   Name: ${contact?.name || '(missing)'}`);
-  console.warn(`│   Title: ${contact?.title || '(missing)'}`);
+  console.warn(`│   Name: ${contact?.name ? '(present)' : '(missing)'}`);
+  console.warn(`│   Title: ${contact?.title ? '(present)' : '(missing)'}`);
   console.warn('└─────────────────────────────────────────────────');
 }

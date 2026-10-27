@@ -15,6 +15,10 @@
  * write (linkedinConfirm.js): the URL, and LinkedIn's details only where the
  * contact's own are empty. A title that differs from the card's is offered,
  * never applied. Nothing here logs.
+ *
+ * Barry Enrich shows this same screen on the contact profile (context
+ * "profile"), starting from the profiles Barry found instead of searching,
+ * or from the paste box when it found none.
  */
 import { useEffect, useRef, useState } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
@@ -33,6 +37,12 @@ const FILLED_TEXT = Object.freeze({
 });
 
 const firstName = name => (typeof name === 'string' ? name.trim().split(/\s+/)[0] : '') || 'them';
+
+/** The words that differ between right after a card save and on the contact's profile. */
+const TEXT = Object.freeze({
+  capture: { noneOfThese: 'None of these: open profile', none: 'Open profile', leave: 'Open profile', skip: 'Skip', own: 'card', back: c => `Open ${firstName(c.name)}` },
+  profile: { noneOfThese: 'None of these', none: 'Not now', leave: 'Done', skip: 'Not now', own: 'contact', back: () => 'Close' },
+});
 
 /** "headline, location and photo" */
 function listText(items) {
@@ -127,7 +137,7 @@ function PasteLink({ onConfirm, T }) {
 }
 
 /** After the profile is attached: what it added, and what LinkedIn says differently. */
-function Linked({ outcome, contact, onAccept, accepting, accepted, acceptFailed, T, muted }) {
+function Linked({ outcome, contact, onAccept, accepting, accepted, acceptFailed, own = 'card', T, muted }) {
   const filled = outcome.filled.map(f => FILLED_TEXT[f] ?? f);
   const title = outcome.suggestions.find(s => s.field === 'title' && s.actionable);
   const company = outcome.suggestions.find(s => s.field === 'company');
@@ -148,7 +158,7 @@ function Linked({ outcome, contact, onAccept, accepting, accepted, acceptFailed,
       {title && (
         <div style={box} data-testid="linkedin-title-suggestion">
           <div style={{ fontSize: 14, color: T.text }}>
-            LinkedIn lists the title as <strong>{title.suggested}</strong>. The card says <strong>{title.current}</strong>.
+            LinkedIn lists the title as <strong>{title.suggested}</strong>. The {own} says <strong>{title.current}</strong>.
           </div>
           {accepted ? (
             <div style={{ fontSize: 13, color: '#16a34a', display: 'flex', gap: 6, alignItems: 'center' }}><CheckCircle size={14} /> Title updated</div>
@@ -157,7 +167,7 @@ function Linked({ outcome, contact, onAccept, accepting, accepted, acceptFailed,
               <button type="button" disabled={accepting} onClick={() => onAccept(title)} style={{ padding: '8px 12px', borderRadius: 10, border: `1px solid ${T.border}`, background: T.cardBg, color: T.text, fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
                 Use LinkedIn&apos;s title
               </button>
-              <span style={{ fontSize: 13, color: T.textMuted }}>or keep the card&apos;s</span>
+              <span style={{ fontSize: 13, color: T.textMuted }}>or keep the {own}&apos;s</span>
             </div>
           )}
           {acceptFailed && <p role="alert" style={{ fontSize: 13, color: '#dc2626', margin: 0 }}>Couldn&apos;t update the title. Try again.</p>}
@@ -166,7 +176,7 @@ function Linked({ outcome, contact, onAccept, accepting, accepted, acceptFailed,
       {company && (
         <div style={box} data-testid="linkedin-company-difference">
           <div style={{ fontSize: 14, color: T.text }}>
-            LinkedIn lists the company as <strong>{company.suggested}</strong>. The card says <strong>{company.current}</strong>, and that stays.
+            LinkedIn lists the company as <strong>{company.suggested}</strong>. The {own} says <strong>{company.current}</strong>, and that stays.
           </div>
         </div>
       )}
@@ -183,10 +193,13 @@ function Linked({ outcome, contact, onAccept, accepting, accepted, acceptFailed,
  * @param {Function} [props.search]       injectable for tests
  * @param {Function} [props.confirm]      (contactId, linkedinUrl) => outcome; injectable for tests
  * @param {Function} [props.accept]       (contactId, suggestion) => void; injectable for tests
+ * @param {object[]} [props.found]        profiles already found (Barry Enrich): shown at once, no search
+ * @param {string}   [props.context]      'capture' (after a card save) or 'profile' (on the contact profile)
  */
 export default function FindLinkedIn({
   contactId, onDone, T,
   loadContact = loadSavedContact, search = findLinkedInProfiles, confirm = confirmForUser, accept = acceptForUser,
+  found = null, context = 'capture',
 }) {
   // loading | offer | searching | results | none | error | confirming | linked | taken | has_other | save_error
   const [step, setStep] = useState('loading');
@@ -198,8 +211,10 @@ export default function FindLinkedIn({
   const [accepting, setAccepting] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [acceptFailed, setAcceptFailed] = useState(false);
-  // The caller's handler may be a new function each render; the load runs once per contact.
+  const t = TEXT[context] ?? TEXT.capture;
+  // The caller's handler and list may be new each render; the load runs once per contact.
   const doneRef = useRef(onDone);
+  const foundRef = useRef(found);
   useEffect(() => { doneRef.current = onDone; }, [onDone]);
 
   useEffect(() => {
@@ -210,7 +225,13 @@ export default function FindLinkedIn({
         // Already has a LinkedIn, or cannot be read: nothing to offer, open the profile.
         if (!saved || saved.linkedin_url || !saved.name) { doneRef.current(contactId); return; }
         setContact(saved);
-        setStep('offer');
+        const given = Array.isArray(foundRef.current) ? foundRef.current : null;
+        if (given) {
+          setCandidates(given);
+          setStep(given.length ? 'results' : 'none');
+        } else {
+          setStep('offer');
+        }
       })
       .catch(() => { if (live) doneRef.current(contactId); });
     return () => { live = false; };
@@ -275,9 +296,15 @@ export default function FindLinkedIn({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }} data-testid="find-linkedin">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 16, fontWeight: 700, color: T.text }}>
-        <CheckCircle size={22} color="#16a34a" /> {contact.name} added
-      </div>
+      {context === 'profile' ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 16, fontWeight: 700, color: T.text }}>
+          <Linkedin size={20} color="#0a66c2" /> {firstName(contact.name)}&apos;s LinkedIn
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 16, fontWeight: 700, color: T.text }}>
+          <CheckCircle size={22} color="#16a34a" /> {contact.name} added
+        </div>
+      )}
 
       {step === 'offer' && (
         <>
@@ -304,7 +331,7 @@ export default function FindLinkedIn({
             {candidates.map(c => <Candidate key={c.linkedinUrl} candidate={c} personName={contact.name} onConfirm={choose} T={T} />)}
           </ul>
           <PasteLink onConfirm={choose} T={T} />
-          <button type="button" style={{ ...secondary, alignSelf: 'flex-start' }} onClick={done}>None of these: open profile</button>
+          <button type="button" style={{ ...secondary, alignSelf: 'flex-start' }} onClick={done}>{t.noneOfThese}</button>
         </>
       )}
 
@@ -312,7 +339,7 @@ export default function FindLinkedIn({
         <>
           <p style={muted}>No likely LinkedIn profile found for {contact.name}.</p>
           <PasteLink onConfirm={choose} T={T} />
-          <button type="button" style={{ ...secondary, alignSelf: 'flex-start' }} onClick={done}>Open profile</button>
+          <button type="button" style={{ ...secondary, alignSelf: 'flex-start' }} onClick={done}>{t.none}</button>
         </>
       )}
 
@@ -336,8 +363,8 @@ export default function FindLinkedIn({
 
       {step === 'linked' && (
         <>
-          <Linked outcome={outcome} contact={contact} onAccept={takeSuggestion} accepting={accepting} accepted={accepted} acceptFailed={acceptFailed} T={T} muted={muted} />
-          <button type="button" style={{ ...primary, alignSelf: 'flex-start' }} onClick={done}>Open profile</button>
+          <Linked outcome={outcome} contact={contact} onAccept={takeSuggestion} accepting={accepting} accepted={accepted} acceptFailed={acceptFailed} own={t.own} T={T} muted={muted} />
+          <button type="button" style={{ ...primary, alignSelf: 'flex-start' }} onClick={done}>{t.leave}</button>
         </>
       )}
 
@@ -356,7 +383,7 @@ export default function FindLinkedIn({
               </button>
             )}
             <button type="button" style={secondary} onClick={back}>Choose another</button>
-            <button type="button" style={secondary} onClick={done}>Open {firstName(contact.name)}</button>
+            <button type="button" style={secondary} onClick={done}>{t.back(contact)}</button>
           </div>
         </>
       )}
@@ -364,7 +391,7 @@ export default function FindLinkedIn({
       {step === 'has_other' && (
         <>
           <p style={muted} role="alert">{contact.name} already has a different LinkedIn profile. Nothing was changed.</p>
-          <button type="button" style={{ ...secondary, alignSelf: 'flex-start' }} onClick={done}>Open profile</button>
+          <button type="button" style={{ ...secondary, alignSelf: 'flex-start' }} onClick={done}>{t.leave}</button>
         </>
       )}
 
@@ -373,7 +400,7 @@ export default function FindLinkedIn({
           <p style={muted} role="alert">Couldn&apos;t add the LinkedIn profile.</p>
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             <button type="button" style={secondary} onClick={() => choose(chosen)}><RotateCcw size={16} /> Try again</button>
-            <button type="button" style={secondary} onClick={done}>Skip</button>
+            <button type="button" style={secondary} onClick={done}>{t.skip}</button>
           </div>
         </>
       )}

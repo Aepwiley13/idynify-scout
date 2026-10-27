@@ -161,4 +161,6 @@ The profile then shows the new details where it already shows them: the photo, t
 
 **Logging:** the screen and `linkedinConfirm` log nothing. `findContactByLinkedInUrl` now logs only that a lookup ran and whether it found someone; its usage record no longer holds the URL or the name, and an Apollo error log shows the URL as `(redacted)`.
 
-**Not covered yet:** Instagram, Facebook and other social profiles; Barry's **Enrich** button on the profile, which still replaces some fields with what it finds.
+**The same rules everywhere:** Barry's **Enrich** button on the profile follows these rules too, and offers the LinkedIn profiles it finds through this same confirm. See `docs/architecture/enrichment-rules.md`.
+
+**Not covered yet:** Instagram, Facebook and other social profiles.

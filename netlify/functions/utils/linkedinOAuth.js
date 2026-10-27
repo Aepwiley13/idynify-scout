@@ -58,7 +58,12 @@ export const LINKEDIN_AUTHORIZE_URL = 'https://www.linkedin.com/oauth/v2/authori
 export const LINKEDIN_TOKEN_URL = 'https://www.linkedin.com/oauth/v2/accessToken';
 export const LINKEDIN_USERINFO_URL = 'https://api.linkedin.com/v2/userinfo';
 export const LINKEDIN_JWKS_URL = 'https://www.linkedin.com/oauth/openid/jwks';
-export const LINKEDIN_ISSUER = 'https://www.linkedin.com';
+// LinkedIn's Sign In prose documentation says the issuer is
+// https://www.linkedin.com, but its live OIDC discovery metadata
+// (https://www.linkedin.com/oauth/.well-known/openid-configuration) and the
+// ID tokens it actually issues say https://www.linkedin.com/oauth. Validation
+// follows the live discovery issuer, exactly — one value, no prefix matching.
+export const LINKEDIN_ISSUER = 'https://www.linkedin.com/oauth';
 export const ID_TOKEN_ALGORITHMS = ['RS256'];
 export const ID_TOKEN_CLOCK_TOLERANCE_S = 60;
 

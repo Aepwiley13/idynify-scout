@@ -25,7 +25,9 @@ import { validatePhone } from '../../src/capture/validators.js';
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 // Anything that would be a card value in this suite. Reports must never contain one.
-const VALUES = /Avery|Quinn|avery|example|555|Robotics|Partnerships|Director|Northwind|card-00/;
+// The sample phone's 555 counts only as its own token (not inside a commit hash
+// like 3555426, which reports record), or as the whole number in digit form.
+const VALUES = /Avery|Quinn|avery|example|(?<![0-9A-Za-z])555(?![0-9A-Za-z])|4155550\d{3}|Robotics|Partnerships|Director|Northwind|card-00/;
 
 const seg = (m, p) => [0xFF, m, (p.length + 2) >> 8, (p.length + 2) & 0xFF, ...p];
 const sof = (w, h) => seg(0xC0, [8, h >> 8, h & 255, w >> 8, w & 255, 3, 1, 0x11, 0, 2, 0x11, 1, 3, 0x11, 1]);
@@ -62,6 +64,13 @@ const outcomeText = (label, extraction) => levelOutcomes(label, extraction).outc
 
 const temp = mkdtempSync(join(tmpdir(), 'capture-bench-report-'));
 afterAll(() => rmSync(temp, { recursive: true, force: true }));
+
+describe('the card-value matcher', () => {
+  it('finds the sample phone however it is written, but not inside a commit hash', () => {
+    for (const leak of ['+1 (415) 555-0142', '555', '4155550142', '14155550100']) expect(leak).toMatch(VALUES);
+    for (const hash of ['3555426', 'a555b12', '"commit":"3555426"']) expect(hash).not.toMatch(VALUES);
+  });
+});
 
 // ─── Levels and the accuracy within them ────────────────────────────────────
 

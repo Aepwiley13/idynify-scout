@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ChevronDown, ChevronUp, Mail, Phone, Linkedin, MapPin, Building2, Calendar, GitBranch, Users, ArrowRight } from 'lucide-react';
+import { ChevronDown, ChevronUp, Mail, Phone, Linkedin, MapPin, Building2, Calendar, GitBranch, Users, ArrowRight, Briefcase } from 'lucide-react';
 import { auth } from '../../firebase/config';
 import { getContactReferralAnalytics } from '../../services/referralIntelligenceService';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
@@ -99,6 +99,16 @@ export default function DetailDrawer({ contact, onUpdate }) {
                     >
                       View Profile →
                     </a>
+                  </div>
+                </div>
+              )}
+
+              {contact.headline && (
+                <div className="drawer-item">
+                  <Briefcase className="drawer-icon" />
+                  <div>
+                    <p className="drawer-label">Headline</p>
+                    <p className="drawer-value">{contact.headline}</p>
                   </div>
                 </div>
               )}

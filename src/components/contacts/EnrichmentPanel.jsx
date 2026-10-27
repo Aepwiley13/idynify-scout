@@ -30,7 +30,9 @@ const SOURCE_LABELS = {
   internal_db: 'Internal DB',
   apollo_match: 'Apollo (Exact)',
   apollo_search: 'Apollo (Search)',
-  google_places: 'Google Places'
+  google_places: 'Google Places',
+  user_confirmed: 'You confirmed',
+  user_accepted: 'You chose'
 };
 
 const SOURCE_ICONS = {
@@ -41,6 +43,7 @@ const SOURCE_ICONS = {
 };
 
 const FIELD_LABELS = {
+  title: 'Title',
   email: 'Email',
   phone: 'Phone',
   linkedin_url: 'LinkedIn',

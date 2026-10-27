@@ -95,6 +95,8 @@ The flow sends no card value to any server log, and none to the browser console.
 ```
 Add Person → "{name} added. Find their LinkedIn and complete the profile?" → Find LinkedIn | Skip
            → the likely profiles (at most three), each with why it matched
+           → "This is {first name}" (or paste their LinkedIn link)
+           → "LinkedIn added", what it filled in, and any title that differs from the card's
 ```
 
 Saving never waits on this. The person is saved first, from the card, and Skip opens their profile. A person who already has a LinkedIn URL goes straight to their profile without being asked.
@@ -127,4 +129,36 @@ Authorization: Bearer <Firebase ID token>
   A profile without every part of the name is never offered. Apollo's record and Google's result for the same profile are one candidate, and Apollo's details win.
 - **Logging:** it logs through `captureLog` only (outcome, counts, source names). The usage record holds the same counts and source names. No name, email, company, title or URL is logged or stored.
 
-This step writes nothing. Confirming a profile ("This is Kristin") and completing the contact from it is the next change.
+Finding profiles writes nothing.
+
+### Confirming a profile
+
+Nothing is attached until the user taps **This is {first name}** on one profile, or pastes a profile link (`linkedin.com/in/…`; anything else is refused). Then `linkedinConfirm.confirmLinkedIn` runs, in the browser, as the signed-in user:
+
+1. **The contact still has no LinkedIn**, or already has this one (a repeat is harmless). A contact that has a different one is left alone.
+2. **No other contact has this profile.** The shared identity resolver decides, the one every save uses. If another contact has it, nothing is written and the screen offers both people.
+3. **The profile's details** come from LinkedIn Link's exact lookup (`findContactByLinkedInUrl`: Apollo's record for exactly this URL). If it has no record, or fails, the URL is still linked and the screen says no more details were available.
+4. **One update to that contact** (`linkedinEnrichment.enrichmentFromProfile`, pure):
+
+   | Field | Written when |
+   |---|---|
+   | `linkedin_url` (`https://www.linkedin.com/in/<id>`), `linkedin_url_normalized`, `linkedin_confirmed_at` | always: the user's confirmation |
+   | `title`, `headline`, `seniority`, `departments` | the contact's own is empty |
+   | `location`, `city`, `state`, `country` | the contact has none of the four (location is filled as one, never mixed) |
+   | `photo_url` (`photo_source: 'linkedin'`) | the contact has no real photo |
+   | `apollo_person_id` | the contact has none, and no other contact holds it |
+   | `last_enriched_at` | the profile's details were loaded |
+   | `enrichment_provenance` | merged: `linkedin_url: 'user_confirmed'`, each filled field `'apollo_match'` |
+
+   Never written: name, email, phones, company, website, notes, status.
+
+**Whose value wins:** user-confirmed, then card-observed, then verified enrichment, then inferred. So where LinkedIn disagrees with the card, the card's value stays:
+
+- **A different title** is shown beside the card's with **Use LinkedIn's title**. Taking it writes `title` and `enrichment_provenance.title: 'user_accepted'`.
+- **A different company** is shown for information only. Changing the company means changing which company the person belongs to, which this step does not do.
+
+The profile then shows the new details where it already shows them: the photo, title and LinkedIn link on the card, and the headline, location and LinkedIn link in the details drawer. The enrichment panel's sources name the user for what they confirmed or chose.
+
+**Logging:** the screen and `linkedinConfirm` log nothing. `findContactByLinkedInUrl` now logs only that a lookup ran and whether it found someone; its usage record no longer holds the URL or the name, and an Apollo error log shows the URL as `(redacted)`.
+
+**Not covered yet:** Instagram, Facebook and other social profiles; Barry's **Enrich** button on the profile, which still replaces some fields with what it finds.

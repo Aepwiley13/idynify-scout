@@ -5,11 +5,12 @@
  * else goes straight to their profile), that Skip opens the profile, that the
  * search uses the saved contact's own details, that each likely profile shows
  * who it is and why it matched, that "none found" and errors leave the person
- * saved and the way to their profile open, and that this step writes nothing
- * and logs nothing.
+ * saved and the way to their profile open, that nothing is attached until the
+ * user taps "This is Kristin" (or pastes a link), what the screen says after,
+ * and that the screen itself writes nothing directly and logs nothing.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, cleanup } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -53,11 +54,25 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-function renderFind({ contact = KRISTIN, search = vi.fn(async () => ({ status: 200, body: { candidates: CANDIDATES } })) } = {}) {
+const LINKED = Object.freeze({ status: 'linked', profileStatus: 'found', filled: ['headline', 'location', 'photo_url'], suggestions: [] });
+
+function renderFind({
+  contact = KRISTIN,
+  search = vi.fn(async () => ({ status: 200, body: { candidates: CANDIDATES } })),
+  confirm = vi.fn(async () => LINKED),
+  accept = vi.fn(async () => {}),
+} = {}) {
   const onDone = vi.fn();
   const loadContact = vi.fn(async () => contact);
-  render(<FindLinkedIn contactId="cap_x_p1" onDone={onDone} T={T} loadContact={loadContact} search={search} />);
-  return { onDone, loadContact, search };
+  render(<FindLinkedIn contactId="cap_x_p1" onDone={onDone} T={T} loadContact={loadContact} search={search} confirm={confirm} accept={accept} />);
+  return { onDone, loadContact, search, confirm, accept };
+}
+
+async function showResults(options) {
+  const rendered = renderFind(options);
+  fireEvent.click(await screen.findByRole('button', { name: /Find LinkedIn/ }));
+  await screen.findAllByTestId('linkedin-candidate');
+  return rendered;
 }
 
 describe('offered after a save, never in the way', () => {
@@ -108,13 +123,12 @@ describe('the likely profiles', () => {
     expect(within(cards[1]).getByText('KS')).toBeTruthy();                       // no photo: initials
   });
 
-  it('confirming is not switched on in this step; None of these opens the profile', async () => {
-    const { onDone } = renderFind();
-    fireEvent.click(await screen.findByRole('button', { name: /Find LinkedIn/ }));
-    await screen.findAllByTestId('linkedin-candidate');
-    expect(screen.getAllByRole('button', { name: 'This is Kristin' }).every(b => b.disabled)).toBe(true);
+  it('nothing is attached by showing them; None of these opens the profile', async () => {
+    const { onDone, confirm } = await showResults();
+    expect(screen.getAllByRole('button', { name: 'This is Kristin' })).toHaveLength(2);
     fireEvent.click(screen.getByRole('button', { name: /None of these/ }));
     expect(onDone).toHaveBeenCalledWith('cap_x_p1');
+    expect(confirm).not.toHaveBeenCalled();
   });
 
   it('none found: says so, and opens the profile', async () => {
@@ -151,6 +165,108 @@ describe('the likely profiles', () => {
   });
 });
 
+describe('"This is Kristin"', () => {
+  it('attaches the profile the user picked, then says what LinkedIn added', async () => {
+    const { confirm, onDone } = await showResults();
+    fireEvent.click(within(screen.getAllByTestId('linkedin-candidate')[1]).getByRole('button', { name: 'This is Kristin' }));
+    expect(confirm).toHaveBeenCalledWith('cap_x_p1', 'https://www.linkedin.com/in/kristin-sokol-2');
+    expect((await screen.findByText(/LinkedIn added to Kristin/))).toBeTruthy();
+    expect(screen.getByText('Added from LinkedIn: headline, location and photo.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Open profile' }));
+    expect(onDone).toHaveBeenCalledWith('cap_x_p1');
+  });
+
+  it('a different title is offered, kept unless the user takes it; a different company is only shown', async () => {
+    const suggestions = [
+      { field: 'title', current: 'Instructional Matchmaker', suggested: 'Director of Matching', actionable: true },
+      { field: 'company', current: 'Bright Path Learning', suggested: 'Bright Path', actionable: false },
+    ];
+    const { accept } = await showResults({ confirm: vi.fn(async () => ({ ...LINKED, filled: [], suggestions })) });
+    fireEvent.click(screen.getAllByRole('button', { name: 'This is Kristin' })[0]);
+    expect(await screen.findByText('Nothing new to add: the contact already has what LinkedIn shows.')).toBeTruthy();
+    const title = screen.getByTestId('linkedin-title-suggestion');
+    expect(title.textContent).toContain('Director of Matching');
+    expect(title.textContent).toContain('Instructional Matchmaker');
+    const company = screen.getByTestId('linkedin-company-difference');
+    expect(company.textContent).toContain('Bright Path Learning');
+    expect(within(company).queryByRole('button')).toBeNull();
+    expect(accept).not.toHaveBeenCalled();
+
+    fireEvent.click(within(title).getByRole('button', { name: "Use LinkedIn's title" }));
+    expect(accept).toHaveBeenCalledWith('cap_x_p1', suggestions[0]);
+    expect(await within(title).findByText('Title updated')).toBeTruthy();
+  });
+
+  it('taking the title can fail and be tried again', async () => {
+    const accept = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce();
+    const suggestions = [{ field: 'title', current: 'A', suggested: 'B', actionable: true }];
+    await showResults({ confirm: vi.fn(async () => ({ ...LINKED, suggestions })), accept });
+    fireEvent.click(screen.getAllByRole('button', { name: 'This is Kristin' })[0]);
+    fireEvent.click(await screen.findByRole('button', { name: "Use LinkedIn's title" }));
+    expect((await screen.findByRole('alert')).textContent).toBe("Couldn't update the title. Try again.");
+    fireEvent.click(screen.getByRole('button', { name: "Use LinkedIn's title" }));
+    expect(await screen.findByText('Title updated')).toBeTruthy();
+  });
+
+  it('linked without details: says why nothing was added', async () => {
+    for (const [profileStatus, text] of [['not_found', 'No more details were available for this profile.'], ['failed', "Couldn't load more details from LinkedIn right now."]]) {
+      const view = await showResults({ confirm: vi.fn(async () => ({ ...LINKED, profileStatus, filled: [] })) });
+      fireEvent.click(screen.getAllByRole('button', { name: 'This is Kristin' })[0]);
+      expect(await screen.findByText(text)).toBeTruthy();
+      expect(view.onDone).not.toHaveBeenCalled();
+      cleanup();
+    }
+  });
+
+  it('already on another contact: nothing changed, and either person can be opened', async () => {
+    const { onDone } = await showResults({ confirm: vi.fn(async () => ({ status: 'taken', by: { contactId: 'c_other', name: 'Kris Sokol', count: 1 } })) });
+    fireEvent.click(screen.getAllByRole('button', { name: 'This is Kristin' })[0]);
+    expect((await screen.findByRole('alert')).textContent).toMatch(/already on Kris Sokol.*Nothing was changed/);
+    fireEvent.click(screen.getByRole('button', { name: 'Open Kris' }));
+    expect(onDone).toHaveBeenCalledWith('c_other');
+    fireEvent.click(screen.getByRole('button', { name: 'Choose another' }));
+    expect(screen.getAllByTestId('linkedin-candidate')).toHaveLength(2);
+  });
+
+  it('the contact got a different LinkedIn meanwhile: nothing changed', async () => {
+    await showResults({ confirm: vi.fn(async () => ({ status: 'has_other' })) });
+    fireEvent.click(screen.getAllByRole('button', { name: 'This is Kristin' })[0]);
+    expect((await screen.findByRole('alert')).textContent).toBe('Kristin Sokol already has a different LinkedIn profile. Nothing was changed.');
+  });
+
+  it('a failed save can be tried again with the same profile, or skipped', async () => {
+    const confirm = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(LINKED);
+    await showResults({ confirm });
+    fireEvent.click(screen.getAllByRole('button', { name: 'This is Kristin' })[0]);
+    expect((await screen.findByRole('alert')).textContent).toBe("Couldn't add the LinkedIn profile.");
+    fireEvent.click(screen.getByRole('button', { name: /Try again/ }));
+    expect(await screen.findByText(/LinkedIn added to Kristin/)).toBeTruthy();
+    expect(confirm.mock.calls).toEqual([['cap_x_p1', CANDIDATES[0].linkedinUrl], ['cap_x_p1', CANDIDATES[0].linkedinUrl]]);
+  });
+
+  it('none found: a pasted profile link is used, in its one form; anything else is refused', async () => {
+    const { confirm } = renderFind({ search: vi.fn(async () => ({ status: 200, body: { candidates: [] } })) });
+    fireEvent.click(await screen.findByRole('button', { name: /Find LinkedIn/ }));
+    const input = await screen.findByLabelText('Or paste their LinkedIn link');
+    fireEvent.change(input, { target: { value: 'https://www.linkedin.com/company/bright-path' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add this profile' }));
+    expect((await screen.findByRole('alert')).textContent).toMatch(/isn't a LinkedIn profile link/);
+    expect(confirm).not.toHaveBeenCalled();
+
+    fireEvent.change(input, { target: { value: ' uk.linkedin.com/in/Kristin-Sokol/?trk=card ' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Add this profile' }));
+    expect(confirm).toHaveBeenCalledWith('cap_x_p1', 'https://www.linkedin.com/in/kristin-sokol');
+    expect(await screen.findByText(/LinkedIn added to Kristin/)).toBeTruthy();
+  });
+
+  it('logs nothing on the way', async () => {
+    await showResults();
+    fireEvent.click(screen.getAllByRole('button', { name: 'This is Kristin' })[0]);
+    await screen.findByText(/LinkedIn added to Kristin/);
+    expect(logs.filter(line => CARD_VALUES.some(v => line.includes(v)))).toEqual([]);
+  });
+});
+
 describe('what is searched with', () => {
   it('the contact\'s own details; a domain from the website, else a work email, never a free-mail one', () => {
     expect(searchPersonFrom({ name: ' Ann Lee ', company: 'Acme', email: 'ann@acme.io', city: 'Provo', state: 'UT' }))
@@ -177,16 +293,23 @@ describe('what is searched with', () => {
   });
 });
 
-describe('this step cannot write', () => {
+describe('where the writes are', () => {
   const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-  const importsOf = path => [...readFileSync(resolve(repo, path), 'utf8').matchAll(/(?:from\s+|^import\s+)['"]([^'"]+)['"]/gm)].map(m => m[1]);
+  const read = path => readFileSync(resolve(repo, path), 'utf8');
+  const importsOf = path => [...read(path).matchAll(/(?:from\s+|^import\s+)['"]([^'"]+)['"]/gm)].map(m => m[1]);
 
-  it('reads one contact; imports no write call, service that writes, or log', () => {
-    const src = readFileSync(resolve(repo, 'src/components/capture/FindLinkedIn.jsx'), 'utf8');
-    expect(src).not.toMatch(/setDoc|updateDoc|addDoc|deleteDoc|runTransaction|writeBatch|console\./);
+  it('the screen reads one contact and writes only through linkedinConfirm; it logs nothing', () => {
+    expect(read('src/components/capture/FindLinkedIn.jsx')).not.toMatch(/setDoc|updateDoc|addDoc|deleteDoc|runTransaction|writeBatch|console\./);
     expect(importsOf('src/components/capture/FindLinkedIn.jsx').sort()).toEqual([
       '../../context/ImpersonationContext', '../../firebase/config', './captureLabApi.js', './findLinkedInView.js',
-      'firebase/firestore', 'lucide-react', 'react',
+      './linkedinConfirm.js', './linkedinEnrichment.js', 'firebase/firestore', 'lucide-react', 'react',
     ]);
+  });
+
+  it('linkedinConfirm updates one contact, and only that way; nothing there logs', () => {
+    const src = read('src/components/capture/linkedinConfirm.js');
+    expect(src).not.toMatch(/setDoc|addDoc|deleteDoc|runTransaction|writeBatch|console\./);
+    expect(src.match(/updateDoc\(/g)).toHaveLength(2);                 // the confirm, and a taken suggestion
+    expect(read('src/components/capture/linkedinEnrichment.js')).not.toMatch(/firebase|fetch\(|console\./);
   });
 });

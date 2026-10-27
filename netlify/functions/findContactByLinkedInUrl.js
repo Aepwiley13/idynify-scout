@@ -21,6 +21,10 @@ import { logApolloError } from './utils/apolloErrorLogger.js';
  * - Location
  *
  * If no exact match found, returns clear error.
+ *
+ * Also the exact lookup behind Scan Business Card's Find LinkedIn, after a
+ * person confirms which profile is them. Its log lines and usage record carry
+ * no name or URL.
  */
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -42,7 +46,7 @@ export const handler = async (event) => {
     // Normalize LinkedIn URL: remove trailing slash, strip query params/fragments
     const normalizedUrl = linkedin_url.trim().replace(/\/+$/, '').split('?')[0].split('#')[0];
 
-    console.log('🔍 LinkedIn URL exact match lookup:', normalizedUrl);
+    console.log('🔍 LinkedIn URL exact match lookup');
 
     // Get Apollo API key (throws if not configured)
     const apolloApiKey = getApolloApiKey();
@@ -92,7 +96,8 @@ export const handler = async (event) => {
     });
 
     if (!apolloResponse.ok) {
-      await logApolloError(apolloResponse, matchBody, 'findContactByLinkedInUrl');
+      // The error log prints the request; the URL itself stays out of it.
+      await logApolloError(apolloResponse, { linkedin_url: '(redacted)' }, 'findContactByLinkedInUrl');
 
       if (apolloResponse.status === 404) {
         throw new Error('PROFILE_NOT_FOUND');
@@ -114,7 +119,7 @@ export const handler = async (event) => {
       throw new Error('PROFILE_NOT_FOUND');
     }
 
-    console.log(`✅ Found exact match: ${person.name}`);
+    console.log('✅ Found exact match');
 
     // Extract ONLY the required preview fields (minimal data)
     const contact = {
@@ -125,6 +130,7 @@ export const handler = async (event) => {
       // Required preview fields ONLY
       name: person.name || 'Unknown',
       title: person.title || person.headline || null,
+      headline: person.headline || null,
       organization_name: person.organization_name || person.organization?.name || null,
       location: person.city && person.state
         ? `${person.city}, ${person.state}`
@@ -141,6 +147,7 @@ export const handler = async (event) => {
       organization: person.organization || null,
       city: person.city || null,
       state: person.state || null,
+      country: person.country || null,
       departments: person.departments || [],
       seniority: person.seniority || null
     };
@@ -150,8 +157,7 @@ export const handler = async (event) => {
     await logApiUsage(userId, 'findContactByLinkedInUrl', 'success', {
       responseTime,
       metadata: {
-        linkedin_url: normalizedUrl,
-        contactFound: person.name
+        contactFound: true
       }
     });
 

@@ -581,7 +581,7 @@ describe('captureExtract with claude-vision', () => {
     person: {
       fullName: t('Avery Quinn', 0.98), givenName: t('Avery'), middleName: blank, familyName: t('Quinn'), suffix: blank,
       title: t('Director of Partnerships', 0.93), emails: [t('avery.quinn@example.com')],
-      phones: [{ ...t('+1 (415) 555-0142', 0.95), label: 'mobile' }], linkedinUrl: blank,
+      phones: [{ ...t('+1 (415) 555-0142', 0.95), label: 'mobile' }], linkedinUrl: blank, socials: [],
     },
     company: { name: { ...t('Example Robotics', 0.96), onlyInLogo: false }, website: t('www.example.com', 0.96), address: blank, linkedinUrl: blank },
   };
@@ -619,7 +619,7 @@ describe('captureExtract with claude-vision', () => {
     const { status, body } = await call({ token: 'tok_SECRET_beta', userId: ENROLLED, image });
     expect(status).toBe(200);
     expect(validateCardExtraction(body.extraction)).toEqual({ ok: true, errors: [] });
-    expect(body.extraction.capture.provider).toEqual({ id: 'claude-vision', adapterVersion: '1', modelId: 'claude-opus-5-5', promptVersion: 'card-claude/v1' });
+    expect(body.extraction.capture.provider).toEqual({ id: 'claude-vision', adapterVersion: '1', modelId: 'claude-opus-5-5', promptVersion: 'card-claude/v2' });
     expect(body.extraction.capture.usage).toEqual({ inputTokens: 3912, outputTokens: 744 });
     expect(body.extraction.person.fullName).toMatchObject({ value: 'Avery Quinn', extraction: { level: 'confirmed' } });
 
@@ -630,7 +630,7 @@ describe('captureExtract with claude-vision', () => {
     expect(hasJpegMetadata(sent)).toBe(false);
 
     expect(store.docs.get(opPath(ENROLLED)).extraction).toEqual({
-      status: 'ok', provider: 'claude-vision', model: 'claude-opus-5-5', promptVersion: 'card-claude/v1', ms: expect.any(Number), fieldCount: 9,
+      status: 'ok', provider: 'claude-vision', model: 'claude-opus-5-5', promptVersion: 'card-claude/v2', ms: expect.any(Number), fieldCount: 9,
     });
     const [, operation, outcome, options] = logApiUsage.mock.calls[0];
     expect([operation, outcome]).toEqual(['captureExtract', 'success']);

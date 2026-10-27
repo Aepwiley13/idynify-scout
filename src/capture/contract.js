@@ -1,5 +1,6 @@
 /**
- * CardExtraction v1 — the one shape every reader's output becomes.
+ * CardExtraction v2 — the one shape every reader's output becomes. v2 adds
+ * `person.socials`: social handles and profile addresses printed on the card.
  *
  * Part of the Relationship Capture foundation (PR 2). Pure, runtime-
  * independent and NOT IMPORTED BY THE APP YET.
@@ -31,13 +32,14 @@
  */
 
 import { nameKey } from '../utils/identityNormalization.js';
+import { SOCIAL_PLATFORMS } from '../utils/socialProfiles.js';
 import { CHECKS, domainKey, domainStem, emailHost } from './validators.js';
 import {
   SAFEGUARDS, CAPTURE_FREE_EMAIL_DOMAINS, CAPTURE_ISP_EMAIL_DOMAINS,
   domainSafeguards, emailDomainSafeguards, websiteSafeguards,
 } from './safeguards.js';
 
-export const CONTRACT_VERSION = 'card-extraction/v1';
+export const CONTRACT_VERSION = 'card-extraction/v2';
 
 export const SOURCES = Object.freeze(['card_text', 'card_logo', 'inferred', 'user']);
 export const INFERRED_FROM = Object.freeze(['email_domain', 'email_local_part', 'website', 'full_name']);
@@ -101,6 +103,16 @@ export function emptyCaptureMeta({ operationId, extractedAt } = {}) {
   };
 }
 
+/**
+ * A social handle or profile address: a field plus its platform field. The
+ * platform has its own confidence: one the card's address names is certain,
+ * one the reader saw beside a bare handle is not, and a bare handle with
+ * nothing beside it has none (value null) for the user to choose.
+ */
+export function makeSocialField(field = {}, { platform = makeField() } = {}) {
+  return { ...makeField(field), platform: makeField(platform) };
+}
+
 /** A complete extraction with every field unknown. */
 export function emptyCardExtraction(meta = {}) {
   return {
@@ -108,7 +120,7 @@ export function emptyCardExtraction(meta = {}) {
     person: {
       fullName: makeField(), givenName: makeField(), middleName: makeField(),
       familyName: makeField(), suffix: makeField(), title: makeField(),
-      emails: [], phones: [], linkedinUrl: makeField(),
+      emails: [], phones: [], linkedinUrl: makeField(), socials: [],
     },
     company: {
       name: makeField(), domain: makeField(), website: makeField(), address: makeField(),
@@ -131,7 +143,7 @@ const isNullableString = v => v === null || typeof v === 'string';
 const isNullableNumber = v => v === null || (typeof v === 'number' && Number.isFinite(v));
 
 /**
- * Validate a CardExtraction v1. Structural (types, enums, no unknown keys, no
+ * Validate a CardExtraction v2. Structural (types, enums, no unknown keys, no
  * undefined, JSON-safe) and semantic (the contract rules). Never throws.
  *
  * @returns {{ ok: boolean, errors: Array<{ path: string, code: string }> }}
@@ -197,7 +209,7 @@ export function validateCardExtraction(extraction) {
 
   // ── person ──
   const person = extraction.person;
-  if (exactKeys(person, 'person', [...PERSON_FIELDS, 'emails', 'phones'])) {
+  if (exactKeys(person, 'person', [...PERSON_FIELDS, 'emails', 'phones', 'socials'])) {
     for (const name of PERSON_FIELDS) {
       if (isPlainObject(person[name])) checkField(person[name], `person.${name}`, { witnessed: WITNESSED.has(`person.${name}`) });
     }
@@ -221,6 +233,19 @@ export function validateCardExtraction(extraction) {
         if (!(kind.value === null || PHONE_KINDS.includes(kind.value))) fail(`${path}.kind.value`, 'bad_enum');
       } else {
         fail(`${path}.kind`, 'not_object');
+      }
+    });
+    if (!Array.isArray(person.socials)) fail('person.socials', 'bad_type');
+    else person.socials.forEach((social, i) => {
+      const path = `person.socials[${i}]`;
+      if (!isPlainObject(social)) { fail(path, 'not_object'); return; }
+      const { platform, ...field } = social;
+      checkField(field, path, { witnessed: true });
+      if (isPlainObject(platform)) {
+        checkField(platform, `${path}.platform`);
+        if (!(platform.value === null || SOCIAL_PLATFORMS.includes(platform.value))) fail(`${path}.platform.value`, 'bad_enum');
+      } else {
+        fail(`${path}.platform`, 'not_object');
       }
     });
   }

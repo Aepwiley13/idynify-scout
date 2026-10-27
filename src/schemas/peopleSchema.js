@@ -43,6 +43,10 @@
  * @property {string}  [website]           - Personal or company website
  * @property {string}  [photo_url]         - Profile photo URL
  * @property {string}  [twitter_url]       - Twitter/X profile URL
+ * @property {string}  [facebook_url]      - Facebook profile URL
+ * @property {Array}   [social_profiles]   - Social profiles beyond these fields (src/utils/socialProfiles.js):
+ *                                           { platform, handle, url, observed, source, status, added_at }.
+ *                                           Never used to identify or merge people.
  *
  * ── RELATIONSHIP CLASSIFICATION ──────────────────────────────────
  * @property {string}  person_type         - 'lead' | 'customer' | 'partner' | 'network' | 'past_customer'

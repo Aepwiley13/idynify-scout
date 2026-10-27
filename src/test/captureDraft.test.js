@@ -7,7 +7,11 @@
  * set" whenever the card does not say: never a guess.
  */
 import { describe, it, expect, beforeAll } from 'vitest';
-import { draftsFromExtraction, emptyDraft, phoneFromExtraction, printedPhoneLabel } from '../components/capture/captureDraft.js';
+import {
+  draftsFromExtraction, emptyDraft, phoneFromExtraction, printedPhoneLabel, newSocialRow, socialProblems,
+} from '../components/capture/captureDraft.js';
+import { assembleExtraction } from '../../netlify/functions/utils/capture/assembleExtraction.js';
+import { emptyReading } from '../../netlify/functions/utils/capture/cardReading.js';
 import { encodeBase64 } from '../capture/preparedImage.js';
 import { runExtraction } from '../../netlify/functions/utils/capture/orchestrator.js';
 import { createFakeExtractor } from '../../netlify/functions/utils/capture/fakeExtractor.js';
@@ -87,7 +91,53 @@ describe('a capture is a list of people', () => {
 
   it('no extraction is no people; by hand starts from an empty person', () => {
     expect(draftsFromExtraction(null)).toEqual([]);
-    expect(emptyDraft()).toMatchObject({ name: '', company: '', email: '', phones: [], toCheck: [] });
+    expect(emptyDraft()).toMatchObject({ name: '', company: '', email: '', phones: [], socials: [], toCheck: [] });
+  });
+});
+
+describe('social handles are what the card printed', () => {
+  /** A card with a name and the given socials, through the real assembler. */
+  function withSocials(socials) {
+    const base = emptyReading('read');
+    const reading = { ...base, person: { ...base.person, fullName: { raw: 'Kristin Sokol', score: 0.97 }, socials } };
+    const result = assembleExtraction(reading, {
+      operationId: 'cap_3f2a9c1e-5b7d-4e8a-9c21-7d4e5f6a8b90', extractedAt: '2026-10-27T22:00:00.000Z', image: image(),
+      provider: { id: 'fake', adapterVersion: '1', modelId: 'fake-v1', promptVersion: 'fake-v1' },
+    });
+    expect(result.ok).toBe(true);
+    return draftsFromExtraction(result.extraction)[0];
+  }
+
+  it('the fictional card has none', () => {
+    expect(draftsFromExtraction(card)[0].socials).toEqual([]);
+  });
+
+  it('a bare @handle keeps its printed text and waits for the user to choose its network', () => {
+    const draft = withSocials([{ raw: '@KRISTINSOKOL', score: 0.95, platform: null }]);
+    expect(draft.socials).toEqual([{
+      id: 'social-1', platform: null, text: '@KRISTINSOKOL', observed: '@KRISTINSOKOL', fromCard: true, confirmed: false, unsure: false,
+    }]);
+    expect(socialProblems(draft)).toEqual([{ id: 'social-1', problem: 'platform_required' }]);
+  });
+
+  it('a network the card shows is kept, not confirmed: the user has not touched it', () => {
+    const draft = withSocials([{ raw: 'instagram.com/kristinsokol', score: 0.95, platform: null }, { raw: '@studio.sokol', score: 0.6, platform: 'facebook' }]);
+    expect(draft.socials.map(r => [r.platform, r.text, r.confirmed, r.unsure])).toEqual([
+      ['instagram', 'instagram.com/kristinsokol', false, false],
+      ['facebook', '@studio.sokol', false, true],
+    ]);
+    expect(socialProblems(draft)).toEqual([]);
+  });
+
+  it('a row whose text is not a handle for its network cannot be saved as it is', () => {
+    const draft = { socials: [{ id: 'social-1', platform: 'instagram', text: 'facebook.com/kristin.sokol' }, { id: 'social-2', platform: 'facebook', text: '' }] };
+    expect(socialProblems(draft)).toEqual([{ id: 'social-1', problem: 'unreadable' }, { id: 'social-2', problem: 'unreadable' }]);
+  });
+
+  it('a row the user adds is theirs from the start, with an id no other row has', () => {
+    expect(newSocialRow([{ id: 'social-1' }, { id: 'social-3' }])).toEqual({
+      id: 'social-4', platform: null, text: '', observed: '', fromCard: false, confirmed: true, unsure: false,
+    });
   });
 });
 

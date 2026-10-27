@@ -19,9 +19,17 @@
  * "Type not set". With no printed word, only the extractor's mobile, direct
  * and fax are kept; its `office` covers Main, Office and Tel alike, so it is
  * "Type not set" rather than a guess. Capture's own extraction is unchanged.
+ *
+ * SOCIAL HANDLES ARE WHAT THE CARD PRINTED
+ * ───────────────────────────────────────
+ * Each social row keeps the printed text and the platform the card showed.
+ * A bare handle with no network beside it has no platform until the user
+ * chooses one; nothing guesses it. A row the user chose, typed or edited is
+ * `confirmed`; one left as read is only observed (src/utils/socialProfiles.js).
  */
 import { labelFromPrinted } from '../../utils/phoneLabels';
 import { makePhone } from '../../utils/contactPhones';
+import { parseSocialReference, REVIEW_SOCIAL_PLATFORMS } from '../../utils/socialProfiles';
 
 /** The word printed before a number: "Main Line" in "Main Line: 801…". The extraction's own prefix shape. */
 const PRINTED_LABEL = /^([a-z][a-z ./&'-]{0,24}?)\s*:?\s*(?=[+(\d])/i;
@@ -54,6 +62,42 @@ export function phoneFromExtraction(phone, index) {
     label,
     labelSource: 'card',
     observedLabel: printed,
+  });
+}
+
+/** One extracted social handle as a review row. */
+export function socialFromExtraction(social, index) {
+  const platform = social?.platform?.value;
+  return {
+    id: `social-${index + 1}`,
+    platform: REVIEW_SOCIAL_PLATFORMS.includes(platform) ? platform : null,
+    text: text(social),
+    observed: typeof social?.raw === 'string' ? social.raw : text(social),
+    fromCard: true,
+    confirmed: false,
+    unsure: unsure(social),
+  };
+}
+
+/** A row the user adds by hand. */
+export function newSocialRow(existing = []) {
+  const ids = new Set(existing.map(row => row.id));
+  let n = existing.length + 1;
+  while (ids.has(`social-${n}`)) n += 1;
+  return { id: `social-${n}`, platform: null, text: '', observed: '', fromCard: false, confirmed: true, unsure: false };
+}
+
+/**
+ * Rows that cannot be saved as they are: no platform chosen, or text that is
+ * not a handle or profile address for it.
+ *
+ * @returns {Array<{ id: string, problem: 'platform_required' | 'unreadable' }>}
+ */
+export function socialProblems(draft) {
+  return (draft?.socials ?? []).flatMap((row) => {
+    if (!row.platform) return [{ id: row.id, problem: 'platform_required' }];
+    const parsed = parseSocialReference(row.text, { platform: row.platform });
+    return parsed?.platform === row.platform ? [] : [{ id: row.id, problem: 'unreadable' }];
   });
 }
 
@@ -92,6 +136,7 @@ export function draftsFromExtraction(extraction) {
     linkedinUrl: text(person.linkedinUrl),
     website: text(company.website),
     phones: (person.phones ?? []).map(phoneFromExtraction).filter(Boolean),
+    socials: (person.socials ?? []).map(socialFromExtraction).filter(row => row.text),
     toCheck,
   }];
 }
@@ -100,6 +145,6 @@ export function draftsFromExtraction(extraction) {
 export function emptyDraft() {
   return {
     key: 'person-1', name: '', title: '', company: '', email: '', otherEmails: [],
-    linkedinUrl: '', website: '', phones: [], toCheck: [],
+    linkedinUrl: '', website: '', phones: [], socials: [], toCheck: [],
   };
 }

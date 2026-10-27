@@ -109,7 +109,14 @@ describe('no production path uses the capture foundation yet', () => {
     expect([...src.matchAll(/(?:from\s+|import\s*\(\s*|require\s*\(\s*)['"]([^'"]+)['"]/g)].map(m => m[1])).toEqual([]);
   });
 
-  it('the capture modules import only each other, identityNormalization and tldts', () => {
+  it('socialProfiles.js imports nothing: the capture modules and the app share it', () => {
+    const src = readFileSync(resolve(repo, 'src/utils/socialProfiles.js'), 'utf8');
+    expect([...src.matchAll(/(?:from\s+|import\s*\(\s*|require\s*\(\s*)['"]([^'"]+)['"]/g)].map(m => m[1])).toEqual([]);
+  });
+
+  // Social handles read from a card use the contact's own platform registry,
+  // which imports nothing, so a card and a contact agree on what a handle is.
+  it('the capture modules import only each other, identityNormalization, socialProfiles and tldts', () => {
     const capture = sources(['src/capture']);
     expect(capture.map(([path]) => path).sort()).toEqual([
       'src/capture/confidence.js', 'src/capture/contract.js', 'src/capture/preparedImage.js',
@@ -119,7 +126,7 @@ describe('no production path uses the capture foundation yet', () => {
       const specifiers = [...src.matchAll(/from\s+['"]([^'"]+)['"]/g)].map(m => m[1]);
       for (const specifier of specifiers) {
         expect(
-          ['tldts', '../utils/identityNormalization.js'].includes(specifier) || /^\.\/(contract|validators|confidence|safeguards)\.js$/.test(specifier),
+          ['tldts', '../utils/identityNormalization.js', '../utils/socialProfiles.js'].includes(specifier) || /^\.\/(contract|validators|confidence|safeguards)\.js$/.test(specifier),
           `${path} imports ${specifier}`,
         ).toBe(true);
       }

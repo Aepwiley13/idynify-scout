@@ -1,5 +1,5 @@
 /**
- * CardReading (what an extractor says is printed) → CardExtraction v1 (what
+ * CardReading (what an extractor says is printed) → CardExtraction v2 (what
  * the app shows, reviews and later saves).
  *
  * The same for every extractor, so they differ only in what they read. All of
@@ -20,15 +20,19 @@
  *     free-mail, ISP, role or shared-host address
  *   - nothing is invented: a field not printed is unknown, and a company name
  *     is never made up from a domain
+ *   - a social's platform is the one its printed address names; else the one
+ *     the extractor saw beside it, never more than likely; else none, for the
+ *     user to choose. LinkedIn stays in its own field, and a network the app
+ *     does not support yet is left out
  *
  * The result must pass validateCardExtraction; if it does not, that is an
  * error, never a partial response.
  */
 import {
-  CONTRACT_VERSION, makeField, makeEmailField, makePhoneField, emptyCaptureMeta, validateCardExtraction,
+  CONTRACT_VERSION, makeField, makeEmailField, makePhoneField, makeSocialField, emptyCaptureMeta, validateCardExtraction,
 } from '../../../../src/capture/contract.js';
 import {
-  CHECKS, validateEmail, validatePhone, validateUrl, validateLinkedInPerson, validateLinkedInCompany,
+  CHECKS, validateEmail, validatePhone, validateUrl, validateLinkedInPerson, validateLinkedInCompany, validateSocial,
   personNameKey, domainKey, emailHost,
 } from '../../../../src/capture/validators.js';
 import {
@@ -36,6 +40,7 @@ import {
 } from '../../../../src/capture/safeguards.js';
 import { computeExtractionLevel, LEVEL_ORDER } from '../../../../src/capture/confidence.js';
 import { nameKey } from '../../../../src/utils/identityNormalization.js';
+import { REVIEW_SOCIAL_PLATFORMS } from '../../../../src/utils/socialProfiles.js';
 
 /** No witness runs in V1, so every identifier is unchecked: capped at likely. */
 const NO_WITNESS = 'skipped';
@@ -139,6 +144,35 @@ function linkedinField(text, validate, overridden) {
   return field({ text, value, normalized: check.normalized, checks: check.checks, witnessed: true, overridden });
 }
 
+/**
+ * The social handles and profile addresses printed, each with its platform.
+ * LinkedIn (its own field) and networks not supported yet are left out; the
+ * same handle on the same platform is kept once.
+ */
+function socialFields(texts, overridden) {
+  const seen = new Set();
+  const out = [];
+  for (const text of texts) {
+    const value = clean(text.raw);
+    if (!value || text.platform === 'linkedin' || text.platform === 'other') continue;
+    const check = validateSocial(value);
+    if (check.platform && !REVIEW_SOCIAL_PLATFORMS.includes(check.platform)) continue;
+    const fromAddress = check.platform !== null;
+    const platformValue = check.platform ?? (REVIEW_SOCIAL_PLATFORMS.includes(text.platform) ? text.platform : null);
+    const key = `${platformValue ?? ''}:${check.normalized ?? value.toLowerCase()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const platform = platformValue
+      ? fieldParams({ text, raw: null, value: platformValue, normalized: platformValue, overridden, ceiling: fromAddress ? 'confirmed' : 'likely' })
+      : {};
+    out.push(makeSocialField(
+      fieldParams({ text, value, normalized: check.normalized, checks: check.checks, witnessed: true, overridden }),
+      { platform },
+    ));
+  }
+  return out;
+}
+
 function websiteField(text, emails, overridden) {
   const value = clean(text.raw);
   if (!value) return makeField();
@@ -178,7 +212,7 @@ function domainField({ evidence, website, emails, overridden }) {
 function counts(extraction) {
   const all = [
     ...['fullName', 'givenName', 'middleName', 'familyName', 'suffix', 'title', 'linkedinUrl'].map(k => extraction.person[k]),
-    ...extraction.person.emails, ...extraction.person.phones,
+    ...extraction.person.emails, ...extraction.person.phones, ...extraction.person.socials,
     ...['name', 'domain', 'website', 'address', 'linkedinUrl'].map(k => extraction.company[k]),
   ].filter(f => f.value !== null);
   const by = level => all.filter(f => f.extraction.level === level).length;
@@ -198,7 +232,7 @@ function statusOf(reading, extraction) {
   const identifier = [...p.emails, ...p.phones, p.linkedinUrl].some(usable);
   if (named || identifier) return 'ok';
   const c = extraction.company;
-  const anything = [p.middleName, p.suffix, p.title, c.name, c.domain, c.website, c.address, c.linkedinUrl].some(usable);
+  const anything = [p.middleName, p.suffix, p.title, ...p.socials, c.name, c.domain, c.website, c.address, c.linkedinUrl].some(usable);
   return anything ? 'partial' : 'unreadable';
 }
 
@@ -246,6 +280,7 @@ export function assembleExtraction(reading, {
       emails,
       phones: phoneFields(p.phones, overridden),
       linkedinUrl: linkedinField(p.linkedinUrl, validateLinkedInPerson, overridden),
+      socials: socialFields(p.socials, overridden),
     },
     company: {
       name,

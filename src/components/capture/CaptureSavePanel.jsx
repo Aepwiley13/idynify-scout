@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { Loader, UserPlus, UserCheck, AlertTriangle, Building2, RotateCcw } from 'lucide-react';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { previewCapturePerson, saveCapturePerson } from './captureSave.js';
+import { socialProblems } from './captureDraft.js';
 
 const MATCHED_ON = Object.freeze({
   email: 'email', phone: 'phone number', linkedin_url: 'LinkedIn', apollo_person_id: 'Apollo ID', name_company: 'name and company',
@@ -157,6 +158,8 @@ export default function CaptureSavePanel({ operationId, people, onSaved, T }) {
   const key = identityKey(people);
   const stale = checkedKey !== key;
   const missingName = people.some(p => !p.name?.trim());
+  const socialsUnresolved = people.some(p => socialProblems(p).length > 0);
+  const blocked = missingName || socialsUnresolved;
   const uid = signedInUid();
 
   const check = async () => {
@@ -196,9 +199,11 @@ export default function CaptureSavePanel({ operationId, people, onSaved, T }) {
           setMatches(list => list.map((m, i) => (i === index ? { ...m, person: result.person } : m)));
           setChoices(list => list.map((c, i) => (i === index ? { ...c, person: null } : c)));
         }
-        setNotice(result.status === 'invalid'
-          ? 'Add a name before saving.'
-          : 'Something changed in IDYNIFY since you checked. Look at the match again, then save.');
+        setNotice(result.status !== 'invalid'
+          ? 'Something changed in IDYNIFY since you checked. Look at the match again, then save.'
+          : result.reason === 'social_needs_platform'
+            ? 'Choose a network for each social profile, or remove it, before saving.'
+            : 'Add a name before saving.');
         setPhase('ready');
         return;
       }
@@ -222,15 +227,16 @@ export default function CaptureSavePanel({ operationId, people, onSaved, T }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         {failed === 'check' && <p role="alert" style={{ ...muted, color: '#b91c1c' }}>Couldn't check IDYNIFY for this person. Try again.</p>}
-        <button type="button" style={primary(!missingName && phase !== 'checking')} disabled={missingName || phase === 'checking'} onClick={check}>
+        <button type="button" style={primary(!blocked && phase !== 'checking')} disabled={blocked || phase === 'checking'} onClick={check}>
           {phase === 'checking' ? <><Loader size={16} className="animate-spin" /> Checking IDYNIFY…</> : 'Continue'}
         </button>
         {missingName && <p style={muted}>Add a name to continue.</p>}
+        {!missingName && socialsUnresolved && <p style={muted}>Choose a network for each social profile, or remove it, to continue.</p>}
       </div>
     );
   }
 
-  const ready = matches.every((m, i) => canSave(m, choices[i]));
+  const ready = !socialsUnresolved && matches.every((m, i) => canSave(m, choices[i]));
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }} data-testid="capture-match">
       {matches.map((match, i) => (
@@ -251,6 +257,7 @@ export default function CaptureSavePanel({ operationId, people, onSaved, T }) {
         </div>
       ))}
       {notice && <p role="alert" style={{ ...muted, color: '#b45309', display: 'flex', gap: 6, alignItems: 'center' }}><AlertTriangle size={14} /> {notice}</p>}
+      {socialsUnresolved && !notice && <p style={muted}>Choose a network for each social profile, or remove it, to save.</p>}
       {failed === 'save' && (
         <p role="alert" style={{ ...muted, color: '#b91c1c', display: 'flex', gap: 6, alignItems: 'center' }}>
           <RotateCcw size={14} /> Couldn't save. Your details are still here: try again.

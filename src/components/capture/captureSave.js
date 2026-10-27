@@ -30,6 +30,14 @@
  * A capture is a source, not a person: one capture can produce zero, one or
  * several contacts, which is why the id carries the person's position.
  *
+ * SOCIAL PROFILES ARE NEVER IDENTITY
+ * ──────────────────────────────────
+ * The card's Instagram and Facebook handles are saved to `social_profiles`
+ * (src/utils/socialProfiles.js) and play no part in matching: the candidate
+ * the resolver sees has none, so two people sharing a business's account stay
+ * two people. On an existing contact they are added beside what it has, never
+ * in place of it.
+ *
  * SAVE LOOKS AGAIN
  * ────────────────
  * The workspace can change between showing a match and saving. Save resolves
@@ -44,6 +52,8 @@ import { resolveCompany, ensureCompanyForContact, normalizeDomain, workDomainFro
 import { buildUserAddedContact } from '../../schemas/userAddedContact';
 import { buildPhoneWrite, readContactPhones } from '../../utils/contactPhones';
 import { IdentityConflictError } from '../../utils/identityResolution';
+import { makeSocialProfile, mergeSocialProfiles, SOCIAL_SOURCES, SOCIAL_STATUS } from '../../utils/socialProfiles';
+import { socialProblems } from './captureDraft.js';
 
 /** `source` / `addedFrom` on what a capture saves. Distinct from the legacy scanner's "Scanned Business Card". */
 export const CAPTURE_SOURCE = 'business_card';
@@ -76,6 +86,21 @@ export function candidateFromDraft(draft) {
     ...buildPhoneWrite(draft.phones ?? []),
     source: CAPTURE_SOURCE,
   };
+}
+
+/**
+ * The reviewed social rows as stored entries. A row left as the card printed
+ * it is observed; one the user chose, typed or edited is user_confirmed.
+ */
+export function socialProfilesFromDraft(draft, { addedAt = new Date().toISOString() } = {}) {
+  return (draft.socials ?? []).map(row => makeSocialProfile({
+    text: row.text,
+    platform: row.platform,
+    observed: row.fromCard ? row.observed : row.text,
+    source: row.fromCard ? SOCIAL_SOURCES.BUSINESS_CARD : SOCIAL_SOURCES.USER,
+    status: row.confirmed ? SOCIAL_STATUS.USER_CONFIRMED : SOCIAL_STATUS.OBSERVED,
+    addedAt,
+  })).filter(Boolean);
 }
 
 /** The company signal on a draft, for resolveCompany and ensureCompanyForContact. */
@@ -205,8 +230,9 @@ function newNumbers(existingList, cardList) {
 /**
  * The update for an existing contact: identifiers it is missing
  * (mergeIdentifiers), its company if it has none, the card's title and
- * website where it has none, and any number it does not already have. Never
- * overwrites what the record holds.
+ * website where it has none, any number it does not already have, and any
+ * social profile it does not already have. Never overwrites what the record
+ * holds.
  */
 function mergePatch(existing, candidate, draft) {
   const patch = mergeIdentifiers(existing, candidate);
@@ -218,6 +244,7 @@ function mergePatch(existing, candidate, draft) {
   const current = readContactPhones(existing);
   const added = newNumbers(current, buildPhoneWrite(draft.phones ?? []).phones);
   if (added.length > 0) Object.assign(patch, buildPhoneWrite([...current, ...added]));
+  Object.assign(patch, mergeSocialProfiles(existing, socialProfilesFromDraft(draft)).patch);
 
   if (Object.keys(patch).length > 0 && !patch.identity_merged_at) patch.identity_merged_at = new Date().toISOString();
   return patch;
@@ -250,12 +277,13 @@ async function createOnce(uid, id, data) {
  *   | { status: 'changed', person }       the match moved: nothing written, show this one
  *   | { status: 'refused', person }       two existing contacts share an identifier
  *   | { status: 'needs_choice', person }  a possible match the user has not answered
- *   | { status: 'invalid', reason }
+ *   | { status: 'invalid', reason }       no_workspace, name_required, or social_needs_platform
  * >}
  */
 export async function saveCapturePerson(uid, { operationId, index, draft, shown, choices = {} }) {
   if (!uid || !operationId) return { status: 'invalid', reason: 'no_workspace' };
   if (!orNull(draft.name)) return { status: 'invalid', reason: 'name_required' };
+  if (socialProblems(draft).length > 0) return { status: 'invalid', reason: 'social_needs_platform' };
 
   const id = captureContactId(operationId, index);
   const own = await getDoc(contactRef(uid, id));
@@ -314,6 +342,7 @@ export async function saveCapturePerson(uid, { operationId, index, draft, shown,
     addedFrom: CAPTURE_SOURCE,
     extra: {
       ...buildPhoneWrite(draft.phones ?? []),
+      ...mergeSocialProfiles({}, socialProfilesFromDraft(draft)).patch,
       website: orNull(draft.website),
       identity_sources: [CAPTURE_SOURCE],
       capture_operation_id: operationId,

@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  CONTRACT_VERSION, makeField, makeEmailField, makePhoneField, emptyCardExtraction, validateCardExtraction,
+  CONTRACT_VERSION, makeField, makeEmailField, makePhoneField, makeSocialField, emptyCardExtraction, validateCardExtraction,
 } from '../capture/contract.js';
 
 /** A fully populated, valid extraction exercising every kind of metadata. */
@@ -45,6 +45,16 @@ function richExtraction() {
     raw: 'linkedin.com/in/jose-obrien', value: 'https://www.linkedin.com/in/jose-obrien', normalized: 'linkedin.com/in/jose-obrien',
     source: 'card_text', score: 0.9, level: 'likely', checks: ['linkedin_person_ok'], witness: 'absent',
   });
+  person.socials = [
+    makeSocialField({
+      raw: '@JOSEOBRIEN', value: '@JOSEOBRIEN', normalized: 'joseobrien',
+      source: 'card_text', score: 0.92, level: 'likely', checks: ['social_ok'], witness: 'skipped',
+    }),
+    makeSocialField({
+      raw: 'instagram.com/acmerockets', value: 'instagram.com/acmerockets', normalized: 'acmerockets',
+      source: 'card_text', score: 0.95, level: 'likely', checks: ['social_ok'], witness: 'skipped',
+    }, { platform: { value: 'instagram', normalized: 'instagram', source: 'card_text', score: 0.95, level: 'confirmed' } }),
+  ];
 
   company.name = makeField({ raw: 'ACME ROCKETS INC', value: 'Acme Rockets Inc', normalized: 'acme rockets', source: 'card_text', score: 0.95, level: 'confirmed' });
   company.website = makeField({
@@ -270,6 +280,10 @@ describe('the contract rules', () => {
     [x => { x.person.emails[0].witness = 'yes'; }, 'person.emails[0].witness', 'bad_enum'],
     [x => { x.person.emails[0].kind = 'business'; }, 'person.emails[0].kind', 'bad_enum'],
     [x => { x.person.phones[0].kind.value = 'pager'; }, 'person.phones[0].kind.value', 'bad_enum'],
+    [x => { x.person.socials[1].platform.value = 'myspace'; }, 'person.socials[1].platform.value', 'bad_enum'],
+    [x => { x.person.socials[0].platform = 'instagram'; }, 'person.socials[0].platform', 'not_object'],
+    [x => { x.person.socials[0].witness = 'yes'; }, 'person.socials[0].witness', 'bad_enum'],
+    [x => { x.person.socials = {}; }, 'person.socials', 'bad_type'],
     [x => { x.person.title.extraction.checks.push('looks_fine'); }, 'person.title.extraction.checks[0]', 'bad_enum'],
     [x => { x.company.safeguards.push('NOT_A_CODE'); }, 'company.safeguards[1]', 'bad_enum'],
     [x => { x.person.phones[1].extension = 'x204'; }, 'person.phones[1].extension', 'bad_type'],
@@ -280,7 +294,7 @@ describe('the contract rules', () => {
     [x => { x.capture.operationId = 'op-1'; }, 'capture.operationId', 'bad_operation_id'],
     [x => { x.capture.extractedAt = 'yesterday'; }, 'capture.extractedAt', 'bad_timestamp'],
     [x => { x.capture.timing.totalMs = Infinity; }, 'capture.timing.totalMs', 'bad_type'],
-    [x => { x.version = 'card-extraction/v2'; }, 'extraction.version', 'bad_version'],
+    [x => { x.version = 'card-extraction/v1'; }, 'extraction.version', 'bad_version'],
   ])('rejects a bad value at %#', (mutate, path, code) => {
     expectError(mutate, path, code);
   });
@@ -290,6 +304,7 @@ describe('the contract rules', () => {
     expectError(x => { x.person.nickname = makeField(); }, 'person.nickname', 'unknown_key');
     expectError(x => { x.company.name.confidence = 0.9; }, 'company.name.confidence', 'unknown_key');
     expectError(x => { delete x.company.website; }, 'company.website', 'missing_key');
+    expectError(x => { delete x.person.socials; }, 'person.socials', 'missing_key');
     expectError(x => { x.person.title.raw = undefined; }, 'person.title.raw', 'undefined_value');
   });
 

@@ -21,6 +21,7 @@
 
 import { parse as parsePublicSuffix } from 'tldts';
 import { normalizeEmail, normalizeCapturePhone } from '../utils/identityNormalization.js';
+import { parseSocialReference } from '../utils/socialProfiles.js';
 
 export const CHECKS = Object.freeze({
   EMAIL_SYNTAX_OK: 'email_syntax_ok',
@@ -37,12 +38,14 @@ export const CHECKS = Object.freeze({
   PHONE_TOO_LONG: 'phone_too_long',
   PHONE_INVALID_CHARACTERS: 'phone_invalid_characters',
   PHONE_COUNTRY_UNRESOLVED: 'phone_country_unresolved',
+  SOCIAL_OK: 'social_ok',
+  SOCIAL_INVALID: 'social_invalid',
   OCR_SUSPECTED: 'ocr_suspected',
 });
 
 /** Checks that make a value unusable. confidence.js forces such a field to `unknown`. */
 export const FAILING_CHECKS = Object.freeze(new Set([
-  CHECKS.EMAIL_SYNTAX_INVALID, CHECKS.HOST_INVALID, CHECKS.URL_INVALID, CHECKS.LINKEDIN_INVALID,
+  CHECKS.EMAIL_SYNTAX_INVALID, CHECKS.HOST_INVALID, CHECKS.URL_INVALID, CHECKS.LINKEDIN_INVALID, CHECKS.SOCIAL_INVALID,
   CHECKS.PHONE_TOO_SHORT, CHECKS.PHONE_TOO_LONG, CHECKS.PHONE_INVALID_CHARACTERS,
 ]));
 
@@ -231,6 +234,19 @@ export function validateLinkedInPerson(input) {
 /** `linkedin.com/company/<slug>` — a company page. */
 export function validateLinkedInCompany(input) {
   return validateLinkedIn(input, 'company', CHECKS.LINKEDIN_COMPANY_OK);
+}
+
+// ─── Social ──────────────────────────────────────────────────────────────────
+
+/**
+ * A printed social handle or profile address (src/utils/socialProfiles.js).
+ * `platform` is the one its address names, or null for a bare handle: the
+ * network is never guessed here. `normalized` is the handle's matching form.
+ */
+export function validateSocial(input) {
+  const parsed = parseSocialReference(input);
+  if (!parsed) return { ok: false, platform: null, normalized: null, checks: [CHECKS.SOCIAL_INVALID] };
+  return { ok: true, platform: parsed.platform, normalized: parsed.handle, checks: [CHECKS.SOCIAL_OK] };
 }
 
 // ─── Phone ───────────────────────────────────────────────────────────────────

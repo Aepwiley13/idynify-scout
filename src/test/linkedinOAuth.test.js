@@ -324,7 +324,16 @@ describe('linkedin-oauth-callback', () => {
     expect((await connect('A')).outcome).toBe('connected');
     expect(jwksFetches).toBeGreaterThan(0);                        // fetched from LINKEDIN_JWKS_URL (then cached)
     expect(LINKEDIN_JWKS_URL).toBe('https://www.linkedin.com/oauth/openid/jwks');
-    expect(LINKEDIN_ISSUER).toBe('https://www.linkedin.com');
+    expect(LINKEDIN_ISSUER).toBe('https://www.linkedin.com/oauth');
+  });
+
+  // Regression: production rejected real LinkedIn tokens while the expected
+  // issuer was the documentation's https://www.linkedin.com. The literal here,
+  // not LINKEDIN_ISSUER, is what LinkedIn's discovery metadata and tokens use.
+  it('accepts an ID token with LinkedIn\'s live discovery issuer, https://www.linkedin.com/oauth', async () => {
+    const { outcome } = await connect('A', { claims: { iss: 'https://www.linkedin.com/oauth' } });
+    expect(outcome).toBe('connected');
+    expect(store.get('users/A/integrations/linkedin').linkedinMemberId).toBe('member-1');
   });
 
   const unsigned = (claims) => `${b64url({ alg: 'none', kid: KID })}.${b64url({ iss: LINKEDIN_ISSUER, aud: CLIENT_ID, sub: 'member-1', exp: Math.floor(Date.now() / 1000) + 3600, ...claims })}.`;
@@ -338,7 +347,10 @@ describe('linkedin-oauth-callback', () => {
     ['a malformed ID token', { rawIdToken: 'not.a.jwt' }],
     ['an ID token for another app', { claims: { aud: 'other-client' } }],
     ['an ID token from another issuer', { claims: { iss: 'https://evil.example' } }],
-    ['an ID token with the discovery-path issuer (must be exact)', { claims: { iss: 'https://www.linkedin.com/oauth' } }],
+    // The documentation's issuer is not what LinkedIn issues: rejected unless
+    // LinkedIn's live discovery metadata changes to it.
+    ['an ID token with the documented-but-not-issued issuer https://www.linkedin.com', { claims: { iss: 'https://www.linkedin.com' } }],
+    ['an ID token whose issuer only nearly matches (trailing slash)', { claims: { iss: 'https://www.linkedin.com/oauth/' } }],
     ['an expired ID token', { claims: { exp: Math.floor(Date.now() / 1000) - 3600 } }],
     ['an ID token with no expiry', { claims: { exp: undefined } }],
     ['an ID token with no subject', { claims: { sub: undefined } }],
@@ -419,7 +431,7 @@ describe('verifyLinkedInIdToken and the nonce policy', () => {
 
   it('returns the verified claims for a valid token', async () => {
     const { claims, nonceCheck } = await verifyLinkedInIdToken(await idToken({ nonce: 'n1' }), { clientId: CLIENT_ID, nonce: 'n1', keySet });
-    expect(claims).toMatchObject({ iss: 'https://www.linkedin.com', aud: CLIENT_ID, sub: 'member-1' });
+    expect(claims).toMatchObject({ iss: 'https://www.linkedin.com/oauth', aud: CLIENT_ID, sub: 'member-1' });
     expect(nonceCheck).toBe('matched');
   });
 

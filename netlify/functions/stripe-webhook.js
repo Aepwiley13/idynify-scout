@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import admin from 'firebase-admin';
+import { withLambda } from '@netlify/aws-lambda-compat';
 
 // Initialize Firebase Admin (only once)
 if (!admin.apps.length) {
@@ -14,7 +15,7 @@ if (!admin.apps.length) {
 
 const db = admin.firestore();
 
-export const handler = async (event) => {
+const handler = async (event) => {
   // Only allow POST
   if (event.httpMethod !== 'POST') {
     return {
@@ -188,3 +189,9 @@ export const handler = async (event) => {
     };
   }
 };
+
+// PHASE 0 SPIKE (#734) — do not merge. Runs this Lambda-style handler on
+// Netlify's modern runtime. An export *named* `handler` makes Netlify treat
+// the file as Lambda-mode, so the tests import it as `lambdaHandler`.
+export { handler as lambdaHandler };
+export default withLambda(handler);

@@ -16,6 +16,7 @@ import {
   getLinkedInConfig, createOAuthState, buildAuthorizationUrl, bindingCookie,
   LinkedInOAuthError, OUTCOMES,
 } from './utils/linkedinOAuth.js';
+import { withLambda } from '@netlify/aws-lambda-compat';
 
 const JSON_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
 
@@ -23,7 +24,7 @@ function respond(statusCode, body, extraHeaders = {}) {
   return { statusCode, headers: { ...JSON_HEADERS, ...extraHeaders }, body: JSON.stringify(body) };
 }
 
-export const handler = async (event) => {
+const handler = async (event) => {
   if (event.httpMethod !== 'POST') return respond(405, { error: 'Method not allowed' });
 
   const authToken = extractAuthToken(event);
@@ -58,3 +59,9 @@ export const handler = async (event) => {
     return respond(500, { error: 'Could not start the LinkedIn connection. Please try again.' });
   }
 };
+
+// PHASE 0 SPIKE (#734) — do not merge. Runs this Lambda-style handler on
+// Netlify's modern runtime. An export *named* `handler` makes Netlify treat
+// the file as Lambda-mode, so the tests import it as `lambdaHandler`.
+export { handler as lambdaHandler };
+export default withLambda(handler);

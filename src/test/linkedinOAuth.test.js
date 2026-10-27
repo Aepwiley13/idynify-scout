@@ -64,9 +64,9 @@ vi.mock('../../netlify/functions/firebase-admin.js', () => ({
   db: fakeDb,
 }));
 
-const { handler: init } = await import('../../netlify/functions/linkedin-oauth-init.js');
-const { handler: callback } = await import('../../netlify/functions/linkedin-oauth-callback.js');
-const { handler: disconnect } = await import('../../netlify/functions/linkedin-disconnect.js');
+const { lambdaHandler: init } = await import('../../netlify/functions/linkedin-oauth-init.js');
+const { lambdaHandler: callback } = await import('../../netlify/functions/linkedin-oauth-callback.js');
+const { lambdaHandler: disconnect } = await import('../../netlify/functions/linkedin-disconnect.js');
 const {
   STATE_TTL_MS, BINDING_COOKIE, LINKEDIN_TOKEN_URL, LINKEDIN_USERINFO_URL, LINKEDIN_JWKS_URL, LINKEDIN_ISSUER,
   LINKEDIN_NONCE_POLICY, NONCE_POLICY, verifyLinkedInIdToken, checkNonce,

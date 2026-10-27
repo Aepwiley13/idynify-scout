@@ -21,6 +21,7 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { requireProjectId } from './utils/firebaseEnv.js';
+import { withLambda } from '@netlify/aws-lambda-compat';
 
 // Initialize Firebase Admin (only once) — same pattern as the other functions.
 if (getApps().length === 0) {
@@ -137,7 +138,7 @@ async function recordOpen({ userId, cadenceId, contactId, messageId }) {
   ]);
 }
 
-export const handler = async (event) => {
+const handler = async (event) => {
   // Only GET serves the pixel; still return the pixel for anything else so a
   // stray request never surfaces an error to a mail client.
   const params = decodeParams(event.queryStringParameters?.data);
@@ -158,3 +159,9 @@ export const handler = async (event) => {
 
   return PIXEL_RESPONSE;
 };
+
+// PHASE 0 SPIKE (#734) — do not merge. Runs this Lambda-style handler on
+// Netlify's modern runtime. An export *named* `handler` makes Netlify treat
+// the file as Lambda-mode, so the tests import it as `lambdaHandler`.
+export { handler as lambdaHandler };
+export default withLambda(handler);

@@ -43,7 +43,7 @@ vi.mock('../../netlify/functions/utils/gmailSignature.js', () => ({
   appendSignatureHtml: (body) => body,
 }));
 
-const { handler } = await import('../../netlify/functions/track-open.js');
+const { lambdaHandler: handler } = await import('../../netlify/functions/track-open.js');
 const { buildTrackingPixel, buildRawEmail } = await import('../../netlify/functions/gmail-send-quick.js');
 
 const GIF_HEADER = 'GIF89a';

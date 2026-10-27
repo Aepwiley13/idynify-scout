@@ -16,17 +16,15 @@
  *
  * Never touched: name, email, phones, company, website, notes, status. The
  * LinkedIn URL itself is the user's confirmation, recorded as such.
+ *
+ * The rules are shared with Barry Enrich: src/utils/contactProtection.js.
  */
 import { normalizeLinkedInUrl } from '../../utils/identityNormalization';
 import { hasRealContactPhoto } from '../../utils/contactPhoto';
+import { text, isBlank as empty, differenceSuggestions } from '../../utils/contactProtection';
 
 /** Where a value came from, in `enrichment_provenance` (the map Barry's enrichment also keeps). */
 export const PROVENANCE = Object.freeze({ CONFIRMED: 'user_confirmed', PROFILE: 'apollo_match', ACCEPTED: 'user_accepted' });
-
-const text = v => (typeof v === 'string' && v.trim() ? v.trim() : null);
-const empty = v => text(v) === null;
-const same = (a, b) => String(a ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
-  === String(b ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
 /** https://www.linkedin.com/in/<id> for a person's profile; null for anything else. */
 export function profileUrl(value) {
@@ -117,15 +115,7 @@ export function enrichmentFromProfile(contact, linkedinUrl, profile, { apolloIdT
     const apolloId = text(profile.apollo_person_id);
     if (apolloId && empty(contact.apollo_person_id) && !apolloIdTaken) patch.apollo_person_id = apolloId;
 
-    const title = text(profile.title);
-    if (title && !empty(contact.title) && !same(title, contact.title)) {
-      suggestions.push({ field: 'title', current: text(contact.title), suggested: title, actionable: true });
-    }
-    const company = text(profile.organization_name);
-    const ownCompany = text(contact.company_name) ?? text(contact.company);
-    if (company && ownCompany && !same(company, ownCompany)) {
-      suggestions.push({ field: 'company', current: ownCompany, suggested: company, actionable: false });
-    }
+    suggestions.push(...differenceSuggestions(contact, { title: profile.title, company: profile.organization_name }));
 
     patch.last_enriched_at = now;
   }

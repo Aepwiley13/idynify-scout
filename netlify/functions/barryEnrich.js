@@ -14,11 +14,12 @@
  * Step 1: Apollo PEOPLE_MATCH / PEOPLE_SEARCH — person-level data
  * Step 2: Google Places — company-level fallback (phone, address, website)
  *
- * MERGE RULES (deterministic, not AI):
- * - Person-level beats company-level
- * - Direct source beats inferred
- * - New data never overwrites user-entered data
- * - Every field gets a source tag
+ * MERGE RULES (deterministic, not AI) — src/utils/contactProtection.js:
+ * - The contact's own values win; enrichment fills empty fields only
+ * - Name, email, phones, company and website are never overwritten
+ * - A different title or company is returned as a suggestion, not written
+ * - Location is filled as one unit; person-level beats company-level
+ * - Every written field gets a source tag in enrichment_provenance
  *
  * Last updated: January 2026
  */
@@ -29,6 +30,7 @@ import { logApolloError } from './utils/apolloErrorLogger.js';
 import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } from './utils/scoutContactContract.js';
 import { googleBusinessLookup } from './utils/googleBusinessLookup.js';
 import { searchLinkedInProfile, searchLinkedInPhoto, extractEmailDomain } from './utils/linkedinSearch.js';
+import { enrichmentPatch } from '../../src/utils/contactProtection.js';
 import { load } from 'cheerio';
 
 export const handler = async (event) => {
@@ -477,8 +479,8 @@ export const handler = async (event) => {
         const googleResult = await googleBusinessLookup({
           companyName,
           domain: mergedSoFar.company_domain || null,
-          city: mergedSoFar.city || null,
-          state: mergedSoFar.state || null
+          city: mergedSoFar.city || mergedSoFar.company_city || null,
+          state: mergedSoFar.state || mergedSoFar.company_state || null
         });
 
         step2.status = googleResult.status;
@@ -503,78 +505,24 @@ export const handler = async (event) => {
     // BUILD FINAL RESULT — deterministic merge
     // ═══════════════════════════════════════════════════
 
-    // Process phone numbers from Apollo
     const phoneNumbers = apolloRawData?.phone_numbers || [];
-    const phoneByType = { mobile: null, direct: null, work: null, home: null };
-
-    phoneNumbers.forEach(phone => {
-      const type = phone.type?.toLowerCase() || 'other';
-      if (phoneByType[type] !== undefined && !phoneByType[type]) {
-        phoneByType[type] = phone.sanitized_number || phone.raw_number || phone.number;
-      }
-    });
-
-    const primaryPhone = phoneByType.mobile || phoneByType.direct || phoneByType.work ||
-                          phoneByType.home || phoneNumbers[0]?.sanitized_number || null;
 
     // Compute final missing fields + confidence (rule-based)
     const finalMissing = assessMissingData({ ...contact, ...enrichedData });
     const totalFieldsFound = steps.reduce((acc, s) => acc + (s.fieldsFound?.length || 0), 0);
     const confidence = computeConfidence(totalFieldsFound, finalMissing.length);
 
+    // What may be written onto the contact: its own values win, enrichment
+    // fills empty fields, and a different title or company is a suggestion
+    // (src/utils/contactProtection.js, the rules #732 set for LinkedIn).
+    const { patch, filled, suggestions } = enrichmentPatch(contact, enrichedData, {
+      provenance,
+      phoneNumbers,
+      person: apolloRawData,
+    });
+
     const finalEnrichedData = {
-      // Person contact info (Apollo-sourced)
-      email: enrichedData.email || contact.email || null,
-      email_status: enrichedData.email_status || contact.email_status || null,
-      email_confidence: enrichedData.email_confidence || contact.email_confidence || null,
-      emailSource: enrichedData.emailSource || contact.emailSource || null,
-
-      // Phone (Apollo-sourced, person-level)
-      phone: primaryPhone || contact.phone || null,
-      phone_mobile: phoneByType.mobile || contact.phone_mobile || null,
-      phone_direct: phoneByType.direct || contact.phone_direct || null,
-      phone_work: phoneByType.work || contact.phone_work || null,
-      phone_home: phoneByType.home || contact.phone_home || null,
-      phone_numbers: phoneNumbers.length > 0 ? phoneNumbers : (contact.phone_numbers || []),
-
-      // Social (Apollo-sourced)
-      linkedin_url: enrichedData.linkedin_url || contact.linkedin_url || null,
-      twitter_url: enrichedData.twitter_url || contact.twitter_url || null,
-      facebook_url: enrichedData.facebook_url || contact.facebook_url || null,
-
-      // Professional (Apollo-sourced)
-      seniority: enrichedData.seniority || contact.seniority || null,
-      departments: enrichedData.departments || contact.departments || [],
-      functions: enrichedData.functions || contact.functions || [],
-
-      // Current Employment (Apollo-sourced)
-      // Primary fields - these are what the UI reads
-      title: enrichedData.current_position_title || enrichedData.title || contact.title || null,
-      company_name: enrichedData.current_company_name || enrichedData.company_name || contact.company_name || contact.company || null,
-      // Legacy Apollo-style fields - kept for backward compatibility
-      current_position_title: enrichedData.current_position_title || contact.title || null,
-      current_company_name: enrichedData.current_company_name || contact.company_name || contact.company || null,
-      job_start_date: enrichedData.job_start_date || contact.job_start_date || null,
-
-      // History (Apollo-sourced)
-      employment_history: enrichedData.employment_history || contact.employment_history || [],
-      education: enrichedData.education || contact.education || [],
-
-      // Location (Apollo person-level, or Google company-level)
-      city: enrichedData.city || enrichedData.company_city || contact.city || null,
-      state: enrichedData.state || enrichedData.company_state || contact.state || null,
-      country: enrichedData.country || enrichedData.company_country || contact.country || null,
-      time_zone: enrichedData.time_zone || contact.time_zone || null,
-
-      // Metadata
-      headline: enrichedData.headline || contact.headline || null,
-      photo_url: enrichedData.photo_url || contact.photo_url || null,
-      is_likely_decision_maker: enrichedData.is_likely_decision_maker || contact.is_likely_decision_maker || false,
-
-      // Company-level data (Google-sourced)
-      company_phone: enrichedData.company_phone || contact.company_phone || null,
-      company_website: enrichedData.company_website || contact.company_website || null,
-      company_address: enrichedData.company_address || contact.company_address || null,
+      ...patch,
 
       // Lead fields
       lead_status: contact.lead_status || 'saved',
@@ -582,8 +530,8 @@ export const handler = async (event) => {
       last_enriched_at: new Date().toISOString(),
       data_sources: buildDataSources(steps),
 
-      // Enrichment provenance — tracks where each field came from
-      enrichment_provenance: provenance,
+      // enrichment_provenance comes from the patch: every existing entry, plus
+      // the source of each field written here.
       enrichment_steps: steps.map(s => ({
         source: s.source,
         status: s.status,
@@ -595,6 +543,7 @@ export const handler = async (event) => {
       // Rule-based enrichment summary (NO AI)
       enrichment_summary: {
         fields_found: Object.keys(provenance),
+        fields_filled: filled,
         fields_missing: finalMissing,
         confidence,
         total_steps: steps.length,
@@ -637,6 +586,7 @@ export const handler = async (event) => {
       body: JSON.stringify({
         success: true,
         enrichedData: finalEnrichedData,
+        suggestions,
         steps,
         provenance,
         summary: finalEnrichedData.enrichment_summary
@@ -728,13 +678,15 @@ function extractInternalFields(contact) {
     fieldsFound.push('company_name');
   }
 
-  // Check for location from organization data
+  // The organization's location is where the company is, not the person:
+  // kept as the company location, so a person-level location found later wins
+  // and this one is used only as a whole fallback.
   if ((!contact.city && !contact.state) && contact.organization) {
     if (contact.organization.city) {
-      data.city = contact.organization.city;
-      data.state = contact.organization.state || null;
-      data.country = contact.organization.country || null;
-      fieldsFound.push('location');
+      data.company_city = contact.organization.city;
+      data.company_state = contact.organization.state || null;
+      data.company_country = contact.organization.country || null;
+      fieldsFound.push('company_location');
     }
   }
 
@@ -866,14 +818,34 @@ function extractSupplementalFields(person, existingData) {
   return { data, fieldsFound };
 }
 
+// A location is one fact: its parts are taken together from one source, or
+// not at all, so a city from one source never sits beside a state from another.
+const LOCATION_GROUPS = [
+  ['city', 'state', 'country', 'time_zone'],
+  ['company_city', 'company_state', 'company_country', 'company_zip'],
+];
+const hasText = v => typeof v === 'string' && v.trim() !== '';
+
 /**
  * Merge new data into enriched data, respecting precedence.
  * User-entered data is never overwritten.
  */
 function mergeWithPrecedence(enrichedData, newData, originalContact) {
   const merged = { ...enrichedData };
+  const rest = { ...newData };
 
-  for (const [key, value] of Object.entries(newData)) {
+  for (const group of LOCATION_GROUPS) {
+    const offered = group.filter(key => key in rest);
+    if (offered.length === 0) continue;
+    const taken = group.some(key => hasText(originalContact[key]) || hasText(merged[key]));
+    const usable = group.some(key => hasText(rest[key]));
+    if (!taken && usable) {
+      for (const key of group) if (key in rest) merged[key] = rest[key];
+    }
+    for (const key of offered) delete rest[key];
+  }
+
+  for (const [key, value] of Object.entries(rest)) {
     // Never overwrite user-entered data (from original contact)
     const userEntered = originalContact[key];
     if (userEntered && typeof userEntered === 'string' && userEntered.trim() !== '') {

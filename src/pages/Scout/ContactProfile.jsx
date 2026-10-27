@@ -36,6 +36,8 @@ import RelationshipArc from '../../components/contacts/RelationshipArc';
 import KeyMetricsGrid from '../../components/contacts/KeyMetricsGrid';
 import ReferralHub from '../../components/contacts/ReferralHub';
 import LinkedInImportModal from '../../components/contacts/LinkedInImportModal';
+import EnrichSuggestions from '../../components/contacts/EnrichSuggestions';
+import { acceptTitleSuggestion, USER_ACCEPTED } from '../../services/contactSuggestions';
 import ReinforcementsEngagementPanel from '../../components/contacts/ReinforcementsEngagementPanel';
 import { STAGE_MAP } from '../../constants/stageSystem';
 import { getContactReferralAnalytics } from '../../services/referralIntelligenceService';
@@ -141,6 +143,8 @@ export default function ContactProfile({
   const [needsManualLinkedIn, setNeedsManualLinkedIn] = useState(false);
   const [manualLinkedInUrl, setManualLinkedInUrl] = useState('');
   const [enrichmentSummary, setEnrichmentSummary] = useState(null);
+  // Title/company differences Enrich found; offered, never written (contactProtection).
+  const [enrichSuggestions, setEnrichSuggestions] = useState([]);
   const [photoRefreshLoading, setPhotoRefreshLoading] = useState(false);
   const [photoRefreshError, setPhotoRefreshError] = useState(null);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
@@ -394,6 +398,7 @@ export default function ContactProfile({
       setEnriching(true);
       setEnrichError(null);
       setEnrichSuccess(false);
+      setEnrichSuggestions([]);
 
       const user = getEffectiveUser();
       if (!user) throw new Error('Not authenticated');
@@ -461,6 +466,7 @@ export default function ContactProfile({
       // Update local state
       const updatedContact = { ...contact, ...result.enrichedData };
       setContact(updatedContact);
+      setEnrichSuggestions(result.suggestions || []);
 
       // Regenerate Barry context after enrichment (more data = better context)
       console.log('🐻 Regenerating Barry context after enrichment...');
@@ -548,6 +554,7 @@ export default function ContactProfile({
       // Update local state
       const updatedContact = { ...contactWithLinkedIn, ...result.enrichedData };
       setContact(updatedContact);
+      setEnrichSuggestions(result.suggestions || []);
 
       // Regenerate Barry context
       generateBarryContext(updatedContact, user);
@@ -563,6 +570,18 @@ export default function ContactProfile({
       setEnrichError(err.message || 'Failed to enrich contact. Please try again.');
       setEnriching(false);
     }
+  }
+
+  // Taking Enrich's title is the user's choice, recorded as theirs.
+  async function handleAcceptEnrichTitle(suggestion) {
+    const user = getEffectiveUser();
+    if (!user) throw new Error('Not authenticated');
+    const { title } = await acceptTitleSuggestion(user.uid, contact.id, suggestion);
+    setContact(prev => ({
+      ...prev,
+      title,
+      enrichment_provenance: { ...(prev.enrichment_provenance || {}), title: USER_ACCEPTED },
+    }));
   }
 
   async function handleRefreshPhoto() {
@@ -785,6 +804,13 @@ export default function ContactProfile({
             <CheckCircle className="w-5 h-5" />
             <span>Contact enriched successfully.</span>
           </div>
+        )}
+        {enrichSuggestions.length > 0 && (
+          <EnrichSuggestions
+            suggestions={enrichSuggestions}
+            onAcceptTitle={handleAcceptEnrichTitle}
+            onDismiss={() => setEnrichSuggestions([])}
+          />
         )}
         {enrichError && (
           <div className="enrich-error-banner">

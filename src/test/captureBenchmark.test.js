@@ -146,7 +146,7 @@ describe('captureBenchmark: scoring one card', () => {
   });
 
   it('a score holds booleans and counts only', async () => {
-    expect(JSON.stringify(scoreCard(truth(), await fakeExtraction()))).not.toMatch(/Avery|Quinn|example|555|Robotics|Director/);
+    expect(JSON.stringify(scoreCard(truth(), await fakeExtraction()))).not.toMatch(/Avery|Quinn|example|(?<![0-9A-Za-z])555(?![0-9A-Za-z])|4155550\d{3}|Robotics|Director/);
   });
 });
 
@@ -261,7 +261,9 @@ describe('captureBenchmark: a pilot end to end', () => {
     });
     expect(summary.metrics.accuracy.title).toBeCloseTo(2 / 3, 6);
     expect(summary.gate.results.find(r => r.id === 'title').pass).toBe(false);
-    expect(JSON.stringify(summary)).not.toMatch(/Avery|Quinn|avery|example\.com|555|Robotics|Partnerships|card-00/);
+    // 555 only as its own token or the whole sample number: the summary records
+    // the commit, and a hash like 3555426 is not card data.
+    expect(JSON.stringify(summary)).not.toMatch(/Avery|Quinn|avery|example\.com|(?<![0-9A-Za-z])555(?![0-9A-Za-z])|4155550\d{3}|Robotics|Partnerships|card-00/);
 
     const perCard = readFileSync(join(dir, 'runs', runs[0], 'results.jsonl'), 'utf8').trim().split('\n').map(l => JSON.parse(l));
     expect(perCard.map(r => r.photo).sort()).toEqual(['card-001.jpg', 'card-002.jpg', 'card-003.jpg']);

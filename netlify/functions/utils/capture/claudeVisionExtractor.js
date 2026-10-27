@@ -1,7 +1,7 @@
 /**
  * claude-vision: reads a card photo with Claude (vision plus structured
  * outputs). An adapter only: it sends the image, maps Claude's answer to a
- * card-reading/v1 and maps Claude's errors to extractor codes. Everything that
+ * card-reading/v2 and maps Claude's errors to extractor codes. Everything that
  * decides what the reading is worth — validators, safeguards, confidence, the
  * domain — happens after it, in assembleExtraction, as for every extractor.
  *
@@ -30,11 +30,11 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { MODEL_CAPTURE_DEFAULT } from '../models.js';
 import { CaptureExtractorError, EXTRACTOR_ERRORS } from './errors.js';
-import { notPrinted, PHONE_LABELS } from './cardReading.js';
+import { notPrinted, PHONE_LABELS, SOCIAL_READ_PLATFORMS } from './cardReading.js';
 
 export const CLAUDE_VISION_ID = 'claude-vision';
 export const CLAUDE_VISION_ADAPTER_VERSION = '1';
-export const CLAUDE_VISION_PROMPT_VERSION = 'card-claude/v1';
+export const CLAUDE_VISION_PROMPT_VERSION = 'card-claude/v2';
 export const EFFORTS = Object.freeze(['low', 'medium', 'high']);
 export const DEFAULT_EFFORT = 'low';
 export const MAX_TOKENS = 8000;
@@ -44,7 +44,7 @@ export const FALLBACK_BETA = 'server-side-fallback-2026-07-01';
 const SDK_TIMEOUT_MS = 20_000;
 const MAX_ITEMS = 5;
 
-// ─── Prompt (card-claude/v1) ────────────────────────────────────────────────
+// ─── Prompt (card-claude/v2) ────────────────────────────────────────────────
 
 export const SYSTEM_PROMPT = `You read a photo of one side of a business card and report the text printed on it, field by field, in the JSON format you are given.
 
@@ -59,6 +59,7 @@ Fields:
 - person.title: the person's job title as printed.
 - person.emails and person.phones: every one printed, in the order printed.
 - person.linkedinUrl: a LinkedIn profile address for the person, as printed. company.linkedinUrl: a LinkedIn company page address, as printed.
+- person.socials: every other social media handle or profile address printed on the card, such as "@name" or "instagram.com/name", in the order printed. Give platform only when the card itself shows the network: its address names the site, or the network's name, label or icon is printed beside it. Use instagram or facebook for those, other for any other network, and none when the card does not show which network it is. Never decide the network from the handle alone. LinkedIn addresses go only in linkedinUrl.
 - company.name: the organization's name as printed. If it appears only in a logo or graphic, still report it and set onlyInLogo to true.
 - company.website: a website address as printed (never an email address).
 - company.address: the postal address as printed, with its lines joined by ", ".
@@ -102,6 +103,15 @@ export const RESPONSE_SCHEMA = object({
       }),
     },
     linkedinUrl: text('The person\'s LinkedIn profile address as printed.'),
+    socials: {
+      type: 'array',
+      description: 'Every other social handle or profile address printed, in order.',
+      items: object({
+        text: { type: 'string', description: 'The handle or address as printed, without its label.' },
+        confidence: { type: 'number', description: '0 to 1.' },
+        platform: { type: 'string', enum: [...SOCIAL_READ_PLATFORMS.filter(p => p !== 'linkedin'), 'none'], description: 'The network the card shows for it, or none.' },
+      }),
+    },
   }),
   company: object({
     name: object({
@@ -166,10 +176,10 @@ const printedList = list => {
 };
 
 /**
- * Claude's JSON → card-reading/v1. A mapping only: an empty string is "not
- * printed", the phone label "none" is null, at most five emails and phones
- * are kept. Scores pass through untouched; validateCardReading refuses any
- * that are not 0–1. Throws TypeError on a shape that is not the schema.
+ * Claude's JSON → card-reading/v2. A mapping only: an empty string is "not
+ * printed", the phone label and social platform "none" are null, at most
+ * five emails, phones and socials are kept. Scores pass through untouched;
+ * validateCardReading refuses any that are not 0–1. Throws TypeError on a shape that is not the schema.
  */
 export function toReading(output) {
   if (!isRecord(output) || !isRecord(output.person) || !isRecord(output.company)) throw new TypeError('output');
@@ -193,6 +203,13 @@ export function toReading(output) {
         .filter(t => t.raw !== null)
         .slice(0, MAX_ITEMS),
       linkedinUrl: printed(person.linkedinUrl),
+      socials: printedList(person.socials)
+        .map((social) => {
+          const platform = typeof social?.platform === 'string' ? social.platform.toLowerCase() : null;
+          return { ...printed(social), platform: SOCIAL_READ_PLATFORMS.includes(platform) ? platform : null };
+        })
+        .filter(t => t.raw !== null)
+        .slice(0, MAX_ITEMS),
     },
     company: {
       name: { ...name, fromLogo: name.raw !== null && company.name.onlyInLogo === true },
@@ -203,7 +220,7 @@ export function toReading(output) {
   };
   const texts = [
     ...['fullName', 'givenName', 'middleName', 'familyName', 'suffix', 'title', 'linkedinUrl'].map(k => reading.person[k]),
-    ...reading.person.emails, ...reading.person.phones,
+    ...reading.person.emails, ...reading.person.phones, ...reading.person.socials,
     ...['name', 'website', 'address', 'linkedinUrl'].map(k => reading.company[k]),
   ];
   if (output.textFound === false && texts.every(t => t.raw === null)) reading.status = 'no_text';

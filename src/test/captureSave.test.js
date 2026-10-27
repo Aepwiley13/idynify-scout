@@ -470,6 +470,78 @@ describe('companies', () => {
   });
 });
 
+describe('social profiles', () => {
+  const row = (n, text, platform, over = {}) => ({ id: `social-${n}`, platform, text, observed: text, fromCard: true, confirmed: false, unsure: false, ...over });
+  const KRISTIN = { name: 'Kristin Sokol', email: 'kristin@sokolstudio.example', company: 'Sokol Studio', linkedinUrl: '', website: '', title: '', phones: [] };
+
+  it('a new person: each printed handle saved with its source and trust; the network the user chose is theirs', async () => {
+    const d = draft({
+      ...KRISTIN,
+      socials: [
+        row(1, '@KRISTINSOKOL', 'instagram', { confirmed: true }),           // bare on the card; the user chose Instagram
+        row(2, 'facebook.com/sokol.studio', 'facebook'),                    // the card's address named it; left as read
+      ],
+    });
+    const { result } = await lookAndSave(d);
+    expect(result).toMatchObject({ status: 'saved', outcome: 'created' });
+    const [saved] = contacts();
+    expect(saved.social_profiles.map(p => [p.platform, p.handle, p.observed, p.source, p.status])).toEqual([
+      ['instagram', 'kristinsokol', '@KRISTINSOKOL', 'business_card', 'user_confirmed'],
+      ['facebook', 'sokol.studio', 'facebook.com/sokol.studio', 'business_card', 'observed'],
+    ]);
+    expect(saved.social_profiles[0].url).toBe('https://www.instagram.com/kristinsokol');
+    expect(saved.facebook_url ?? null).toBeNull();                        // only read, not confirmed: the older field stays empty
+    expect(saved.linkedin_url ?? null).toBeNull();
+  });
+
+  it('a handle whose network nobody chose is not saved: nothing is written until the user picks one or removes it', async () => {
+    const d = draft({ ...KRISTIN, socials: [row(1, '@KRISTINSOKOL', null)] });
+    const shown = await previewCapturePerson(UID, { operationId: OP, index: 0, draft: d });
+    const result = await saveCapturePerson(UID, { operationId: OP, index: 0, draft: d, shown: shown.person });
+    expect(result).toEqual({ status: 'invalid', reason: 'social_needs_platform' });
+    expect(store.writes).toEqual([]);
+  });
+
+  it('an existing person: profiles added beside theirs, never instead; a profile they have is not added twice; repeating writes nothing', async () => {
+    const own = { platform: 'instagram', handle: 'kristinsokol', url: 'https://www.instagram.com/kristinsokol', observed: '@kristinsokol', source: 'user', status: 'user_confirmed', added_at: '2026-01-01T00:00:00.000Z' };
+    putContact('c_1', {
+      name: 'Kristin Sokol', email: 'kristin@sokolstudio.example', email_normalized: 'kristin@sokolstudio.example',
+      facebook_url: 'https://www.facebook.com/kristin.personal', social_profiles: [own],
+    });
+    const d = draft({
+      ...KRISTIN,
+      socials: [
+        row(1, 'instagram.com/KristinSokol', 'instagram'),                 // theirs already, written differently
+        row(2, '@sokol.studio', 'facebook', { confirmed: true }),          // another Facebook: added beside theirs
+      ],
+    });
+    const { result } = await lookAndSave(d);
+    expect(result).toMatchObject({ status: 'saved', contactId: 'c_1', outcome: 'updated' });
+    const saved = contacts().find(c => c.id === 'c_1');
+    expect(saved.social_profiles[0]).toEqual(own);                         // kept exactly, status and all
+    expect(saved.social_profiles.map(p => [p.platform, p.handle])).toEqual([['instagram', 'kristinsokol'], ['facebook', 'sokol.studio']]);
+    expect(saved.facebook_url).toBe('https://www.facebook.com/kristin.personal');   // never replaced
+
+    const writes = store.writes.length;
+    await lookAndSave(d, { op: OP2 });
+    expect(store.writes.length).toBe(writes);
+  });
+
+  it('never identity: a contact with the same Instagram or Facebook is a different person', async () => {
+    putContact('c_9', {
+      name: 'Studio Front Desk', email: 'hello@other.example', email_normalized: 'hello@other.example',
+      facebook_url: 'https://www.facebook.com/sokol.studio',
+      social_profiles: [{ platform: 'instagram', handle: 'kristinsokol', url: 'https://www.instagram.com/kristinsokol', source: 'user', status: 'user_confirmed' }],
+    });
+    const d = draft({ ...KRISTIN, socials: [row(1, '@KRISTINSOKOL', 'instagram'), row(2, 'facebook.com/sokol.studio', 'facebook')] });
+    const { shown, result } = await lookAndSave(d);
+    expect(shown.person).toEqual({ status: 'new' });
+    expect(result).toMatchObject({ status: 'saved', outcome: 'created' });
+    expect(contacts()).toHaveLength(2);
+    expect(contacts().find(c => c.id === 'c_9').social_profiles).toHaveLength(1);   // untouched
+  });
+});
+
 describe('what a save writes', () => {
   it('only the contact and its company: nothing under capture_operations, no other collection', async () => {
     await lookAndSave(draft());
@@ -495,6 +567,8 @@ describe('it decides nothing on its own', () => {
       '../../services/contactWriteGuard',
       '../../utils/contactPhones',
       '../../utils/identityResolution',
+      '../../utils/socialProfiles',
+      './captureDraft.js',
       'firebase/firestore',
     ]);
     expect(src).not.toMatch(/capture_operations|addDoc|setDoc|deleteDoc|writeBatch/);

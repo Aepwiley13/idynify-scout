@@ -1,5 +1,6 @@
 /**
- * CardReading — card-reading/v1. What every extractor returns.
+ * CardReading — card-reading/v2. What every extractor returns. v2 adds
+ * `person.socials`.
  *
  * Every extractor (a model reading the photo, OCR plus a parser, the test
  * fake) only reports what is printed on the card, verbatim, with its own 0–1
@@ -15,7 +16,8 @@
  *       fullName, givenName, middleName, familyName, suffix, title: Text,
  *       emails: Text[],
  *       phones: Array<Text & { label: 'mobile' | 'office' | 'direct' | 'fax' | null }>,
- *       linkedinUrl: Text
+ *       linkedinUrl: Text,
+ *       socials: Array<Text & { platform: 'instagram' | 'facebook' | 'linkedin' | 'other' | null }>
  *     },
  *     company: {
  *       name: Text & { fromLogo: boolean },   // true when only the logo shows the name
@@ -28,12 +30,18 @@
  *          such as "E:" or "Web:"; score is 0..1. A phone's printed label
  *          ("M:", "Fax") may stay in its raw text and also goes in `label`.
  *
+ * A social's platform is the network the card itself shows for it (its
+ * address, the network's name or icon beside it), 'other' for a network the
+ * app does not support yet, and null when the card does not show one. The
+ * extractor never guesses it from the handle.
+ *
  * A field not printed is { raw: null, score: 0 }. 'no_text' means nothing on
  * the image could be read; every raw is then null.
  */
 
-export const CARD_READING_VERSION = 'card-reading/v1';
+export const CARD_READING_VERSION = 'card-reading/v2';
 export const PHONE_LABELS = Object.freeze(['mobile', 'office', 'direct', 'fax']);
+export const SOCIAL_READ_PLATFORMS = Object.freeze(['instagram', 'facebook', 'linkedin', 'other']);
 
 const PERSON_TEXT = ['fullName', 'givenName', 'middleName', 'familyName', 'suffix', 'title', 'linkedinUrl'];
 const COMPANY_TEXT = ['website', 'address', 'linkedinUrl'];
@@ -53,7 +61,7 @@ export function emptyReading(status = 'no_text') {
     status,
     person: {
       fullName: notPrinted(), givenName: notPrinted(), middleName: notPrinted(), familyName: notPrinted(),
-      suffix: notPrinted(), title: notPrinted(), emails: [], phones: [], linkedinUrl: notPrinted(),
+      suffix: notPrinted(), title: notPrinted(), emails: [], phones: [], linkedinUrl: notPrinted(), socials: [],
     },
     company: { name: { ...notPrinted(), fromLogo: false }, website: notPrinted(), address: notPrinted(), linkedinUrl: notPrinted() },
   };
@@ -66,7 +74,7 @@ function textOk(text, extraKeys = []) {
 }
 
 /**
- * Is this a well-formed card-reading/v1? Returns { ok } or { ok: false, path }
+ * Is this a well-formed card-reading/v2? Returns { ok } or { ok: false, path }
  * naming the first problem by path only (never by value).
  */
 export function validateCardReading(reading) {
@@ -75,7 +83,7 @@ export function validateCardReading(reading) {
   if (!['read', 'no_text'].includes(reading.status)) return bad('status');
 
   const { person, company } = reading;
-  if (!exactKeys(person, [...PERSON_TEXT, 'emails', 'phones'])) return bad('person');
+  if (!exactKeys(person, [...PERSON_TEXT, 'emails', 'phones', 'socials'])) return bad('person');
   for (const key of PERSON_TEXT) if (!textOk(person[key])) return bad(`person.${key}`);
   if (!Array.isArray(person.emails) || person.emails.length > MAX_ITEMS) return bad('person.emails');
   for (let i = 0; i < person.emails.length; i += 1) if (!textOk(person.emails[i])) return bad(`person.emails[${i}]`);
@@ -84,13 +92,18 @@ export function validateCardReading(reading) {
     const phone = person.phones[i];
     if (!textOk(phone, ['label']) || !(phone.label === null || PHONE_LABELS.includes(phone.label))) return bad(`person.phones[${i}]`);
   }
+  if (!Array.isArray(person.socials) || person.socials.length > MAX_ITEMS) return bad('person.socials');
+  for (let i = 0; i < person.socials.length; i += 1) {
+    const social = person.socials[i];
+    if (!textOk(social, ['platform']) || !(social.platform === null || SOCIAL_READ_PLATFORMS.includes(social.platform))) return bad(`person.socials[${i}]`);
+  }
 
   if (!exactKeys(company, ['name', ...COMPANY_TEXT])) return bad('company');
   if (!textOk(company.name, ['fromLogo']) || typeof company.name.fromLogo !== 'boolean') return bad('company.name');
   for (const key of COMPANY_TEXT) if (!textOk(company[key])) return bad(`company.${key}`);
 
   if (reading.status === 'no_text') {
-    const anything = [...PERSON_TEXT.map(k => person[k]), ...person.emails, ...person.phones, company.name, ...COMPANY_TEXT.map(k => company[k])]
+    const anything = [...PERSON_TEXT.map(k => person[k]), ...person.emails, ...person.phones, ...person.socials, company.name, ...COMPANY_TEXT.map(k => company[k])]
       .some(text => text.raw !== null);
     if (anything) return bad('status');
   }

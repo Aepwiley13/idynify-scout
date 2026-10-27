@@ -52,6 +52,7 @@ export function fakeCardReading() {
         { raw: 'T: +1 (415) 555-0100 x12', score: 0.9, label: null },
       ],
       linkedinUrl: { raw: 'linkedin.com/in/avery-quinn-example', score: 0.9 },
+      socials: [],
     },
     company: {
       name: { raw: 'Example Robotics', score: 0.96, fromLogo: false },

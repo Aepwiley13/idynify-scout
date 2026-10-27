@@ -21,6 +21,7 @@ export function extractionRows(extraction) {
     person.phones.forEach((f, i) => add(`Phone ${i + 1}`, f, [f.kind.value ? `${f.kind.value} (${f.kind.extraction.level})` : 'no label', f.extension ? `ext ${f.extension}` : ''].filter(Boolean).join(' · ')));
   } else add('Phone', { value: null, extraction: { level: 'unknown', score: 0, checks: [] } });
   add('LinkedIn', person.linkedinUrl);
+  person.socials.forEach((f, i) => add(`Social ${i + 1}`, f, f.platform.value ? `${f.platform.value} (${f.platform.extraction.level})` : 'network not shown'));
   add('Company', company.name, company.name.source === 'card_logo' ? 'from logo' : '');
   add('Domain', company.domain, company.domain.inferredFrom ? `from ${company.domain.inferredFrom}` : '');
   add('Website', company.website);

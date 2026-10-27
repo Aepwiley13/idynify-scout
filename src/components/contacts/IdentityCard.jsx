@@ -22,6 +22,7 @@ import {
   Mail, Phone, Building2, Pencil,
   Copy, Check, Linkedin, Camera, Link2,
   Loader, ChevronDown, RefreshCw, X, Plus, Tag,
+  Instagram, Facebook,
 } from 'lucide-react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
@@ -43,6 +44,7 @@ import ContactPhones from './ContactPhones';
 import ContactIdentityViewer from './ContactIdentityViewer';
 import { hasRealContactPhoto, resolveContactPhotoSources, contactDisplayName } from '../../utils/contactPhoto';
 import { readContactPhones, primaryPhone, buildPhoneWrite } from '../../utils/contactPhones';
+import { readSocialProfiles, SOCIAL_STATUS } from '../../utils/socialProfiles';
 
 // ─── Color maps for classification chips ─────────────────────────────────────
 
@@ -316,6 +318,49 @@ function FieldChip({ label, value, options, colorMap, onSelect, saving, T }) {
 }
 
 // ─── IdentityCard ─────────────────────────────────────────────────────────────
+
+/** How each platform's row looks on the profile. */
+const SOCIAL_ROW = Object.freeze({
+  linkedin: { Icon: Linkedin, color: '#0077b5', text: () => 'LinkedIn Profile →' },
+  instagram: { Icon: Instagram, color: '#e1306c', text: p => `@${p.handle}` },
+  facebook: { Icon: Facebook, color: '#1877f2', text: p => (p.handle.startsWith('profile.php') ? 'Facebook profile' : p.handle) },
+});
+
+/**
+ * The contact's social profiles (src/utils/socialProfiles.js), one row each.
+ * LinkedIn comes from `linkedin_url`, as before. A handle only read from a
+ * card, not yet confirmed by the user, says so.
+ */
+function SocialProfileRows({ contact, T }) {
+  // LinkedIn shows whenever `linkedin_url` is set, with that address, exactly as before.
+  const linkedin = contact.linkedin_url ? [{ platform: 'linkedin', handle: 'linkedin_url', url: contact.linkedin_url, status: null }] : [];
+  const others = readSocialProfiles(contact).filter(p => p.platform !== 'linkedin');
+  return [...linkedin, ...others].map((profile) => {
+    const row = SOCIAL_ROW[profile.platform];
+    if (!row) return null;
+    const { Icon } = row;
+    const href = profile.url;
+    return (
+      <div className="idc-detail-row" key={`${profile.platform}:${profile.handle}`} data-testid={`social-${profile.platform}`}>
+        <div className="idc-detail-icon" style={{ background: `${row.color}12`, color: row.color }}>
+          <Icon size={13} />
+        </div>
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="idc-detail-val"
+          style={{ color: T.text, flex: 1, minWidth: 0 }}
+        >
+          {row.text(profile)}
+        </a>
+        {profile.status === SOCIAL_STATUS.OBSERVED && (
+          <span style={{ fontSize: 11, color: T.textFaint, flexShrink: 0 }} title="Read from a business card; not confirmed">from card</span>
+        )}
+      </div>
+    );
+  });
+}
 
 export default function IdentityCard({
   contact,
@@ -1204,23 +1249,8 @@ export default function IdentityCard({
           {/* Phones — each with its type: Mobile, Direct, Main, Work… */}
           <ContactPhones contact={contact} onSave={savePhones} T={T} />
 
-          {/* LinkedIn */}
-          {contact.linkedin_url && (
-            <div className="idc-detail-row">
-              <div className="idc-detail-icon" style={{ background: '#0077b512', color: '#0077b5' }}>
-                <Linkedin size={13} />
-              </div>
-              <a
-                href={contact.linkedin_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="idc-detail-val"
-                style={{ color: T.text, flex: 1 }}
-              >
-                LinkedIn Profile →
-              </a>
-            </div>
-          )}
+          {/* LinkedIn, Instagram, Facebook — display only */}
+          <SocialProfileRows contact={contact} T={T} />
         </div>
 
         {photoRefreshError && (

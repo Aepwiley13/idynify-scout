@@ -50,9 +50,9 @@ const levelOf = f => f.extraction.level;
 
 // ─── The reading contract ───────────────────────────────────────────────────
 
-describe('validateCardReading (card-reading/v1)', () => {
+describe('validateCardReading (card-reading/v2)', () => {
   it('pins the version and the phone labels', () => {
-    expect(CARD_READING_VERSION).toBe('card-reading/v1');
+    expect(CARD_READING_VERSION).toBe('card-reading/v2');
     expect(PHONE_LABELS).toEqual(['mobile', 'office', 'direct', 'fax']);
   });
 
@@ -95,7 +95,7 @@ describe('assembleExtraction: the fake card', () => {
   const e = extract(fakeCardReading());
 
   it('is a complete, valid CardExtraction with the provider meta and counts', () => {
-    expect(e.version).toBe('card-extraction/v1');
+    expect(e.version).toBe('card-extraction/v2');
     expect(e.capture).toEqual({
       operationId: OP,
       extractedAt: '2026-10-16T09:00:00.000Z',
@@ -304,6 +304,51 @@ describe('assembleExtraction: validators decide, never repair', () => {
   it('a LinkedIn URL in the wrong section is unknown', () => {
     const e = extract(reading({ person: { fullName: t('Avery Quinn'), linkedinUrl: t('linkedin.com/company/example') } }));
     expect(e.person.linkedinUrl.extraction).toMatchObject({ level: 'unknown', checks: ['linkedin_invalid'] });
+  });
+});
+
+describe('assembleExtraction: social handles', () => {
+  const social = (raw, platform = null, score = 0.97) => ({ ...t(raw, score), platform });
+  const withSocials = socials => extract(reading({ person: { fullName: t('Kristin Sokol'), socials } }));
+
+  it('a bare @handle keeps its printed text and has no platform: the network is never guessed', () => {
+    const [s] = withSocials([social('@KRISTINSOKOL')]).person.socials;
+    expect(s).toMatchObject({ raw: '@KRISTINSOKOL', value: '@KRISTINSOKOL', normalized: 'kristinsokol', source: 'card_text', witness: 'skipped' });
+    expect(s.extraction).toMatchObject({ level: 'likely', checks: ['social_ok'] });
+    expect(s.platform).toMatchObject({ value: null, extraction: { level: 'unknown' } });
+  });
+
+  it('a printed address names its platform for certain', () => {
+    const [s] = withSocials([social('instagram.com/KristinSokol')]).person.socials;
+    expect(s).toMatchObject({ value: 'instagram.com/KristinSokol', normalized: 'kristinsokol' });
+    expect(s.platform).toMatchObject({ value: 'instagram', extraction: { level: 'confirmed' } });
+  });
+
+  it('a platform only the extractor saw beside a handle stops at likely; the address wins over it', () => {
+    const [seen, address] = withSocials([social('@kristinsokol', 'instagram'), social('facebook.com/kristin.sokol', 'instagram')]).person.socials;
+    expect(seen.platform).toMatchObject({ value: 'instagram', extraction: { level: 'likely' } });
+    expect(address.platform).toMatchObject({ value: 'facebook', extraction: { level: 'confirmed' } });
+  });
+
+  it('leaves out LinkedIn (its own field) and networks not supported yet', () => {
+    const e = withSocials([social('linkedin.com/in/kristin'), social('@kristin', 'linkedin'), social('x.com/kristin', 'other'), social('@kristin', 'other')]);
+    expect(e.person.socials).toEqual([]);
+  });
+
+  it('the same handle on the same platform is read once; a different platform is kept', () => {
+    const e = withSocials([social('@KristinSokol', 'instagram'), social('instagram.com/kristinsokol'), social('@kristinsokol', 'facebook')]);
+    expect(e.person.socials.map(s => [s.platform.value, s.normalized])).toEqual([['instagram', 'kristinsokol'], ['facebook', 'kristinsokol']]);
+  });
+
+  it('text that is not a handle is unknown, kept as printed', () => {
+    const [s] = withSocials([social('www.acme.com')]).person.socials;
+    expect(s).toMatchObject({ value: 'www.acme.com', normalized: null, extraction: { level: 'unknown', checks: ['social_invalid'] } });
+  });
+
+  it('a card with only a handle is partial, and counts it', () => {
+    const e = extract(reading({ person: { socials: [social('@kristinsokol', 'instagram')] } }));
+    expect(e.capture.status).toBe('partial');
+    expect(e.capture.counts.fields).toBe(1);
   });
 });
 

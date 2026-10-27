@@ -130,7 +130,7 @@ describe('captureTry: a run', () => {
   it('--json prints the CardExtraction', async () => {
     const lines = [];
     expect(await main([photo(), '--extractor', 'fake', '--json'], { out: l => lines.push(l), env: {} })).toBe(0);
-    expect(JSON.parse(lines.join('\n')).version).toBe('card-extraction/v1');
+    expect(JSON.parse(lines.join('\n')).version).toBe('card-extraction/v2');
   });
 
   it('a failure exits 1 with its code', async () => {

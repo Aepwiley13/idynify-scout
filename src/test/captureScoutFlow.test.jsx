@@ -287,11 +287,11 @@ describe('this step cannot write', () => {
   const read = path => readFileSync(resolve(repo, path), 'utf8');
   const importsOf = src => [...src.matchAll(/(?:from\s+|import\s*\(\s*|^import\s+)['"]([^'"]+)['"]/gm)].map(m => m[1]);
 
-  it('the capture flow files import only the Capture Lab parts, the phone helpers and the profile phone editor', () => {
+  it('the capture flow files import only the Capture Lab parts, the phone and social helpers and the profile phone editor', () => {
     const files = {
       'src/components/capture/CaptureFlow.jsx': ['react', 'lucide-react', './imagePrep.js', './captureLabApi.js', './captureDraft.js', './CaptureReview.jsx', '../../theme/ThemeContext'],
-      'src/components/capture/CaptureReview.jsx': ['lucide-react', '../contacts/ContactPhones', '../contacts/IdentityCard.css', './CaptureReview.css'],
-      'src/components/capture/captureDraft.js': ['../../utils/phoneLabels', '../../utils/contactPhones'],
+      'src/components/capture/CaptureReview.jsx': ['lucide-react', '../contacts/ContactPhones', '../contacts/IdentityCard.css', './CaptureReview.css', './captureDraft.js', '../../utils/socialProfiles'],
+      'src/components/capture/captureDraft.js': ['../../utils/phoneLabels', '../../utils/contactPhones', '../../utils/socialProfiles'],
       'src/components/capture/captureAvailability.js': ['react', '../../context/ImpersonationContext', './captureLabApi.js'],
     };
     for (const [path, allowed] of Object.entries(files)) {

@@ -18,7 +18,7 @@ Turning it on and off is the same switch as the Capture Lab (docs/capture/captur
 |---|---|---|
 | Photo | `prepareCardImage` on the device, with the blur, glare and darkness check (Use anyway / Retake) | Nothing |
 | Read | `captureExtract`, as the signed-in user, one scan (`operationId`) per photo, retried as the same scan only when the endpoint says so | The existing values-free operation record only |
-| Review | A list of people (one per card today). Name, title, company, email, LinkedIn and website are editable. Phones use the profile's phone editor | Nothing |
+| Review | A list of people (one per card today). Name, title, company, email, LinkedIn and website are editable. Phones use the profile's phone editor. Social handles are listed under Social | Nothing |
 | Match | `previewCapturePerson` (`src/components/capture/captureSave.js`): the person through the shared resolver, the company through `resolveCompany` | Nothing |
 | Save | `saveCapturePerson`: the write guard, the company resolver and the user-added contact builder | The contact, and its company when one is linked or created |
 | After | The saved contact's profile (`/contact/:id`) | |
@@ -28,6 +28,14 @@ Turning it on and off is the same switch as the Capture Lab (docs/capture/captur
 The type of each number is what the card printed before it, through the approved table in `src/utils/phoneLabels.js`. For example, `Main` → Main, `Direct`/`D` → Direct, `Mobile`/`M`/`Cell`/`C` → Mobile, `Office`/`O`/`Work`/`W` → Work, `Fax`/`F` → Fax, and `Tel`/`T`/`Phone`/`P`/`Ph` → Type not set.
 
 With no printed word, only the extractor's mobile, direct or fax is kept. Its `office` is Type not set, never a guess. The user can change any type before saving. Capture's extraction is unchanged.
+
+## Social profiles
+
+Instagram and Facebook handles or profile addresses printed on the card are listed under **Social** in review, each with its network. The network is the one the card shows: an address names its site, and the reader may report a name or icon printed beside a handle. A bare handle such as `@KRISTINSOKOL` has no network until the user chooses one; nothing guesses it. Continue and save wait until every row has a network or is removed. LinkedIn keeps its own field.
+
+A row left as the card printed it is saved as `observed`. One whose network the user chose, or that the user typed or edited, is `user_confirmed`. Each is stored in `social_profiles` (`src/utils/socialProfiles.js`) with the printed text, the source and when it was added.
+
+Social profiles never identify a person: two contacts who share a business's Instagram stay two contacts. Nothing looks them up, scrapes them or checks that they exist.
 
 ## Matching
 
@@ -54,6 +62,7 @@ An existing person keeps the company they already have. No company phone number 
 **A new person** goes to `users/{uid}/contacts/<operationId>_p<n>`. The document holds:
 - the reviewed name, title, email, LinkedIn and website, plus `company`, `company_name` and `company_id`;
 - the typed `phones[]` and the single phone fields derived from it (`phone`, `phone_mobile`, `phone_direct`, `phone_work`, `phone_home`);
+- `social_profiles`, and `facebook_url` from a confirmed Facebook profile;
 - `phone_normalized`, from a mobile, direct or home number only;
 - the identity and status fields from the write guard;
 - `source` and `addedFrom` set to `business_card` (distinct from the legacy scanner's "Scanned Business Card"), `identity_sources: ['business_card']`, and `capture_operation_id`.
@@ -61,7 +70,8 @@ An existing person keeps the company they already have. No company phone number 
 **An existing person** is updated additively:
 - identifiers the record lacks are filled in (the shared `mergeIdentifiers`);
 - the title and website are filled in only where empty;
-- numbers the record doesn't already have are added to its phone list.
+- numbers the record doesn't already have are added to its phone list;
+- social profiles it doesn't already have are added beside its own (compared by network and handle, its `facebook_url` included); `facebook_url` is filled from a confirmed one only when empty.
 
 Nothing the record already holds is overwritten.
 

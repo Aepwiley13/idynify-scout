@@ -59,7 +59,7 @@ The server checks `image` again with `checkPreparedImage`: shape and limits, rea
 
 - `image` is `{ mimeType, data, widthPx, heightPx }`: the metadata-stripped JPEG, nothing else (no preflight, no user, no operation).
 - `signal` is an AbortSignal; pass it to the network call. The orchestrator also stops waiting at the deadline whether or not it is honoured.
-- `reading` is a card-reading/v1 (`cardReading.js`): for each field, the printed text (`raw`, or null when not printed) and a 0–1 `score`. Phones also carry a printed `label`, and the company name carries `fromLogo`. There is no place for a level, a check, a source or a company domain. Extra keys make the reading invalid.
+- `reading` is a card-reading/v2 (`cardReading.js`): for each field, the printed text (`raw`, or null when not printed) and a 0–1 `score`. Phones also carry a printed `label`, socials the `platform` the card shows (or null), and the company name carries `fromLogo`. There is no place for a level, a check, a source or a company domain. Extra keys make the reading invalid.
 - `usage` is `{ inputTokens, outputTokens }`, nulls when unknown.
 - `modelId`, when present, names the model that actually served the call (for example a fallback model); it is recorded only if it is a well-formed token.
 - Failures throw `CaptureExtractorError(code, { usage, detail })`, with a code from the table below. `detail` is an optional diagnostic code for logs (`http_529`, `refusal`, `max_tokens`; anything not code-shaped is dropped). Nothing else is carried: no vendor message, body or card text.
@@ -67,7 +67,7 @@ The server checks `image` again with `checkPreparedImage`: shape and limits, rea
 ### Adding an extractor (PR 7)
 
 1. Write `netlify/functions/utils/capture/<name>Extractor.js` exporting a factory `(env) => extractor`. Throw from the factory when it cannot be built, for example when a key is missing (it becomes `config_error`).
-2. Implement `extract()`: send the image, map the vendor's response to a card-reading/v1, and map the vendor's errors to the codes below.
+2. Implement `extract()`: send the image, map the vendor's response to a card-reading/v2, and map the vendor's errors to the codes below.
 3. Set `modelId` and `promptVersion`.
 4. Add one line to `REGISTRY` in `extractors.js`.
 5. Set `CAPTURE_EXTRACTOR=<id>` for the Production context.

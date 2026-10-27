@@ -7,7 +7,7 @@
  * They pin: the request shape (structured outputs, effort, server-side
  * fallback, no SDK retries), that the schema stays inside the documented
  * structured-outputs limits, that a prompt change cannot ship without a new
- * prompt version, the mapping to card-reading/v1, the error mapping, and the
+ * prompt version, the mapping to card-reading/v2, the error mapping, and the
  * whole path through the orchestrator to a CardExtraction. Every card is
  * fictional.
  */
@@ -45,6 +45,7 @@ function cardOutput() {
       emails: [t('avery.quinn@example.com')],
       phones: [{ ...t('+1 (415) 555-0142', 0.95), label: 'mobile' }, { ...t('+1 (415) 555-0100 x12', 0.9), label: 'office' }],
       linkedinUrl: blank(),
+      socials: [],
     },
     company: {
       name: { ...t('Example Robotics', 0.96), onlyInLogo: false },
@@ -210,8 +211,8 @@ describe('claude-vision: the schema and prompt', () => {
     // so every recorded result names exactly the prompt that produced it.
     const fingerprint = createHash('sha256').update(JSON.stringify({ SYSTEM_PROMPT, USER_TEXT, RESPONSE_SCHEMA, MAX_TOKENS })).digest('hex');
     expect({ version: CLAUDE_VISION_PROMPT_VERSION, fingerprint }).toEqual({
-      version: 'card-claude/v1',
-      fingerprint: '7a01922588ccd601b26be7ad893426a389fcda2ad72c740bbd940da3e3f185f2',
+      version: 'card-claude/v2',
+      fingerprint: '2bfecb0d76908c59d15796dae7cdef366cb93e922a39af7cde398785df05f3e0',
     });
   });
 
@@ -226,7 +227,7 @@ describe('claude-vision: the schema and prompt', () => {
 
 // ─── The response ───────────────────────────────────────────────────────────
 
-describe('claude-vision: mapping the answer to card-reading/v1', () => {
+describe('claude-vision: mapping the answer to card-reading/v2', () => {
   it('maps the card: empty means not printed, labels pass through, scores untouched', () => {
     const reading = toReading(cardOutput());
     expect(validateCardReading(reading)).toEqual({ ok: true });
@@ -238,6 +239,35 @@ describe('claude-vision: mapping the answer to card-reading/v1', () => {
       { raw: '+1 (415) 555-0100 x12', score: 0.9, label: 'office' },
     ]);
     expect(reading.company.name).toEqual({ raw: 'Example Robotics', score: 0.96, fromLogo: false });
+  });
+
+  it('maps printed socials: platform none and unknown are null, LinkedIn and other pass through', () => {
+    const out = cardOutput();
+    out.person.socials = [
+      { ...t('@KRISTINSOKOL', 0.9), platform: 'none' },
+      { ...t('instagram.com/kristinsokol'), platform: 'Instagram' },
+      { ...t('@kristin'), platform: 'tiktok' },
+      { ...t(''), platform: 'facebook' },
+      { ...t('x.com/ks'), platform: 'other' },
+    ];
+    const reading = toReading(out);
+    expect(validateCardReading(reading)).toEqual({ ok: true });
+    expect(reading.person.socials).toEqual([
+      { raw: '@KRISTINSOKOL', score: 0.9, platform: null },
+      { raw: 'instagram.com/kristinsokol', score: 0.97, platform: 'instagram' },
+      { raw: '@kristin', score: 0.97, platform: null },
+      { raw: 'x.com/ks', score: 0.97, platform: 'other' },
+    ]);
+  });
+
+  it('a card with only a social handle is a read, not no_text', () => {
+    const out = cardOutput();
+    for (const k of ['fullName', 'givenName', 'familyName', 'title']) out.person[k] = blank();
+    out.person.emails = [];
+    out.person.phones = [];
+    out.person.socials = [{ ...t('@kristinsokol'), platform: 'none' }];
+    out.company = { name: { ...blank(), onlyInLogo: false }, website: blank(), address: blank(), linkedinUrl: blank() };
+    expect(toReading({ ...out, textFound: false }).status).toBe('read');
   });
 
   it('none and unknown labels are null; label case is ignored', () => {
@@ -357,7 +387,7 @@ describe('claude-vision: configuration', () => {
     for (const mode of ['internal', 'beta', 'on']) {
       const ex = resolveExtractor({ ...ENV, CAPTURE_MODE: mode, CAPTURE_EXTRACTOR: 'claude-vision' });
       expect(isExtractor(ex)).toBe(true);
-      expect(ex).toMatchObject({ id: 'claude-vision', adapterVersion: '1', modelId: 'claude-opus-5-5', promptVersion: 'card-claude/v1', billingProvider: 'anthropic' });
+      expect(ex).toMatchObject({ id: 'claude-vision', adapterVersion: '1', modelId: 'claude-opus-5-5', promptVersion: 'card-claude/v2', billingProvider: 'anthropic' });
     }
   });
 
@@ -381,7 +411,7 @@ describe('claude-vision through the orchestrator', () => {
     const result = await run(ex);
     expect(result).toMatchObject({ ok: true, attempts: 1, usage: { inputTokens: 3912, outputTokens: 744 }, modelId: 'claude-opus-5-5' });
     expect(validateCardExtraction(result.extraction)).toEqual({ ok: true, errors: [] });
-    expect(result.extraction.capture.provider).toEqual({ id: 'claude-vision', adapterVersion: '1', modelId: 'claude-opus-5-5', promptVersion: 'card-claude/v1' });
+    expect(result.extraction.capture.provider).toEqual({ id: 'claude-vision', adapterVersion: '1', modelId: 'claude-opus-5-5', promptVersion: 'card-claude/v2' });
     expect(result.extraction.person.emails[0]).toMatchObject({ value: 'avery.quinn@example.com', extraction: { level: 'likely' } });
     expect(result.extraction.company.domain).toMatchObject({ value: 'example.com', inferredFrom: 'website' });
   });

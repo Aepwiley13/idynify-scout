@@ -405,7 +405,7 @@ export async function searchLinkedInPhoto({ linkedinUrl, name }) {
       ? `"${name}" site:linkedin.com/in/${username || ''}`
       : `site:linkedin.com/in/${username || ''}`;
 
-    console.log(`📷 LinkedIn Photo Search: ${searchQuery}`);
+    console.log('📷 LinkedIn photo search');
 
     const url = new URL(GOOGLE_SEARCH_API);
     url.searchParams.append('key', apiKey);
@@ -436,7 +436,7 @@ export async function searchLinkedInPhoto({ linkedinUrl, name }) {
         const photoUrl = extractPhotoFromSearchResult(item);
 
         if (photoUrl) {
-          console.log(`✅ LinkedIn photo found: ${photoUrl}`);
+          console.log('✅ LinkedIn photo found');
           return {
             success: true,
             photoUrl,

@@ -29,7 +29,7 @@ import { resolveCaptureConfig, isEnrolled } from './utils/captureFlags.js';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { APOLLO_ENDPOINTS, getApolloHeaders } from './utils/apolloConstants.js';
 import { searchLinkedInCandidates } from './utils/linkedinSearch.js';
-import { rankLinkedInCandidates } from './utils/capture/linkedinCandidates.js';
+import { rankLinkedInCandidates, readPerson, candidateFromApolloPerson } from './utils/capture/linkedinCandidates.js';
 import { captureLog } from './utils/capture/captureLog.js';
 
 export const OPERATION = 'captureLinkedIn';
@@ -53,8 +53,6 @@ export const STATUS = Object.freeze({
 });
 
 const USER_ID = /^[A-Za-z0-9_-]{1,128}$/;
-const PERSON_FIELDS = Object.freeze(['name', 'company', 'title', 'domain', 'email', 'location']);
-const MAX_FIELD = 300;
 
 function respond(statusCode, payload) {
   return { statusCode, headers: { ...HEADERS }, body: JSON.stringify(payload) };
@@ -66,18 +64,7 @@ function failure(code, { reason, log = {} } = {}) {
   return respond(status, { error: code, ...(reason ? { reason } : {}) });
 }
 
-/** The person to look for: short strings only, and a name. */
-export function readPerson(raw) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const person = {};
-  for (const key of PERSON_FIELDS) {
-    const value = raw[key];
-    if (value === undefined || value === null) { person[key] = null; continue; }
-    if (typeof value !== 'string' || value.length > MAX_FIELD) return null;
-    person[key] = value.replace(/\s+/g, ' ').trim() || null;
-  }
-  return person.name ? person : null;
-}
+export { readPerson };
 
 /** Admins and super admins, through the existing checks. */
 async function isCaptureAdmin(uid) {
@@ -102,23 +89,8 @@ async function apolloProfile(person) {
     const response = await fetch(APOLLO_ENDPOINTS.PEOPLE_MATCH, { method: 'POST', headers: getApolloHeaders(), body: JSON.stringify(body) });
     if (response.status === 404) return { ran: true, failed: false, found: [] };
     if (!response.ok) return { ran: true, failed: true, found: [] };
-    const match = (await response.json())?.person;
-    if (!match?.linkedin_url) return { ran: true, failed: false, found: [] };
-    return {
-      ran: true,
-      failed: false,
-      found: [{
-        source: 'apollo',
-        linkedinUrl: match.linkedin_url,
-        name: match.name || [match.first_name, match.last_name].filter(Boolean).join(' ') || null,
-        headline: match.headline || match.title || null,
-        company: match.organization?.name || match.organization_name || null,
-        companyDomain: match.organization?.primary_domain || null,
-        location: [match.city, match.state].filter(Boolean).join(', ') || match.country || null,
-        photoUrl: match.photo_url || null,
-        text: [match.title, match.headline].filter(Boolean).join(' '),
-      }],
-    };
+    const candidate = candidateFromApolloPerson((await response.json())?.person);
+    return { ran: true, failed: false, found: candidate ? [candidate] : [] };
   } catch {
     return { ran: true, failed: true, found: [] };
   }

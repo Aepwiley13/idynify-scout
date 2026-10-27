@@ -113,6 +113,8 @@ export function enrichmentPatch(contact, found, { provenance = {}, phoneNumbers 
   }
 
   // Phones: only onto a contact with no number at all, as one canonical list.
+  // The provider's raw phone_numbers go with it and only then (Enrich used to
+  // rewrite them on every run).
   if (readContactPhones(contact).length === 0) {
     const phones = phonesFromProvider(phoneNumbers);
     if (phones.length) {
@@ -159,7 +161,7 @@ export function enrichmentPatch(contact, found, { provenance = {}, phoneNumbers 
     if (Object.keys(parts).length) {
       Object.assign(patch, parts);
       if (text(found.time_zone) && isBlank(contact.time_zone)) patch.time_zone = text(found.time_zone);
-      record('location', personal ? (provenance.location ?? 'apollo_match') : 'google_places');
+      record('location', personal ? (provenance.location ?? 'apollo_match') : (provenance.company_location ?? 'google_places'));
     }
   }
 
@@ -173,6 +175,8 @@ export function enrichmentPatch(contact, found, { provenance = {}, phoneNumbers 
     fillText(field, found[field]);
   }
 
+  // An inferred flag: set once, when the contact has none. Enrich used to
+  // rewrite it on every run.
   if (typeof found.is_likely_decision_maker === 'boolean' && contact.is_likely_decision_maker == null) {
     patch.is_likely_decision_maker = found.is_likely_decision_maker;
   }

@@ -37,6 +37,7 @@ import KeyMetricsGrid from '../../components/contacts/KeyMetricsGrid';
 import ReferralHub from '../../components/contacts/ReferralHub';
 import LinkedInImportModal from '../../components/contacts/LinkedInImportModal';
 import EnrichSuggestions from '../../components/contacts/EnrichSuggestions';
+import { acceptTitleSuggestion, USER_ACCEPTED } from '../../services/contactSuggestions';
 import ReinforcementsEngagementPanel from '../../components/contacts/ReinforcementsEngagementPanel';
 import { STAGE_MAP } from '../../constants/stageSystem';
 import { getContactReferralAnalytics } from '../../services/referralIntelligenceService';
@@ -574,15 +575,12 @@ export default function ContactProfile({
   // Taking Enrich's title is the user's choice, recorded as theirs.
   async function handleAcceptEnrichTitle(suggestion) {
     const user = getEffectiveUser();
-    if (!user || suggestion?.field !== 'title' || !suggestion.actionable) return;
-    await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
-      title: suggestion.suggested,
-      'enrichment_provenance.title': 'user_accepted',
-    });
+    if (!user) throw new Error('Not authenticated');
+    const { title } = await acceptTitleSuggestion(user.uid, contact.id, suggestion);
     setContact(prev => ({
       ...prev,
-      title: suggestion.suggested,
-      enrichment_provenance: { ...(prev.enrichment_provenance || {}), title: 'user_accepted' },
+      title,
+      enrichment_provenance: { ...(prev.enrichment_provenance || {}), title: USER_ACCEPTED },
     }));
   }
 

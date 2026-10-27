@@ -168,10 +168,10 @@ vi.mock('../../netlify/functions/utils/linkedinSearch.js', () => ({
 const { handler } = await import('../../netlify/functions/barryEnrich.js');
 const { APOLLO_ENDPOINTS } = await import('../../netlify/functions/utils/apolloConstants.js');
 
-async function enrich(contact) {
+async function enrich(contact, person = APOLLO_PERSON) {
   vi.stubGlobal('fetch', vi.fn(async (url) => {
     if (String(url).startsWith('https://identitytoolkit.googleapis.com')) return { ok: true, json: async () => ({ users: [{ localId: 'u1' }] }) };
-    if (url === APOLLO_ENDPOINTS.PEOPLE_MATCH) return { ok: true, json: async () => ({ person: APOLLO_PERSON }) };
+    if (url === APOLLO_ENDPOINTS.PEOPLE_MATCH) return { ok: true, json: async () => ({ person }) };
     if (url === APOLLO_ENDPOINTS.PEOPLE_SEARCH) return { ok: true, json: async () => ({ people: [] }) };
     throw new Error(`unexpected fetch ${url}`);
   }));
@@ -217,4 +217,51 @@ describe('barryEnrich: what it returns to be written', () => {
     expect(enrichedData.enrichment_summary.fields_filled).toEqual(expect.arrayContaining(['email', 'title', 'company_name', 'phone']));
     expect(suggestions).toEqual([]);
   });
+
+  it('location is one unit: an organization city with no state never meets Apollo\'s state; the person\'s location wins', async () => {
+    const { enrichedData } = await enrich({ id: 'c3', name: 'Jimmy Choi', apollo_person_id: 'apollo-1', organization: { city: 'Provo' } });
+    expect(enrichedData).toMatchObject({ city: 'Denver', state: 'Colorado', country: 'United States' });
+    expect(enrichedData.enrichment_provenance.location).toBe('apollo_match');
+  });
+
+  it('the organization\'s location is used only whole, as the company-level fallback', async () => {
+    const noPlace = { ...APOLLO_PERSON, city: null, state: null, country: null, time_zone: null };
+    const { enrichedData } = await enrich({ id: 'c4', name: 'Jimmy Choi', apollo_person_id: 'apollo-1', organization: { city: 'Provo', state: 'Utah' } }, noPlace);
+    expect(enrichedData).toMatchObject({ city: 'Provo', state: 'Utah' });
+    expect(enrichedData).not.toHaveProperty('country');
+    expect(enrichedData.enrichment_provenance.location).toBe('internal_db');
+  });
 });
+
+// ─── Running Enrich again changes nothing ───────────────────────────────────
+
+describe('barryEnrich: repeated runs are idempotent', () => {
+  // Bookkeeping about the run itself, rewritten every time by design.
+  const RUN_FIELDS = ['lead_status', 'export_ready', 'last_enriched_at', 'data_sources', 'enrichment_steps', 'enrichment_summary', '_raw_apollo_data', 'enrichment_provenance'];
+  const facts = (data) => Object.fromEntries(Object.entries(data).filter(([k]) => !RUN_FIELDS.includes(k)));
+
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+    process.env.APOLLO_API_KEY = 'test-apollo-key';
+    process.env.FIREBASE_API_KEY = 'test-firebase-key';
+    vi.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  it.each([
+    ['a card contact', CARD],
+    ['an empty contact', { id: 'c2', name: 'Jimmy Choi', apollo_person_id: 'apollo-1' }],
+    ['a contact with an organization location', { id: 'c3', name: 'Jimmy Choi', apollo_person_id: 'apollo-1', organization: { city: 'Provo' } }],
+  ])('%s: the second run writes no fact, keeps provenance, and suggests the same', async (_name, start) => {
+    // Written the way ContactProfile writes it: the result spread onto the contact.
+    const first = await enrich(start);
+    const once = { ...start, ...first.enrichedData };
+    const second = await enrich(once);
+    const twice = { ...once, ...second.enrichedData };
+
+    expect(facts(second.enrichedData)).toEqual({});
+    expect(second.enrichedData.enrichment_provenance).toEqual(once.enrichment_provenance);
+    expect(facts(twice)).toEqual(facts(once));
+    expect(second.suggestions).toEqual(first.suggestions);
+  });
+});
+

@@ -479,8 +479,8 @@ export const handler = async (event) => {
         const googleResult = await googleBusinessLookup({
           companyName,
           domain: mergedSoFar.company_domain || null,
-          city: mergedSoFar.city || null,
-          state: mergedSoFar.state || null
+          city: mergedSoFar.city || mergedSoFar.company_city || null,
+          state: mergedSoFar.state || mergedSoFar.company_state || null
         });
 
         step2.status = googleResult.status;
@@ -678,13 +678,15 @@ function extractInternalFields(contact) {
     fieldsFound.push('company_name');
   }
 
-  // Check for location from organization data
+  // The organization's location is where the company is, not the person:
+  // kept as the company location, so a person-level location found later wins
+  // and this one is used only as a whole fallback.
   if ((!contact.city && !contact.state) && contact.organization) {
     if (contact.organization.city) {
-      data.city = contact.organization.city;
-      data.state = contact.organization.state || null;
-      data.country = contact.organization.country || null;
-      fieldsFound.push('location');
+      data.company_city = contact.organization.city;
+      data.company_state = contact.organization.state || null;
+      data.company_country = contact.organization.country || null;
+      fieldsFound.push('company_location');
     }
   }
 
@@ -816,14 +818,34 @@ function extractSupplementalFields(person, existingData) {
   return { data, fieldsFound };
 }
 
+// A location is one fact: its parts are taken together from one source, or
+// not at all, so a city from one source never sits beside a state from another.
+const LOCATION_GROUPS = [
+  ['city', 'state', 'country', 'time_zone'],
+  ['company_city', 'company_state', 'company_country', 'company_zip'],
+];
+const hasText = v => typeof v === 'string' && v.trim() !== '';
+
 /**
  * Merge new data into enriched data, respecting precedence.
  * User-entered data is never overwritten.
  */
 function mergeWithPrecedence(enrichedData, newData, originalContact) {
   const merged = { ...enrichedData };
+  const rest = { ...newData };
 
-  for (const [key, value] of Object.entries(newData)) {
+  for (const group of LOCATION_GROUPS) {
+    const offered = group.filter(key => key in rest);
+    if (offered.length === 0) continue;
+    const taken = group.some(key => hasText(originalContact[key]) || hasText(merged[key]));
+    const usable = group.some(key => hasText(rest[key]));
+    if (!taken && usable) {
+      for (const key of group) if (key in rest) merged[key] = rest[key];
+    }
+    for (const key of offered) delete rest[key];
+  }
+
+  for (const [key, value] of Object.entries(rest)) {
     // Never overwrite user-entered data (from original contact)
     const userEntered = originalContact[key];
     if (userEntered && typeof userEntered === 'string' && userEntered.trim() !== '') {

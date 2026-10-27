@@ -7,12 +7,12 @@
  * message, user id or stored value other than a duration reaches the output.
  */
 import { describe, it, expect } from 'vitest';
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import {
   readLogEntry, parseJsonLines, stats, summarizeLogs, generationTimesFromDashboard, generationTimesFromUser,
-  summarizeGenerations, parseArgs, main,
+  summarizeGenerations, parseArgs, main, FUNCTIONS,
 } from '../../scripts/measureFunctionDurations.mjs';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -169,9 +169,33 @@ describe('end to end', () => {
     expect(PRIVATE.filter(value => json.includes(value))).toEqual([]);
   });
 
+  it('--netlify fetches every listed function\'s logs through the CLI, ten at a time, and keeps them in memory', async () => {
+    const calls = [];
+    const netlify = async args => {
+      calls.push(args);
+      const names = args.filter((_, i) => args[i - 1] === '--function');
+      return names.includes('gmail-sync-worker') ? LOG : 'No logs found for the given time range.\n';
+    };
+    let out = '';
+    expect(await main(['--netlify', '7d'], { netlify, write: s => { out += s; }, readFile: () => { throw new Error('no file reads'); } })).toBe(0);
+    expect(calls.map(args => args.slice(0, 6))).toEqual(Array(3).fill(['logs', '--source', 'functions', '--since', '7d', '--json']));
+    const asked = calls.flatMap(args => args.filter((_, i) => args[i - 1] === '--function'));
+    expect(asked).toEqual([...FUNCTIONS]);
+    expect(calls.every(args => args.filter(a => a === '--function').length <= 10)).toBe(true);
+    expect(out).toMatch(/last 7d of 21 functions/);
+    expect(out).toMatch(/gmail-sync-worker · timed out\s+1\s+after 30 s/);
+    expect(out).not.toMatch(/kristin|u_secret_123|Calling Claude/);
+  });
+
+  it('measures functions that exist', () => {
+    for (const name of FUNCTIONS) expect(existsSync(resolve(repo, `netlify/functions/${name}.js`)), name).toBe(true);
+  });
+
   it('refuses bad arguments, a missing key and an unreadable file without echoing them', async () => {
-    expect(() => parseArgs([])).toThrow(/--logs <file>, --firestore/);
-    expect(() => parseArgs(['--logs'])).toThrow(/needs a file/);
+    expect(() => parseArgs([])).toThrow(/--netlify <since>, --logs <file>, --firestore/);
+    expect(() => parseArgs(['--logs'])).toThrow(/needs a value/);
+    expect(() => parseArgs(['--netlify', 'forever'])).toThrow(/24h or 7d/);
+    expect(parseArgs(['--netlify=24h']).netlify).toBe('24h');
     expect(() => parseArgs(['--apply'])).toThrow(/unknown argument/);
     let err = '';
     expect(await main(['--firestore'], { env: {}, warn: s => { err += s; } })).toBe(1);

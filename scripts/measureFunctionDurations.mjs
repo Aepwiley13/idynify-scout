@@ -7,22 +7,22 @@
  * ║  anywhere, and prints only function names, counts and seconds.           ║
  * ╚══════════════════════════════════════════════════════════════════════════╝
  *
- * SOURCES (either or both)
+ * SOURCES (any combination)
  *
- *   --logs <file>  Netlify function logs saved as JSON Lines by the Netlify CLI:
+ *   --netlify <since>  Fetches the production function logs itself, through the
+ *     Netlify CLI you are logged in with, for every function in FUNCTIONS
+ *     below, over <since> (e.g. 7d, 24h). The log text stays in memory; it is
+ *     never written to disk or printed.
  *
- *       netlify logs --source functions --since 7d --json \
- *         --function gmail-sync-worker --function process-barry-inbox-queue \
- *         --function process-scheduled-engagements --function process-barry-queue \
- *         --function daily-leads-refresh > function-logs.jsonl
+ *   --logs <file>  The same logs, already saved as JSON Lines by
+ *     `netlify logs --source functions --json`. May be given more than once.
  *
- *     A duration is read from three kinds of line:
+ *     In both, a duration is read from three kinds of line:
  *       · the platform's line for each invocation: "Duration: 1234.5 ms"
  *       · the function's own summary: `durationMs: 1234` (the five scheduled
  *         jobs) or "Generation time: 12.34s" (the RECON and ICP generators)
  *       · "Task timed out after 30.03 seconds": a run the platform stopped.
  *         Its number is the limit actually enforced on that function.
- *     May be given more than once.
  *
  *   --firestore    The generation time each RECON section saved with its
  *     result, for all time: dashboards/{uid} → module "recon" → sections[].
@@ -32,29 +32,44 @@
  *     service account with read-only Firestore access (roles/datastore.viewer).
  *     The project comes from the key; nothing is hard-coded.
  *
- * USAGE
- *   node scripts/measureFunctionDurations.mjs --logs function-logs.jsonl
+ * USAGE (from a checkout linked to the site: `netlify link`)
+ *   node scripts/measureFunctionDurations.mjs --netlify 7d
  *   FIREBASE_SERVICE_ACCOUNT_PATH=/path/to/read-only-key.json \
- *     node scripts/measureFunctionDurations.mjs --firestore [--logs <file>] [--json]
+ *     node scripts/measureFunctionDurations.mjs --netlify 7d --firestore [--json]
  *
  * PRIVACY: a log message, a user id and any stored value other than a duration
  * never reach the output.
  *
  * EXIT CODES: 0 completed; 1 did not complete (bad arguments, an unreadable
- * file, credentials, or a Firestore error).
+ * file, the Netlify CLI, credentials, or a Firestore error).
  */
 import { readFileSync } from 'node:fs';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { NetlifyCliError, runNetlify } from './netlifyCli.mjs';
 
 /** Seconds. A run longer than each is counted: the limits #734 has to choose between. */
 export const THRESHOLDS = Object.freeze([10, 26, 30, 60, 300, 900]);
 export const RECON_SECTIONS = Object.freeze([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
+/**
+ * What --netlify measures: the five scheduled functions, the RECON and ICP
+ * generators, and the functions netlify.toml gives 26 s (a setting the build
+ * does not apply).
+ */
+export const FUNCTIONS = Object.freeze([
+  'daily-leads-refresh', 'gmail-sync-worker', 'process-barry-inbox-queue', 'process-barry-queue', 'process-scheduled-engagements',
+  ...RECON_SECTIONS.map(section => `generate-section-${section}`), 'generate-icp-brief', 'generate-all-reports',
+  'adminGetUsers', 'analyze-website', 'barryBulkPersonalize', 'captureExtract',
+]);
+/** The Netlify CLI fetches logs for at most 10 functions per call. */
+const PER_CALL = 10;
+
 const USAGE = `
-Usage:
-  node scripts/measureFunctionDurations.mjs --logs <function-logs.jsonl> [--logs <more.jsonl>] [--json]
-  FIREBASE_SERVICE_ACCOUNT_PATH=<read-only-key.json> node scripts/measureFunctionDurations.mjs --firestore [--json]
+Usage (from a checkout linked to the site with \`netlify link\`):
+  node scripts/measureFunctionDurations.mjs --netlify 7d [--json]
+  FIREBASE_SERVICE_ACCOUNT_PATH=<read-only-key.json> node scripts/measureFunctionDurations.mjs --netlify 7d --firestore [--json]
+  node scripts/measureFunctionDurations.mjs --logs <function-logs.jsonl> [--json]
 `;
 
 class UsageError extends Error {}
@@ -203,7 +218,9 @@ export function formatText(report) {
   const header = `  ${''.padEnd(44)}${COLUMNS.map(c => c.padStart(7)).join('')}`;
   if (report.logs) {
     const { logs } = report;
-    out.push(`Function logs: ${logs.lines} lines${logs.unreadable ? ` (${logs.unreadable} not JSON, skipped)` : ''}, ${logs.from ?? '?'} to ${logs.to ?? '?'}`);
+    const asked = logs.since ? `last ${logs.since} of ${logs.functionsAsked} functions; ` : '';
+    out.push(`Function logs (${asked}${logs.lines} lines${logs.unreadable ? `, ${logs.unreadable} other lines skipped` : ''}): ${logs.from ?? '?'} to ${logs.to ?? '?'}`);
+    out.push('  Functions with no duration line in the window are not listed.');
     out.push(header);
     const names = Object.keys(logs.functions);
     if (names.length === 0) out.push('  (no duration lines found)');
@@ -231,42 +248,65 @@ export function formatText(report) {
 
 // ─── Arguments ───────────────────────────────────────────────────────────────
 
+const SINCE = /^\d+[mhd]$/;
+
 export function parseArgs(argv) {
-  const options = { logs: [], firestore: false, json: false, help: false };
+  const options = { logs: [], netlify: null, firestore: false, json: false, help: false };
+  const valueOf = (arg, i, name) => {
+    const value = arg.includes('=') ? arg.slice(arg.indexOf('=') + 1) : argv[i + 1];
+    if (!value || value.startsWith('--')) throw new UsageError(`${name} needs a value`);
+    return { value, skip: arg.includes('=') ? 0 : 1 };
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--help' || arg === '-h') options.help = true;
     else if (arg === '--json') options.json = true;
     else if (arg === '--firestore') options.firestore = true;
-    else if (arg === '--logs') {
-      const file = argv[i + 1];
-      if (!file || file.startsWith('--')) throw new UsageError('--logs needs a file');
-      options.logs.push(file);
-      i += 1;
-    } else if (arg.startsWith('--logs=')) options.logs.push(arg.slice('--logs='.length));
-    else throw new UsageError(`unknown argument ${arg}`);
+    else if (arg === '--logs' || arg.startsWith('--logs=')) {
+      const { value, skip } = valueOf(arg, i, '--logs');
+      options.logs.push(value);
+      i += skip;
+    } else if (arg === '--netlify' || arg.startsWith('--netlify=')) {
+      const { value, skip } = valueOf(arg, i, '--netlify');
+      if (!SINCE.test(value)) throw new UsageError('--netlify needs a window such as 24h or 7d');
+      options.netlify = value;
+      i += skip;
+    } else throw new UsageError(`unknown argument ${arg}`);
   }
-  if (!options.help && options.logs.length === 0 && !options.firestore) {
-    throw new UsageError('give --logs <file>, --firestore, or both');
+  if (!options.help && options.logs.length === 0 && !options.netlify && !options.firestore) {
+    throw new UsageError('give --netlify <since>, --logs <file>, --firestore, or a combination');
   }
   return options;
 }
 
-function readLogFiles(files, readFile) {
-  let entries = [];
-  let unreadable = 0;
+/** Each `netlify logs` call's JSON Lines, for every function in FUNCTIONS. */
+async function fetchNetlifyLogs(since, netlify) {
+  const texts = [];
+  for (let i = 0; i < FUNCTIONS.length; i += PER_CALL) {
+    const names = FUNCTIONS.slice(i, i + PER_CALL);
+    texts.push(await netlify(['logs', '--source', 'functions', '--since', since, '--json', ...names.flatMap(name => ['--function', name])]));
+  }
+  return texts;
+}
+
+async function readLogs({ files, since }, { readFile, netlify }) {
+  const texts = [];
   for (const file of files) {
-    let text;
     try {
-      text = readFile(file);
+      texts.push(readFile(file));
     } catch {
       throw new UsageError(`could not read the log file ${file}`);
     }
+  }
+  if (since) texts.push(...await fetchNetlifyLogs(since, netlify));
+  let entries = [];
+  let unreadable = 0;
+  for (const text of texts) {
     const parsed = parseJsonLines(text);
     entries = entries.concat(parsed.entries);
     unreadable += parsed.unreadable;
   }
-  return { ...summarizeLogs(entries), unreadable };
+  return { ...summarizeLogs(entries), unreadable, ...(since ? { since, functionsAsked: FUNCTIONS.length } : {}) };
 }
 
 // ═══ FIRESTORE READS — BEGIN ═════════════════════════════════════════════════
@@ -313,7 +353,7 @@ export async function collectGenerations(db) {
  * by tests; otherwise the read-only key and the file system are used.
  */
 export async function main(argv = process.argv.slice(2), {
-  db = null, env = process.env, readFile = file => readFileSync(file, 'utf8'),
+  db = null, env = process.env, readFile = file => readFileSync(file, 'utf8'), netlify = args => runNetlify(args),
   write = s => process.stdout.write(s), warn = s => process.stderr.write(s),
 } = {}) {
   let options;
@@ -329,12 +369,14 @@ export async function main(argv = process.argv.slice(2), {
   }
   try {
     const report = { readOnly: true };
-    if (options.logs.length) report.logs = readLogFiles(options.logs, readFile);
+    if (options.logs.length || options.netlify) report.logs = await readLogs({ files: options.logs, since: options.netlify }, { readFile, netlify });
     if (options.firestore) report.firestore = summarizeGenerations(await collectGenerations(db ?? await connectReadOnly(env)));
     write(options.json ? `${JSON.stringify(report, null, 2)}\n` : formatText(report));
     return 0;
   } catch (error) {
-    const reason = error instanceof UsageError ? error.message : `${error?.code ?? error?.name ?? 'Error'}: ${error?.message ?? ''}`;
+    const reason = error instanceof UsageError || error instanceof NetlifyCliError
+      ? error.message
+      : `${error?.code ?? error?.name ?? 'Error'}: ${error?.message ?? ''}`;
     warn(`function durations did not complete: ${reason}\n`);
     return 1;
   }

@@ -89,3 +89,42 @@ The flow sends no card value to any server log, and none to the browser console.
 - **Existing person.** The update is a single additive write. With the app's offline persistence, a pending update survives a reload and is sent later; applying it late is harmless.
 - **Company.** It is linked or created before the person. A reload between the two leaves the company in place, and the next save of that card finds it and links it.
 - **After a reload.** The scan on screen is gone, so scanning the card again starts a new scan. An exact identifier (email, LinkedIn, a mobile, direct or home number) brings back "Already in IDYNIFY", and saving writes nothing new. A card with only a name and company brings the saved person back as a possible match to confirm.
+
+## Find LinkedIn (after Add Person)
+
+```
+Add Person → "{name} added. Find their LinkedIn and complete the profile?" → Find LinkedIn | Skip
+           → the likely profiles (at most three), each with why it matched
+```
+
+Saving never waits on this. The person is saved first, from the card, and Skip opens their profile. A person who already has a LinkedIn URL goes straight to their profile without being asked.
+
+**`captureLinkedIn`** (read-only) finds the profiles:
+
+```
+POST /.netlify/functions/captureLinkedIn
+Authorization: Bearer <Firebase ID token>
+{ "userId": "<uid>", "person": { "name", "company", "title", "domain", "email", "location" } }
+
+200 { "candidates": [{ "linkedinUrl", "name", "headline", "company", "location", "photoUrl",
+                       "sources": ["apollo", "search"], "strength": "strong", "reasons": ["name", "company"] }] }
+```
+
+- **Who may call it:** the same as `captureExtract`. It is the token's own user only, and only where the capture mode covers them (404 `capture_disabled` otherwise).
+- **What it searches with:** the saved contact's own details. The domain comes from the website, or else a work email; never a free-mail one.
+- **Where it looks.** It uses two existing sources. Either may be missing or fail, and the other still answers; 503 `unavailable` only when every source that ran failed, or none is configured.
+  - **Apollo people match** (`APOLLO_API_KEY`): the name with the email, company and domain, giving at most one person record with a LinkedIn URL.
+  - **Google Custom Search** (`linkedinSearch.searchLinkedInCandidates`, the helper Barry's enrichment uses). The name is paired with the company, then the domain, then the title. The name alone is searched only when the card has nothing else. It runs at most two searches.
+- **Cost per search:** one Apollo match and up to two Google queries.
+- **How profiles are ranked** (`utils/capture/linkedinCandidates.js`):
+
+  | Strength | Evidence |
+  |---|---|
+  | Strong match | the whole name, and the company or its website |
+  | Good match | the whole name, and the title or the location |
+  | Possible match | the whole name only. Offered only when the card gives nothing else; otherwise a profile that matches only the name is someone else with the same name |
+
+  A profile without every part of the name is never offered. Apollo's record and Google's result for the same profile are one candidate, and Apollo's details win.
+- **Logging:** it logs through `captureLog` only (outcome, counts, source names). The usage record holds the same counts and source names. No name, email, company, title or URL is logged or stored.
+
+This step writes nothing. Confirming a profile ("This is Kristin") and completing the contact from it is the next change.

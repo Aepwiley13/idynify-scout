@@ -20,6 +20,8 @@ const viewer = vi.hoisted(() => ({ impersonating: false }));
 const api = vi.hoisted(() => ({ preview: vi.fn(), save: vi.fn() }));
 // The real photo preparation needs a browser canvas: the flow is handed a prepared photo.
 const prep = vi.hoisted(() => ({ image: null }));
+// The contact Find LinkedIn reads after a save.
+const savedContacts = vi.hoisted(() => new Map());
 
 vi.mock('../theme/ThemeContext', () => ({ useT: () => T }));
 vi.mock('../context/ImpersonationContext', () => ({
@@ -28,6 +30,11 @@ vi.mock('../context/ImpersonationContext', () => ({
 vi.mock('../firebase/config', () => ({
   auth: { currentUser: { uid: 'uid_admin_7g5g', getIdToken: async () => 'tok_admin' }, onAuthStateChanged: () => () => {} },
   db: {},
+}));
+vi.mock('firebase/firestore', async (importOriginal) => ({
+  ...(await importOriginal()),
+  doc: (_db, ...path) => ({ path: path.join('/'), id: path[path.length - 1] }),
+  getDoc: async (ref) => ({ id: ref.id, exists: () => savedContacts.has(ref.id), data: () => savedContacts.get(ref.id) }),
 }));
 vi.mock('../services/analytics', () => ({ logEvent: vi.fn(), EVENTS: new Proxy({}, { get: (_, k) => String(k) }) }));
 vi.mock('../components/capture/captureSave.js', () => ({
@@ -222,7 +229,7 @@ function ContactPage() {
   return <div>CONTACT PAGE {id}</div>;
 }
 
-describe('Scout+ → Scan Business Card → photo → review → Add Person → the contact', () => {
+describe('Scout+ → Scan Business Card → photo → review → Add Person → Find LinkedIn → the contact', () => {
   it('opens the saved contact\'s page', async () => {
     const { extraction } = await runExtraction({ extractor: createFakeExtractor({}), image: image(), operationId: OP, startedAt: Date.now() });
     vi.stubGlobal('fetch', async (url) => (url.endsWith('/captureConfig')
@@ -230,7 +237,10 @@ describe('Scout+ → Scan Business Card → photo → review → Add Person → 
       : { status: 200, json: async () => ({ operationId: OP, extraction }) }));
     prep.image = image();
     api.preview.mockResolvedValue(NEW);
-    api.save.mockImplementation(async (_uid, { operationId }) => ({ status: 'saved', contactId: `${operationId}_p1`, companyId: 'co_9', outcome: 'created' }));
+    api.save.mockImplementation(async (_uid, { operationId, draft }) => {
+      savedContacts.set(`${operationId}_p1`, { name: draft.name, company_name: draft.company, linkedin_url: null });
+      return { status: 'saved', contactId: `${operationId}_p1`, companyId: 'co_9', outcome: 'created' };
+    });
 
     const user = userEvent.setup();
     render(
@@ -253,10 +263,47 @@ describe('Scout+ → Scan Business Card → photo → review → Add Person → 
     expect(await screen.findByText(/New person\./)).toBeTruthy();
     await user.click(screen.getByRole('button', { name: /Add Person/ }));
 
+    // Saved, with no LinkedIn: Find LinkedIn is offered, and Skip opens the person.
+    expect(await screen.findByText('Avery Quinn added')).toBeTruthy();
+    expect(screen.getByRole('heading', { level: 2, name: 'Scan Business Card' })).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Skip' }));
+
     // The contact's own page, for the id this scan gave the person.
     expect(await screen.findByText(/^CONTACT PAGE cap_[0-9a-f-]+_p1$/)).toBeTruthy();
     const [, saved] = api.save.mock.calls[0];
     expect(saved.draft).toMatchObject({ name: 'Avery Quinn', company: 'Example Robotics', email: 'avery.quinn@example.com' });
     expect(saved.draft.phones.map(p => p.label)).toEqual(['mobile', 'unknown']);
+  });
+});
+
+describe('after Add Person, someone who already has a LinkedIn', () => {
+  it('goes straight to their profile', async () => {
+    const { extraction } = await runExtraction({ extractor: createFakeExtractor({}), image: image(), operationId: OP, startedAt: Date.now() });
+    vi.stubGlobal('fetch', async (url) => (url.endsWith('/captureConfig')
+      ? { status: 200, json: async () => ({ enabled: true, stage: 'internal' }) }
+      : { status: 200, json: async () => ({ operationId: OP, extraction }) }));
+    prep.image = image();
+    api.preview.mockResolvedValue({ person: { status: 'existing', contactId: 'c_1', name: 'Avery Quinn', company: 'Example Robotics', matchedOn: 'email' }, company: { status: 'existing', companyId: 'co_1', name: 'Example Robotics' } });
+    api.save.mockImplementation(async () => {
+      savedContacts.set('c_1', { name: 'Avery Quinn', linkedin_url: 'https://www.linkedin.com/in/avery-quinn-example' });
+      return { status: 'saved', contactId: 'c_1', companyId: 'co_1', outcome: 'updated' };
+    });
+
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter initialEntries={['/scout?tab=scout-plus']}>
+        <Routes>
+          <Route path="/scout" element={<ScoutPlus />} />
+          <Route path="/contact/:id" element={<ContactPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await user.click(await screen.findByRole('button', { name: /Scan Business Card/ }));
+    fireEvent.change(screen.getByTestId('capture-take-photo'), { target: { files: [new File(['x'], 'IMG_0042.HEIC', { type: 'image/heic' })] } });
+    await screen.findByText(/Check each detail against the card/);
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(await screen.findByRole('button', { name: /Update Avery Quinn/ }));
+    expect(await screen.findByText('CONTACT PAGE c_1')).toBeTruthy();
+    expect(screen.queryByText(/Find their LinkedIn/)).toBeNull();
   });
 });

@@ -128,11 +128,14 @@ describe('no production path uses the capture foundation yet', () => {
 
   // PR 4 adds the rollout switch, the config endpoint and the operation store.
   // PR 6 adds the extraction endpoint and its modules, PR 7 the claude-vision
-  // extractor: no endpoint that previews or saves a card yet. A later PR adds
+  // extractor. Find LinkedIn adds captureLinkedIn and its ranking module: they
+  // read Apollo and Google for profiles to offer, and write nothing. (Saving a
+  // card is the browser's, through the shared write guard.) A later PR adds
   // its files on purpose, in review.
   const APPROVED_CAPTURE_SERVER_FILES = [
     'netlify/functions/captureConfig.js',
     'netlify/functions/captureExtract.js',
+    'netlify/functions/captureLinkedIn.js',
     'netlify/functions/utils/capture/assembleExtraction.js',
     'netlify/functions/utils/capture/captureLog.js',
     'netlify/functions/utils/capture/cardReading.js',
@@ -140,6 +143,7 @@ describe('no production path uses the capture foundation yet', () => {
     'netlify/functions/utils/capture/errors.js',
     'netlify/functions/utils/capture/extractors.js',
     'netlify/functions/utils/capture/fakeExtractor.js',
+    'netlify/functions/utils/capture/linkedinCandidates.js',
     'netlify/functions/utils/capture/orchestrator.js',
     'netlify/functions/utils/captureFlags.js',
     'netlify/functions/utils/captureOperations.js',
@@ -192,7 +196,7 @@ describe('the extraction endpoint (PR 6)', () => {
 
   it('capture server code logs only through captureLog', () => {
     const direct = server
-      .filter(([path]) => path.startsWith(CAPTURE_DIR) || path === 'netlify/functions/captureExtract.js')
+      .filter(([path]) => path.startsWith(CAPTURE_DIR) || ['netlify/functions/captureExtract.js', 'netlify/functions/captureLinkedIn.js'].includes(path))
       .filter(([path]) => path !== `${CAPTURE_DIR}captureLog.js`)
       .filter(([, text]) => /\bconsole\s*\./.test(text))
       .map(([path]) => path);

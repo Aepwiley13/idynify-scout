@@ -798,6 +798,17 @@
   background: rgba(0, 0, 0, 0.05) !important;
 }
 
+/* A phone number is read whole. On a narrow row its type badge moves above it
+   rather than the number breaking inside "801-555-0199": the number asks for
+   about 8.5em before the row wraps, then takes the rest of its line. */
+.idc-phone-entry {
+  flex-wrap: wrap;
+}
+
+.idc-field-entry.idc-phone-entry .idc-entry-val {
+  flex: 1 1 8.5em;
+}
+
 /* Entry value */
 .idc-entry-val {
   flex: 1;

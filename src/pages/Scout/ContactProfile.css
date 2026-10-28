@@ -2044,3 +2044,18 @@
     padding: 14px 56px;
   }
 }
+
+/* ========================================
+   PHONES - form fields at 16px
+   iOS Safari zooms in on any field under 16px when it is tapped, and keeps
+   the zoom after leaving it, so the page then slides sideways. Every field
+   on the profile (inline email, phone and website entries, title, tags,
+   photo link) is 16px on a phone.
+   ======================================== */
+@media (max-width: 640px) {
+  .contact-profile-page input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  .contact-profile-page select,
+  .contact-profile-page textarea {
+    font-size: 16px;
+  }
+}

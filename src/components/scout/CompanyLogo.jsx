@@ -27,6 +27,9 @@ export default function CompanyLogo({ company, size = 'default', className = '' 
     default: 'w-16 h-16 text-base',
     large: 'w-20 h-20 text-xl',
     card: 'w-[88px] h-[88px] text-2xl flex-shrink-0',
+    // The phone discovery card's large logo, and its short-screen size.
+    hero: 'w-[140px] h-[140px] text-6xl flex-shrink-0',
+    heroCompact: 'w-[92px] h-[92px] text-4xl flex-shrink-0',
   };
 
   const iconSizes = {
@@ -34,6 +37,8 @@ export default function CompanyLogo({ company, size = 'default', className = '' 
     default: 'w-8 h-8',
     large: 'w-10 h-10',
     card: 'w-10 h-10',
+    hero: 'w-16 h-16',
+    heroCompact: 'w-12 h-12',
   };
 
   // Extract company initial for fallback (single letter - matches Manual Search)

@@ -23,7 +23,12 @@
  *
  * The one thing the stage may set is a min-height — a measured floor, so the
  * deck does not resize under the queue on every swipe. A floor cannot clip and
- * cannot scroll: a card taller than it still sets its own height.
+ * cannot scroll: a card taller than it still sets its own height. *
+ * Phones are the exception, on purpose: below 1024px the page passes `fit`,
+ * the stage takes the column's remaining height and the card fills it — a
+ * card that never scrolls, with everything deeper in a Details sheet.
+ * dailyDiscoveryPhoneCard.test.jsx holds those rules; the card tests below
+ * render without `fit`, as the page does at 1024px and up.
  */
 
 import { render } from '@testing-library/react';
@@ -94,7 +99,7 @@ const SCROLLING = ['auto', 'scroll', 'overlay'];
 
 describe('Daily Discovery card — content decides its height', () => {
   for (const wide of [true, false]) {
-    const at = wide ? 'desktop' : 'mobile';
+    const at = wide ? 'desktop' : 'narrow, no fit';
 
     it(`[${at}] the company card carries no height of its own`, () => {
       const { container } = render(
@@ -167,7 +172,7 @@ describe('Daily Discovery card — the stats grid stays inside the card', () => 
   );
 
   for (const wide of [true, false]) {
-    const at = wide ? 'desktop' : 'mobile';
+    const at = wide ? 'desktop' : 'narrow, no fit';
 
     it(`[${at}] the grid splits the card in two equal columns`, () => {
       const { grid, cells } = statCells(renderLong(wide).container);
@@ -230,11 +235,27 @@ describe('Daily Discovery card — the stage constrains nothing, and floors only
     expect(stages).toHaveLength(2);
   });
 
-  it('no stage sets a height, a max-height or an overflow', () => {
+  // The one overflow a stage may carry: on a phone it clips the card's
+  // sideways movement with `clip`, which, unlike `hidden`, makes no scroll box.
+  const CLIP_ON_PHONE = "overflowX: isDesktop ? undefined : 'clip'";
+
+  it('no stage sets a height, a max-height or a scrolling overflow', () => {
     for (const stage of stages) {
       expect(stage, 'stage pins a height').not.toMatch(/[^a-zA-Z]height:/);
       expect(stage, 'stage caps its height').not.toMatch(/maxHeight/);
-      expect(stage, 'stage clips or scrolls').not.toMatch(/overflow/i);
+      expect(stage.replace(CLIP_ON_PHONE, ''), 'stage clips or scrolls').not.toMatch(/overflow/i);
+    }
+  });
+
+  it('on a phone each stage owns the card\'s sideways movement: clipped on x with `clip`, never `hidden`; desktop unchanged', () => {
+    // A drag moves the card with translateX and a decision flies it 700px off.
+    // A transform still counts as scrollable width, so an unclipped stage
+    // widened the column that scrolls the page on every swipe (measured: 375
+    // to 478 dragging, to 948 flying out), and Safari let the finger pan and
+    // bounce that column sideways.
+    for (const stage of stages) {
+      expect(stage, 'stage does not clip the card on a phone').toContain(CLIP_ON_PHONE);
+      expect(stage, '`hidden` makes the stage a scroll box again').not.toMatch(/'hidden'/);
     }
   });
 
@@ -244,6 +265,8 @@ describe('Daily Discovery card — the stage constrains nothing, and floors only
     // still sets its own height — but an explicit min-height replaces a flex
     // item's automatic minimum size, so `flexShrink: 0` has to travel with it
     // or the column squeezes a tall card back down onto what follows.
+    // On a phone the floor is 0 and PHONE_STAGE, spread after it, makes the
+    // stage fill the column instead (see dailyDiscoveryPhoneCard.test.jsx).
     for (const [stage, floor] of stages.map((s, i) => [s, ['COMPANY_STAGE_MIN_H', 'PERSON_STAGE_MIN_H'][i]])) {
       expect(stage, `${floor} is missing`).toMatch(new RegExp(`minHeight: ${floor}`));
       expect(stage, `${floor} without flexShrink: 0`).toMatch(/flexShrink: 0/);

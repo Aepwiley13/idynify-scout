@@ -80,11 +80,16 @@ describe('Daily Discoveries chrome — the reclaimed space stays reclaimed', () 
       .toMatch(/maxWidth: isDesktop \? CARD_MAX_W \+ 20 : 440/);
   });
 
-  it('the stage floors are re-measured medians, not guesses', () => {
+  it('the desktop stage floors are re-measured medians, not guesses; a phone has none', () => {
     // A wider card is a shorter card: the desktop company median moved
-    // 583.9 -> 563.9 when the card went to CARD_MAX_W. Person cards and every
-    // mobile card keep their width, so their floors did not move.
-    expect(src).toMatch(/const COMPANY_STAGE_MIN_H = isDesktop \? 564 : 522;/);
-    expect(src).toMatch(/const PERSON_STAGE_MIN_H = isDesktop \? 512 : 456;/);
+    // 583.9 -> 563.9 when the card went to CARD_MAX_W. Person cards keep their
+    // width, so their floor did not move.
+    //
+    // Below 1024px the floors were 522 and 456, the median card heights. A
+    // phone's card now fills the column between the tabs and the bottom nav
+    // instead of being content-sized (dailyDiscoveryPhoneCard.test.jsx), so
+    // there is nothing for a floor to hold.
+    expect(src).toMatch(/const COMPANY_STAGE_MIN_H = isDesktop \? 564 : 0;/);
+    expect(src).toMatch(/const PERSON_STAGE_MIN_H = isDesktop \? 512 : 0;/);
   });
 });

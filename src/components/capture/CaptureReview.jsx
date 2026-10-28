@@ -117,7 +117,7 @@ function SocialRows({ draft, onChange, inputStyle, T }) {
 function PersonDraft({ draft, index, count, onChange, T }) {
   const set = (key, value) => onChange({ ...draft, [key]: value, toCheck: draft.toCheck.filter(k => k !== key) });
   const inputStyle = {
-    width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, fontSize: 15,
+    width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, fontSize: 16,
     border: `1px solid ${T.border}`, background: T.input ?? T.cardBg, color: T.text,
   };
 

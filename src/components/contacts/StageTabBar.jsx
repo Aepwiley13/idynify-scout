@@ -20,14 +20,20 @@ export default function StageTabBar({ contact, previewStage, onPreviewChange }) 
   // Which tab is visually "selected" — preview wins if set, otherwise active stage
   const selectedTab = previewStage || activeStage;
 
+  // On a phone the five labels are wider than the screen ("Reinforcements"
+  // alone is ~100px). The row scrolls sideways on its own instead of pushing
+  // the whole page wider; on wider screens the tabs still share the row.
   return (
-    <div style={{
+    <div data-testid="stage-tab-bar" style={{
       display: 'flex',
       gap: 4,
       padding: '4px',
       background: T.surface,
       border: `1px solid ${T.border}`,
       borderRadius: 12,
+      minWidth: 0,
+      overflowX: 'auto',
+      scrollbarWidth: 'none',
     }}>
       {PIPELINE_STAGES.map((stageId, idx) => {
         const stage = STAGE_MAP[stageId];
@@ -50,7 +56,8 @@ export default function StageTabBar({ contact, previewStage, onPreviewChange }) 
             }}
             title={isPreviewing ? `Preview mode — click "Generate" to get Barry's take` : stage.description}
             style={{
-              flex: 1,
+              flex: '1 0 auto',
+              whiteSpace: 'nowrap',
               padding: '8px 6px',
               minHeight: 44,
               borderRadius: 9,

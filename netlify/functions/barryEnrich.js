@@ -31,6 +31,21 @@
  * confirm through Find LinkedIn's confirm (the duplicate check, then the
  * exact lookup).
  *
+ * WHERE THE RESULT IS WRITTEN (#738)
+ * ─────────────────────────────────
+ * With `save: true` and a `contactId` (the contact profile), the result is
+ * written here, in one Firestore transaction on the contact as it is stored
+ * NOW: users/{uid}/contacts/{contactId}, with uid from the verified token.
+ * What may be written is decided inside that transaction, against that
+ * latest copy, so a field the contact gained after the browser loaded it
+ * (another tab, device or teammate) is never overwritten, and provenance is
+ * added entry by entry, so an entry written meanwhile survives. If the
+ * contact changes while the transaction runs, Firestore retries it and the
+ * decision is made again on the new state.
+ *
+ * Without `save` (Relationship First Value), nothing is written: the answer
+ * is computed against the contact the request sent, for display only.
+ *
  * Logs carry step names, statuses and counts: never a name, email, phone,
  * company, title or URL.
  */
@@ -57,9 +72,13 @@ export const handler = async (event) => {
   }
 
   try {
-    const { userId, authToken, contact, person: requestedPerson } = JSON.parse(event.body);
+    const { userId, authToken, contact, person: requestedPerson, contactId, save } = JSON.parse(event.body);
 
     if (!userId || !authToken || !contact) {
+      throw new Error('Missing required parameters');
+    }
+    // A saved run names one contact document; never a path.
+    if (save && (typeof contactId !== 'string' || !/^[A-Za-z0-9_-]{1,200}$/.test(contactId))) {
       throw new Error('Missing required parameters');
     }
 
@@ -463,69 +482,94 @@ export const handler = async (event) => {
 
     const phoneNumbers = apolloRawData?.phone_numbers || [];
 
-    // Compute final missing fields + confidence (rule-based)
-    const finalMissing = assessMissingData({ ...contact, ...enrichedData });
-    const totalFieldsFound = steps.reduce((acc, s) => acc + (s.fieldsFound?.length || 0), 0);
-    const confidence = computeConfidence(totalFieldsFound, finalMissing.length);
+    // What may be written, decided against `base`: the contact as stored at
+    // the moment of the write when saving (inside the transaction below), or
+    // the contact the request sent when only showing the result.
+    const decide = (base) => {
+      // Compute final missing fields + confidence (rule-based)
+      const finalMissing = assessMissingData({ ...base, ...enrichedData });
+      const totalFieldsFound = steps.reduce((acc, s) => acc + (s.fieldsFound?.length || 0), 0);
+      const confidence = computeConfidence(totalFieldsFound, finalMissing.length);
 
-    // What may be written onto the contact: its own values win, enrichment
-    // fills empty fields, and a different title or company is a suggestion
-    // (src/utils/contactProtection.js, the rules #732 set for LinkedIn).
-    const { patch, filled, suggestions } = enrichmentPatch(contact, enrichedData, {
-      provenance,
-      phoneNumbers,
-      person: apolloRawData,
-    });
+      // What may be written onto the contact: its own values win, enrichment
+      // fills empty fields, and a different title or company is a suggestion
+      // (src/utils/contactProtection.js, the rules #732 set for LinkedIn).
+      const { patch, filled, suggestions } = enrichmentPatch(base, enrichedData, {
+        provenance,
+        phoneNumbers,
+        person: apolloRawData,
+      });
 
-    const finalEnrichedData = {
-      ...patch,
+      const finalEnrichedData = {
+        ...patch,
 
-      // Lead fields
-      lead_status: contact.lead_status || 'saved',
-      export_ready: true,
-      last_enriched_at: new Date().toISOString(),
-      data_sources: buildDataSources(steps),
+        // Lead fields
+        lead_status: base.lead_status || 'saved',
+        export_ready: true,
+        last_enriched_at: new Date().toISOString(),
+        data_sources: buildDataSources(steps),
 
-      // enrichment_provenance comes from the patch: every existing entry, plus
-      // the source of each field written here.
-      enrichment_steps: steps.map(s => ({
-        source: s.source,
-        status: s.status,
-        fieldsFound: s.fieldsFound || [],
-        timestamp: s.timestamp,
-        message: s.message || null
-      })),
+        // enrichment_provenance comes from the patch: every existing entry, plus
+        // the source of each field written here.
+        enrichment_steps: steps.map(s => ({
+          source: s.source,
+          status: s.status,
+          fieldsFound: s.fieldsFound || [],
+          timestamp: s.timestamp,
+          message: s.message || null
+        })),
 
-      // Rule-based enrichment summary (NO AI)
-      enrichment_summary: {
-        fields_found: Object.keys(provenance),
-        fields_filled: filled,
-        fields_missing: finalMissing,
-        confidence,
-        total_steps: steps.length,
-        sources_used: [...new Set(Object.values(provenance))],
-        // No LinkedIn and none found: the profile offers a pasted link instead
-        needs_manual_linkedin: !contact.linkedin_url && linkedinCandidates.length === 0,
-        // Enrichment quality assessment
-        enrichment_quality: Object.keys(provenance).length >= 5 ? 'complete' :
-                           Object.keys(provenance).length >= 2 ? 'partial' : 'minimal'
-      },
+        // Rule-based enrichment summary (NO AI)
+        enrichment_summary: {
+          fields_found: Object.keys(provenance),
+          fields_filled: filled,
+          fields_missing: finalMissing,
+          confidence,
+          total_steps: steps.length,
+          sources_used: [...new Set(Object.values(provenance))],
+          // No LinkedIn and none found: the profile offers a pasted link instead
+          needs_manual_linkedin: !base.linkedin_url && linkedinCandidates.length === 0,
+          // Enrichment quality assessment
+          enrichment_quality: Object.keys(provenance).length >= 5 ? 'complete' :
+                             Object.keys(provenance).length >= 2 ? 'partial' : 'minimal'
+        },
 
-      // Raw data for debugging
-      _raw_apollo_data: apolloRawData ? {
-        person_id: apolloRawData.id,
-        enriched_at: new Date().toISOString(),
-        total_phone_numbers: phoneNumbers.length
-      } : contact._raw_apollo_data || null
+        // Raw data for debugging
+        _raw_apollo_data: apolloRawData ? {
+          person_id: apolloRawData.id,
+          enriched_at: new Date().toISOString(),
+          total_phone_numbers: phoneNumbers.length
+        } : base._raw_apollo_data || null
+      };
+
+      // A company filled where the contact had none: the browser links it
+      // through the shared company resolver, with the matched organization.
+      const company = filled.includes('company_name') ? {
+        name: patch.company_name,
+        apollo_organization_id: apolloRawData?.organization_id || apolloRawData?.organization?.id || null,
+        domain: apolloRawData?.organization?.primary_domain || null,
+      } : null;
+      return { finalEnrichedData, company, suggestions, confidence };
     };
 
-    // A company filled where the contact had none: the browser links it
-    // through the shared company resolver, with the matched organization.
-    const company = filled.includes('company_name') ? {
-      name: patch.company_name,
-      apollo_organization_id: apolloRawData?.organization_id || apolloRawData?.organization?.id || null,
-      domain: apolloRawData?.organization?.primary_domain || null,
-    } : null;
+    let decided;
+    if (save) {
+      // uid is the verified token's (checked against userId above); the
+      // contact is addressed by id alone.
+      const { db } = await import('./firebase-admin.js');
+      const ref = db.doc(`users/${userId}/contacts/${contactId}`);
+      decided = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) throw new Error('Contact not found');
+        const latest = { id: snap.id, ...snap.data() };
+        const result = decide(latest);
+        tx.update(ref, firestoreUpdate(result.finalEnrichedData, latest));
+        return result;
+      });
+    } else {
+      decided = decide(contact);
+    }
+    const { finalEnrichedData, company, suggestions, confidence } = decided;
 
     // Log API usage
     const responseTime = Date.now() - startTime;
@@ -593,6 +637,21 @@ export const handler = async (event) => {
 // ═══════════════════════════════════════════════════
 // HELPER FUNCTIONS — all deterministic, no AI
 // ═══════════════════════════════════════════════════
+
+/**
+ * The Firestore update for a saved run: every written field, with
+ * provenance set entry by entry (`enrichment_provenance.<field>`) rather than
+ * as a whole map, so an entry written meanwhile is never dropped.
+ */
+function firestoreUpdate(finalEnrichedData, latest) {
+  const { enrichment_provenance: provenance = {}, ...fields } = finalEnrichedData;
+  const update = Object.fromEntries(Object.entries(fields).filter(([, v]) => v !== undefined));
+  const before = latest.enrichment_provenance ?? {};
+  for (const [field, source] of Object.entries(provenance)) {
+    if (source !== undefined && before[field] !== source) update[`enrichment_provenance.${field}`] = source;
+  }
+  return update;
+}
 
 /**
  * Assess which key fields are missing from a contact.

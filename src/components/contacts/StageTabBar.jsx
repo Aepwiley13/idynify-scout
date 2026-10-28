@@ -20,11 +20,11 @@ export default function StageTabBar({ contact, previewStage, onPreviewChange }) 
   // Which tab is visually "selected" — preview wins if set, otherwise active stage
   const selectedTab = previewStage || activeStage;
 
-  // On a phone the five labels are wider than the screen ("Reinforcements"
-  // alone is ~100px). The row scrolls sideways on its own instead of pushing
-  // the whole page wider; on wider screens the tabs still share the row.
   return (
-    <div data-testid="stage-tab-bar" style={{
+    // On a narrow screen the five stages can be wider than the page: the row
+    // scrolls on its own rather than widening the page (.page-content scrolls
+    // sideways when anything inside it is wider).
+    <div style={{
       display: 'flex',
       gap: 4,
       padding: '4px',
@@ -56,7 +56,8 @@ export default function StageTabBar({ contact, previewStage, onPreviewChange }) 
             }}
             title={isPreviewing ? `Preview mode — click "Generate" to get Barry's take` : stage.description}
             style={{
-              flex: '1 0 auto',
+              flex: 1,
+              minWidth: 'max-content',
               whiteSpace: 'nowrap',
               padding: '8px 6px',
               minHeight: 44,

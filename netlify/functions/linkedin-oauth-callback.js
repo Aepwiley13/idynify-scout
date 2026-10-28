@@ -16,6 +16,7 @@ import {
   getLinkedInConfig, consumeOAuthState, resolveLinkedInIdentity, saveLinkedInIntegration,
   readBindingCookie, clearBindingCookie, LinkedInOAuthError, OUTCOMES, RETURN_PATH,
 } from './utils/linkedinOAuth.js';
+import { withLambda } from '@netlify/aws-lambda-compat';
 
 function backToSettings(outcome) {
   return {
@@ -29,7 +30,7 @@ function backToSettings(outcome) {
   };
 }
 
-export const handler = async (event) => {
+const handler = async (event) => {
   if (event.httpMethod !== 'GET') return backToSettings(OUTCOMES.ERROR);
 
   const params = event.queryStringParameters || {};
@@ -72,3 +73,9 @@ export const handler = async (event) => {
     return backToSettings(outcome);
   }
 };
+
+// PHASE 0 SPIKE (#734) — do not merge. Runs this Lambda-style handler on
+// Netlify's modern runtime. An export *named* `handler` makes Netlify treat
+// the file as Lambda-mode, so the tests import it as `lambdaHandler`.
+export { handler as lambdaHandler };
+export default withLambda(handler);

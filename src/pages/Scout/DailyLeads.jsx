@@ -3012,8 +3012,18 @@ export default function DailyLeads({ onNavigate }) {
                       used to live here; because a box cannot clip one axis and
                       leave the other visible, the browser resolved overflow-y to
                       `auto` and the card scrolled inside the stage. The stage
-                      now takes its height from the card, never the reverse. */}
-                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, minHeight: COMPANY_STAGE_MIN_H, flexShrink: 0 }}>
+                      now takes its height from the card, never the reverse.
+
+                      On a phone the stage owns the card's sideways movement:
+                      a drag moves the card with translateX and a decision
+                      flies it 700px off, and a transform still counts as
+                      scrollable width. Unclipped, every swipe widened the
+                      column that scrolls this page, which Safari then let the
+                      finger pan and bounce sideways. `clip` cuts the overflow
+                      on x only and, unlike `hidden`, makes no scroll box, so
+                      the card still sets the stage's height (see above). A
+                      browser without `clip` ignores it and behaves as before. */}
+                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, minHeight: COMPANY_STAGE_MIN_H, flexShrink: 0, overflowX: isDesktop ? undefined : 'clip' }}>
                     {visibleCompanies.length > 1 && renderGhostCards(visibleCompanies.length - 1)}
                     {currentCompany && (
                       <CompanySwipeCard
@@ -3101,7 +3111,8 @@ export default function DailyLeads({ onNavigate }) {
                 </div>
               ) : (
                 <>
-                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, minHeight: PERSON_STAGE_MIN_H, flexShrink: 0 }}>
+                  {/* Clipped on x on a phone, as the company stage above, for the same reason. */}
+                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, minHeight: PERSON_STAGE_MIN_H, flexShrink: 0, overflowX: isDesktop ? undefined : 'clip' }}>
                     {peopleQueue.slice(currentPersonIdx + 1, currentPersonIdx + 3).map((_, i) => (
                       <div key={i} style={{ position: 'absolute', top: (i + 1) * 8, left: (i + 1) * 8, right: (i + 1) * 8, bottom: -(i + 1) * 8, background: T.cardBg, border: `1px solid ${T.border}`, borderRadius: 22, opacity: 0.15 + (i === 0 ? 0.15 : 0), pointerEvents: 'none' }} />
                     ))}

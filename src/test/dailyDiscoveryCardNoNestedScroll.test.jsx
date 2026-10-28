@@ -230,11 +230,27 @@ describe('Daily Discovery card — the stage constrains nothing, and floors only
     expect(stages).toHaveLength(2);
   });
 
-  it('no stage sets a height, a max-height or an overflow', () => {
+  // The one overflow a stage may carry: on a phone it clips the card's
+  // sideways movement with `clip`, which, unlike `hidden`, makes no scroll box.
+  const CLIP_ON_PHONE = "overflowX: isDesktop ? undefined : 'clip'";
+
+  it('no stage sets a height, a max-height or a scrolling overflow', () => {
     for (const stage of stages) {
       expect(stage, 'stage pins a height').not.toMatch(/[^a-zA-Z]height:/);
       expect(stage, 'stage caps its height').not.toMatch(/maxHeight/);
-      expect(stage, 'stage clips or scrolls').not.toMatch(/overflow/i);
+      expect(stage.replace(CLIP_ON_PHONE, ''), 'stage clips or scrolls').not.toMatch(/overflow/i);
+    }
+  });
+
+  it('on a phone each stage owns the card\'s sideways movement: clipped on x with `clip`, never `hidden`; desktop unchanged', () => {
+    // A drag moves the card with translateX and a decision flies it 700px off.
+    // A transform still counts as scrollable width, so an unclipped stage
+    // widened the column that scrolls the page on every swipe (measured: 375
+    // to 478 dragging, to 948 flying out), and Safari let the finger pan and
+    // bounce that column sideways.
+    for (const stage of stages) {
+      expect(stage, 'stage does not clip the card on a phone').toContain(CLIP_ON_PHONE);
+      expect(stage, '`hidden` makes the stage a scroll box again').not.toMatch(/'hidden'/);
     }
   });
 

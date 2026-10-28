@@ -91,7 +91,7 @@ function PhoneRow({ entry, isNew, onChange, onDelete, T }) {
 
   return (
     <div className="idc-field-entry-wrap">
-      <div className="idc-field-entry">
+      <div className="idc-field-entry idc-phone-entry">
         <div className="idc-label-wrap" ref={pickerRef}>
           <button
             type="button"

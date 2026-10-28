@@ -2,9 +2,9 @@
  * Phone widths: nothing on the contact profile may make the page wider than
  * the screen. `.page-content` scrolls sideways when anything inside it is
  * wider, and the top bar widens the whole document, so each root cause found
- * at 375–430px is pinned here: the stage row scrolls on its own, the top bar's
- * left side shrinks, the engagement header wraps, long values wrap, and a
- * closed drawer is hidden. (jsdom does no layout: these pin the rules, and the
+ * at 375–430px is pinned here: the stage tabs wrap onto a second line, the top
+ * bar's left side shrinks, the engagement header wraps, long values wrap, a
+ * phone number is read whole, and a closed drawer is hidden. (jsdom does no layout: these pin the rules, and the
  * PR records the measured widths.)
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -39,13 +39,26 @@ const media = (text, query) => {
 };
 
 describe('the contact profile fits a phone', () => {
-  it('the five stage tabs scroll inside their own row instead of widening the page', () => {
+  it('the five stage tabs wrap onto a second line: none is hidden past the edge, and the page is not widened', () => {
     render(<StageTabBar contact={{ stage: 'scout' }} previewStage={null} onPreviewChange={() => {}} />);
-    const tab = screen.getByRole('button', { name: /Reinforcements/ });
-    expect(tab.parentElement.style.overflowX).toBe('auto');
-    expect(tab.parentElement.style.minWidth).toBe('0px');
-    expect(tab.style.whiteSpace).toBe('nowrap');
-    expect(tab.style.minWidth).toBe('max-content');
+    const bar = screen.getByTestId('stage-tab-bar');
+    expect(bar.style.flexWrap).toBe('wrap');
+    expect(bar.style.overflowX).toBe('');            // no scrolling row that hides "Reinforcements"
+    expect(bar.style.minWidth).toBe('0px');
+    const tabs = bar.querySelectorAll('button');
+    expect(tabs).toHaveLength(5);
+    for (const tab of tabs) {
+      expect(tab.style.whiteSpace).toBe('nowrap');   // a label is never split…
+      expect(tab.style.minWidth).toBe('max-content'); // …or cut: the tab moves to the next line instead
+    }
+  });
+
+  it('a phone number is read whole: its row wraps (badge above) instead of breaking inside the number', () => {
+    const card = css('src/components/contacts/IdentityCard.css');
+    expect(rule(card, '.idc-phone-entry')).toMatch(/flex-wrap:\s*wrap/);
+    expect(rule(card, '.idc-field-entry.idc-phone-entry .idc-entry-val')).toMatch(/flex:\s*1 1 8\.5em/);
+    const phones = readFileSync(resolve(repo, 'src/components/contacts/ContactPhones.jsx'), 'utf8');
+    expect(phones).toContain('className="idc-field-entry idc-phone-entry"');
   });
 
   it('the top bar\'s left side can shrink, so a long name never pushes its icons off the screen', () => {

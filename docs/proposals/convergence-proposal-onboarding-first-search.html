@@ -1,0 +1,988 @@
+<title>Onboarding First-Search Convergence</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap">
+
+<style>
+  /* Utilitarian technical proposal — tight hierarchy, code-forward, no hero */
+  :root {
+    --bg: #fafaf8;
+    --fg: #1a1a18;
+    --fg-muted: #6b6b63;
+    --accent: #2d5a27;
+    --accent-light: #e8f0e6;
+    --surface: #f0efeb;
+    --border: #d8d6cf;
+    --code-bg: #eeedea;
+    --red: #a33225;
+    --red-light: #fbeae8;
+    --amber: #8a6d1b;
+    --amber-light: #faf3e0;
+    --green: #2d5a27;
+    --green-light: #e8f0e6;
+
+    --font-display: 'Source Serif 4', Georgia, serif;
+    --font-mono: 'IBM Plex Mono', 'Menlo', monospace;
+    --font-body: -apple-system, 'Segoe UI', system-ui, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141413;
+      --fg: #e5e5e0;
+      --fg-muted: #908f88;
+      --accent: #6fbf65;
+      --accent-light: #1a2e18;
+      --surface: #1e1e1c;
+      --border: #333330;
+      --code-bg: #1c1c1a;
+      --red: #e06050;
+      --red-light: #2a1614;
+      --amber: #d4a72c;
+      --amber-light: #261e0a;
+      --green: #6fbf65;
+      --green-light: #1a2e18;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141413;
+    --fg: #e5e5e0;
+    --fg-muted: #908f88;
+    --accent: #6fbf65;
+    --accent-light: #1a2e18;
+    --surface: #1e1e1c;
+    --border: #333330;
+    --code-bg: #1c1c1a;
+    --red: #e06050;
+    --red-light: #2a1614;
+    --amber: #d4a72c;
+    --amber-light: #261e0a;
+    --green: #6fbf65;
+    --green-light: #1a2e18;
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 2rem 4rem;
+    max-width: 52rem;
+    margin: 0 auto;
+  }
+
+  h1 {
+    font-family: var(--font-display);
+    font-size: 1.75rem;
+    font-weight: 700;
+    line-height: 1.2;
+    text-wrap: balance;
+    margin: 0 0 0.25rem;
+    letter-spacing: -0.01em;
+  }
+
+  .subtitle {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--fg-muted);
+    margin: 0 0 2.5rem;
+  }
+
+  h2 {
+    font-family: var(--font-display);
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin: 2.5rem 0 1rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h3 {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+    margin: 1.5rem 0 0.5rem;
+  }
+
+  p { margin: 0 0 0.75rem; }
+
+  .decision {
+    background: var(--surface);
+    border-left: 3px solid var(--accent);
+    padding: 1rem 1.25rem;
+    margin: 1rem 0;
+    border-radius: 0 4px 4px 0;
+  }
+
+  .decision-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin: 0 0 0.25rem;
+  }
+
+  .decision p { margin: 0 0 0.5rem; }
+  .decision p:last-child { margin: 0; }
+
+  .gap {
+    background: var(--red-light);
+    border-left: 3px solid var(--red);
+    padding: 0.75rem 1rem;
+    margin: 0.75rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.9rem;
+  }
+
+  .gap-label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--red);
+  }
+
+  .wire {
+    background: var(--amber-light);
+    border-left: 3px solid var(--amber);
+    padding: 0.75rem 1rem;
+    margin: 0.75rem 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 0.9rem;
+  }
+
+  .wire-label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--amber);
+  }
+
+  code {
+    font-family: var(--font-mono);
+    font-size: 0.82em;
+    background: var(--code-bg);
+    padding: 0.15em 0.35em;
+    border-radius: 3px;
+  }
+
+  pre {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.5;
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1rem;
+    overflow-x: auto;
+    margin: 0.75rem 0;
+  }
+
+  pre code {
+    background: none;
+    padding: 0;
+    font-size: inherit;
+  }
+
+  .flow-diagram {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0;
+    align-items: stretch;
+    margin: 1.5rem 0;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+  }
+
+  .flow-step {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 0.6rem 0.8rem;
+    text-align: center;
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 2.5rem;
+  }
+  .flow-step:first-child { border-radius: 4px 0 0 4px; }
+  .flow-step:last-child { border-radius: 0 4px 4px 0; }
+
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    color: var(--fg-muted);
+    padding: 0 0.25rem;
+    font-size: 0.9rem;
+    flex-shrink: 0;
+  }
+
+  .sufficiency-rule {
+    background: var(--green-light);
+    border: 1px solid var(--green);
+    border-radius: 4px;
+    padding: 1rem 1.25rem;
+    margin: 1rem 0;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    line-height: 1.6;
+  }
+
+  .fixture {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1rem 1.25rem;
+    margin: 0.75rem 0;
+  }
+
+  .fixture-name {
+    font-family: var(--font-mono);
+    font-weight: 600;
+    font-size: 0.82rem;
+    margin: 0 0 0.5rem;
+  }
+
+  .fixture dl {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.2rem 0.75rem;
+    margin: 0;
+    font-size: 0.85rem;
+  }
+
+  .fixture dt {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--fg-muted);
+    white-space: nowrap;
+  }
+
+  .fixture dd { margin: 0; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    margin: 0.75rem 0;
+  }
+
+  th {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--fg-muted);
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+  }
+
+  td {
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  .status-pass {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--green);
+    font-weight: 600;
+  }
+
+  .status-fail {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--red);
+    font-weight: 600;
+  }
+
+  .status-new {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--amber);
+    font-weight: 600;
+  }
+
+  ol, ul { padding-left: 1.25rem; margin: 0.5rem 0; }
+  li { margin: 0.25rem 0; }
+
+  .file-ref {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--fg-muted);
+  }
+
+  .section-status {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 0.15em 0.5em;
+    border-radius: 2px;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+  }
+
+  .status-resolved { background: var(--green-light); color: var(--green); }
+  .status-blocked { background: var(--red-light); color: var(--red); }
+  .status-proposed { background: var(--amber-light); color: var(--amber); }
+
+  .toc {
+    background: var(--surface);
+    border-radius: 4px;
+    padding: 1rem 1.25rem;
+    margin: 0 0 2rem;
+  }
+
+  .toc-title {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--fg-muted);
+    margin: 0 0 0.5rem;
+  }
+
+  .toc ol {
+    margin: 0;
+    padding-left: 1.25rem;
+    font-size: 0.9rem;
+  }
+  .toc li { margin: 0.2rem 0; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  .done-checklist {
+    list-style: none;
+    padding: 0;
+    margin: 1rem 0;
+  }
+
+  .done-checklist li {
+    padding: 0.4rem 0;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    gap: 0.5rem;
+    align-items: baseline;
+  }
+
+  .done-checklist li:last-child { border-bottom: none; }
+
+  .check { font-size: 0.85rem; flex-shrink: 0; }
+
+  footer {
+    margin-top: 3rem;
+    padding-top: 1rem;
+    border-top: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--fg-muted);
+  }
+
+  @media (max-width: 600px) {
+    h1 { font-size: 1.4rem; }
+    .flow-diagram { flex-direction: column; }
+    .flow-step:first-child { border-radius: 4px 4px 0 0; }
+    .flow-step:last-child { border-radius: 0 0 4px 4px; }
+    .flow-arrow { justify-content: center; transform: rotate(90deg); padding: 0.15rem 0; }
+    .fixture dl { grid-template-columns: 1fr; }
+    .fixture dt { margin-top: 0.3rem; }
+    pre { font-size: 0.72rem; }
+    table { font-size: 0.78rem; }
+    th, td { padding: 0.4rem 0.5rem; }
+  }
+</style>
+
+<h1>Convergence Proposal: Onboarding &rarr; First Search</h1>
+<p class="subtitle">Team B &middot; Barry Onboarding Sprint &middot; 2026-10-28</p>
+
+<div class="toc">
+  <div class="toc-title">Contents</div>
+  <ol>
+    <li><a href="#problem">The Problem</a></li>
+    <li><a href="#decisions">Four Architecture Decisions</a></li>
+    <li><a href="#wire">The Wire</a></li>
+    <li><a href="#observability">Observability</a></li>
+    <li><a href="#sufficiency">First-Search Targeting Sufficiency</a></li>
+    <li><a href="#fixtures">Test Fixtures</a></li>
+    <li><a href="#scope">Scope &amp; Held Items</a></li>
+    <li><a href="#done">Definition of Done</a></li>
+  </ol>
+</div>
+
+
+<h2 id="problem">1. The Problem</h2>
+
+<p>OnboardingFlow writes four fields that <code>buildApolloQuery</code> never reads. Barry's onboarding intelligence does not reach the first Scout search.</p>
+
+<div class="gap">
+  <div class="gap-label">Gap &mdash; Dormant Fields</div>
+  <p style="margin:0.4rem 0 0">OnboardingFlow produces <code>idealCustomerTypes</code>, <code>excludedIndustries</code>, <code>valueProposition</code>, <code>perfectCustomer</code>. These are free-text strings written to <code>companyProfile/current</code>.</p>
+</div>
+
+<div class="gap">
+  <div class="gap-label">Gap &mdash; Missing Fields</div>
+  <p style="margin:0.4rem 0 0"><code>buildApolloQuery</code> consumes <code>industries[]</code>, <code>companyKeywords[]</code>, <code>companySizes[]</code>, <code>locations[]</code>, <code>isNationwide</code>, <code>searchStrategy</code>. None of these are populated by OnboardingFlow.</p>
+</div>
+
+<div class="gap">
+  <div class="gap-label">Gap &mdash; Discarded Intelligence</div>
+  <p style="margin:0.4rem 0 0"><code>analyze-website</code> (Step 2) returns <code>targetIndustry</code>, <code>targetCompanySize</code>, <code>icpSummary</code> to the client. OnboardingFlow checks <code>data.success !== false</code> and discards the extraction. This structured intelligence never reaches the ICP or the search.</p>
+</div>
+
+<p>By contrast, <code>BarryOnboarding.jsx:310-338</code> works because it produces the exact structured fields Apollo needs. The fix is not a UX redesign&mdash;it is a translation layer that converts the intelligence Barry already collects into the targeting structure Apollo requires.</p>
+
+
+<h2 id="decisions">2. Four Architecture Decisions</h2>
+
+<h3>D1: ICP Identity <span class="section-status status-proposed">Proposed</span></h3>
+
+<div class="decision">
+  <div class="decision-label">Decision</div>
+  <p>An ICP is a versioned document with a stable identifier. It contains structured targeting fields (what <code>buildApolloQuery</code> consumes), source intelligence (the raw inputs that produced those fields), and metadata. Multiple ICPs are supported through distinct document IDs.</p>
+  <p>Minimal schema for onboarding-generated ICP:</p>
+</div>
+
+<pre><code>{
+  "icpId": "primary",
+  "version": 1,
+  "source": "onboarding_flow",
+  "createdAt": "2026-10-28T...",
+
+  // Structured targeting — what buildApolloQuery reads
+  "targeting": {
+    "industries": ["healthcare", "medical devices"],
+    "companyKeywords": ["hospital", "clinic", "health system"],
+    "companySizes": ["51-200", "201-500"],
+    "locations": ["Utah"],
+    "isNationwide": false,
+    "searchStrategy": "industry_only",
+    "lookalikeSeed": null,
+    "foundedAgeRange": null
+  },
+
+  // Raw intelligence — what produced the targeting
+  "sourceIntelligence": {
+    "websiteExtraction": {
+      "targetIndustry": "Healthcare companies and hospital systems",
+      "targetCompanySize": "mid-market",
+      "icpSummary": "...",
+      "confidence": 72
+    },
+    "smartQuestions": {
+      "fastestClose": "Hospital systems with 50-500 beds",
+      "avoidIndustries": "Government, K-12 education",
+      "differentiator": "HIPAA-compliant patient engagement platform",
+      "perfectCustomer": "Regional hospital network in the Mountain West"
+    }
+  },
+
+  // Sufficiency assessment — did this pass the gate?
+  "sufficiency": {
+    "pass": true,
+    "hasKeywords": true,
+    "hasGeography": true,
+    "checkedAt": "2026-10-28T..."
+  }
+}</code></pre>
+
+<h3>D2: ICP Authority <span class="section-status status-proposed">Proposed</span></h3>
+
+<div class="decision">
+  <div class="decision-label">Decision</div>
+  <p>The authoritative ICP lives at <code>users/{uid}/icpProfiles/{icpId}</code>. For the onboarding-generated ICP: <code>users/{uid}/icpProfiles/primary</code>.</p>
+  <p><code>companyProfile/current</code> is <strong>not</strong> the source of truth. It is a legacy projection target. Onboarding writes to the authoritative store first, then projects a compatible view to <code>companyProfile/current</code> for existing consumers.</p>
+  <p>This separates authority from consumption without migrating existing readers. The six existing writers to <code>companyProfile/current</code> (BarryOnboarding, ICPSettings, updateIcpFromChat, setActiveIcpProfile, dashboardUtils, adminUpdateUserICP) continue to work unchanged&mdash;they will be migrated to write to <code>icpProfiles</code> in a future sprint.</p>
+</div>
+
+<h3>D3: Projection <span class="section-status status-proposed">Proposed</span></h3>
+
+<div class="decision">
+  <div class="decision-label">Decision</div>
+  <p>A pure function <code>projectToLegacyProfile(icpDoc)</code> maps the authoritative ICP into the <code>companyProfile/current</code> shape. It runs after every authoritative write during onboarding.</p>
+</div>
+
+<pre><code>function projectToLegacyProfile(icp) {
+  return {
+    ...icp.targeting,
+    source: icp.source,
+    updatedAt: icp.createdAt,
+    scoringWeights: DEFAULT_WEIGHTS,
+    managedByBarry: true,
+    barryConfidenceScore:
+      (icp.sourceIntelligence?.websiteExtraction?.confidence ?? 50) / 100,
+    // Preserve original intelligence for any consumer that reads it
+    idealCustomerTypes:
+      icp.sourceIntelligence?.smartQuestions?.fastestClose || '',
+    excludedIndustries:
+      icp.sourceIntelligence?.smartQuestions?.avoidIndustries || '',
+    valueProposition:
+      icp.sourceIntelligence?.smartQuestions?.differentiator || '',
+    perfectCustomer:
+      icp.sourceIntelligence?.smartQuestions?.perfectCustomer || '',
+  };
+}</code></pre>
+
+<p><code>search-companies</code> continues to receive <code>companyProfile</code> in the request body, reading the same structured fields it always has. No change to the server function.</p>
+
+<h3>D4: First-Search Targeting Sufficiency <span class="section-status status-proposed">Proposed</span></h3>
+
+<div class="decision">
+  <div class="decision-label">Decision</div>
+  <p>A search is targetable if and only if it has at least one keyword dimension <strong>and</strong> at least one geographic dimension. This is deterministic, testable, and enforced at two points: client-side before triggering <code>search-companies</code>, and server-side in <code>search-companies</code> before calling Apollo.</p>
+</div>
+
+<div class="sufficiency-rule">
+SUFFICIENT&nbsp;=<br>
+&nbsp;&nbsp;(&nbsp;industries.length&nbsp;&gt;&nbsp;0 &nbsp;OR&nbsp; companyKeywords.length&nbsp;&gt;&nbsp;0&nbsp;)<br>
+&nbsp;&nbsp;AND<br>
+&nbsp;&nbsp;(&nbsp;locations.length&nbsp;&gt;&nbsp;0 &nbsp;OR&nbsp; isNationwide&nbsp;===&nbsp;true&nbsp;)
+</div>
+
+<p>Rationale from <code>buildApolloQuery</code> behavior:</p>
+<ul>
+  <li>Without keywords: Apollo has no <code>q_organization_keyword_tags</code> and returns untargeted results. The log already warns: <code>"⚠️ No industries selected!"</code></li>
+  <li>Without geography: Apollo returns global results or nothing useful. The log warns: <code>"⚠️ No locations selected and not nationwide!"</code></li>
+  <li><code>companySizes</code> strengthens targeting but its absence doesn't make a search meaningless&mdash;it remains optional.</li>
+</ul>
+
+<p>On failure, the ICP is written with <code>sufficiency.pass = false</code> and <code>barryState</code> is set to <code>ERROR</code> with a reason code, surfacing the problem rather than running a doomed search.</p>
+
+
+<h2 id="wire">3. The Wire</h2>
+
+<p>The missing piece: a server-side translation that converts OnboardingFlow's combined intelligence (website extraction + smart question answers) into the structured targeting fields <code>buildApolloQuery</code> consumes.</p>
+
+<div class="flow-diagram">
+  <div class="flow-step">Step 2<br>analyze-website</div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step" style="background:var(--amber-light);border-color:var(--amber)">Capture extraction<br><small>(currently discarded)</small></div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step">Step 3<br>smart questions</div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step" style="background:var(--amber-light);border-color:var(--amber)">translate-icp<br><small>(new function)</small></div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step">icpProfiles/primary</div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step">companyProfile/current<br><small>(projection)</small></div>
+  <div class="flow-arrow">&rarr;</div>
+  <div class="flow-step">search-companies</div>
+</div>
+
+<h3>Implementation Changes</h3>
+
+<div class="wire">
+  <div class="wire-label">Change 1 &mdash; Capture Website Extraction</div>
+  <p style="margin:0.4rem 0 0"><span class="file-ref">OnboardingFlow.jsx:381-388</span> &mdash; Store the <code>data.data</code> (extraction result) from <code>analyze-website</code> response in component state instead of discarding it. This contains <code>targetIndustry</code>, <code>targetCompanySize</code>, <code>icpSummary</code>, <code>whoTheyServeTo</code>, <code>confidence</code>.</p>
+</div>
+
+<div class="wire">
+  <div class="wire-label">Change 2 &mdash; New Netlify Function: translate-icp</div>
+  <p style="margin:0.4rem 0 0"><span class="file-ref">netlify/functions/translate-icp.js</span> (new) &mdash; Takes combined onboarding intelligence. Returns structured ICP targeting fields. Uses a single Claude API call with a tightly constrained prompt that outputs the exact JSON shape <code>buildApolloQuery</code> requires.</p>
+</div>
+
+<pre><code>// translate-icp input
+{
+  "websiteExtraction": {
+    "targetIndustry": "Healthcare companies and hospital systems",
+    "targetCompanySize": "mid-market",
+    "icpSummary": "...",
+    "whoTheyServeTo": "...",
+    "confidence": 72
+  },
+  "smartQuestions": {
+    "fastestClose": "Hospital systems with 50-500 beds",
+    "avoidIndustries": "Government, K-12 education",
+    "differentiator": "HIPAA-compliant patient engagement platform",
+    "perfectCustomer": "Regional hospital network in the Mountain West"
+  }
+}
+
+// translate-icp output
+{
+  "industries": ["healthcare", "medical devices", "hospitals"],
+  "companyKeywords": ["hospital", "health system", "clinic", "patient"],
+  "companySizes": ["51-200", "201-500"],
+  "locations": ["Utah", "Idaho", "Wyoming", "Montana", "Colorado"],
+  "isNationwide": false,
+  "searchStrategy": "industry_only"
+}</code></pre>
+
+<p>The prompt constrains Barry to output only the Apollo-compatible field shapes. Each field includes a brief explanation of why it was chosen, which becomes the observability trace (see &sect;4).</p>
+
+<div class="wire">
+  <div class="wire-label">Change 3 &mdash; Rewrite handleFinishQuestions</div>
+  <p style="margin:0.4rem 0 0"><span class="file-ref">OnboardingFlow.jsx:423-493</span> &mdash; After collecting Step 3 answers:</p>
+  <ol style="margin:0.4rem 0 0;font-size:0.9rem">
+    <li>Call <code>translate-icp</code> with website extraction + smart question answers</li>
+    <li>Check sufficiency gate (D4)</li>
+    <li>Write authoritative ICP to <code>icpProfiles/primary</code></li>
+    <li>Project to <code>companyProfile/current</code> via <code>projectToLegacyProfile()</code></li>
+    <li>Set <code>barryState: 'SEARCHING'</code></li>
+    <li>Fire <code>search-companies</code> with projected profile</li>
+  </ol>
+</div>
+
+<div class="wire">
+  <div class="wire-label">Change 4 &mdash; Server-Side Sufficiency Check</div>
+  <p style="margin:0.4rem 0 0"><span class="file-ref">search-companies.js:~230</span> &mdash; Before entering the Apollo query path, validate the sufficiency rule against the received <code>companyProfile</code>. On failure: return early, set <code>barryState: 'ERROR'</code>, log the specific missing dimensions.</p>
+</div>
+
+
+<h2 id="observability">4. Observability</h2>
+
+<p>The goal: inspect any first search and answer <em>"Which pieces of onboarding intelligence caused this company to be searched for or returned?"</em></p>
+
+<h3>Translation Trace</h3>
+
+<p>The <code>translate-icp</code> function returns a <code>reasoning</code> object alongside the structured fields, linking each targeting decision to its source intelligence:</p>
+
+<pre><code>{
+  "targeting": { "industries": ["healthcare", ...], ... },
+  "reasoning": {
+    "industries": {
+      "derived_from": ["website.targetIndustry", "questions.fastestClose"],
+      "rationale": "Website identifies healthcare as target industry;
+                    fastest-close answer specifies hospital systems"
+    },
+    "locations": {
+      "derived_from": ["questions.perfectCustomer"],
+      "rationale": "Perfect customer answer specifies Mountain West region"
+    },
+    "companySizes": {
+      "derived_from": ["website.targetCompanySize", "questions.fastestClose"],
+      "rationale": "Website says mid-market; fastest-close says 50-500 beds
+                    maps to 51-500 employees"
+    }
+  }
+}</code></pre>
+
+<p>This <code>reasoning</code> is persisted on the ICP document. It does not need to reach Apollo&mdash;it is a diagnostic artifact for the team.</p>
+
+<h3>Query Trace</h3>
+
+<p><code>buildApolloQuery</code> already logs which fields it consumes. We add a structured return alongside the Apollo query:</p>
+
+<pre><code>// In search-companies, after buildApolloQuery:
+const queryTrace = {
+  icpId: companyProfile.icpId || 'legacy',
+  fieldsUsed: {
+    industries: (companyProfile.industries || []).length > 0,
+    companyKeywords: (companyProfile.companyKeywords || []).length > 0,
+    companySizes: (companyProfile.companySizes || []).length > 0,
+    locations: (companyProfile.locations || []).length > 0,
+    isNationwide: !!companyProfile.isNationwide,
+  },
+  apolloParams: Object.keys(query),
+  timestamp: new Date().toISOString()
+};</code></pre>
+
+<p>This trace is written to the user doc alongside <code>barryState: 'READY'</code> so the dashboard can display it.</p>
+
+<h3>Full Traceability Chain</h3>
+
+<div style="overflow-x:auto">
+<table>
+  <thead>
+    <tr>
+      <th>Layer</th>
+      <th>What's Stored</th>
+      <th>Where</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Source intelligence</td>
+      <td>Website extraction + smart question answers</td>
+      <td><code>icpProfiles/primary.sourceIntelligence</code></td>
+    </tr>
+    <tr>
+      <td>Translation reasoning</td>
+      <td>Why each targeting field was chosen</td>
+      <td><code>icpProfiles/primary.reasoning</code></td>
+    </tr>
+    <tr>
+      <td>Sufficiency check</td>
+      <td>Pass/fail + which dimensions present</td>
+      <td><code>icpProfiles/primary.sufficiency</code></td>
+    </tr>
+    <tr>
+      <td>Query trace</td>
+      <td>Which ICP fields entered the Apollo query</td>
+      <td><code>users/{uid}.lastSearchTrace</code></td>
+    </tr>
+    <tr>
+      <td>Results</td>
+      <td>Companies returned, with Apollo match metadata</td>
+      <td><code>users/{uid}/companies/{id}</code> (existing)</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+<h2 id="sufficiency">5. First-Search Targeting Sufficiency</h2>
+
+<p>The sufficiency rule is checked at two enforcement points:</p>
+
+<div style="overflow-x:auto">
+<table>
+  <thead>
+    <tr>
+      <th>Checkpoint</th>
+      <th>Location</th>
+      <th>On Failure</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Client-side gate</td>
+      <td><code>OnboardingFlow.jsx</code>, after <code>translate-icp</code> returns</td>
+      <td>Write ICP with <code>sufficiency.pass = false</code>. Set <code>barryState: 'ERROR'</code> with reason <code>'insufficient_targeting'</code>. Do not call <code>search-companies</code>.</td>
+    </tr>
+    <tr>
+      <td>Server-side guard</td>
+      <td><code>search-companies.js</code>, before <code>buildApolloQuery</code></td>
+      <td>Return <code>{ success: false, error: 'insufficient_targeting' }</code>. Set <code>barryState: 'ERROR'</code>. Log which dimensions were missing.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>The server-side guard is the safety net. Even if a future client bypasses the gate, no untargeted search reaches Apollo.</p>
+
+
+<h2 id="fixtures">6. Test Fixtures</h2>
+
+<p>Four realistic scenarios. Each traces the full path: onboarding intelligence &rarr; translated ICP &rarr; Apollo query parameters &rarr; expected result characteristics &rarr; which intelligence caused which targeting.</p>
+
+<div class="fixture">
+  <div class="fixture-name">1. Utah Professional Services</div>
+  <dl>
+    <dt>Website</dt>
+    <dd>HR consulting firm in Salt Lake City serving small businesses</dd>
+    <dt>targetIndustry</dt>
+    <dd>"Professional services, HR consulting"</dd>
+    <dt>targetCompanySize</dt>
+    <dd>"Small businesses, 10-100 employees"</dd>
+    <dt>fastestClose</dt>
+    <dd>"Growing companies that just hit 20 employees and need their first HR policies"</dd>
+    <dt>perfectCustomer</dt>
+    <dd>"Utah tech startup with 20-50 employees, no HR department yet"</dd>
+    <dt style="color:var(--accent);font-weight:500">Expected ICP</dt>
+    <dd><code>industries: ["technology", "software"]</code>, <code>companyKeywords: ["startup"]</code>, <code>companySizes: ["11-20", "21-50"]</code>, <code>locations: ["Utah"]</code></dd>
+    <dt style="color:var(--accent);font-weight:500">Sufficiency</dt>
+    <dd><span class="status-pass">PASS</span> &mdash; has keywords + geography</dd>
+    <dt style="color:var(--accent);font-weight:500">Trace</dt>
+    <dd><code>industries</code> &larr; perfectCustomer ("tech startup"); <code>locations</code> &larr; perfectCustomer ("Utah"); <code>companySizes</code> &larr; fastestClose ("20 employees") + perfectCustomer ("20-50")</dd>
+  </dl>
+</div>
+
+<div class="fixture">
+  <div class="fixture-name">2. Shopify Ecommerce Agency</div>
+  <dl>
+    <dt>Website</dt>
+    <dd>Shopify development agency building custom storefronts for DTC brands</dd>
+    <dt>targetIndustry</dt>
+    <dd>"E-commerce, retail, direct-to-consumer"</dd>
+    <dt>targetCompanySize</dt>
+    <dd>"SMB to mid-market, $1M-$50M revenue"</dd>
+    <dt>fastestClose</dt>
+    <dd>"DTC brands doing $2M-$10M that have outgrown their Shopify template"</dd>
+    <dt>perfectCustomer</dt>
+    <dd>"A beauty or wellness brand doing $5M on Shopify that needs a custom storefront"</dd>
+    <dt style="color:var(--accent);font-weight:500">Expected ICP</dt>
+    <dd><code>industries: ["consumer goods", "retail", "health wellness and fitness"]</code>, <code>companyKeywords: ["ecommerce", "direct to consumer", "shopify", "beauty", "wellness"]</code>, <code>companySizes: ["11-20", "21-50", "51-200"]</code>, <code>isNationwide: true</code></dd>
+    <dt style="color:var(--accent);font-weight:500">Sufficiency</dt>
+    <dd><span class="status-pass">PASS</span> &mdash; has keywords + nationwide</dd>
+    <dt style="color:var(--accent);font-weight:500">Trace</dt>
+    <dd><code>industries</code> &larr; website.targetIndustry + perfectCustomer ("beauty or wellness"); <code>companyKeywords</code> &larr; website ("Shopify", "DTC") + fastestClose; <code>isNationwide</code> &larr; no location mentioned = nationwide</dd>
+  </dl>
+</div>
+
+<div class="fixture">
+  <div class="fixture-name">3. Mid-Market Healthcare SaaS</div>
+  <dl>
+    <dt>Website</dt>
+    <dd>Patient engagement platform for hospital networks, HIPAA compliant</dd>
+    <dt>targetIndustry</dt>
+    <dd>"Healthcare, hospitals"</dd>
+    <dt>targetCompanySize</dt>
+    <dd>"Mid-market to enterprise, 200+ employees"</dd>
+    <dt>fastestClose</dt>
+    <dd>"Hospital systems with 50-500 beds that are under CMS quality mandates"</dd>
+    <dt>avoidIndustries</dt>
+    <dd>"Government agencies, K-12 schools, individual practices"</dd>
+    <dt>perfectCustomer</dt>
+    <dd>"Regional hospital network in the Mountain West expanding outpatient care"</dd>
+    <dt style="color:var(--accent);font-weight:500">Expected ICP</dt>
+    <dd><code>industries: ["hospital & health care", "medical devices"]</code>, <code>companyKeywords: ["hospital", "health system", "patient"]</code>, <code>companySizes: ["201-500", "501-1,000", "1,001-2,000"]</code>, <code>locations: ["Utah", "Idaho", "Wyoming", "Montana", "Colorado"]</code></dd>
+    <dt style="color:var(--accent);font-weight:500">Sufficiency</dt>
+    <dd><span class="status-pass">PASS</span> &mdash; has keywords + geography</dd>
+    <dt style="color:var(--accent);font-weight:500">Trace</dt>
+    <dd><code>industries</code> &larr; website.targetIndustry; <code>locations</code> &larr; perfectCustomer ("Mountain West"); <code>companySizes</code> &larr; website.targetCompanySize ("mid-market") + fastestClose ("50-500 beds")</dd>
+  </dl>
+</div>
+
+<div class="fixture">
+  <div class="fixture-name">4. Nonprofit Consulting</div>
+  <dl>
+    <dt>Website</dt>
+    <dd>Grant writing and fundraising consultancy for nonprofits</dd>
+    <dt>targetIndustry</dt>
+    <dd>"Non-profit, charitable organizations"</dd>
+    <dt>targetCompanySize</dt>
+    <dd>"Small to mid-size nonprofits"</dd>
+    <dt>fastestClose</dt>
+    <dd>"Nonprofits that just got their 501c3 and need their first federal grant"</dd>
+    <dt>perfectCustomer</dt>
+    <dd>"A community health nonprofit in the Southeast with 5-20 staff needing a HRSA grant"</dd>
+    <dt style="color:var(--accent);font-weight:500">Expected ICP</dt>
+    <dd><code>industries: ["non-profit organization management", "civic & social organization"]</code>, <code>companyKeywords: ["nonprofit", "501c3", "community health"]</code>, <code>companySizes: ["1-10", "11-20"]</code>, <code>locations: ["Georgia", "Florida", "North Carolina", "South Carolina", "Alabama", "Tennessee"]</code></dd>
+    <dt style="color:var(--accent);font-weight:500">Sufficiency</dt>
+    <dd><span class="status-pass">PASS</span> &mdash; has keywords + geography</dd>
+    <dt style="color:var(--accent);font-weight:500">Trace</dt>
+    <dd><code>industries</code> &larr; website.targetIndustry; <code>locations</code> &larr; perfectCustomer ("Southeast"); <code>companySizes</code> &larr; perfectCustomer ("5-20 staff")</dd>
+  </dl>
+</div>
+
+<h3>Sufficiency Failure Fixture</h3>
+
+<div class="fixture">
+  <div class="fixture-name">5. Vague Onboarding (No Website, Minimal Answers)</div>
+  <dl>
+    <dt>Website</dt>
+    <dd>Skipped (no extraction)</dd>
+    <dt>fastestClose</dt>
+    <dd>"Businesses that need help"</dd>
+    <dt>avoidIndustries</dt>
+    <dd>(left blank)</dd>
+    <dt>perfectCustomer</dt>
+    <dd>"A company that appreciates good work"</dd>
+    <dt style="color:var(--accent);font-weight:500">Expected ICP</dt>
+    <dd><code>industries: []</code>, <code>companyKeywords: []</code>, <code>locations: []</code>, <code>isNationwide: false</code></dd>
+    <dt style="color:var(--accent);font-weight:500">Sufficiency</dt>
+    <dd><span class="status-fail">FAIL</span> &mdash; no keywords, no geography</dd>
+    <dt style="color:var(--accent);font-weight:500">Outcome</dt>
+    <dd>ICP written with <code>sufficiency.pass = false</code>. <code>barryState = 'ERROR'</code>, reason: <code>insufficient_targeting</code>. User sees: "Barry needs more to go on. Tell me about your ideal customer's industry and location."</dd>
+  </dl>
+</div>
+
+
+<h2 id="scope">7. Scope &amp; Held Items</h2>
+
+<h3>In Scope (This Sprint)</h3>
+
+<div style="overflow-x:auto">
+<table>
+  <thead>
+    <tr>
+      <th>Change</th>
+      <th>Files</th>
+      <th>Type</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Capture website extraction in OnboardingFlow state</td>
+      <td><code>OnboardingFlow.jsx</code></td>
+      <td>~5 lines</td>
+    </tr>
+    <tr>
+      <td>New <code>translate-icp</code> Netlify function</td>
+      <td><code>netlify/functions/translate-icp.js</code></td>
+      <td>New file, ~200 lines</td>
+    </tr>
+    <tr>
+      <td>Rewrite <code>handleFinishQuestions</code></td>
+      <td><code>OnboardingFlow.jsx</code></td>
+      <td>Replace lines 448-493</td>
+    </tr>
+    <tr>
+      <td><code>projectToLegacyProfile</code> utility</td>
+      <td><code>src/utils/icpUtils.js</code></td>
+      <td>New file, ~30 lines</td>
+    </tr>
+    <tr>
+      <td>Sufficiency check (client + server)</td>
+      <td><code>OnboardingFlow.jsx</code> + <code>search-companies.js</code></td>
+      <td>~20 lines each</td>
+    </tr>
+    <tr>
+      <td>Query trace logging</td>
+      <td><code>search-companies.js</code></td>
+      <td>~15 lines</td>
+    </tr>
+    <tr>
+      <td>Test fixtures (as unit tests for <code>translate-icp</code>)</td>
+      <td><code>tests/translate-icp.test.js</code></td>
+      <td>New file</td>
+    </tr>
+    <tr>
+      <td><code>netlify.toml</code> timeout for translate-icp</td>
+      <td><code>netlify.toml</code></td>
+      <td>2 lines</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Explicitly Held</h3>
+
+<ul>
+  <li>New global context assembler</li>
+  <li>Large storage migrations (existing writers to <code>companyProfile/current</code> continue as-is)</li>
+  <li>Onboarding UX redesign (questions stay the same)</li>
+  <li>Generalized intelligence schemas</li>
+  <li>Full derived-intelligence persistence</li>
+  <li>Eligibility/Match/Coverage persistence systems (concepts preserved, no new storage)</li>
+</ul>
+
+<h3>Unresolved Decisions That Would Block Implementation</h3>
+
+<p><strong>None.</strong> All four decisions required for this path are proposed above. No external dependency blocks the implementation.</p>
+
+<p>One timing question to note: <code>translate-icp</code> adds a Claude API call between Step 3 completion and the search trigger. Expected latency: 2-4 seconds. The user is already in a waiting state (Step 4: Gmail or Step 5: Building List), so this latency is absorbed without UX impact. The <code>netlify.toml</code> timeout should be 30 seconds (generous, as the call is a single short-prompt completion).</p>
+
+
+<h2 id="done">8. Definition of Done</h2>
+
+<ul class="done-checklist">
+  <li><span class="check">&#9744;</span> User completes OnboardingFlow &rarr; <code>analyze-website</code> extraction is captured (not discarded)</li>
+  <li><span class="check">&#9744;</span> Smart question answers + website extraction sent to <code>translate-icp</code></li>
+  <li><span class="check">&#9744;</span> <code>translate-icp</code> returns structured targeting fields that <code>buildApolloQuery</code> can consume</li>
+  <li><span class="check">&#9744;</span> Sufficiency gate prevents untargeted searches (deterministic, both client and server)</li>
+  <li><span class="check">&#9744;</span> Authoritative ICP written to <code>icpProfiles/primary</code> with source intelligence + reasoning</li>
+  <li><span class="check">&#9744;</span> Legacy projection written to <code>companyProfile/current</code> (existing consumers unaffected)</li>
+  <li><span class="check">&#9744;</span> <code>search-companies</code> generates a meaningfully targeted Apollo query</li>
+  <li><span class="check">&#9744;</span> Appropriate companies return for all four fixture personas</li>
+  <li><span class="check">&#9744;</span> For any search: which onboarding intelligence caused which targeting field is inspectable</li>
+  <li><span class="check">&#9744;</span> Vague-input fixture correctly fails the sufficiency gate</li>
+</ul>
+
+<p>The test: <em>Would the customer reasonably believe Barry understood who they wanted to target?</em></p>
+
+
+<footer>
+  Convergence Proposal &middot; Team B &middot; Barry Onboarding Sprint &middot; Builds on Intelligence Contract v0.3.1 and Phase 0B stabilization
+</footer>

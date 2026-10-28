@@ -42,6 +42,10 @@
   display: flex;
   align-items: center;
   gap: 1rem;
+  /* Shrinks below the breadcrumb's full text, so a long contact name is cut
+     with its ellipsis instead of pushing the right-hand icons off a phone's
+     screen (which made the whole page slide sideways). */
+  min-width: 0;
 }
 
 /* Mobile Menu Trigger - Hidden on Desktop */
@@ -101,6 +105,7 @@
   display: flex;
   align-items: center;
   gap: 1rem;
+  flex-shrink: 0;
 }
 
 /* ── User menu ──

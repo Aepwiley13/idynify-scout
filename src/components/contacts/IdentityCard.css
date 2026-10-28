@@ -1025,4 +1025,12 @@
     left: auto;
     right: 0;
   }
+
+  /* A long email, number or profile is read in full: it wraps rather than
+     being cut short with an ellipsis. */
+  .idc-entry-val,
+  .idc-detail-val {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
 }

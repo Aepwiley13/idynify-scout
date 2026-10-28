@@ -18,7 +18,7 @@ Turning it on and off is the same switch as the Capture Lab (docs/capture/captur
 |---|---|---|
 | Photo | `prepareCardImage` on the device, with the blur, glare and darkness check (Use anyway / Retake) | Nothing |
 | Read | `captureExtract`, as the signed-in user, one scan (`operationId`) per photo, retried as the same scan only when the endpoint says so | The existing values-free operation record only |
-| Review | A list of people (one per card today). Name, title, company, email, LinkedIn and website are editable. Phones use the profile's phone editor. Social handles are listed under Social | Nothing |
+| Review | A list of people (one per card today). Name, title, company, email, LinkedIn and website are editable. Phones use the profile's phone editor. Social handles are listed under Social. Company text that is not a company (the person's name, a title) is offered as a suggestion, not filled in | Nothing |
 | Match | `previewCapturePerson` (`src/components/capture/captureSave.js`): the person through the shared resolver, the company through `resolveCompany` | Nothing |
 | Save | `saveCapturePerson`: the write guard, the company resolver and the user-added contact builder | The contact, and its company when one is linked or created |
 | After | The saved contact's profile (`/contact/:id`) | |
@@ -51,9 +51,16 @@ Only a mobile, direct or home number can match a person (ADR-002). A main, work,
 | Company | Meaning | Save |
 |---|---|---|
 | Existing company | Matched by name (or by website when no name was printed) | Linked; a pending company is accepted, as every add path does |
-| Possible match | Same website or email domain, different printed name | Linked by default, or "Don't link a company" |
-| New company | No match, and a name was printed | Created with `name_source: user` |
-| No company | No name printed and no existing company at that website | None created: a company is never named from a domain here |
+| Possible match | Same website or email domain, different printed name | "Link to …" or "No company" |
+| New company | No match, and a name was printed | "New company: …" (created with `name_source: user`) or "No company" |
+| No company | No company name, and no existing company at that website | None created: a company is never named from a domain here |
+
+"No company" means no company record and no company text on the person.
+
+**A card can be a person, not a company.** An independent professional's card may hold a name, a service line, a personal domain, an email, a phone and a handle, and no company. The extraction still reports whatever it read as the company, often the person's name set as a wordmark, and lists safeguard codes beside it (`company.safeguards`). Review acts on them (`captureDraft.js`, `NOT_A_COMPANY`):
+
+- **Not a company:** the text is the person's name, a job title or the service line, too generic, too short, or not printed as a company. Company stays empty ("No company"), and the text is offered as a suggestion: "The card shows “Kristin Sokol”, but that's the person's name, so no company is added. **Use as company**".
+- **A weak read:** the text is only in a logo, or unclear (`WEAK_COMPANY_TEXT`). Company stays filled and marked Check. If the user leaves it as read, a new or possible company starts at "No company", so nothing is created unless the user chooses it. Editing the field makes it the user's, and it starts at "New company".
 
 An existing person keeps the company they already have. No company phone number is written.
 

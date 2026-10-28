@@ -4,7 +4,11 @@
  *   Continue      look each reviewed person up in the workspace (read-only)
  *   the match     New person / Already in IDYNIFY / Possible match (choose) /
  *                 Conflict (cannot save); and Existing company / Possible
- *                 match (choose) / New company / No company
+ *                 match (link, or No company) / New company (add, or No
+ *                 company) / No company. A company the card showed only weakly
+ *                 (a logo, an unclear read) that the user did not confirm
+ *                 starts at No company: a company is never created for it
+ *                 unless the user chooses to.
  *   Add Person    save (captureSave.js), then hand the saved ids back
  *
  * Editing a detail after the check makes the match stale: Continue again.
@@ -15,7 +19,7 @@ import { useState } from 'react';
 import { Loader, UserPlus, UserCheck, AlertTriangle, Building2, RotateCcw } from 'lucide-react';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { previewCapturePerson, saveCapturePerson } from './captureSave.js';
-import { socialProblems } from './captureDraft.js';
+import { socialProblems, companyIsUnconfirmed } from './captureDraft.js';
 
 const MATCHED_ON = Object.freeze({
   email: 'email', phone: 'phone number', linkedin_url: 'LinkedIn', apollo_person_id: 'Apollo ID', name_company: 'name and company',
@@ -103,41 +107,67 @@ function PersonMatch({ match, choice, setChoice, onOpen, T }) {
   );
 }
 
-function CompanyMatch({ match, choice, setChoice, T }) {
+function CompanyMatch({ match, choice, setChoice, weak, T }) {
   const { person, company } = match;
-  const line = { display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 14, color: T.text };
-  const radio = { display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', fontSize: 14, cursor: 'pointer' };
+  const line = { display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 14, color: T.text, minWidth: 0 };
+  const radio = { display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', minHeight: 44, fontSize: 14, cursor: 'pointer' };
+  const text = { minWidth: 0, overflowWrap: 'anywhere' };
+  const noCompany = (
+    <label style={radio}>
+      <input type="radio" name="capture-company" checked={choice.company === 'none'} onChange={() => setChoice({ ...choice, company: 'none' })} />
+      <span style={text}>No company</span>
+    </label>
+  );
   const icon = <Building2 size={16} style={{ flexShrink: 0, marginTop: 2, color: T.textMuted }} />;
 
   if (person.status === 'saved' || person.status === 'conflict') return null;
   if (person.status === 'existing' && person.company) {
-    return <div style={line} data-testid="company-match">{icon}<span>Company stays <strong>{person.company}</strong>.</span></div>;
+    return <div style={line} data-testid="company-match">{icon}<span style={text}>Company stays <strong>{person.company}</strong>.</span></div>;
   }
   if (company.status === 'existing') {
-    return <div style={line} data-testid="company-match">{icon}<span><strong>Existing company:</strong> {company.name}</span></div>;
+    return <div style={line} data-testid="company-match">{icon}<span style={text}><strong>Existing company:</strong> {company.name}</span></div>;
   }
   if (company.status === 'possible') {
     return (
       <div style={line} data-testid="company-match">
         {icon}
-        <div role="radiogroup" aria-label="Link this company?">
-          <strong>Possible company match:</strong> {company.name} (same website or email domain, different name).
+        <div role="radiogroup" aria-label="Link this company?" style={{ minWidth: 0 }}>
+          <span style={text}><strong>Possible company match:</strong> {company.name} (same website or email domain, different name).</span>
           <label style={radio}>
             <input type="radio" name="capture-company" checked={choice.company !== 'none'} onChange={() => setChoice({ ...choice, company: 'link' })} />
-            Link to {company.name}
+            <span style={text}>Link to {company.name}</span>
           </label>
-          <label style={radio}>
-            <input type="radio" name="capture-company" checked={choice.company === 'none'} onChange={() => setChoice({ ...choice, company: 'none' })} />
-            Don't link a company
-          </label>
+          {noCompany}
         </div>
       </div>
     );
   }
   if (company.status === 'new') {
-    return <div style={line} data-testid="company-match">{icon}<span><strong>New company:</strong> {company.name}, added to Saved Companies.</span></div>;
+    return (
+      <div style={line} data-testid="company-match">
+        {icon}
+        <div role="radiogroup" aria-label="Add this company?" style={{ minWidth: 0 }}>
+          {weak && (
+            <span style={{ ...text, display: 'block', color: T.textMuted }}>
+              The company on the card was unclear or only in a logo, so it isn't added unless you choose it.
+            </span>
+          )}
+          <label style={radio}>
+            <input type="radio" name="capture-company" checked={choice.company !== 'none'} onChange={() => setChoice({ ...choice, company: 'link' })} />
+            <span style={text}><strong>New company:</strong> {company.name}, added to Saved Companies</span>
+          </label>
+          {noCompany}
+        </div>
+      </div>
+    );
   }
   return <div style={line} data-testid="company-match">{icon}<span>No company.</span></div>;
+}
+
+/** The company choice a match starts at: No company for a weak read the user has not confirmed. */
+function startingCompanyChoice(match, draft) {
+  const offered = ['new', 'possible'].includes(match.company?.status);
+  return offered && companyIsUnconfirmed(draft) ? 'none' : 'link';
 }
 
 /**
@@ -172,7 +202,7 @@ export default function CaptureSavePanel({ operationId, people, onSaved, T }) {
         found.push(await previewCapturePerson(uid, { operationId, index, draft: people[index] }));
       }
       setMatches(found);
-      setChoices(found.map(() => ({ person: null, company: 'link' })));
+      setChoices(found.map((match, i) => ({ person: null, company: startingCompanyChoice(match, people[i]) })));
       setCheckedKey(key);
       setPhase('ready');
     } catch {
@@ -252,6 +282,7 @@ export default function CaptureSavePanel({ operationId, people, onSaved, T }) {
             match={match}
             choice={choices[i]}
             setChoice={next => setChoices(list => list.map((c, j) => (j === i ? next : c)))}
+            weak={companyIsUnconfirmed(people[i])}
             T={T}
           />
         </div>

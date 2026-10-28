@@ -23,7 +23,12 @@
  *
  * The one thing the stage may set is a min-height — a measured floor, so the
  * deck does not resize under the queue on every swipe. A floor cannot clip and
- * cannot scroll: a card taller than it still sets its own height.
+ * cannot scroll: a card taller than it still sets its own height. *
+ * Phones are the exception, on purpose: below 1024px the page passes `fit`,
+ * the stage takes the column's remaining height and the card fills it, with
+ * one vertically scrolling body between a fixed header and fixed buttons.
+ * dailyDiscoveryPhoneCard.test.jsx holds those rules; the card tests below
+ * render without `fit`, as the page does at 1024px and up.
  */
 
 import { render } from '@testing-library/react';
@@ -94,7 +99,7 @@ const SCROLLING = ['auto', 'scroll', 'overlay'];
 
 describe('Daily Discovery card — content decides its height', () => {
   for (const wide of [true, false]) {
-    const at = wide ? 'desktop' : 'mobile';
+    const at = wide ? 'desktop' : 'narrow, no fit';
 
     it(`[${at}] the company card carries no height of its own`, () => {
       const { container } = render(
@@ -167,7 +172,7 @@ describe('Daily Discovery card — the stats grid stays inside the card', () => 
   );
 
   for (const wide of [true, false]) {
-    const at = wide ? 'desktop' : 'mobile';
+    const at = wide ? 'desktop' : 'narrow, no fit';
 
     it(`[${at}] the grid splits the card in two equal columns`, () => {
       const { grid, cells } = statCells(renderLong(wide).container);
@@ -260,6 +265,8 @@ describe('Daily Discovery card — the stage constrains nothing, and floors only
     // still sets its own height — but an explicit min-height replaces a flex
     // item's automatic minimum size, so `flexShrink: 0` has to travel with it
     // or the column squeezes a tall card back down onto what follows.
+    // On a phone the floor is 0 and PHONE_STAGE, spread after it, makes the
+    // stage fill the column instead (see dailyDiscoveryPhoneCard.test.jsx).
     for (const [stage, floor] of stages.map((s, i) => [s, ['COMPANY_STAGE_MIN_H', 'PERSON_STAGE_MIN_H'][i]])) {
       expect(stage, `${floor} is missing`).toMatch(new RegExp(`minHeight: ${floor}`));
       expect(stage, `${floor} without flexShrink: 0`).toMatch(/flexShrink: 0/);

@@ -25,8 +25,8 @@
  * deck does not resize under the queue on every swipe. A floor cannot clip and
  * cannot scroll: a card taller than it still sets its own height. *
  * Phones are the exception, on purpose: below 1024px the page passes `fit`,
- * the stage takes the column's remaining height and the card fills it, with
- * one vertically scrolling body between a fixed header and fixed buttons.
+ * the stage takes the column's remaining height and the card fills it — a
+ * card that never scrolls, with everything deeper in a Details sheet.
  * dailyDiscoveryPhoneCard.test.jsx holds those rules; the card tests below
  * render without `fit`, as the page does at 1024px and up.
  */

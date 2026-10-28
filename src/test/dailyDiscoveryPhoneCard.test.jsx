@@ -1,24 +1,25 @@
 /**
- * ONE DISCOVERY, ONE SCREEN — the Daily Discoveries card on a phone.
+ * ONE DISCOVERY, ONE CARD — Daily Discoveries on a phone.
  *
- * On a real iPhone the card was taller than the space between the tabs and the
- * bottom navigation (a 606px card in a ~436px column), so judging a discovery
- * meant scrolling the page to reach the buttons. A vertical scroll could also
- * drift sideways into a swipe, and the queue button floated over the Match
- * button and the bottom nav.
+ * Below 1024px (`fit`) a discovery is one screen-sized card, like a dating
+ * profile: the company's logo or the person's photo first, then who or what
+ * it is and why it might fit, then Not a Match / Match. The card never
+ * scrolls. Everything deeper — the full ICP breakdown, Barry Intel, the
+ * company facts, Website and LinkedIn — is in a Details sheet over the same
+ * card, opened from Details or by swiping up, with the decision at its foot.
  *
- * Below 1024px (`fit`) the card is now the stage's height, which is the
- * column's remaining height: its header and the decision buttons stay put,
- * and only the middle (ICP match, factors, Barry Intel, and the Details) scrolls,
- * vertically, inside the card. A press is read once as horizontal (a swipe)
- * or vertical (that scroll), and a vertical one never moves or decides the card.
+ * The gesture model this pins: a press is read once as horizontal (a swipe,
+ * which decides past the threshold and otherwise snaps back) or vertical
+ * (which never moves or decides the card; far enough up, it opens Details).
+ * The sheet owns every touch inside it.
  *
  * Desktop (`wide`, no `fit`) is unchanged; dailyDiscoveryCardNoNestedScroll
- * holds its rules. jsdom does no layout: these pin the structure, and the PR
- * records the measured sizes at 375–430px.
+ * holds its rules. jsdom does no layout: these pin the structure and the
+ * behaviour, and the PR records the measured sizes at 375–430px.
  */
 
-import { render, fireEvent, act, within } from '@testing-library/react';
+import { createRef } from 'react';
+import { render, fireEvent, act, within, screen } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
@@ -37,8 +38,18 @@ vi.mock('../components/scout/BarryICPPanel', () => ({
   default: () => null,
   BarryAvatar: () => null,
 }));
+// The card's reasons come from the ICP breakdown. A fixed one lets these tests
+// say exactly which reasons show, in what order.
+const breakdown = vi.hoisted(() => ({ current: null }));
+vi.mock('../utils/icpScoring', async (importOriginal) => {
+  const actual = await importOriginal();
+  return { ...actual, getScoreBreakdown: (...args) => breakdown.current ?? actual.getScoreBreakdown(...args) };
+});
 
 import { CompanySwipeCard, PersonSwipeCard } from '../pages/Scout/DailyLeads.jsx';
+
+const row = (match, extra = {}) => ({ match, active: true, unknown: false, contribution: match, weight: 25, value: null, ...extra });
+const NOT_MEASURED = { match: 0, active: true, unknown: true, contribution: null, weight: 10, value: null };
 
 const COMPANY = {
   id: 'co1',
@@ -47,164 +58,284 @@ const COMPANY = {
   headquarters_city: 'Salt Lake City',
   headquarters_state: 'Utah',
   employee_count: 1250,
-  revenue: '$50M-$100M',
+  revenue: '$50M–$100M',
   founded_year: 2004,
+  ceo_name: 'Dana Reyes',
   fit_score: 82,
   website_url: 'https://sokol.example',
   linkedin_url: 'https://www.linkedin.com/company/sokol-example',
-  barry_intel: 'A long-established enterprise software consultancy.',
+  barry_intel: 'A long-established enterprise software consultancy with deep ties to regional healthcare systems.',
 };
-const PERSON = { id: 'p1', name: 'Kristin Sokol', title: 'Senior Vice President, Strategic Partnerships', linkedin_url: 'https://www.linkedin.com/in/k' };
+const PERSON = {
+  id: 'p1', name: 'Kristin Sokol', title: 'Senior Vice President, Sales',
+  seniority: 'vp', departments: ['master_sales'], city: 'Salt Lake City', state: 'Utah',
+  photo_url: 'https://media.licdn.com/dms/image/kristin-sokol.jpg',
+  linkedin_url: 'https://www.linkedin.com/in/kristin-sokol-example',
+};
+const ICP = { industries: ['Information Technology & Services'] };
 
 const SCROLLING = ['auto', 'scroll', 'overlay'];
+const noop = () => {};
 const renderCompany = (props = {}) => render(
-  <CompanySwipeCard company={COMPANY} onAccept={() => {}} onReject={() => {}} onSkip={() => {}} fit {...props} />,
+  <CompanySwipeCard company={COMPANY} onAccept={noop} onReject={noop} onSkip={noop} fit icpProfile={ICP} {...props} />,
 );
 const renderPerson = (props = {}) => render(
-  <PersonSwipeCard person={PERSON} company={COMPANY} matchText="Matches your SVP target" onAccept={() => {}} onReject={() => {}} onSkip={() => {}} fit {...props} />,
+  <PersonSwipeCard person={PERSON} company={COMPANY} matchText="Matches your Senior Vice President target" onAccept={noop} onReject={noop} onSkip={noop} fit {...props} />,
 );
 const parts = (container) => {
   const root = container.firstChild;
   const surface = [...root.children].reverse().find(el => el.style.borderRadius === '22px');
-  const body = container.querySelectorAll('[data-card-body]');
-  return { root, surface, body: body[0], bodies: body.length };
+  return { root, surface };
 };
-const button = (container, re) => [...container.querySelectorAll('button')].find(b => re.test(b.textContent));
+const button = (scope, name) => within(scope).getByRole('button', { name });
+const sheet = () => document.querySelector('[data-details-sheet]');
+const settle = () => act(() => { vi.advanceTimersByTime(600); });
+const touch = (el, type, x, y) => fireEvent[type](el, { touches: type === 'touchEnd' ? [] : [{ clientX: x, clientY: y }], changedTouches: [{ clientX: x ?? 0, clientY: y ?? 0 }] });
 
-describe.each([['company', renderCompany], ['person', renderPerson]])('on a phone the %s card is the screen', (_, renderCard) => {
-  it('fills the stage instead of setting a height of its own', () => {
+beforeEach(() => { breakdown.current = null; });
+
+describe.each([['company', renderCompany], ['person', renderPerson]])('on a phone the %s card is one screen and never scrolls', (_, renderCard) => {
+  it('fills the stage instead of carrying a height of its own', () => {
     const { root, surface } = parts(renderCard().container);
     for (const [name, el] of [['swipe root', root], ['card surface', surface]]) {
       expect(el.style.flex, `${name} does not fill`).toBe('1 1 0%');
-      expect(el.style.minHeight, `${name} cannot shrink below its content`).toBe('0px');
-      expect(el.style.flexDirection).toBe('column');
+      expect(el.style.minHeight).toBe('0px');
       expect(el.style.height, `${name} pins a height`).toBe('');
       expect(el.style.maxHeight, `${name} caps its height`).toBe('');
-      expect(SCROLLING).not.toContain(el.style.overflowY);
     }
     expect(surface.style.overflow, 'the surface only clips its corners').toBe('hidden');
     expect(root.style.touchAction, 'vertical touch must stay with the browser').toBe('pan-y');
   });
 
-  it('scrolls one part only, vertically, without passing the scroll on to the page', () => {
-    const { body, bodies } = parts(renderCard().container);
-    expect(bodies).toBe(1);
-    expect(body.style.overflowY).toBe('auto');
-    expect(body.style.overflowX, 'the body must never scroll sideways').toBe('');
-    expect(body.style.overscrollBehavior, 'reaching the end would scroll or bounce the page').toBe('contain');
-    expect(body.style.flex).toBe('1 1 0%');
-    expect(body.style.minHeight).toBe('0px');
-  });
-
-  it('keeps Not a Match and This is a Match outside the scrolling part, so they are always in view', () => {
+  it('has nothing inside it that scrolls', () => {
     const { container } = renderCard();
-    const { body } = parts(container);
-    for (const re of [/Not a Match/, /This is a Match/]) {
-      const b = button(container, re);
-      expect(b, `${re} is missing`).toBeTruthy();
-      expect(body.contains(b), `${re} scrolls away with the body`).toBe(false);
-    }
+    const scrollers = [...container.querySelectorAll('*')]
+      .filter(el => SCROLLING.includes(el.style.overflowY) || SCROLLING.includes(el.style.overflow));
+    expect(scrollers).toEqual([]);
+  });
+
+  it('decides with Not a Match and Match on the card; Skip lives below it', () => {
+    const { container } = renderCard();
+    expect(button(container, /Not a Match/)).toBeTruthy();
+    expect(button(container, /^Match$/)).toBeTruthy();
+    expect(within(container).queryByRole('button', { name: /Skip/ }), 'Skip is on the card again').toBeNull();
+  });
+
+  it('Details opens a sheet over the card that owns its own scrolling, with the decision at its foot; ✕ closes it', () => {
+    const { container } = renderCard();
+    expect(sheet()).toBeNull();
+    fireEvent.click(button(container, 'Details'));
+    const dialog = screen.getByRole('dialog');
+    expect(sheet().parentElement, 'the sheet covers the page, not just the card').toBe(document.body);
+    const body = dialog.querySelector('[data-sheet-body]');
+    expect(body.style.overflowY).toBe('auto');
+    expect(body.style.overscrollBehavior).toBe('contain');
+    expect(button(dialog, /Not a Match/)).toBeTruthy();
+    expect(button(dialog, /^Match$/)).toBeTruthy();
+    fireEvent.click(button(dialog, 'Close details'));
+    expect(sheet()).toBeNull();
+    expect(container.firstChild.style.transform).toMatch(/translateX\(0px\)/);
   });
 });
 
-describe('the phone company card: what is always there, and what waits behind Details', () => {
-  it('logo, name, confidence and key facts head the card; ICP match and Barry Intel open the body', () => {
+describe('the phone company card: the company first, then why it might fit', () => {
+  it('logo, confidence, name, industry · HQ, ICP match, and one line of size', () => {
     const { container, getByTestId } = renderCompany();
-    const { body } = parts(container);
-    expect(body.contains(getByTestId('logo'))).toBe(false);
-    const header = container.querySelector('[title="Sokol Studio"]');
-    expect(body.contains(header), 'the name scrolls away').toBe(false);
-    expect(container.textContent).toMatch(/confidence/);
-    expect(container.querySelector('[title="1,250 employees · $50M-$100M"]'), 'key facts line').toBeTruthy();
-    expect(body.textContent).toMatch(/ICP MATCH SCORE/i);
-    expect(body.textContent).toMatch(/BARRY INTEL/i);
+    expect(getByTestId('logo')).toBeTruthy();
+    expect(container.textContent).toMatch(/High confidence/i);
+    expect(container.querySelector('[title="Sokol Studio"]')).toBeTruthy();
+    expect(container.querySelector('[title*="Salt Lake City"]').textContent).toMatch(/·/);
+    expect(within(container).getByTestId('icp-match-chip').textContent).toBe('82% ICP match');
+    expect(container.textContent).toMatch(/Strong Fit/);
+    expect(container.textContent).toMatch(/1,250 employees · \$50M–\$100M revenue/);
   });
 
-  it('the stats and links are one tap away, inside the same scrolling body', () => {
+  it('keeps the rest for Details: no Barry Intel, stats grid or links on the card', () => {
     const { container } = renderCompany();
-    const { body } = parts(container);
-    expect(body.textContent, 'details showing before they were asked for').not.toMatch(/FOUNDED/);
-    fireEvent.click(within(body).getByText('Details'));
-    expect(body.textContent).toMatch(/FOUNDED/);
-    expect(body.querySelector('a[href="https://sokol.example"]'), 'website link').toBeTruthy();
-    fireEvent.click(within(body).getByText('Details'));
-    expect(body.textContent).not.toMatch(/FOUNDED/);
+    expect(container.textContent).not.toMatch(/BARRY INTEL|FOUNDED/);
+    expect(container.querySelector('a')).toBeNull();
   });
 
-  it('without `fit` the card is the desktop card it was: everything in one column, no scrolling body', () => {
-    const { container } = render(
-      <CompanySwipeCard company={COMPANY} onAccept={() => {}} onReject={() => {}} onSkip={() => {}} wide />,
-    );
-    expect(container.querySelector('[data-card-body]')).toBeNull();
-    expect(container.textContent).toMatch(/FOUNDED/);
-    expect(container.firstChild.style.flex).toBe('');
+  it('shows up to three reasons, strongest first; a factor with no data is not one', () => {
+    breakdown.current = {
+      industry: row(50), location: row(100, { value: 'Utah' }), employeeSize: row(0), revenue: NOT_MEASURED,
+    };
+    const { container } = renderCompany();
+    const reasons = [...container.querySelectorAll('[data-reason]')];
+    expect(reasons.map(r => [r.dataset.reason, r.textContent])).toEqual([
+      ['matched', '✓In your target region: Utah'],
+      ['partial', '≈Related to your target industry'],
+      ['missed', '✗Size outside your range'],
+    ]);
   });
-});
 
-describe('the phone person card keeps who it is in view', () => {
-  it('name, title, company and the target match sit in the header, above the scrolling facts', () => {
-    const { container } = renderPerson();
-    const { body } = parts(container);
-    for (const title of ['Kristin Sokol', PERSON.title, 'Sokol Studio', 'Matches your SVP target']) {
-      const el = container.querySelector(`[title="${title}"]`);
-      expect(el, `${title} is missing`).toBeTruthy();
-      expect(body.contains(el), `${title} scrolls away`).toBe(false);
+  it('never more than three, however many matched', () => {
+    breakdown.current = { industry: row(100), location: row(100), employeeSize: row(100), revenue: row(100) };
+    expect(renderCompany().container.querySelectorAll('[data-reason]')).toHaveLength(3);
+  });
+
+  it('a short screen (an SE) shows two, so the card still fits without scrolling', () => {
+    breakdown.current = { industry: row(100), location: row(100), employeeSize: row(100), revenue: row(100) };
+    const original = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = class {
+      constructor(cb) { this.cb = cb; }
+      observe() { this.cb([{ contentRect: { height: 386 } }]); }
+      disconnect() {}
+    };
+    try {
+      expect(renderCompany().container.querySelectorAll('[data-reason]')).toHaveLength(2);
+    } finally {
+      globalThis.ResizeObserver = original;
     }
-    expect(body.textContent).toMatch(/COMPANY/);
+  });
+
+  it('its sheet holds everything the card left out: the full breakdown, Barry Intel, facts, Website and LinkedIn', () => {
+    breakdown.current = { industry: row(100), location: row(100), employeeSize: row(50), revenue: NOT_MEASURED };
+    const { container } = renderCompany();
+    fireEvent.click(button(container, 'Details'));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAccessibleName('Sokol Studio details');
+    expect(dialog.textContent).toMatch(/ICP MATCH/);
+    expect(dialog.textContent).toMatch(/not measured/);
+    expect(dialog.textContent).toMatch(/BARRY INTEL/);
+    expect(dialog.textContent).toMatch(/FOUNDED/);
+    expect(dialog.textContent).toMatch(/Dana Reyes/);
+    expect(dialog.querySelector('a[href="https://sokol.example"]')).toBeTruthy();
+    expect(dialog.querySelector('a[href="https://www.linkedin.com/company/sokol-example"]')).toBeTruthy();
   });
 });
 
-// ── Horizontal is a swipe, vertical is a scroll ─────────────────────────────
-// A press is read once, after it has moved AXIS_LOCK_PX. A vertical scroll
-// that drifts sideways past the decision threshold used to decide the card.
-const touch = (el, type, x, y) => fireEvent[type](el, { touches: type === 'touchEnd' ? [] : [{ clientX: x, clientY: y }] });
-const settle = () => act(() => { vi.advanceTimersByTime(600); });
+describe('the phone person card: the person first, and no made-up score', () => {
+  it('a real Apollo photo fills the picture; name, title @ company and city sit on it', () => {
+    const { container } = renderPerson();
+    expect(container.querySelector('img').getAttribute('src')).toBe(PERSON.photo_url);
+    expect(container.querySelector('[title="Kristin Sokol"]')).toBeTruthy();
+    expect(container.querySelector('[title="Senior Vice President, Sales @ Sokol Studio"]')).toBeTruthy();
+    expect(container.textContent).toMatch(/Salt Lake City, Utah/);
+  });
 
+  it('no photo, a placeholder, or one that fails to load: initials, in the same layout', () => {
+    for (const photo_url of [null, 'https://static.licdn.com/sc/h/ghost-person.png']) {
+      const { container, unmount } = renderPerson({ person: { ...PERSON, photo_url } });
+      expect(container.querySelector('img')).toBeNull();
+      expect(container.textContent).toMatch(/KS/);
+      unmount();
+    }
+    const { container } = renderPerson();
+    fireEvent.error(container.querySelector('img'));
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.textContent).toMatch(/KS/);
+  });
+
+  it('the target-title statement and the strongest signals; the company\'s ICP match is the only percentage', () => {
+    const { container } = renderPerson();
+    expect(container.textContent).toMatch(/Matches your Senior Vice President target/);
+    expect([...container.querySelectorAll('[data-reason]')].map(r => r.textContent)).toEqual([
+      '✓Decision maker · VP level', '•Sales department', '✓Company: 82% ICP match',
+    ]);
+    expect(container.textContent.match(/\d+%[^\d]{0,10}/g)).toEqual(['82% ICP match']);
+  });
+
+  it('a signal we do not have is left out, not guessed', () => {
+    const { container } = renderPerson({ person: { ...PERSON, seniority: null, departments: [] }, company: { ...COMPANY, fit_score: undefined } });
+    expect(container.querySelectorAll('[data-reason]')).toHaveLength(0);
+  });
+
+  it('its sheet: why this person, their company, Barry Intel and the links', () => {
+    const { container } = renderPerson();
+    fireEvent.click(button(container, 'Details'));
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveAccessibleName('Kristin Sokol details');
+    expect(dialog.textContent).toMatch(/WHY THIS PERSON/);
+    expect(dialog.textContent).toMatch(/Decision maker · VP level/);
+    expect(dialog.textContent).toMatch(/THEIR COMPANY/);
+    expect(dialog.textContent).toMatch(/82% ICP match/);
+    expect(dialog.textContent).toMatch(/BARRY INTEL/);
+    expect(dialog.querySelector(`a[href="${PERSON.linkedin_url}"]`)).toBeTruthy();
+  });
+});
+
+// ── Gestures: horizontal decides, vertical never does ───────────────────────
 describe.each([
-  ['company', CompanySwipeCard, { company: COMPANY }],
-  ['person', PersonSwipeCard, { person: PERSON, company: COMPANY }],
-])('the %s card reads a press as a swipe or a scroll, once', (_, Card, props) => {
+  ['company', CompanySwipeCard, { company: COMPANY }, 'co1'],
+  ['person', PersonSwipeCard, { person: PERSON, company: COMPANY }, 'co1_p1'],
+])('the %s card reads a press once', (_, Card, props, subjectId) => {
   beforeEach(() => { vi.useFakeTimers(); });
   afterEach(() => { vi.useRealTimers(); });
 
-  const setup = () => {
+  const setup = (extra = {}) => {
     const onAccept = vi.fn();
     const onReject = vi.fn();
-    const { container } = render(<Card {...props} onAccept={onAccept} onReject={onReject} onSkip={() => {}} fit />);
-    return { el: container.firstChild, onAccept, onReject };
+    const onSkip = vi.fn();
+    const skipRef = createRef();
+    const { container } = render(<Card {...props} onAccept={onAccept} onReject={onReject} onSkip={onSkip} skipRef={skipRef} fit {...extra} />);
+    return { el: container.firstChild, container, onAccept, onReject, onSkip, skipRef };
+  };
+  const press = (el, points) => {
+    touch(el, 'touchStart', ...points[0]);
+    for (const p of points.slice(1)) touch(el, 'touchMove', ...p);
+    touch(el, 'touchEnd', ...points[points.length - 1]);
   };
 
-  it('a vertical scroll that drifts far sideways neither moves nor decides the card', () => {
+  it('a vertical press that drifts far sideways neither moves nor decides the card', () => {
     const { el, onAccept, onReject } = setup();
     touch(el, 'touchStart', 100, 300);
-    touch(el, 'touchMove', 102, 280);   // vertical: the press is a scroll from here on
-    touch(el, 'touchMove', 260, 120);   // 160px sideways — past the threshold
-    expect(el.style.transform, 'the card followed a vertical scroll').toMatch(/translateX\(0px\)/);
-    touch(el, 'touchEnd');
+    touch(el, 'touchMove', 102, 320);
+    touch(el, 'touchMove', 260, 420);
+    expect(el.style.transform).toMatch(/translateX\(0px\)/);
+    touch(el, 'touchEnd', 260, 420);
     settle();
+    expect(onAccept).not.toHaveBeenCalled();
+    expect(onReject).not.toHaveBeenCalled();
+    expect(sheet(), 'a downward press opened Details').toBeNull();
+  });
+
+  it('a swipe up opens Details and decides nothing; a short one does neither', () => {
+    const { el, onAccept, onReject } = setup();
+    press(el, [[100, 300], [101, 290], [102, 270]]);
+    expect(sheet(), '30px up opened Details').toBeNull();
+    press(el, [[100, 300], [101, 290], [104, 200]]);
+    settle();
+    expect(sheet()).not.toBeNull();
     expect(onAccept).not.toHaveBeenCalled();
     expect(onReject).not.toHaveBeenCalled();
   });
 
-  it('a jitter below the lock distance is neither', () => {
-    const { el, onAccept } = setup();
-    touch(el, 'touchStart', 100, 300);
-    touch(el, 'touchMove', 105, 303);
-    expect(el.style.transform).toMatch(/translateX\(0px\)/);
-    touch(el, 'touchEnd');
+  it('nothing inside the sheet can drag or decide the card behind it', () => {
+    const { el, container, onAccept, onReject } = setup();
+    fireEvent.click(button(container, 'Details'));
+    const body = sheet().querySelector('[data-sheet-body]');
+    press(body, [[50, 400], [70, 401], [300, 405]]);
+    fireEvent.mouseDown(body, { clientX: 50, clientY: 400 });
+    fireEvent.mouseMove(body, { clientX: 300, clientY: 400 });
+    fireEvent.mouseUp(body, { clientX: 300, clientY: 400 });
     settle();
+    expect(el.style.transform).toMatch(/translateX\(0px\)/);
     expect(onAccept).not.toHaveBeenCalled();
+    expect(onReject).not.toHaveBeenCalled();
   });
 
-  it('a horizontal swipe follows the finger and decides exactly once, even if it then turns vertical', () => {
+  it('Match in the sheet closes it and takes the card\'s own path: the feedback face, then one decision', () => {
+    const { container, onAccept } = setup();
+    fireEvent.click(button(container, 'Details'));
+    fireEvent.click(button(screen.getByRole('dialog'), /^Match$/));
+    expect(sheet()).toBeNull();
+    act(() => { vi.advanceTimersByTime(200); });
+    fireEvent.click(within(container).getAllByRole('button', { name: /^Skip$/ })[0]);
+    settle();
+    expect(onAccept).toHaveBeenCalledTimes(1);
+    expect(onAccept.mock.calls[0]).toContain(subjectId);
+  });
+
+  it('a horizontal swipe follows the finger and decides exactly once', () => {
     const { el, onAccept, onReject } = setup();
     touch(el, 'touchStart', 100, 300);
-    touch(el, 'touchMove', 120, 302);   // horizontal: the press is a swipe from here on
+    touch(el, 'touchMove', 120, 302);
     touch(el, 'touchMove', 160, 340);
-    expect(el.style.transform, 'the card does not follow the finger').toMatch(/translateX\(60px\)/);
+    expect(el.style.transform).toMatch(/translateX\(60px\)/);
     touch(el, 'touchMove', 230, 400);
-    touch(el, 'touchEnd');
-    fireEvent.mouseUp(el);              // the compatibility events a touch release brings
+    touch(el, 'touchEnd', 230, 400);
+    fireEvent.mouseUp(el);
     fireEvent.mouseLeave(el);
     settle();
     expect(onAccept).toHaveBeenCalledTimes(1);
@@ -213,29 +344,55 @@ describe.each([
 
   it('a swipe released short of the threshold snaps back and decides nothing', () => {
     const { el, onAccept, onReject } = setup();
-    touch(el, 'touchStart', 300, 300);
-    touch(el, 'touchMove', 280, 300);
-    touch(el, 'touchMove', 210, 305);
-    touch(el, 'touchEnd');
+    press(el, [[300, 300], [280, 300], [210, 305]]);
     settle();
     expect(el.style.transform).toMatch(/translateX\(0px\)/);
     expect(onAccept).not.toHaveBeenCalled();
     expect(onReject).not.toHaveBeenCalled();
   });
 
-  it('left past the threshold is Not a Match, once', () => {
+  it('left past the threshold is Not a Match, once, however fast the second flick', () => {
     const { el, onAccept, onReject } = setup();
-    touch(el, 'touchStart', 300, 300);
-    touch(el, 'touchMove', 280, 300);
-    touch(el, 'touchMove', 150, 310);
-    touch(el, 'touchEnd');
-    touch(el, 'touchStart', 300, 300);  // a second flick on the card already leaving
-    touch(el, 'touchMove', 280, 300);
-    touch(el, 'touchMove', 150, 310);
-    touch(el, 'touchEnd');
+    press(el, [[300, 300], [280, 300], [150, 310]]);
+    press(el, [[300, 300], [280, 300], [150, 310]]);
     settle();
     expect(onReject).toHaveBeenCalledTimes(1);
     expect(onAccept).not.toHaveBeenCalled();
+  });
+
+  it('Skip below the card goes through the card\'s latch: once, and never after a decision', () => {
+    const first = setup();
+    act(() => { first.skipRef.current(); first.skipRef.current(); });
+    expect(first.onSkip).toHaveBeenCalledTimes(1);
+    expect(first.onSkip).toHaveBeenCalledWith(subjectId);
+
+    const second = setup();
+    press(second.el, [[300, 300], [280, 300], [150, 310]]);
+    act(() => { second.skipRef.current(); });
+    settle();
+    expect(second.onSkip).not.toHaveBeenCalled();
+    expect(second.onReject).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('without `fit` the cards are the desktop cards they were', () => {
+  it('no Details sheet, no swipe-up, Skip on the card', () => {
+    vi.useFakeTimers();
+    try {
+      const { container } = render(<CompanySwipeCard company={COMPANY} onAccept={noop} onReject={noop} onSkip={noop} wide />);
+      expect(within(container).queryByRole('button', { name: 'Details' })).toBeNull();
+      expect(within(container).getByRole('button', { name: /Skip for now/ })).toBeTruthy();
+      expect(container.textContent).toMatch(/This is a Match/);
+      const el = container.firstChild;
+      touch(el, 'touchStart', 100, 300);
+      touch(el, 'touchMove', 101, 290);
+      touch(el, 'touchMove', 104, 150);
+      touch(el, 'touchEnd', 104, 150);
+      settle();
+      expect(sheet()).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 
@@ -247,12 +404,18 @@ describe('the page gives a phone card the screen', () => {
     expect(src).toMatch(/const PHONE_STAGE = isDesktop \? null : \{ flex: '1 1 0%', minHeight: 0, display: 'flex', flexDirection: 'column' \};/);
     const stages = src.match(/<div style=\{\{ position: 'relative', width: '100%', maxWidth: isDesktop \? CARD_MAX_W \+ 20 : 440[^}]*\}\}>/g) || [];
     expect(stages).toHaveLength(2);
-    // Spread last, so on a phone it overrides the desktop floor's flexShrink: 0.
     for (const stage of stages) expect(stage).toMatch(/\.\.\.PHONE_STAGE \}\}>$/);
   });
 
-  it('both cards are told to fit on a phone, and only there', () => {
+  it('both cards are told to fit on a phone, and only there, each with its Skip handle', () => {
     expect(src.match(/fit=\{!isDesktop\}/g)).toHaveLength(2);
+    expect(src).toMatch(/skipRef=\{companySkipRef\}/);
+    expect(src).toMatch(/skipRef=\{personSkipRef\}/);
+  });
+
+  it('on a phone Skip is below the card and goes through the card\'s own handle', () => {
+    expect(src).toMatch(/onClick=\{\(\) => companySkipRef\.current\?\.\(\)\}[\s\S]{0,300}Skip for now/);
+    expect(src).toMatch(/onClick=\{\(\) => personSkipRef\.current\?\.\(\)\}[\s\S]{0,300}Skip for today/);
   });
 
   it('nothing floats over the card or the bottom nav: the queue is in the header at every width, the key hint is desktop-only', () => {

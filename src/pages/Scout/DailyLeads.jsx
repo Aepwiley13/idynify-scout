@@ -4,14 +4,15 @@
  * UI: idynify-v5 design with theme tokens.
  * Data: Firebase Firestore + Apollo (all original wiring preserved).
  */
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useImperativeHandle, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { auth, db } from '../../firebase/config';
 import {
   collection, query, where, getDocs, doc, getDoc,
   setDoc, updateDoc,
 } from 'firebase/firestore';
-import { Globe, Linkedin, Check, X, RefreshCw, Loader, Settings, RotateCcw, MessageCircle, ArrowRight, MapPin, User, List, ChevronDown, Flame, Trophy } from 'lucide-react';
+import { Globe, Linkedin, Check, X, RefreshCw, Loader, Settings, RotateCcw, MessageCircle, ArrowRight, MapPin, User, List, ChevronDown, Flame, Trophy, Info } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
 import ScorePip from '../../components/scout/ScorePip';
@@ -22,6 +23,7 @@ import ContactTitleSetup from '../../components/scout/ContactTitleSetup';
 import BarryICPPanel, { BarryAvatar } from '../../components/scout/BarryICPPanel';
 import { getScoreBreakdown, DEFAULT_WEIGHTS, calculateICPScore, generateMatchReasons, computeCoverage } from '../../utils/icpScoring';
 import { getDisplayIndustry, getDisplayBarryIntel, isMissingValue, VERIFICATION_NEEDED_MESSAGE } from '../../utils/companyDisplay';
+import { resolveContactPhotoSources, getInitials } from '../../utils/contactPhoto';
 import { enrichAcceptedCompany } from '../../services/companyEnrichment';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { prepareContactWrite, applyContactMerge } from '../../services/contactWriteGuard';
@@ -56,6 +58,202 @@ function Av({ initials, color = BRAND.pink, size = 70 }) {
 // vertical (scrolling the card's body). Decided once per gesture: a vertical
 // one never moves or decides the card, however far it drifts sideways later.
 const AXIS_LOCK_PX = 8;
+// On a phone (`fit`) a vertical press that travels this far up opens Details.
+const SWIPE_UP_PX = 60;
+// Below this card height a phone card shows two reasons and a smaller logo
+// rather than three, so nothing on it ever has to scroll (iPhone SE: ~386px).
+const COMPACT_CARD_H = 470;
+
+// ─── Phone card pieces (`fit`) ────────────────────────────────────────────────
+// Below 1024px a discovery is one screen-sized card that never scrolls: who or
+// what it is, why it might fit, and the decision. Everything deeper opens in
+// the Details sheet over the same card.
+
+/** [ref, compact]: compact while the element is shorter than COMPACT_CARD_H. */
+function useCompactCard(enabled) {
+  const ref = useRef(null);
+  const [compact, setCompact] = useState(false);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!enabled || !el || typeof ResizeObserver === 'undefined') return undefined;
+    // The first observation lands after layout and before paint, so a short
+    // screen never shows the full card first. A card not laid out measures 0,
+    // which is not a short screen.
+    const ro = new ResizeObserver(([entry]) => {
+      const h = entry.contentRect.height;
+      if (h > 0) setCompact(h < COMPACT_CARD_H);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [enabled]);
+  return [ref, compact];
+}
+
+// Text on a light card needs the darker shade of each status color to stay
+// readable; the dark themes keep the status colors themselves.
+const inkFor = (T, kind) => {
+  if (kind === 'matched') return T.isDark ? STATUS.green : '#047857';
+  if (kind === 'partial') return T.isDark ? STATUS.amber : '#92400e';
+  if (kind === 'missed') return T.isDark ? STATUS.red : '#b91c1c';
+  return T.textMuted;
+};
+const REASON_SYMBOL = { matched: '✓', partial: '≈', missed: '✗', neutral: '•' };
+
+/** One line of "why": a symbol for what kind of evidence it is, then the words. */
+function ReasonLine({ kind, text, T }) {
+  return (
+    <div data-reason={kind} title={text} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: T.text, minWidth: 0 }}>
+      <span aria-hidden="true" style={{ width: 16, flexShrink: 0, textAlign: 'center', fontWeight: 800, color: inkFor(T, kind) }}>{REASON_SYMBOL[kind]}</span>
+      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</span>
+    </div>
+  );
+}
+
+/**
+ * The company's strongest ICP reasons: matched factors in weight order, then
+ * near ones, then misses. A factor with no data is not a reason either way.
+ */
+function strongestReasons(factorPills) {
+  const TEXT = {
+    industry: { matched: () => 'In your target industry', partial: () => 'Related to your target industry', missed: () => 'Outside your target industries' },
+    location: { matched: v => (v ? `In your target region: ${v}` : 'In your target region'), partial: () => 'Near your target region', missed: () => 'Outside your target region' },
+    employeeSize: { matched: () => 'Size fits your range', partial: () => 'Size near your range', missed: () => 'Size outside your range' },
+    revenue: { matched: () => 'Revenue fits your range', partial: () => 'Revenue near your range', missed: () => 'Revenue outside your range' },
+  };
+  const reasons = factorPills
+    .filter(({ data }) => !data.unknown)
+    .map(({ key, data }) => {
+      const kind = data.match === 100 ? 'matched' : data.match === 50 ? 'partial' : 'missed';
+      const value = typeof data.value === 'string' ? data.value : null;
+      return { key, kind, text: TEXT[key][kind](value) };
+    });
+  const rank = { matched: 0, partial: 1, missed: 2 };
+  return reasons.sort((a, b) => rank[a.kind] - rank[b.kind]);
+}
+
+const SENIORITY_LABELS = {
+  owner: 'Owner', founder: 'Founder', c_suite: 'C-suite', partner: 'Partner', vp: 'VP level',
+  head: 'Head of function', director: 'Director level', manager: 'Manager level',
+  senior: 'Senior individual contributor', entry: 'Entry level', intern: 'Intern',
+};
+const DECISION_MAKERS = new Set(['owner', 'founder', 'c_suite', 'partner', 'vp', 'head', 'director']);
+
+/** Apollo's "master_sales" → "Sales". Nothing for the C-suite: seniority says it. */
+function formatDepartment(raw) {
+  if (typeof raw !== 'string' || !raw.trim()) return null;
+  const key = raw.trim().toLowerCase().replace(/^master_/, '');
+  if (key === 'c_suite') return null;
+  return key.split('_').filter(Boolean).map(w => w[0].toUpperCase() + w.slice(1)).join(' ');
+}
+
+/**
+ * What we know about a person, strongest first. There is no person-level
+ * score, so none is made up: seniority, department, and the company's own
+ * ICP match as context.
+ */
+function personSignals(person, company) {
+  const out = [];
+  const seniority = String(person?.seniority || '').toLowerCase();
+  if (SENIORITY_LABELS[seniority]) {
+    out.push(DECISION_MAKERS.has(seniority)
+      ? { key: 'seniority', kind: 'matched', text: `Decision maker · ${SENIORITY_LABELS[seniority]}` }
+      : { key: 'seniority', kind: 'neutral', text: SENIORITY_LABELS[seniority] });
+  }
+  const department = formatDepartment((person?.departments || [])[0]);
+  if (department) out.push({ key: 'department', kind: 'neutral', text: `${department} department` });
+  const fit = company?.fit_score ?? company?.score;
+  if (typeof fit === 'number') {
+    out.push({ key: 'company', kind: fit >= 75 ? 'matched' : fit >= 50 ? 'partial' : 'neutral', text: `Company: ${fit}% ICP match` });
+  }
+  return out;
+}
+
+/** "Details" on the card: opens the sheet. Over a photo it is light on dark. */
+function DetailsButton({ onOpen, T, onDark = false }) {
+  return (
+    <button
+      type="button"
+      aria-haspopup="dialog"
+      onClick={e => { e.stopPropagation(); onOpen(); }}
+      style={{
+        flexShrink: 0, height: 44, padding: '0 14px', borderRadius: 22, cursor: 'pointer',
+        background: onDark ? '#ffffff26' : T.cardBg, border: `1px solid ${onDark ? '#ffffff80' : T.border2}`,
+        color: onDark ? '#ffffff' : T.textMuted, fontSize: 13, fontWeight: 600,
+        display: 'flex', alignItems: 'center', gap: 6,
+      }}
+    ><Info size={15} />Details</button>
+  );
+}
+
+/** Not a Match / Match on a phone — the card's own handlers, on the card and in the sheet. */
+function PhoneDecision({ onReject, onMatch, T, compact = false, padding }) {
+  const button = (color, ink) => ({
+    flex: 1, height: compact ? 48 : 50, borderRadius: 12, cursor: 'pointer',
+    border: `1.5px solid ${color}45`, background: `${color}0f`, color: ink,
+    fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+  });
+  return (
+    <div style={{ flexShrink: 0, display: 'flex', gap: 10, padding: padding ?? (compact ? '10px 12px 12px' : '14px 14px 14px') }}>
+      <button type="button" onClick={onReject} style={button(STATUS.red, inkFor(T, 'missed'))}><X size={16} />Not a Match</button>
+      <button type="button" onClick={onMatch} style={button(STATUS.green, inkFor(T, 'matched'))}><Check size={16} />Match</button>
+    </div>
+  );
+}
+
+/** A small uppercase label over a section of the sheet. */
+function SheetHeading({ children, T }) {
+  return <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.6, color: T.textMuted, margin: '16px 18px 8px' }}>{children}</div>;
+}
+
+/**
+ * Details: a sheet over the card, not a new page. Only the sheet scrolls; a
+ * drag down on its top edge, the ✕ or the dimmed card behind it closes it, and
+ * the card is exactly as it was. Match / Not a Match stay at its foot.
+ *
+ * It renders into document.body so it covers the bottom navigation, but React
+ * still bubbles its events to the card it belongs to — every one is stopped
+ * here, so nothing in the sheet can drag or decide the card.
+ */
+function DetailsSheet({ label, header, footer, onClose, T, children }) {
+  const pull = useRef(null);
+  const stop = e => e.stopPropagation();
+  return createPortal(
+    <div
+      data-details-sheet
+      onMouseDown={stop} onMouseMove={stop} onMouseUp={stop} onMouseLeave={stop}
+      onTouchStart={stop} onTouchMove={stop} onTouchEnd={stop} onClick={stop}
+      style={{ position: 'fixed', inset: 0, zIndex: 1200 }}
+    >
+      <div aria-hidden="true" onClick={onClose} style={{ position: 'absolute', inset: 0, background: '#12082a73', animation: 'fadeIn 0.2s ease' }} />
+      <div role="dialog" aria-modal="true" aria-label={label} style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0, top: 'calc(env(safe-area-inset-top, 0px) + 56px)',
+        background: T.cardBg, borderRadius: '22px 22px 0 0', boxShadow: '0 -12px 40px #12082a33',
+        display: 'flex', flexDirection: 'column', overflow: 'hidden', animation: 'slideUpSheet 0.24s ease',
+      }}>
+        <div
+          onTouchStart={e => { pull.current = e.touches[0].clientY; }}
+          onTouchEnd={e => { const from = pull.current; pull.current = null; if (from != null && e.changedTouches[0].clientY - from > SWIPE_UP_PX) onClose(); }}
+          style={{ flexShrink: 0, padding: '8px 18px 12px', borderBottom: `1px solid ${T.border}`, touchAction: 'none' }}
+        >
+          <div aria-hidden="true" style={{ width: 40, height: 5, borderRadius: 3, background: T.border2, margin: '0 auto 10px' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 12 }}>{header}</div>
+            <button type="button" aria-label="Close details" onClick={onClose} style={{ width: 44, height: 44, flexShrink: 0, borderRadius: 22, border: `1px solid ${T.border}`, background: T.surface, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}>
+              <X size={16} color={T.textMuted} />
+            </button>
+          </div>
+        </div>
+        <div data-sheet-body style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch', paddingBottom: 12 }}>
+          {children}
+        </div>
+        <div style={{ flexShrink: 0, borderTop: `1px solid ${T.border}`, background: T.cardBg, paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+          {footer}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
+}
 
 // The swipe card's width above 1024px, where the column has room to spare.
 // Wider is shorter: the same text — Barry Intel above all — reflows over fewer
@@ -238,14 +436,16 @@ function FeedbackFace({ entityName, reasons, setReasons, note, setNote, score, s
 // Exported for the gesture regression test (src/test/swipeSingleDecision.test.jsx),
 // which drives the real DOM events a drag release produces. The page still ships
 // as the default export; nothing else imports this.
-export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = false, fit = false, icpProfile, icpWeights }) {
+export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = false, fit = false, skipRef = null, icpProfile, icpWeights }) {
   const T = useT();
   const [dx, setDx] = useState(0);
   const [dy, setDy] = useState(0);
   const [gone, setGone] = useState(null);
   const [showBreakdown, setShowBreakdown] = useState(false);
-  // `fit` (phones): the details below Barry Intel open from the ICP row.
-  const [showDetails, setShowDetails] = useState(false);
+  // `fit` (phones): Details is a sheet over the card, and a short screen gets
+  // a compact card (see COMPACT_CARD_H).
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [surfaceRef, compact] = useCompactCard(fit);
   const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackReasons, setFeedbackReasons] = useState([]);
   const [feedbackNote, setFeedbackNote] = useState('');
@@ -299,15 +499,18 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
   const xy = e => e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.clientX, e.clientY];
   // Post-decision the card is spent; a synthesized compat mousedown must not
   // re-arm the drag it is about to "release".
-  const down = e => { if (decidedRef.current) return; const [x, y] = xy(e); s.current = { x, y, axis: null }; };
+  // While Details is open the sheet owns every touch; its events still bubble
+  // here through the portal, so they are ignored rather than read as a drag.
+  const down = e => { if (decidedRef.current || detailsOpen) return; const [x, y] = xy(e); s.current = { x, y, axis: null, my: 0 }; };
   const move = e => {
     const press = s.current;
     if (!press) return;
     const [cx, cy] = xy(e);
     const mx = cx - press.x;
     const my = cy - press.y;
-    // Intent is read once (AXIS_LOCK_PX): a vertical press is the card body
-    // scrolling, and leaves the card where it is.
+    press.my = my;
+    // Intent is read once (AXIS_LOCK_PX): a vertical press never moves or
+    // decides the card. On a phone, one that goes far enough up opens Details.
     if (!press.axis) {
       if (Math.max(Math.abs(mx), Math.abs(my)) < AXIS_LOCK_PX) return;
       press.axis = Math.abs(mx) > Math.abs(my) ? 'x' : 'y';
@@ -326,7 +529,10 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
     const swiped = pressed.axis === 'x';
     if (swiped && dx > 100) commit(() => { setGone('r'); setTimeout(() => onAccept(null, 'drag', subjectId), 280); });
     else if (swiped && dx < -100) commit(() => { setGone('l'); setTimeout(() => onReject(null, 'drag', subjectId), 280); });
-    else { setDx(0); setDy(0); }
+    else {
+      setDx(0); setDy(0);
+      if (fit && pressed.axis === 'y' && pressed.my < -SWIPE_UP_PX && !decidedRef.current) setDetailsOpen(true);
+    }
   };
 
   const handleMatchClick = (e) => {
@@ -354,6 +560,9 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
   // It still latches: a skip advances the queue, so a skip followed by a stray
   // drag release would decide a company the user has already moved past.
   const handleSkipClick = (e) => { e.stopPropagation(); commit(() => onSkip?.(subjectId)); };
+  // On a phone Skip sits below the card, outside it; it still goes through
+  // this card's latch, so a skip and a swipe on one card cannot both land.
+  useImperativeHandle(skipRef, () => () => commit(() => onSkip?.(subjectId)));
 
   const tx = gone === 'r' ? 700 : gone === 'l' ? -700 : dx;
   // G1-06: a null score means "configured criteria, but nothing measurable on
@@ -403,10 +612,10 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
     company.state,
   ].find(v => typeof v === 'string' && !isMissingValue(v)) || null;
   const employees = [company.employee_count, company.company_size].find(v => !isMissingValue(v)) ?? null;
-  // Phones show the size of the company in the header, beside where it is.
+  // A phone card's one line of size: "1,250 employees · $50M–$100M revenue".
   const keyFacts = [
     employees == null ? null : `${typeof employees === 'number' ? employees.toLocaleString('en-US') : employees} employees`,
-    isMissingValue(company.revenue) ? null : company.revenue,
+    isMissingValue(company.revenue) ? null : `${company.revenue} revenue`,
   ].filter(Boolean).join(' · ');
 
   const ceoName = company.ceo_name
@@ -425,9 +634,8 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
   const overlayOpacity = Math.min(swipeProgress * 1.5, 0.85);
 
   // The card's sections. Desktop shows them in one content-sized column, as
-  // it always has. A phone (`fit`) keeps what decides a match in view —
-  // header, ICP match, Barry Intel, and the buttons pinned at the bottom —
-  // and opens the rest from the ICP row's Details.
+  // it always has. A phone (`fit`) shows the company and why it might fit on
+  // the card, and these sections in its Details sheet.
   const statsGrid = (
     <>
     {/* Stats grid — 3 rows: Industry/Employees, Revenue/Founded, HQ/CEO */}
@@ -464,12 +672,12 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
     <>
     {/* ICP Score row — clickable to expand breakdown */}
     <div
-      onClick={fit ? () => setShowDetails(d => !d) : () => breakdown && setShowBreakdown(p => !p)}
+      onClick={() => breakdown && setShowBreakdown(p => !p)}
       style={{
         padding: wide ? '10px 18px' : '8px 14px', borderBottom: `1px solid ${T.border}`,
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        cursor: fit || breakdown ? 'pointer' : 'default',
-        background: (fit ? showDetails : showBreakdown) ? T.surface : 'transparent',
+        cursor: breakdown ? 'pointer' : 'default',
+        background: showBreakdown ? T.surface : 'transparent',
       }}
     >
       <div>
@@ -485,10 +693,10 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
           }}>{scoreLabel}</span>
         </div>
       </div>
-      {(fit || breakdown) && (
+      {breakdown && (
         <div style={{ fontSize: 10, color: T.textFaint, display: 'flex', alignItems: 'center', gap: 3 }}>
           Details
-          <ChevronDown size={12} style={{ transform: (fit ? showDetails : showBreakdown) ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+          <ChevronDown size={12} style={{ transform: showBreakdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
         </div>
       )}
     </div>
@@ -548,10 +756,10 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
   const breakdownPanel = (
     <>
     {/* Score breakdown — expanded */}
-    {(fit ? showDetails : showBreakdown) && breakdown && (
+    {(fit || showBreakdown) && breakdown && (
       <div style={{
-        padding: wide ? '10px 18px' : '8px 14px', borderBottom: `1px solid ${T.border}`,
-        background: T.surface, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6,
+        padding: wide ? '10px 18px' : fit ? '10px 18px' : '8px 14px', borderBottom: `1px solid ${T.border}`,
+        background: T.surface, display: 'grid', gridTemplateColumns: fit ? '1fr' : '1fr 1fr', gap: fit ? 8 : 6,
       }}>
         {[
           ['Industry', breakdown.industry],
@@ -560,13 +768,18 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
           ['Revenue', breakdown.revenue],
         ].map(([label, data]) => {
           const matchColor = data.match === 100 ? STATUS.green : data.match === 50 ? STATUS.amber : STATUS.red;
+          // The sheet has the room to say what the card's pills say: a factor
+          // with no data was not measured, and each counts for its weight.
+          const measured = !fit || (data.active && !data.unknown);
           return (
-            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 10 }}>
-              <span style={{ color: matchColor, fontWeight: 700, fontSize: 12, lineHeight: 1 }}>
-                {data.match === 100 ? '✓' : data.match === 50 ? '≈' : '✗'}
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: fit ? 12 : 10 }}>
+              <span style={{ color: measured ? matchColor : T.textFaint, fontWeight: 700, fontSize: 12, lineHeight: 1 }}>
+                {!measured ? '–' : data.match === 100 ? '✓' : data.match === 50 ? '≈' : '✗'}
               </span>
               <span style={{ color: T.textMuted }}>{label}</span>
-              <span style={{ marginLeft: 'auto', color: T.textFaint, fontWeight: 600 }}>{data.contribution}pt</span>
+              <span style={{ marginLeft: 'auto', color: T.textFaint, fontWeight: 600 }}>
+                {!fit ? `${data.contribution}pt` : measured ? `${data.contribution} of ${data.weight}pt` : 'not measured'}
+              </span>
             </div>
           );
         })}
@@ -631,6 +844,48 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
     </>
   );
 
+  // ── Phone face (`fit`) ─────────────────────────────────────────────────────
+  const whereLine = [knownIndustry, hqLocation].filter(v => v && !isMissingValue(v)).join(' · ');
+  const matchKind = !isScored ? 'neutral' : score >= 75 ? 'matched' : score >= 50 ? 'partial' : 'missed';
+  const matchInk = inkFor(T, matchKind);
+  const reasons = fit ? strongestReasons(factorPills) : [];
+  const phoneFace = (
+    <>
+      {/* A short screen has no room above the logo for the pill, so there the
+          two sit side by side. */}
+      <div style={{ flex: '1 1 auto', minHeight: 0, position: 'relative', overflow: 'hidden', background: T.cardBg2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
+        <div style={{
+          ...(compact ? { order: 1 } : { position: 'absolute', top: 14, right: 14 }), zIndex: 6,
+          fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: inkFor(T, confidence === 'High' ? 'matched' : confidence === 'Medium' ? 'partial' : 'missed'),
+          padding: '4px 9px', background: `${confColor}18`, border: `1px solid ${confColor}50`, borderRadius: 6,
+        }}>{confidence} confidence</div>
+        <div style={{ borderRadius: compact ? 22 : 32, overflow: 'hidden', flexShrink: 0, boxShadow: `0 14px 34px ${T.isDark ? '#00000066' : '#12082a14'}` }}>
+          <CompanyLogo company={company} size={compact ? 'heroCompact' : 'hero'} className="!rounded-none" />
+        </div>
+      </div>
+      <div style={{ flexShrink: 0, padding: compact ? '10px 16px 0' : '14px 18px 0' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+          <div title={company.name} style={{ minWidth: 0, fontSize: compact ? 22 : 25, fontWeight: 800, letterSpacing: -0.3, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.name}</div>
+          <DetailsButton T={T} onOpen={() => setDetailsOpen(true)} />
+        </div>
+        {whereLine && <div title={whereLine} style={{ fontSize: 14, color: T.textMuted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{whereLine}</div>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: compact ? 8 : 12 }}>
+          <span data-testid="icp-match-chip" style={{ fontSize: 14, fontWeight: 800, color: matchInk, background: `${sc}18`, border: `1px solid ${sc}50`, borderRadius: 8, padding: '4px 10px', whiteSpace: 'nowrap' }}>
+            {isScored ? `${score}% ICP match` : 'ICP match —'}
+          </span>
+          <span style={{ fontSize: 13, fontWeight: 600, color: matchInk, whiteSpace: 'nowrap' }}>{scoreLabel}</span>
+        </div>
+        {keyFacts && <div title={keyFacts} style={{ fontSize: 13, color: T.textMuted, marginTop: compact ? 6 : 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{keyFacts}</div>}
+        {reasons.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: compact ? 5 : 6, marginTop: compact ? 8 : 12 }}>
+            {reasons.slice(0, compact ? 2 : 3).map(r => <ReasonLine key={r.key} kind={r.kind} text={r.text} T={T} />)}
+          </div>
+        )}
+      </div>
+      <PhoneDecision T={T} compact={compact} onReject={handleRejectClick} onMatch={handleMatchClick} />
+    </>
+  );
+
   return (
     <div
       onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
@@ -671,10 +926,10 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
       )}
 
       {/* Card — on desktop its height comes from its content. On a phone
-          (`fit`) it is as tall as the screen allows: the header and the
-          decision buttons stay put and the middle scrolls (see below).
+          (`fit`) it is the stage's height and never scrolls: the company,
+          why it might fit, and the decision; the rest is in Details.
           `hidden` here only clips the corner radius. */}
-      <div style={{
+      <div ref={surfaceRef} style={{
         position: 'relative',
         background: T.cardBg, border: `1px solid ${T.border2}`,
         borderRadius: 22, overflow: 'hidden',
@@ -716,6 +971,8 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
           <div style={{ position: 'absolute', inset: 0, zIndex: 5, borderRadius: 22, background: `${STATUS.red}${Math.round(overlayOpacity * 20).toString(16).padStart(2,'0')}`, pointerEvents: 'none' }} />
         )}
 
+        {fit ? phoneFace : (
+          <>
         {/* Header — horizontal: logo left, info right, confidence pill top-right */}
         <div style={{
           padding: wide ? '18px 24px' : '14px 18px', display: 'flex', alignItems: 'center', gap: wide ? 16 : 12,
@@ -736,9 +993,6 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
                 <MapPin size={10} style={{ flexShrink: 0 }} />{hqLocation}
               </div>
             )}
-            {fit && keyFacts && (
-              <div title={keyFacts} style={{ fontSize: 10, color: T.textFaint, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{keyFacts}</div>
-            )}
           </div>
           <div style={{
             position: 'absolute', top: 12, right: 14, zIndex: 6,
@@ -750,44 +1004,57 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
           </div>
         </div>
 
-        {fit ? (
-          <>
-            {/* The one part of a phone card that scrolls, vertically only:
-                uses `contain` so reaching its end never scrolls or bounces
-                the page behind it. A vertical press here is read as a scroll,
-                never as a swipe (AXIS_LOCK_PX). */}
-            <div data-card-body style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}>
-              {icpRow}
-              {factorPillsRow}
-              {barryIntel}
-              {showDetails && (
-                <>
-                  {breakdownPanel}
-                  {statsGrid}
-                  {actionLinks}
-                </>
-              )}
-            </div>
-            <div style={{ flexShrink: 0 }}>{decisionButtons}</div>
-          </>
-        ) : (
-          <>
-            {statsGrid}
-            {icpRow}
-            {factorPillsRow}
-            {breakdownPanel}
-            {barryIntel}
-            {actionLinks}
-            {decisionButtons}
+        {statsGrid}
+        {icpRow}
+        {factorPillsRow}
+        {breakdownPanel}
+        {barryIntel}
+        {actionLinks}
+        {decisionButtons}
           </>
         )}
       </div>
+
+      {/* A sheet button closes the sheet, then does exactly what the card's
+          own button does: the feedback face, then the one decision. */}
+      {fit && detailsOpen && (
+        <DetailsSheet
+          label={`${company.name} details`}
+          onClose={() => setDetailsOpen(false)}
+          T={T}
+          header={(
+            <>
+              <CompanyLogo company={company} size="small" />
+              <div style={{ minWidth: 0 }}>
+                <div title={company.name} style={{ fontSize: 18, fontWeight: 800, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.name}</div>
+                {whereLine && <div title={whereLine} style={{ fontSize: 12, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{whereLine}</div>}
+              </div>
+            </>
+          )}
+          footer={<PhoneDecision T={T} onReject={e => { setDetailsOpen(false); handleRejectClick(e); }} onMatch={e => { setDetailsOpen(false); handleMatchClick(e); }} padding="12px 14px 14px" />}
+        >
+          <SheetHeading T={T}>ICP MATCH</SheetHeading>
+          <div style={{ padding: '0 18px 10px', display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 30, fontWeight: 800, color: matchInk }}>{isScored ? score : '—'}</span>
+            {isScored && <span style={{ fontSize: 13, color: T.textMuted }}>/100</span>}
+            <span style={{ fontSize: 12, fontWeight: 700, color: matchInk, background: `${sc}18`, border: `1px solid ${sc}50`, borderRadius: 6, padding: '2px 8px' }}>{scoreLabel}</span>
+            <span style={{ marginLeft: 'auto', fontSize: 12, color: T.textMuted }}>{confidence} confidence</span>
+          </div>
+          {factorPillsRow}
+          {breakdownPanel}
+          <div style={{ height: 12 }} />
+          {barryIntel}
+          <SheetHeading T={T}>COMPANY</SheetHeading>
+          {statsGrid}
+          {actionLinks}
+        </DetailsSheet>
+      )}
     </div>
   );
 }
 
 // ─── PersonSwipeCard ──────────────────────────────────────────────────────────
-export function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSkip, wide = false, fit = false }) {
+export function PersonSwipeCard({ person, company, matchText, onAccept, onReject, onSkip, wide = false, fit = false, skipRef = null }) {
   const T = useT();
   const [dx, setDx] = useState(0);
   const [dy, setDy] = useState(0);
@@ -799,6 +1066,10 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
   const [rejectionReasons, setRejectionReasons] = useState([]);
   const [rejectionNote, setRejectionNote] = useState('');
   const [isFlipping, setIsFlipping] = useState(false);
+  // `fit` (phones): Details sheet, short-screen card, and a photo that failed to load.
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [surfaceRef, compact] = useCompactCard(fit);
+  const [photoFailed, setPhotoFailed] = useState(false);
   const s = useRef(null);
 
   // One card, one decision — same latch, same reason as CompanySwipeCard above.
@@ -820,14 +1091,16 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
   const subjectId = `${company.id}_${person.id}`;
 
   const xy = e => e.touches ? [e.touches[0].clientX, e.touches[0].clientY] : [e.clientX, e.clientY];
-  const down = e => { if (decidedRef.current) return; const [x, y] = xy(e); s.current = { x, y, axis: null }; };
-  // Same intent rule as CompanySwipeCard: horizontal or vertical, decided once.
+  const down = e => { if (decidedRef.current || detailsOpen) return; const [x, y] = xy(e); s.current = { x, y, axis: null, my: 0 }; };
+  // Same intent rule as CompanySwipeCard: horizontal or vertical, decided once,
+  // and on a phone a vertical press far enough up opens Details.
   const move = e => {
     const press = s.current;
     if (!press) return;
     const [cx, cy] = xy(e);
     const mx = cx - press.x;
     const my = cy - press.y;
+    press.my = my;
     if (!press.axis) {
       if (Math.max(Math.abs(mx), Math.abs(my)) < AXIS_LOCK_PX) return;
       press.axis = Math.abs(mx) > Math.abs(my) ? 'x' : 'y';
@@ -843,8 +1116,13 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
     const swiped = pressed.axis === 'x';
     if (swiped && dx > 100) commit(() => { setGone('r'); setTimeout(() => onAccept(null, subjectId), 280); });
     else if (swiped && dx < -100) commit(() => { setGone('l'); setTimeout(() => onReject(null, subjectId), 280); });
-    else { setDx(0); setDy(0); }
+    else {
+      setDx(0); setDy(0);
+      if (fit && pressed.axis === 'y' && pressed.my < -SWIPE_UP_PX && !decidedRef.current) setDetailsOpen(true);
+    }
   };
+  // Skip below the card on a phone, through this card's latch (see CompanySwipeCard).
+  useImperativeHandle(skipRef, () => () => commit(() => onSkip(subjectId)));
 
   const handleMatchClick = (e) => {
     e.stopPropagation();
@@ -871,7 +1149,25 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
   const color = BRAND.pink;
 
   // The card's sections: desktop stacks them as it always has; a phone
-  // (`fit`) scrolls the facts and keeps the decision buttons pinned.
+  // (`fit`) puts the links in its Details sheet.
+  const personLinks = (
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: wide ? '13px 16px' : '11px 12px', borderBottom: `1px solid ${T.border}` }}>
+      <a
+        href={company?.website_url || person.organization?.website_url || undefined}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={e => { e.stopPropagation(); if (!(company?.website_url || person.organization?.website_url)) e.preventDefault(); }}
+        style={{ padding: wide ? '10px 12px' : 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#7c5ce4,#6c4fd6)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 600, cursor: (company?.website_url || person.organization?.website_url) ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none', opacity: (company?.website_url || person.organization?.website_url) ? 1 : 0.5 }}
+      ><Globe size={13} />Visit Website</a>
+      <a
+        href={person.linkedin_url || undefined}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={e => { e.stopPropagation(); if (!person.linkedin_url) e.preventDefault(); }}
+        style={{ padding: wide ? '10px 12px' : 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#0077b5,#005e94)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 600, cursor: person.linkedin_url ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none', opacity: person.linkedin_url ? 1 : 0.5 }}
+      ><Linkedin size={13} />LinkedIn</a>
+    </div>
+  );
   const personFacts = (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderBottom: `1px solid ${T.border}` }}>
@@ -887,22 +1183,7 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
           </div>
         ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: wide ? '13px 16px' : '11px 12px', borderBottom: `1px solid ${T.border}` }}>
-        <a
-          href={company?.website_url || person.organization?.website_url || undefined}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={e => { e.stopPropagation(); if (!(company?.website_url || person.organization?.website_url)) e.preventDefault(); }}
-          style={{ padding: wide ? '10px 12px' : 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#7c5ce4,#6c4fd6)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 600, cursor: (company?.website_url || person.organization?.website_url) ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none', opacity: (company?.website_url || person.organization?.website_url) ? 1 : 0.5 }}
-        ><Globe size={13} />Visit Website</a>
-        <a
-          href={person.linkedin_url || undefined}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={e => { e.stopPropagation(); if (!person.linkedin_url) e.preventDefault(); }}
-          style={{ padding: wide ? '10px 12px' : 8, borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#0077b5,#005e94)', color: '#fff', fontSize: wide ? 12 : 11, fontWeight: 600, cursor: person.linkedin_url ? 'pointer' : 'default', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5, textDecoration: 'none', opacity: person.linkedin_url ? 1 : 0.5 }}
-        ><Linkedin size={13} />LinkedIn</a>
-      </div>
+      {personLinks}
     </>
   );
   const personDecision = (
@@ -933,6 +1214,76 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
     </>
   );
 
+  // ── Phone face (`fit`) ─────────────────────────────────────────────────────
+  // The photo when Apollo has a real one (not a placeholder, and it loads);
+  // otherwise initials, in the same place and the same layout.
+  const photo = photoFailed ? null : resolveContactPhotoSources(person).full;
+  const phoneInitials = getInitials(personName);
+  const roleLine = [person.title, personCompany].filter(Boolean).join(' @ ');
+  const city = person.city ? `${person.city}${person.state ? ', ' + person.state : ''}` : null;
+  const signals = fit ? personSignals(person, company) : [];
+  // getBarryText: "Matches your … target", or a weaker "Similar role …".
+  const targetKind = matchText && /^Matches your/.test(matchText) ? 'matched' : 'partial';
+  const companyFit = company?.fit_score ?? company?.score ?? null;
+  const companyEmployees = company?.employee_count || company?.company_size;
+  const companyFacts = [
+    getDisplayIndustry(company, null),
+    companyEmployees ? `${typeof companyEmployees === 'number' ? companyEmployees.toLocaleString('en-US') : companyEmployees} employees` : null,
+    isMissingValue(company?.revenue) ? null : company.revenue,
+  ].filter(Boolean).join(' · ');
+  const companyIntel = company ? getDisplayBarryIntel(company) : null;
+  const seniorityRow = signals.find(x => x.key === 'seniority');
+  const departmentRow = signals.find(x => x.key === 'department');
+  const whyRows = [
+    matchText ? ['Target', matchText, targetKind] : null,
+    person.title ? ['Title', person.title] : null,
+    seniorityRow ? ['Seniority', seniorityRow.text] : null,
+    departmentRow ? ['Department', departmentRow.text.replace(/ department$/, '')] : null,
+    city ? ['Location', city] : null,
+  ].filter(Boolean);
+  const phoneFace = (
+    <>
+      <div style={{ flex: '1 1 auto', minHeight: 0, position: 'relative', overflow: 'hidden', background: T.cardBg2 }}>
+        {photo ? (
+          <img
+            src={photo} alt="" draggable={false} onError={() => setPhotoFailed(true)}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center 30%' }}
+          />
+        ) : (
+          <div aria-hidden="true" style={{
+            position: 'absolute', left: '50%', top: '36%', transform: 'translate(-50%, -50%)',
+            width: compact ? 104 : 164, height: compact ? 104 : 164, borderRadius: '50%',
+            background: `${color}1f`, border: `2px solid ${color}55`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: T.isDark ? color : '#c0146a', fontSize: compact ? 38 : 58, fontWeight: 800,
+          }}>{phoneInitials}</div>
+        )}
+        {/* The name sits on the picture, as on a profile; the shade under it
+            keeps white text readable on any photo and on the initials. */}
+        <div aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '62%', background: 'linear-gradient(180deg, #12082a00 0%, #12082a99 55%, #12082ae0 100%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', left: 18, right: 14, bottom: compact ? 12 : 16, color: '#ffffff', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 }}>
+          <div style={{ minWidth: 0 }}>
+            <div title={personName} style={{ fontSize: compact ? 23 : 27, fontWeight: 800, letterSpacing: -0.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{personName}</div>
+            {roleLine && <div title={roleLine} style={{ fontSize: 15, fontWeight: 500, marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{roleLine}</div>}
+            {city && <div style={{ fontSize: 13, marginTop: 3, color: '#ffffffd9' }}>{city}</div>}
+          </div>
+          <DetailsButton T={T} onDark onOpen={() => setDetailsOpen(true)} />
+        </div>
+      </div>
+      <div style={{ flexShrink: 0, padding: compact ? '10px 16px 0' : '14px 18px 0' }}>
+        {matchText && (
+          <span title={matchText} style={{ display: 'inline-block', maxWidth: '100%', fontSize: 14, fontWeight: 800, color: inkFor(T, targetKind), background: `${targetKind === 'matched' ? STATUS.green : STATUS.amber}18`, border: `1px solid ${targetKind === 'matched' ? STATUS.green : STATUS.amber}50`, borderRadius: 8, padding: '4px 10px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>{matchText}</span>
+        )}
+        {signals.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: compact ? 5 : 6, marginTop: matchText ? (compact ? 8 : 12) : 0 }}>
+            {signals.slice(0, compact ? 2 : 3).map(x => <ReasonLine key={x.key} kind={x.kind} text={x.text} T={T} />)}
+          </div>
+        )}
+      </div>
+      <PhoneDecision T={T} compact={compact} onReject={handleRejectClick} onMatch={handleMatchClick} />
+    </>
+  );
+
   return (
     <div
       onMouseDown={down} onMouseMove={move} onMouseUp={up} onMouseLeave={up}
@@ -955,7 +1306,7 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
       {dx < -30 && (
         <div style={{ position: 'absolute', top: 22, right: 16, zIndex: 10, padding: '5px 13px', borderRadius: 8, border: `3px solid ${STATUS.red}`, color: STATUS.red, fontSize: 13, fontWeight: 700, transform: 'rotate(11deg)', background: `${STATUS.red}10` }}>✗ NOT A MATCH</div>
       )}
-      <div style={{ position: 'relative', background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: 'hidden', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)', transition: 'transform 0.14s ease', ...(fit ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } : null) }}>
+      <div ref={surfaceRef} style={{ position: 'relative', background: T.cardBg, border: `1px solid ${T.border2}`, borderRadius: 22, overflow: 'hidden', boxShadow: `0 28px 70px ${T.isDark ? '#00000099' : '#00000018'}`, transform: isFlipping ? 'scaleX(0)' : 'scaleX(1)', transition: 'transform 0.14s ease', ...(fit ? { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } : null) }}>
         {showFeedback && (
           <div style={{ position: 'absolute', inset: 0, zIndex: 30, background: T.cardBg, borderRadius: 22, overflowY: 'auto' }}>
             <FeedbackFace
@@ -979,60 +1330,75 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
             />
           </div>
         )}
-        {fit ? (
-          /* A phone's header is a row, as on the company card: the stacked
-             one below is ~300px for a long name and title, which on a short
-             screen left no room for the buttons. Each line is capped and
-             keeps its full text on hover. */
-          <div style={{ padding: '14px 16px 12px', background: T.cardBg2, borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Av initials={initials} color={color} size={52} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div title={personName} style={{ fontSize: 18, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{personName}</div>
-                {person.title && (
-                  <div title={person.title} style={{ fontSize: 12, color: T.textMuted, marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{person.title}</div>
-                )}
-                {personCompany && (
-                  <div title={personCompany} style={{ fontSize: 11, color: T.textFaint, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{personCompany}</div>
-                )}
-              </div>
-            </div>
-            {matchText && (
-              <div title={matchText} style={{ marginTop: 10, background: `${STATUS.green}15`, border: `1px solid ${STATUS.green}40`, borderRadius: 8, padding: '4px 12px', color: STATUS.green, fontSize: 11, fontWeight: 600, textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {matchText}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div style={{ padding: wide ? '22px 28px 16px' : '18px 22px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', background: T.cardBg2, borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
-            <Av initials={initials} color={color} size={wide ? 80 : 70} />
-            {matchText && (
-              <div style={{ marginTop: 12, background: `${STATUS.green}15`, border: `1px solid ${STATUS.green}40`, borderRadius: 8, padding: '4px 16px', color: STATUS.green, fontSize: wide ? 12 : 11, fontWeight: 600, marginBottom: 12, width: '88%', textAlign: 'center' }}>
-                {matchText}
-              </div>
-            )}
-            <div style={{ fontSize: wide ? 22 : 20, fontWeight: 700, color: T.text }}>{person.name || `${person.first_name || ''} ${person.last_name || ''}`.trim()}</div>
-            <div style={{ fontSize: wide ? 14 : 13, color: T.textMuted, marginTop: 3 }}>{person.title}</div>
-          </div>
-        )}
-        {fit ? (
+        {fit ? phoneFace : (
           <>
-            {/* As on the company card: only this middle part scrolls, and only
-                vertically; the buttons below stay in view. */}
-            <div data-card-body style={{ flex: 1, minHeight: 0, overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}>
-              {personFacts}
-              {personHint}
+            <div style={{ padding: wide ? '22px 28px 16px' : '18px 22px 12px', display: 'flex', flexDirection: 'column', alignItems: 'center', background: T.cardBg2, borderBottom: `1px solid ${T.border}` }}>
+              <Av initials={initials} color={color} size={wide ? 80 : 70} />
+              {matchText && (
+                <div style={{ marginTop: 12, background: `${STATUS.green}15`, border: `1px solid ${STATUS.green}40`, borderRadius: 8, padding: '4px 16px', color: STATUS.green, fontSize: wide ? 12 : 11, fontWeight: 600, marginBottom: 12, width: '88%', textAlign: 'center' }}>
+                  {matchText}
+                </div>
+              )}
+              <div style={{ fontSize: wide ? 22 : 20, fontWeight: 700, color: T.text }}>{person.name || `${person.first_name || ''} ${person.last_name || ''}`.trim()}</div>
+              <div style={{ fontSize: wide ? 14 : 13, color: T.textMuted, marginTop: 3 }}>{person.title}</div>
             </div>
-            <div style={{ flexShrink: 0 }}>{personDecision}</div>
-          </>
-        ) : (
-          <>
             {personFacts}
             {personDecision}
             {personHint}
           </>
         )}
       </div>
+
+      {fit && detailsOpen && (
+        <DetailsSheet
+          label={`${personName} details`}
+          onClose={() => setDetailsOpen(false)}
+          T={T}
+          header={(
+            <>
+              {photo
+                ? <img src={photo} alt="" style={{ width: 44, height: 44, borderRadius: 22, objectFit: 'cover', flexShrink: 0 }} />
+                : <Av initials={phoneInitials} color={color} size={44} />}
+              <div style={{ minWidth: 0 }}>
+                <div title={personName} style={{ fontSize: 18, fontWeight: 800, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{personName}</div>
+                {roleLine && <div title={roleLine} style={{ fontSize: 12, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{roleLine}</div>}
+              </div>
+            </>
+          )}
+          footer={<PhoneDecision T={T} onReject={e => { setDetailsOpen(false); handleRejectClick(e); }} onMatch={e => { setDetailsOpen(false); handleMatchClick(e); }} padding="12px 14px 14px" />}
+        >
+          <SheetHeading T={T}>WHY THIS PERSON</SheetHeading>
+          <div style={{ margin: '0 18px', border: `1px solid ${T.border}`, borderRadius: 12, overflow: 'hidden', fontSize: 13 }}>
+            {whyRows.map(([label, value, kind], i) => (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, padding: '9px 12px', borderTop: i ? `1px solid ${T.border}` : 'none' }}>
+                <span style={{ color: T.textMuted, flexShrink: 0 }}>{label}</span>
+                <span style={{ color: kind ? inkFor(T, kind) : T.text, fontWeight: kind ? 700 : 400, textAlign: 'right', minWidth: 0 }}>{value}</span>
+              </div>
+            ))}
+          </div>
+          <SheetHeading T={T}>THEIR COMPANY</SheetHeading>
+          <div style={{ margin: '0 18px', border: `1px solid ${T.border}`, borderRadius: 12, padding: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+            <CompanyLogo company={company} size="small" />
+            <div style={{ minWidth: 0, fontSize: 13 }}>
+              <div style={{ fontWeight: 700, color: T.text }}>
+                {personCompany || 'Company'}
+                {typeof companyFit === 'number' && <span style={{ color: inkFor(T, companyFit >= 75 ? 'matched' : companyFit >= 50 ? 'partial' : 'neutral') }}> · {companyFit}% ICP match</span>}
+              </div>
+              {companyFacts && <div style={{ color: T.textMuted, marginTop: 2 }}>{companyFacts}</div>}
+            </div>
+          </div>
+          {companyIntel && (
+            <div style={{ margin: '12px 18px 0', padding: '12px 14px', borderRadius: 12, background: T.accentBg, border: `1px solid ${BRAND.pink}2e` }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
+                <BarryAvatar size={18} />
+                <span style={{ fontSize: 9, letterSpacing: 2, color: BRAND.pink, fontWeight: 700 }}>BARRY INTEL</span>
+              </div>
+              <p style={{ margin: 0, fontSize: 13, color: T.isDark ? '#d0a0c0' : T.textMuted, lineHeight: 1.6 }}>{companyIntel}</p>
+            </div>
+          )}
+          <div style={{ marginTop: 12 }}>{personLinks}</div>
+        </DetailsSheet>
+      )}
     </div>
   );
 }
@@ -1770,6 +2136,10 @@ export default function DailyLeads({ onNavigate }) {
 
   // Refs for keyboard handler (avoid stale closures)
   const handleSwipeRef = useRef(null);
+  // On a phone, Skip sits below the card; these reach the current card's own
+  // latched skip (see CompanySwipeCard), so a skip cannot race its swipe.
+  const companySkipRef = useRef(null);
+  const personSkipRef = useRef(null);
   const handleUndoRef = useRef(null);
 
   // ── Batch Mode state ─────────────────────────────────────────────────────────
@@ -3209,6 +3579,7 @@ export default function DailyLeads({ onNavigate }) {
                         onSkip={handleSkipCompany}
                         wide={isDesktop}
                         fit={!isDesktop}
+                        skipRef={companySkipRef}
                         icpProfile={icpProfile}
                         icpWeights={icpWeights}
                       />
@@ -3243,8 +3614,16 @@ export default function DailyLeads({ onNavigate }) {
                       <RotateCcw size={13} />Undo last skip
                     </button>
                   )}
-                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, fontSize: 10, color: T.textGhost, ...(isDesktop ? null : { flexShrink: 0, height: 30 }) }}>
+                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, fontSize: 10, color: T.textGhost, ...(isDesktop ? null : { flexShrink: 0, height: 40 }) }}>
                     <span>← Sharpens targeting</span>
+                    {/* Skip is below the card on a phone; on desktop it is on the card. */}
+                    {!isDesktop && (
+                      <button
+                        type="button"
+                        onClick={() => companySkipRef.current?.()}
+                        style={{ height: 40, padding: '0 10px', border: 'none', background: 'transparent', color: T.textMuted, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                      >⊙ Skip for now</button>
+                    )}
                     {!isDesktop && showUndo && swipeHistory.length > 0 && (
                       <button
                         onClick={handleUndo}
@@ -3312,10 +3691,18 @@ export default function DailyLeads({ onNavigate }) {
                       onSkip={(subjectId) => handlePersonSwipe('skip', null, subjectId)}
                       wide={isDesktop}
                       fit={!isDesktop}
+                      skipRef={personSkipRef}
                     />
                   </div>
-                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, fontSize: 10, color: T.textGhost, ...(isDesktop ? null : { flexShrink: 0, height: 30 }) }}>
+                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, fontSize: 10, color: T.textGhost, ...(isDesktop ? null : { flexShrink: 0, height: 40 }) }}>
                     <span>← Not this person</span>
+                    {!isDesktop && (
+                      <button
+                        type="button"
+                        onClick={() => personSkipRef.current?.()}
+                        style={{ height: 40, padding: '0 10px', border: 'none', background: 'transparent', color: T.textMuted, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                      >⊙ Skip for today</button>
+                    )}
                     <span>Save to engage →</span>
                   </div>
                 </>

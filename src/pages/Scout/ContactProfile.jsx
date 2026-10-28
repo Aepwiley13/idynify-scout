@@ -430,7 +430,11 @@ export default function ContactProfile({
             title: contact.title || null
           },
           // Who to look for on LinkedIn: the same details Find LinkedIn searches with.
-          person: searchPersonFrom(contact)
+          person: searchPersonFrom(contact),
+          // The server writes the result onto this contact as it is stored
+          // when the run ends, in one transaction (#738).
+          contactId: contact.id,
+          save: true
         })
       });
 
@@ -444,8 +448,9 @@ export default function ContactProfile({
         throw new Error(result.error || 'Enrichment failed');
       }
 
-      // Written by the shared rules (fill only what is empty); an empty
-      // company is linked through the company resolver. Never a LinkedIn URL.
+      // Already written by the server, by the shared rules (fill only what is
+      // empty) against the latest contact; an empty company is linked here
+      // through the company resolver. Never a LinkedIn URL.
       const written = await writeBarryEnrichment(user.uid, contact, result);
 
       // Update local state

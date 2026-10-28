@@ -975,10 +975,14 @@ export default function BarryWorkspace() {
                   color: T.text,
                 }}
               >
+                {/* react-markdown 10 throws on a `className` prop (#745), and a
+                    production build only ever dropped it, so .barry-workspace-prose
+                    has never applied here. It stays off: wrapping these in it would
+                    change how Barry's replies look (paragraph gaps, list indent). */}
                 {turn.role === 'assistant' ? (
                   turn.kind === 'result_set' ? (
                     <ConversationCard kind={turn.kind}>
-                      <ReactMarkdown className="barry-workspace-prose">{turn.content}</ReactMarkdown>
+                      <ReactMarkdown>{turn.content}</ReactMarkdown>
                       <BarryResultSet
                         resultSet={getResultSet(turn.meta?.sessionRef)}
                         disabled={resolving}
@@ -988,7 +992,7 @@ export default function BarryWorkspace() {
                     </ConversationCard>
                   ) : turn.kind === 'resolution_preview' ? (
                     <ConversationCard kind={turn.kind}>
-                      <ReactMarkdown className="barry-workspace-prose">{turn.content}</ReactMarkdown>
+                      <ReactMarkdown>{turn.content}</ReactMarkdown>
                       <BarryResolutionPreview
                         preview={getResultSet(turn.meta?.sessionRef)?.preview || null}
                         settled={settled[turn.meta?.sessionRef] || null}
@@ -998,12 +1002,12 @@ export default function BarryWorkspace() {
                     </ConversationCard>
                   ) : turn.kind && turn.kind !== 'message' ? (
                     <ConversationCard kind={turn.kind}>
-                      <ReactMarkdown className="barry-workspace-prose">
+                      <ReactMarkdown>
                         {turn.content}
                       </ReactMarkdown>
                     </ConversationCard>
                   ) : (
-                    <ReactMarkdown className="barry-workspace-prose">
+                    <ReactMarkdown>
                       {turn.content}
                     </ReactMarkdown>
                   )

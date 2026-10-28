@@ -21,6 +21,9 @@ export default function StageTabBar({ contact, previewStage, onPreviewChange }) 
   const selectedTab = previewStage || activeStage;
 
   return (
+    // On a narrow screen the five stages can be wider than the page: the row
+    // scrolls on its own rather than widening the page (.page-content scrolls
+    // sideways when anything inside it is wider).
     <div style={{
       display: 'flex',
       gap: 4,
@@ -28,6 +31,9 @@ export default function StageTabBar({ contact, previewStage, onPreviewChange }) 
       background: T.surface,
       border: `1px solid ${T.border}`,
       borderRadius: 12,
+      minWidth: 0,
+      overflowX: 'auto',
+      scrollbarWidth: 'none',
     }}>
       {PIPELINE_STAGES.map((stageId, idx) => {
         const stage = STAGE_MAP[stageId];
@@ -51,6 +57,8 @@ export default function StageTabBar({ contact, previewStage, onPreviewChange }) 
             title={isPreviewing ? `Preview mode — click "Generate" to get Barry's take` : stage.description}
             style={{
               flex: 1,
+              minWidth: 'max-content',
+              whiteSpace: 'nowrap',
               padding: '8px 6px',
               minHeight: 44,
               borderRadius: 9,

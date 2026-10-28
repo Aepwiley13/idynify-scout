@@ -16,6 +16,8 @@
 /* ── Section Header ── */
 .ies-section-header {
   display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
   align-items: center;
   justify-content: space-between;
   padding: 1.125rem 1.375rem;
@@ -1418,8 +1420,25 @@
 /* ── Section Header Actions ── */
 .ies-section-header-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
+}
+
+/* Phones: the header stacks (above), so the actions take its full width and
+   the two buttons share a row, or wrap, instead of running past the card. */
+@media (max-width: 480px) {
+  .ies-section-header-actions {
+    width: 100%;
+  }
+
+  .ies-section-header-actions .ies-start-btn {
+    width: auto;
+    flex: 1 1 140px;
+    min-width: 0;
+    white-space: normal;
+  }
 }
 
 .ies-section-collapse-btn {

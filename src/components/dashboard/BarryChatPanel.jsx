@@ -1455,9 +1455,13 @@ export default function BarryChatPanel({
               </div>
             ) : (
               <div className="text-sm leading-relaxed" style={{ color: T.text }}>
-                <ReactMarkdown className="prose prose-invert prose-sm max-w-none [&>p]:mt-0 [&>p:last-child]:mb-0">
-                  {brief || 'Your pipeline is ready. Tell me what you want to work on.'}
-                </ReactMarkdown>
+                {/* react-markdown 10 throws on a `className` prop (#745); the
+                    classes sit on a wrapper instead, which renders the same. */}
+                <div className="prose prose-invert prose-sm max-w-none [&>p]:mt-0 [&>p:last-child]:mb-0">
+                  <ReactMarkdown>
+                    {brief || 'Your pipeline is ready. Tell me what you want to work on.'}
+                  </ReactMarkdown>
+                </div>
               </div>
             )}
           </div>
@@ -1779,9 +1783,11 @@ export default function BarryChatPanel({
                             {msg.kind === 'angles' && !(msg.angles?.length > 0) && (
                               <span className="inline-block text-xs font-bold uppercase tracking-wide mr-1.5" style={{ color: T.cyan, letterSpacing: '0.04em' }}>Angles</span>
                             )}
-                            <ReactMarkdown className="prose prose-invert prose-sm max-w-none [&>p]:mt-0 [&>p:last-child]:mb-0">
-                              {msg.content}
-                            </ReactMarkdown>
+                            <div className="prose prose-invert prose-sm max-w-none [&>p]:mt-0 [&>p:last-child]:mb-0">
+                              <ReactMarkdown>
+                                {msg.content}
+                              </ReactMarkdown>
+                            </div>
                           </div>
                         )}
 

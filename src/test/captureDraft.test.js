@@ -9,7 +9,9 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
   draftsFromExtraction, emptyDraft, phoneFromExtraction, printedPhoneLabel, newSocialRow, socialProblems,
+  NOT_A_COMPANY, companyIsUnconfirmed,
 } from '../components/capture/captureDraft.js';
+import { SAFEGUARDS } from '../capture/safeguards.js';
 import { assembleExtraction } from '../../netlify/functions/utils/capture/assembleExtraction.js';
 import { emptyReading } from '../../netlify/functions/utils/capture/cardReading.js';
 import { encodeBase64 } from '../capture/preparedImage.js';
@@ -91,7 +93,7 @@ describe('a capture is a list of people', () => {
 
   it('no extraction is no people; by hand starts from an empty person', () => {
     expect(draftsFromExtraction(null)).toEqual([]);
-    expect(emptyDraft()).toMatchObject({ name: '', company: '', email: '', phones: [], socials: [], toCheck: [] });
+    expect(emptyDraft()).toMatchObject({ name: '', company: '', companySuggestion: null, email: '', phones: [], socials: [], toCheck: [] });
   });
 });
 
@@ -195,5 +197,76 @@ describe('phone types are what the card printed (approved table)', () => {
 
   it('never home: a card cannot say a number is someone\'s home line', () => {
     expect(phoneFromExtraction(extracted('Home: 801-555-3000'), 0).label).toBe('unknown');
+  });
+});
+
+describe('a company is not a name, a title or a brand (independent professionals)', () => {
+  /** A card through the real assembler: the given person and company text. */
+  function card({ name = 'Kristin Sokol', title = null, company = null, fromLogo = false, website = null, email = null } = {}) {
+    const base = emptyReading('read');
+    const t = (raw, score = 0.95) => (raw ? { raw, score } : { raw: null, score: 0 });
+    const reading = {
+      ...base,
+      person: { ...base.person, fullName: t(name), title: t(title), emails: email ? [t(email)] : [] },
+      company: { ...base.company, name: { ...t(company, 0.9), fromLogo }, website: t(website) },
+    };
+    const result = assembleExtraction(reading, {
+      operationId: 'cap_3f2a9c1e-5b7d-4e8a-9c21-7d4e5f6a8b90', extractedAt: '2026-10-27T22:00:00.000Z', image: image(),
+      provider: { id: 'fake', adapterVersion: '1', modelId: 'fake-v1', promptVersion: 'fake-v1' },
+    });
+    expect(result.ok).toBe(true);
+    return { extraction: result.extraction, draft: draftsFromExtraction(result.extraction)[0] };
+  }
+
+  it('a personal-brand card (the name as a wordmark, a service line, a personal domain): no company, the name kept as a suggestion', () => {
+    const { extraction, draft } = card({
+      company: 'Kristin Sokol', fromLogo: true, title: 'Dating Strategy & Matchmaking',
+      website: 'kristinsokol.com', email: 'kristin@kristinsokol.com',
+    });
+    // The server already said so: the text is the person's name, read from a logo.
+    expect(extraction.company.safeguards).toEqual(expect.arrayContaining(['PERSON_NAME_AS_COMPANY', 'WEAK_COMPANY_TEXT']));
+    expect(draft).toMatchObject({
+      name: 'Kristin Sokol', title: 'Dating Strategy & Matchmaking', company: '', website: 'kristinsokol.com',
+      companySuggestion: { name: 'Kristin Sokol', reason: 'PERSON_NAME_AS_COMPANY' },
+    });
+    expect(draft.toCheck).not.toContain('company');
+    expect(companyIsUnconfirmed(draft)).toBe(false);
+  });
+
+  it('the same in printed text, and in another case: still the person\'s name, still no company', () => {
+    const { draft } = card({ company: 'KRISTIN SOKOL' });
+    expect(draft.company).toBe('');
+    expect(draft.companySuggestion).toEqual({ name: 'KRISTIN SOKOL', reason: 'PERSON_NAME_AS_COMPANY' });
+  });
+
+  it('the service line read as both title and company is not a company either', () => {
+    const { draft } = card({ title: 'Dating Strategy & Matchmaking', company: 'Dating Strategy & Matchmaking' });
+    expect(draft).toMatchObject({ title: 'Dating Strategy & Matchmaking', company: '' });
+    expect(draft.companySuggestion).toEqual({ name: 'Dating Strategy & Matchmaking', reason: 'TITLE_AS_COMPANY' });
+  });
+
+  it('a real company only in a logo stays filled, marked Check, and counts as unconfirmed until the user touches it', () => {
+    const { draft } = card({ name: 'Avery Quinn', company: 'Example Robotics', fromLogo: true, website: 'www.example.com' });
+    expect(draft).toMatchObject({ company: 'Example Robotics', companySuggestion: null });
+    expect(draft.toCheck).toContain('company');
+    expect(companyIsUnconfirmed(draft)).toBe(true);
+    // Editing or confirming the field clears its Check (CaptureReview's set()).
+    expect(companyIsUnconfirmed({ ...draft, toCheck: draft.toCheck.filter(k => k !== 'company') })).toBe(false);
+  });
+
+  it('a printed company that is clearly a company is unchanged', () => {
+    const { draft } = card({ name: 'Avery Quinn', company: 'Example Robotics', website: 'www.example.com' });
+    expect(draft).toMatchObject({ company: 'Example Robotics', companySuggestion: null, toCheck: [] });
+    expect(companyIsUnconfirmed(draft)).toBe(false);
+  });
+
+  it('no company text at all: no company and nothing to suggest', () => {
+    const { draft } = card({ website: 'kristinsokol.com' });
+    expect(draft).toMatchObject({ company: '', companySuggestion: null });
+  });
+
+  it('NOT_A_COMPANY names real safeguard codes, and not WEAK_COMPANY_TEXT (a weak read, not something else)', () => {
+    for (const code of NOT_A_COMPANY) expect(Object.values(SAFEGUARDS)).toContain(code);
+    expect(NOT_A_COMPANY).not.toContain('WEAK_COMPANY_TEXT');
   });
 });

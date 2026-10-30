@@ -3,17 +3,6 @@
  * and Google mocked at fetch), the write (src/services/barryEnrichment.js),
  * the shared company resolver, and Find LinkedIn's confirm on the profile,
  * against a small in-memory Firestore.
- *
- * Pins your cases for this change:
- *   1  a LinkedIn Barry finds is not attached until the user confirms it
- *   2  confirming runs the exact lookup and attaches the URL
- *   3-8 name, email, phone, company and website stay; a new number is added safely
- *   9-10 a different title is offered; an empty title is filled
- *   11 an empty company is linked through the company resolver, without duplicates
- *   12 a LinkedIn another contact has is blocked (older URL forms too)
- *   13 running Enrich again changes nothing
- *   14 no value in any log line
- * and that the profile no longer saves a pasted LinkedIn by itself.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -23,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { format } from 'node:util';
 
 // ── In-memory Firestore (paths → documents) ─────────────────────────────────
-const store = vi.hoisted(() => ({ docs: new Map(), writes: [] }));
+const store = vi.hoisted(() => ({ docs: new Map(), versions: new Map(), writes: [] }));
 
 vi.mock('firebase/firestore', async (importOriginal) => {
   const real = await importOriginal();
@@ -55,25 +44,45 @@ vi.mock('firebase/firestore', async (importOriginal) => {
       .slice(0, cap);
     return { empty: hits.length === 0, size: hits.length, docs: hits.map(snapshot) };
   };
-  const setDoc = async (ref, data, options = {}) => {
-    store.writes.push({ kind: 'set', path: ref.path, data: structuredClone(data) });
-    store.docs.set(ref.path, options.merge ? { ...(store.docs.get(ref.path) ?? {}), ...data } : { ...data });
-  };
-  const updateDoc = async (ref, data) => {
-    if (!store.docs.has(ref.path)) throw new Error(`No document to update: ${ref.path}`);
-    store.writes.push({ kind: 'update', path: ref.path, data: structuredClone(data) });
-    const next = structuredClone(store.docs.get(ref.path));
+  const apply = (kind, ref, data, merge = true) => {
+    store.writes.push({ kind, path: ref.path, data: structuredClone(data) });
+    const next = merge ? { ...(store.docs.get(ref.path) ?? {}) } : {};
     for (const [key, value] of Object.entries(data)) {
       const [head, ...rest] = key.split('.');
       if (rest.length) next[head] = { ...(next[head] ?? {}), [rest.join('.')]: value };
       else next[key] = value;
     }
     store.docs.set(ref.path, next);
+    store.versions.set(ref.path, (store.versions.get(ref.path) ?? 0) + 1);
+  };
+  const setDoc = async (ref, data, options = {}) => apply('set', ref, data, Boolean(options.merge));
+  const updateDoc = async (ref, data) => {
+    if (!store.docs.has(ref.path)) throw new Error(`No document to update: ${ref.path}`);
+    apply('update', ref, data, true);
+  };
+  const runTransaction = async (_db, fn) => {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const pending = [];
+      const reads = new Map();
+      const tx = {
+        get: async (ref) => {
+          reads.set(ref.path, store.versions.get(ref.path) ?? 0);
+          return snapshot(ref.path);
+        },
+        update: (ref, data) => { pending.push(() => apply('tx.update', ref, data, true)); return tx; },
+        set: (ref, data, options = {}) => { pending.push(() => apply('tx.set', ref, data, Boolean(options.merge))); return tx; },
+      };
+      const result = await fn(tx);
+      if ([...reads].some(([path, version]) => (store.versions.get(path) ?? 0) !== version)) continue;
+      pending.forEach(commit => commit());
+      return result;
+    }
+    throw new Error('transaction contention');
   };
   const refuse = name => async () => { throw new Error(`${name} is not expected here`); };
   return {
-    ...real, collection, doc, where, limit, query, getDoc, getDocs, setDoc, updateDoc,
-    addDoc: refuse('addDoc'), deleteDoc: refuse('deleteDoc'), runTransaction: refuse('runTransaction'),
+    ...real, collection, doc, where, limit, query, getDoc, getDocs, setDoc, updateDoc, runTransaction,
+    addDoc: refuse('addDoc'), deleteDoc: refuse('deleteDoc'),
   };
 });
 vi.mock('../firebase/config', () => ({ db: {}, auth: { currentUser: { uid: 'u1' } } }));
@@ -91,12 +100,18 @@ const UID = 'u1';
 const ID = 'cap_x_p1';
 const contactPath = id => `users/${UID}/contacts/${id}`;
 const companyPath = id => `users/${UID}/companies/${id}`;
-const put = (id, data) => store.docs.set(contactPath(id), structuredClone({ id, ...data }));
+const put = (id, data) => {
+  store.docs.set(contactPath(id), structuredClone({ id, ...data }));
+  store.versions.set(contactPath(id), 0);
+};
 const get = id => store.docs.get(contactPath(id));
+const userEdit = (id, patch) => {
+  store.docs.set(contactPath(id), { ...get(id), ...structuredClone(patch) });
+  store.versions.set(contactPath(id), (store.versions.get(contactPath(id)) ?? 0) + 1);
+};
 const companies = () => [...store.docs.keys()].filter(p => p.startsWith(`users/${UID}/companies/`));
 const T = { cardBg: '#fff', border: '#ddd', text: '#111', textMuted: '#555' };
 
-/** A contact as Scan Business Card saves it. */
 const CARD = Object.freeze({
   name: 'Kristin Sokol', first_name: 'Kristin', last_name: 'Sokol', title: 'Founder',
   company_name: 'Bright Path Learning', company_id: 'co_bright',
@@ -114,7 +129,7 @@ const APOLLO_KRISTIN = Object.freeze({
   employment_history: [{ title: 'Founder & CEO', organization_name: 'Bright Path', start_date: '2020-01-01' }],
   phone_numbers: [
     { sanitized_number: '+18015550199', type: 'mobile' },
-    { sanitized_number: '+14155550100', type: 'work_hq' },              // the card's main line, with its country code
+    { sanitized_number: '+14155550100', type: 'work_hq' },
   ],
 });
 const GOOGLE_KRISTIN = Object.freeze({
@@ -129,7 +144,6 @@ const VALUES = ['Kristin', 'Sokol', 'Bright Path', 'brightpath', 'Founder', 'kri
 let logs;
 let fetchCalls;
 
-/** Apollo, Google and the exact LinkedIn lookup, as the browser and server see them. */
 function stubNetwork({ match = APOLLO_KRISTIN, google = [GOOGLE_KRISTIN], search = [APOLLO_KRISTIN] } = {}) {
   fetchCalls = [];
   vi.stubGlobal('fetch', async (url, init = {}) => {
@@ -147,17 +161,21 @@ function stubNetwork({ match = APOLLO_KRISTIN, google = [GOOGLE_KRISTIN], search
   });
 }
 
-/** Enrich as the profile does: the server's answer, written by writeBarryEnrichment. */
-async function enrichAndWrite(id) {
-  const contact = get(id);
+async function enrichResult(id) {
+  const contact = structuredClone(get(id));
   const response = await handler({ httpMethod: 'POST', body: JSON.stringify({ userId: UID, authToken: 'tok', contact }) });
-  const result = JSON.parse(response.body);
+  return { contact, result: JSON.parse(response.body) };
+}
+
+async function enrichAndWrite(id) {
+  const { contact, result } = await enrichResult(id);
   const written = await writeBarryEnrichment(UID, contact, result);
   return { result, written };
 }
 
 beforeEach(() => {
   store.docs.clear();
+  store.versions.clear();
   store.writes.length = 0;
   logs = [];
   for (const level of ['log', 'info', 'warn', 'error', 'debug']) vi.spyOn(console, level).mockImplementation((...a) => logs.push(format(...a)));
@@ -174,10 +192,8 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-// ─── Enrich, written ────────────────────────────────────────────────────────
-
 describe('Enrich on a card contact', () => {
-  it('a LinkedIn Barry finds is not written; it comes back to confirm', async () => {          // 1
+  it('a LinkedIn Barry finds is not written; it comes back to confirm', async () => {
     put(ID, CARD);
     stubNetwork();
     const { result } = await enrichAndWrite(ID);
@@ -186,7 +202,7 @@ describe('Enrich on a card contact', () => {
     expect(result.linkedinCandidates.map(c => c.linkedinUrl)).toEqual([CANDIDATE.linkedinUrl]);
   });
 
-  it('name, email, phone, company, website and title stay; a new number is added once', async () => {   // 3-9
+  it('name, email, phone, company, website and title stay; a new number is added once', async () => {
     put(ID, { ...CARD, apollo_person_id: 'ap_123' });
     stubNetwork({ google: [] });
     const { result } = await enrichAndWrite(ID);
@@ -195,8 +211,8 @@ describe('Enrich on a card contact', () => {
       company_name: 'Bright Path Learning', company_id: 'co_bright', website: 'www.brightpathlearning.com', title: 'Founder',
     });
     expect(get(ID).phones.map(p => [p.value, p.label, p.labelSource])).toEqual([
-      ['415-555-0100', 'main', 'card'],                                        // the card's, unchanged
-      ['+18015550199', 'mobile', 'enrichment'],                                // new
+      ['415-555-0100', 'main', 'card'],
+      ['+18015550199', 'mobile', 'enrichment'],
     ]);
     expect(result.suggestions).toEqual([
       { field: 'title', current: 'Founder', suggested: 'Founder & CEO', actionable: true },
@@ -205,20 +221,19 @@ describe('Enrich on a card contact', () => {
     expect(companies()).toEqual([]);
   });
 
-  it('an empty title is filled', async () => {                                                 // 10
+  it('an empty title is filled', async () => {
     put(ID, { ...CARD, title: '', apollo_person_id: 'ap_123' });
     stubNetwork({ google: [] });
     await enrichAndWrite(ID);
     expect(get(ID).title).toBe('Founder & CEO');
   });
 
-  it('running Enrich again changes nothing: no new values, no repeated numbers', async () => {  // 13
+  it('running Enrich again changes nothing: no new values, no repeated numbers', async () => {
     put(ID, { ...CARD, apollo_person_id: 'ap_123' });
     stubNetwork({ google: [] });
     await enrichAndWrite(ID);
     const first = structuredClone(get(ID));
     await enrichAndWrite(ID);
-    // Bookkeeping about the run itself, rewritten every time by design (as in #737's test).
     const RUN = ['last_enriched_at', 'enrichment_summary', 'enrichment_steps', '_raw_apollo_data', 'data_sources'];
     const facts = data => Object.fromEntries(Object.entries(data).filter(([k]) => !RUN.includes(k)));
     const after = facts(get(ID));
@@ -229,7 +244,116 @@ describe('Enrich on a card contact', () => {
   });
 });
 
-describe('an empty company is linked through the company resolver', () => {                   // 11
+describe('Barry atomic persistence: newer user actions win', () => {
+  async function staleRun(base = {}) {
+    put(ID, { name: 'Kristin Sokol', apollo_person_id: 'ap_123', ...base });
+    stubNetwork({ google: [] });
+    return enrichResult(ID);
+  }
+
+  it('user edits title while Barry is running', async () => {
+    const run = await staleRun({ title: '' });
+    userEdit(ID, { title: 'Chief Revenue Officer', enrichment_provenance: { title: 'user_accepted' } });
+    await writeBarryEnrichment(UID, run.contact, run.result);
+    expect(get(ID).title).toBe('Chief Revenue Officer');
+    expect(get(ID).enrichment_provenance.title).toBe('user_accepted');
+  });
+
+  it('user adds email while Barry is running', async () => {
+    const run = await staleRun({ email: '' });
+    userEdit(ID, { email: 'user@brightpath.example' });
+    await writeBarryEnrichment(UID, run.contact, run.result);
+    expect(get(ID).email).toBe('user@brightpath.example');
+  });
+
+  it('user enters company while Barry is running and no enrichment company is created or attached', async () => {
+    const run = await staleRun({ company_name: null, company_id: null });
+    const ensureCompany = vi.fn(async () => ({ companyId: 'should-not-happen' }));
+    userEdit(ID, { company_name: 'User Company', company_id: 'co_user' });
+    await writeBarryEnrichment(UID, run.contact, run.result, { ensureCompany });
+    expect(get(ID)).toMatchObject({ company_name: 'User Company', company_id: 'co_user' });
+    expect(ensureCompany).not.toHaveBeenCalled();
+  });
+
+  it('user adds phone while Barry is running; merge is recalculated from latest phones', async () => {
+    const run = await staleRun({ phones: [], phone: null, phone_mobile: null });
+    userEdit(ID, {
+      phones: [{ id: 'user-1', value: '+18015550000', label: 'mobile', labelSource: 'user' }],
+      phone: '+18015550000', phone_mobile: '+18015550000', phone_normalized: '+18015550000',
+    });
+    await writeBarryEnrichment(UID, run.contact, run.result);
+    expect(get(ID).phone).toBe('+18015550000');
+    expect(get(ID).phones[0].value).toBe('+18015550000');
+    expect(get(ID).phones.some(p => p.value === '+18015550199')).toBe(true);
+  });
+
+  it('user removes an enrichment phone while Barry is running; removal history prevents re-add', async () => {
+    const provider = { sanitized_number: '+18015550199', type: 'mobile' };
+    const result = {
+      enrichedData: {
+        phones: [{ id: 'enrichment-18015550199', value: '+18015550199', label: 'mobile', labelSource: 'enrichment' }],
+        phone: '+18015550199', phone_mobile: '+18015550199', phone_normalized: '+18015550199',
+        phone_numbers: [provider], enrichment_provenance: { phone: 'apollo_match' },
+      },
+    };
+    put(ID, { name: 'Kristin Sokol', phones: [{ id: 'e1', value: '+18015550199', label: 'mobile', labelSource: 'enrichment' }], phone_numbers: [provider] });
+    const old = structuredClone(get(ID));
+    userEdit(ID, { phones: [], phone: null, phone_mobile: null, phone_normalized: null, phone_numbers: [provider] });
+    await writeBarryEnrichment(UID, old, result);
+    expect(get(ID).phones).toEqual([]);
+    expect(get(ID).phone).toBeNull();
+  });
+
+  it('user enters location while Barry is running', async () => {
+    const run = await staleRun({ city: '', state: '', country: '', location: '' });
+    userEdit(ID, { city: 'Provo', state: 'Utah', location: 'Provo, Utah' });
+    await writeBarryEnrichment(UID, run.contact, run.result);
+    expect(get(ID)).toMatchObject({ city: 'Provo', state: 'Utah', location: 'Provo, Utah' });
+  });
+
+  it('user uploads photo while Barry is running', async () => {
+    const run = await staleRun({ photo_url: null });
+    userEdit(ID, { photo_url: 'https://example.com/user-photo.jpg', photo_source: 'user' });
+    await writeBarryEnrichment(UID, run.contact, run.result);
+    expect(get(ID).photo_url).toBe('https://example.com/user-photo.jpg');
+    expect(get(ID).photo_source).toBe('user');
+  });
+
+  it('user confirms a LinkedIn while Barry is running', async () => {
+    const run = await staleRun({ linkedin_url: null });
+    userEdit(ID, {
+      linkedin_url: 'https://www.linkedin.com/in/user-choice',
+      linkedin_url_normalized: 'linkedin.com/in/user-choice',
+      enrichment_provenance: { linkedin_url: 'user_confirmed' },
+    });
+    await writeBarryEnrichment(UID, run.contact, run.result);
+    expect(get(ID).linkedin_url).toBe('https://www.linkedin.com/in/user-choice');
+    expect(get(ID).enrichment_provenance.linkedin_url).toBe('user_confirmed');
+  });
+
+  it('a provenance change while Barry is running survives the rebase', async () => {
+    const run = await staleRun({ headline: null, enrichment_provenance: { email: 'manual' } });
+    userEdit(ID, { enrichment_provenance: { email: 'manual', headline: 'user_accepted', custom: 'manual' }, headline: 'User headline' });
+    await writeBarryEnrichment(UID, run.contact, run.result);
+    expect(get(ID).headline).toBe('User headline');
+    expect(get(ID).enrichment_provenance).toMatchObject({ email: 'manual', headline: 'user_accepted', custom: 'manual' });
+  });
+
+  it('two enrichment requests at the same time remain additive and do not duplicate phones', async () => {
+    put(ID, { name: 'Kristin Sokol', apollo_person_id: 'ap_123', phones: [] });
+    stubNetwork({ google: [] });
+    const first = await enrichResult(ID);
+    const second = { contact: structuredClone(first.contact), result: structuredClone(first.result) };
+    await Promise.all([
+      writeBarryEnrichment(UID, first.contact, first.result),
+      writeBarryEnrichment(UID, second.contact, second.result),
+    ]);
+    const mobile = get(ID).phones.filter(p => p.value === '+18015550199');
+    expect(mobile).toHaveLength(1);
+  });
+});
+
+describe('an empty company is linked through the company resolver', () => {
   it('an existing company with that name is reused, not duplicated', async () => {
     store.docs.set(companyPath('co_existing'), { name: 'Bright Path', status: 'accepted' });
     put(ID, { ...CARD, company_name: null, company_id: null, apollo_person_id: 'ap_123' });
@@ -261,11 +385,9 @@ describe('an empty company is linked through the company resolver', () => {     
   it('the write never carries a LinkedIn URL', async () => {
     put('c4', { name: 'A' });
     await writeBarryEnrichment(UID, get('c4'), { enrichedData: { headline: 'H', linkedin_url: 'https://www.linkedin.com/in/x', linkedin_url_normalized: 'linkedin.com/in/x' } });
-    expect(get('c4')).toEqual({ id: 'c4', name: 'A', headline: 'H' });
+    expect(get('c4')).toEqual({ id: 'c4', name: 'A', headline: 'H', enrichment_provenance: {} });
   });
 });
-
-// ─── The profile: Barry's profiles through Find LinkedIn's confirm ──────────
 
 function renderProfileFind({ found = [CANDIDATE], contactId = ID } = {}) {
   const onDone = vi.fn();
@@ -283,7 +405,7 @@ describe('Barry\'s LinkedIn profiles, confirmed on the profile', () => {
     expect(store.writes).toEqual([]);
   });
 
-  it('confirmed: the exact lookup runs and the URL is attached', async () => {                 // 2
+  it('confirmed: the exact lookup runs and the URL is attached', async () => {
     put(ID, CARD);
     stubNetwork();
     const { onDone } = renderProfileFind();
@@ -294,12 +416,12 @@ describe('Barry\'s LinkedIn profiles, confirmed on the profile', () => {
       linkedin_url: CANDIDATE.linkedinUrl, linkedin_url_normalized: 'linkedin.com/in/kristin-sokol',
       enrichment_provenance: { linkedin_url: 'user_confirmed' }, title: 'Founder', company_name: 'Bright Path Learning',
     });
-    expect(screen.getAllByText(/The contact says/)).toHaveLength(2);       // title offered, company shown
+    expect(screen.getAllByText(/The contact says/)).toHaveLength(2);
     fireEvent.click(screen.getByRole('button', { name: 'Done' }));
     expect(onDone).toHaveBeenCalledWith(ID);
   });
 
-  it('a profile another contact already has (older URL form too) is blocked: nothing written', async () => {   // 12
+  it('a profile another contact already has (older URL form too) is blocked: nothing written', async () => {
     put(ID, CARD);
     put('other_1', { name: 'K. Sokol', linkedin_url: 'http://linkedin.com/in/Kristin-Sokol/' });
     stubNetwork();
@@ -325,10 +447,8 @@ describe('Barry\'s LinkedIn profiles, confirmed on the profile', () => {
   });
 });
 
-// ─── Logs and the profile's write paths ─────────────────────────────────────
-
 describe('logs and write paths', () => {
-  it('no value in any log line: enrich, write, link a company, confirm a profile', async () => {   // 14
+  it('no value in any log line: enrich, write, link a company, confirm a profile', async () => {
     put(ID, { ...CARD, company_name: null, company_id: null, apollo_person_id: 'ap_123' });
     stubNetwork();
     await enrichAndWrite(ID);

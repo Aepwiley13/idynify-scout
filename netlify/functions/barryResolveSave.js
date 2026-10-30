@@ -270,13 +270,47 @@ async function resolveOne(adapter, candidate, chosenId, operationId) {
 /**
  * A deterministic id where the data supplies one, an auto id otherwise.
  * `{companyId}_{apolloPersonId}` is the convention four existing Apollo paths
- * already use, and re-saving the same person overwrites rather than duplicating.
+ * already use. Creation is now create-only: if an unexpected document already
+ * occupies that id, Barry refuses rather than merging canonical fields into it.
  */
 function deterministicId(candidate) {
   const apollo = candidate.apollo_person_id ?? null;
   const company = candidate.company_id ?? null;
   if (apollo && company) return `${company}_${apollo}`;
   return null;
+}
+
+function contactRecord(candidate, userId, { operationId, actor }) {
+  return {
+    ...identityFields(candidate),
+    ...createStatusFields({
+      recordStatus: RECORD_STATUS.ACTIVE,
+      relationshipStatus: RELATIONSHIP_STATUS.NEW,
+      stage: STAGE.SCOUT,
+    }),
+    name: candidate.name ?? null,
+    title: candidate.title ?? null,
+    email: candidate.email ?? null,
+    phone: candidate.phone ?? null,
+    linkedin_url: candidate.linkedin_url ?? null,
+    apollo_person_id: candidate.apollo_person_id ?? null,
+    company_id: candidate.company_id ?? null,
+    company_name: candidate.company_name ?? null,
+    lead_owner: userId,
+    source: candidate.source ?? 'barry_resolve_save',
+    identity_source: 'barryResolveSave',
+    identity_sources: [candidate.source ?? 'barry_resolve_save'],
+    identity_operation_id: operationId,
+    identity_actor: actor,
+    addedAt: new Date().toISOString(),
+  };
+}
+
+function isAlreadyExists(error) {
+  return error?.code === 6
+    || error?.code === '6'
+    || error?.code === 'already-exists'
+    || error?.code === 'firestore/already-exists';
 }
 
 async function commitResults(userId, results, candidatesByRef, { operationId, actor }) {
@@ -304,31 +338,18 @@ async function commitResults(userId, results, candidatesByRef, { operationId, ac
       const id = deterministicId(candidate);
       const ref = id ? contacts.doc(id) : contacts.doc();
 
-      await ref.set({
-        ...identityFields(candidate),
-        ...createStatusFields({
-          recordStatus: RECORD_STATUS.ACTIVE,
-          relationshipStatus: RELATIONSHIP_STATUS.NEW,
-          stage: STAGE.SCOUT,
-        }),
-        name: candidate.name ?? null,
-        title: candidate.title ?? null,
-        email: candidate.email ?? null,
-        phone: candidate.phone ?? null,
-        linkedin_url: candidate.linkedin_url ?? null,
-        apollo_person_id: candidate.apollo_person_id ?? null,
-        company_id: candidate.company_id ?? null,
-        company_name: candidate.company_name ?? null,
-        lead_owner: userId,
-        source: candidate.source ?? 'barry_resolve_save',
-        identity_source: 'barryResolveSave',
-        identity_sources: [candidate.source ?? 'barry_resolve_save'],
-        identity_operation_id: operationId,
-        identity_actor: actor,
-        addedAt: new Date().toISOString(),
-      }, { merge: true });
-
-      result.contactId = ref.id;
+      try {
+        // `create` is the important boundary here: unlike set(..., {merge:true}),
+        // it cannot overwrite an unexpected occupant of a deterministic id.
+        await ref.create(contactRecord(candidate, userId, { operationId, actor }));
+        result.contactId = ref.id;
+      } catch (error) {
+        if (!id || !isAlreadyExists(error)) throw error;
+        result.outcome = OUTCOME.REFUSED;
+        result.contactId = null;
+        result.reason = 'deterministic_id_occupied';
+        result.detail = 'The deterministic contact id already exists; no fields were written.';
+      }
       continue;
     }
 

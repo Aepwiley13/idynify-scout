@@ -12,6 +12,7 @@
  *   the same operationId bridges preview and commit
  *   a retry does not duplicate
  *   one scan window per operation, not per candidate
+ *   an occupied deterministic id is never overwritten
  *
  * Firestore is faked at the admin boundary. What is under test is the DECISION
  * layer — which outcome each candidate gets, and what is written for it — and
@@ -41,6 +42,16 @@ function contactsQuery(filters = [], cap = null) {
         async get() {
           const row = TABLE.find(r => r.id === docId);
           return { exists: Boolean(row), id: docId, data: () => ({ ...row }) };
+        },
+        async create(data) {
+          const i = TABLE.findIndex(r => r.id === docId);
+          if (i >= 0) {
+            const error = new Error('already exists');
+            error.code = 6;
+            throw error;
+          }
+          WRITES.push({ op: 'create', id: docId, data });
+          TABLE.push({ ...data, id: docId });
         },
         async set(data) {
           WRITES.push({ op: 'set', id: docId, data });
@@ -225,7 +236,7 @@ describe('4 — commit persists matched and created, never ambiguous or refused'
         linkedin_url: 'https://www.linkedin.com/in/new/',
       })],
     });
-    const w = WRITES.find(x => x.op === 'set');
+    const w = WRITES.find(x => x.op === 'create');
     expect(w.data).toMatchObject({
       email_normalized: 'new@acme.com',
       linkedin_url_normalized: 'linkedin.com/in/new',
@@ -250,7 +261,7 @@ describe('4 — commit persists matched and created, never ambiguous or refused'
     const patch = WRITES.find(x => x.op === 'update').data;
     expect(patch.linkedin_url).toBe('linkedin.com/in/dana');
     expect(patch.email_normalized).toBe('dana@acme.com');
-    expect(patch.name).toBeUndefined();          // canonical, never overwritten
+    expect(patch.name).toBeUndefined();
     expect(TABLE[0].name).toBe('Dana Whitfield');
   });
 
@@ -286,6 +297,31 @@ describe('4 — commit persists matched and created, never ambiguous or refused'
       candidates: [person('ui_1', { apollo_person_id: 'ap_9', company_id: 'co_3', name: 'X' })],
     });
     expect(WRITES[0].id).toBe('co_3_ap_9');
+  });
+
+  it('refuses an unexpectedly occupied deterministic id without changing the occupant', async () => {
+    TABLE = [{
+      id: 'co_3_ap_9',
+      name: 'Existing Canonical Person',
+      title: 'User Title',
+      email: 'user-owned@example.com',
+    }];
+    const before = structuredClone(TABLE[0]);
+
+    const r = await call({
+      ...base, operationId: 'op_collision', commit: true,
+      candidates: [person('ui_1', {
+        apollo_person_id: 'ap_9', company_id: 'co_3', name: 'Incoming Person',
+        title: 'Incoming Title', email: 'incoming@example.com',
+      })],
+    });
+
+    expect(byRef(r, 'ui_1')).toMatchObject({
+      outcome: 'refused', contactId: null, reason: 'deterministic_id_occupied',
+    });
+    expect(r.body.summary).toMatchObject({ created: 0, refused: 1 });
+    expect(TABLE).toEqual([before]);
+    expect(WRITES).toEqual([]);
   });
 });
 
@@ -332,15 +368,12 @@ describe('5 — the user may choose, the model may not', () => {
   });
 
   it('refuses a stale choice — the candidate now resolves on its own', async () => {
-    // Between preview and commit the record gained an email, so it is no longer
-    // ambiguous. The user answered a question that is no longer being asked.
     TABLE = [{ id: 'c1', name: 'Sarah Johnson', company_name: 'Acme', email_normalized: 's@acme.com' }];
     const r = await call({
       ...base, operationId: 'op1', commit: true,
       candidates: [person('ui_1', { name: 'Sarah Johnson', company_name: 'Acme', email: 's@acme.com' })],
       resolutions: { ui_1: 'c_stale' },
     });
-    // It resolves authoritatively now; the stale choice is simply not applied.
     expect(byRef(r, 'ui_1')).toMatchObject({ outcome: 'matched', matchedOn: 'email', contactId: 'c1' });
   });
 
@@ -361,7 +394,7 @@ describe('5 — the user may choose, the model may not', () => {
       candidates: [candidate], resolutions: { ui_1: 'c2' },
     });
     expect(byRef(r, 'ui_1').outcome).toBe('matched');
-    expect(WRITES).toHaveLength(0);   // resolved, not written
+    expect(WRITES).toHaveLength(0);
   });
 });
 
@@ -396,10 +429,6 @@ describe('6 — the same operationId bridges preview and commit, and a retry is 
   });
 
   it('a name+company retry is recognised as this operation\'s own write, not a new question', async () => {
-    // Without this the second attempt finds the record the FIRST attempt
-    // created, reports it as an ambiguity against itself, and asks the user to
-    // disambiguate a contact they just made. Recognised via
-    // identity_operation_id — no clientRef persisted, no operations collection.
     const payload = {
       ...base, operationId: 'op_2', commit: true,
       candidates: [person('ui_1', { name: 'Jo Ng', company_name: 'Acme' })],
@@ -420,7 +449,7 @@ describe('6 — the same operationId bridges preview and commit, and a retry is 
     const second = await call({ ...base, operationId: 'op_b', commit: true, candidates: cands });
 
     expect(second.body.summary).toMatchObject({ created: 0, ambiguous: 1 });
-    expect(TABLE).toHaveLength(1);   // and above all: no duplicate
+    expect(TABLE).toHaveLength(1);
   });
 
   it('a DIFFERENT operationId with the same identifiable people still does not duplicate', async () => {
@@ -488,12 +517,10 @@ describe('6b — Barry creates only what Barry can find again', () => {
   }
 
   it('the threshold is exactly the resolver\'s re-match capability', async () => {
-    // Whatever is created must be findable on a second encounter. This is the
-    // property that makes the threshold principled rather than arbitrary.
     const cands = [person('ui_1', { name: 'Jo Ng', company_name: 'Acme' })];
     await call({ ...base, operationId: 'op_a', commit: true, candidates: cands });
     const again = await call({ ...base, operationId: 'op_b', commit: false, candidates: cands });
-    expect(again.body.summary.created).toBe(0);   // found again, not re-created
+    expect(again.body.summary.created).toBe(0);
   });
 
   it('reports refusals in the summary so the preview is honest', async () => {

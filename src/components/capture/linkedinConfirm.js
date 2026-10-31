@@ -2,19 +2,12 @@
  * "This is Kristin": attach the LinkedIn profile the user confirmed, and
  * complete the contact from it.
  *
- *   1. The contact still has no LinkedIn, or has this one (a repeat is safe).
- *   2. No other contact already has this profile: one LinkedIn is one person,
- *      and the shared identity resolver is what says who has it.
- *   3. The verified details: LinkedIn Link's exact lookup
- *      (findContactByLinkedInUrl, Apollo's record for this exact URL).
- *   4. One write: the URL in the canonical identity fields, and the details
- *      only where the contact's own are empty (linkedinEnrichment.js).
- *
- * Nothing is attached without the user's confirmation, and nothing the
- * contact already holds is replaced. A differing title comes back as a
- * suggestion the user can take (acceptLinkedInSuggestion).
+ * Network lookup and duplicate discovery happen before persistence. The final
+ * contact decision is made again inside a Firestore transaction against the
+ * latest canonical document so a manual edit made while those requests are in
+ * flight always wins.
  */
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, runTransaction, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { resolveContact, RESOLUTION } from '../../services/contactIdentityService';
@@ -24,10 +17,7 @@ import { enrichmentFromProfile, profileUrl, PROVENANCE } from './linkedinEnrichm
 
 const WRITE_PATH = 'FindLinkedIn';
 
-/**
- * Apollo's record for one exact profile URL, through LinkedIn Link's lookup.
- * @returns {Promise<{ status: 'found', profile } | { status: 'not_found' } | { status: 'failed' }>}
- */
+/** Apollo's record for one exact profile URL, through LinkedIn Link's lookup. */
 export async function fetchLinkedInProfile(linkedinUrl) {
   try {
     const user = getEffectiveUser();
@@ -65,8 +55,8 @@ async function otherHolder(uid, contactId, candidate) {
 /**
  * @returns {Promise<
  *   { status: 'linked', profileStatus: 'found'|'not_found'|'failed', filled: string[], suggestions: object[] }
- *   | { status: 'taken', by: { contactId, name, count } }   another contact has this profile: nothing written
- *   | { status: 'has_other' }                              the contact has a different LinkedIn: nothing written
+ *   | { status: 'taken', by: { contactId, name, count } }
+ *   | { status: 'has_other' }
  *   | { status: 'invalid' } | { status: 'missing' }
  * >}
  */
@@ -75,12 +65,12 @@ export async function confirmLinkedIn(uid, contactId, linkedinUrl, { fetchProfil
   if (!uid || !contactId || !url) return { status: 'invalid' };
 
   const ref = doc(db, 'users', uid, 'contacts', contactId);
-  const snap = await getDoc(ref);
-  if (!snap.exists()) return { status: 'missing' };
-  const contact = { id: snap.id, ...snap.data() };
+  const initialSnap = await getDoc(ref);
+  if (!initialSnap.exists()) return { status: 'missing' };
+  const initial = { id: initialSnap.id, ...initialSnap.data() };
 
-  const own = normalizeLinkedInUrl(contact.linkedin_url);
-  if (own && own !== normalizeLinkedInUrl(url)) return { status: 'has_other' };
+  const initialOwn = normalizeLinkedInUrl(initial.linkedin_url);
+  if (initialOwn && initialOwn !== normalizeLinkedInUrl(url)) return { status: 'has_other' };
 
   const holder = await otherHolder(uid, contactId, { linkedin_url: url });
   if (holder) return { status: 'taken', by: holder };
@@ -88,12 +78,28 @@ export async function confirmLinkedIn(uid, contactId, linkedinUrl, { fetchProfil
   const fetched = await fetchProfile(url);
   const profile = fetched.status === 'found' ? fetched.profile : null;
   const apolloId = profile?.apollo_person_id;
-  const apolloIdTaken = Boolean(apolloId && !contact.apollo_person_id
+  const apolloIdTaken = Boolean(apolloId
     && await otherHolder(uid, contactId, { apollo_person_id: apolloId }).catch(() => true));
 
-  const { patch, filled, suggestions } = enrichmentFromProfile(contact, url, profile, { apolloIdTaken });
-  await updateDoc(ref, patch);
-  return { status: 'linked', profileStatus: fetched.status, filled, suggestions };
+  return runTransaction(db, async (transaction) => {
+    const snap = await transaction.get(ref);
+    if (!snap.exists()) return { status: 'missing' };
+    const latest = { id: snap.id, ...snap.data() };
+
+    // The user's newer LinkedIn decision wins. We never replace a different
+    // profile that appeared while lookup/enrichment was running.
+    const own = normalizeLinkedInUrl(latest.linkedin_url);
+    if (own && own !== normalizeLinkedInUrl(url)) return { status: 'has_other' };
+
+    const { patch, filled, suggestions } = enrichmentFromProfile(latest, url, profile, {
+      // If the latest contact already owns this Apollo id it is not "taken";
+      // otherwise the preflight duplicate check controls whether it may attach.
+      apolloIdTaken: Boolean(apolloId && !latest.apollo_person_id && apolloIdTaken),
+    });
+
+    transaction.update(ref, patch);
+    return { status: 'linked', profileStatus: fetched.status, filled, suggestions };
+  });
 }
 
 /** Take a suggestion the user tapped (the title today): their choice, recorded as theirs. */

@@ -1,24 +1,12 @@
 /**
  * Find LinkedIn, after "This is Kristin": linkedinEnrichment.js (what a
- * confirmed profile adds) and linkedinConfirm.js (the one write), plus the
+ * confirmed profile adds) and linkedinConfirm.js (the atomic write), plus the
  * LinkedIn Link lookup they reuse (findContactByLinkedInUrl).
- *
- * The REAL identity resolver runs here, against a small in-memory Firestore.
- * These tests pin:
- *   - the URL is stored in the canonical identity fields, marked as the user's;
- *   - the profile fills only what the contact does not have, and never touches
- *     name, email, phones, company or website;
- *   - a title or company that differs from the card's is a suggestion, never a write;
- *   - a profile already on another contact, or a contact that already has a
- *     different LinkedIn, writes nothing;
- *   - a repeat confirmation is harmless;
- *   - the lookup's log lines and usage record carry no name or URL.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { format } from 'node:util';
 
-// ── In-memory Firestore (paths → documents) ─────────────────────────────────
-const store = vi.hoisted(() => ({ docs: new Map(), writes: [] }));
+const store = vi.hoisted(() => ({ docs: new Map(), versions: new Map(), writes: [] }));
 const logApiUsage = vi.hoisted(() => vi.fn());
 vi.mock('../../netlify/functions/utils/logApiUsage.js', () => ({ logApiUsage }));
 
@@ -46,10 +34,9 @@ vi.mock('firebase/firestore', async (importOriginal) => {
       .slice(0, cap);
     return { empty: hits.length === 0, docs: hits.map(snapshot) };
   };
-  // Firestore's update: top-level keys replace, dotted keys set one nested field.
-  const updateDoc = async (ref, data) => {
+  const applyUpdate = (kind, ref, data) => {
     if (!store.docs.has(ref.path)) throw new Error(`No document to update: ${ref.path}`);
-    store.writes.push({ kind: 'update', path: ref.path, data: structuredClone(data) });
+    store.writes.push({ kind, path: ref.path, data: structuredClone(data) });
     const next = structuredClone(store.docs.get(ref.path));
     for (const [key, value] of Object.entries(data)) {
       const [head, ...rest] = key.split('.');
@@ -57,11 +44,31 @@ vi.mock('firebase/firestore', async (importOriginal) => {
       else next[key] = value;
     }
     store.docs.set(ref.path, next);
+    store.versions.set(ref.path, (store.versions.get(ref.path) ?? 0) + 1);
+  };
+  const updateDoc = async (ref, data) => applyUpdate('update', ref, data);
+  const runTransaction = async (_db, fn) => {
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const pending = [];
+      const reads = new Map();
+      const tx = {
+        get: async (ref) => {
+          reads.set(ref.path, store.versions.get(ref.path) ?? 0);
+          return snapshot(ref.path);
+        },
+        update: (ref, data) => { pending.push(() => applyUpdate('tx.update', ref, data)); return tx; },
+      };
+      const result = await fn(tx);
+      if ([...reads].some(([path, version]) => (store.versions.get(path) ?? 0) !== version)) continue;
+      pending.forEach(commit => commit());
+      return result;
+    }
+    throw new Error('transaction contention');
   };
   const refuse = name => async () => { throw new Error(`${name} is not expected here`); };
   return {
-    ...real, collection, doc, where, limit, query, getDoc, getDocs, updateDoc,
-    setDoc: refuse('setDoc'), addDoc: refuse('addDoc'), deleteDoc: refuse('deleteDoc'), runTransaction: refuse('runTransaction'),
+    ...real, collection, doc, where, limit, query, getDoc, getDocs, updateDoc, runTransaction,
+    setDoc: refuse('setDoc'), addDoc: refuse('addDoc'), deleteDoc: refuse('deleteDoc'),
   };
 });
 vi.mock('../firebase/config', () => ({ db: {}, auth: { currentUser: { uid: 'u1' } } }));
@@ -75,12 +82,18 @@ import { confirmLinkedIn, acceptLinkedInSuggestion, fetchLinkedInProfile } from 
 const UID = 'u1';
 const ID = 'cap_3f2a9c1e_p1';
 const path = id => `users/${UID}/contacts/${id}`;
-const put = (id, data) => store.docs.set(path(id), structuredClone(data));
+const put = (id, data) => {
+  store.docs.set(path(id), structuredClone(data));
+  store.versions.set(path(id), 0);
+};
 const get = id => store.docs.get(path(id));
+const userEdit = (id, patch) => {
+  store.docs.set(path(id), { ...get(id), ...structuredClone(patch) });
+  store.versions.set(path(id), (store.versions.get(path(id)) ?? 0) + 1);
+};
 const URL = 'https://www.linkedin.com/in/kristin-sokol';
 const NOW = '2026-10-26T12:00:00.000Z';
 
-/** A contact as Scan Business Card saves it. */
 const CARD = Object.freeze({
   name: 'Kristin Sokol', first_name: 'Kristin', last_name: 'Sokol',
   title: 'Instructional Matchmaker', company_name: 'Bright Path Learning', company_id: 'co_1',
@@ -89,7 +102,6 @@ const CARD = Object.freeze({
   source: 'business_card', addedFrom: 'business_card', capture_operation_id: 'cap_3f2a9c1e',
 });
 
-/** findContactByLinkedInUrl's contact for that URL. */
 const PROFILE = Object.freeze({
   id: 'ap_123', apollo_person_id: 'ap_123', name: 'Kristin Sokol (LinkedIn)',
   title: 'Director of Instructional Matching', headline: 'Matching learners with the right teachers',
@@ -103,6 +115,7 @@ const found = (profile = PROFILE) => vi.fn(async () => ({ status: 'found', profi
 let logs;
 beforeEach(() => {
   store.docs.clear();
+  store.versions.clear();
   store.writes.length = 0;
   logs = [];
   for (const level of ['log', 'info', 'warn', 'error', 'debug']) vi.spyOn(console, level).mockImplementation((...a) => logs.push(format(...a)));
@@ -111,8 +124,6 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
-
-// ─── What a confirmed profile adds ──────────────────────────────────────────
 
 describe('enrichmentFromProfile: fills what is empty, suggests what differs', () => {
   it('a card contact: the URL as the user\'s, LinkedIn\'s details where the card had none', () => {
@@ -203,10 +214,8 @@ describe('enrichmentFromProfile: fills what is empty, suggests what differs', ()
   });
 });
 
-// ─── The write ──────────────────────────────────────────────────────────────
-
-describe('confirmLinkedIn: one write, after the user said so', () => {
-  it('links the profile and fills the empty fields, in one update to that contact', async () => {
+describe('confirmLinkedIn: one atomic write, after the user said so', () => {
+  it('links the profile and fills the empty fields, in one transaction update', async () => {
     put(ID, CARD);
     const fetchProfile = found();
     const result = await confirmLinkedIn(UID, ID, 'https://linkedin.com/in/kristin-sokol/', { fetchProfile });
@@ -220,7 +229,7 @@ describe('confirmLinkedIn: one write, after the user said so', () => {
         { field: 'company', current: 'Bright Path Learning', suggested: 'Bright Path', actionable: false },
       ],
     });
-    expect(store.writes.map(w => [w.kind, w.path])).toEqual([['update', path(ID)]]);
+    expect(store.writes.map(w => [w.kind, w.path])).toEqual([['tx.update', path(ID)]]);
     const saved = get(ID);
     expect(saved).toMatchObject({
       ...CARD,
@@ -259,7 +268,7 @@ describe('confirmLinkedIn: one write, after the user said so', () => {
     expect(store.writes).toEqual([]);
   });
 
-  it('confirming the same profile again changes nothing the first time set', async () => {
+  it('confirming the same profile again changes no canonical facts', async () => {
     put(ID, CARD);
     await confirmLinkedIn(UID, ID, URL, { fetchProfile: found() });
     const first = structuredClone(get(ID));
@@ -274,6 +283,7 @@ describe('confirmLinkedIn: one write, after the user said so', () => {
   it('details unavailable: the URL is still linked, and the screen is told why nothing was added', async () => {
     for (const status of ['not_found', 'failed']) {
       store.docs.clear();
+      store.versions.clear();
       put(ID, CARD);
       const result = await confirmLinkedIn(UID, ID, URL, { fetchProfile: vi.fn(async () => ({ status })) });
       expect(result).toEqual({ status: 'linked', profileStatus: status, filled: [], suggestions: [] });
@@ -307,6 +317,50 @@ describe('confirmLinkedIn: one write, after the user said so', () => {
     expect([...store.docs.keys()].some(p => p.includes('capture_operations'))).toBe(false);
     const values = ['Kristin', 'Sokol', 'Bright Path', 'kristin-sokol', 'Matchmaker', 'ap_123', 'brightpath'];
     expect(logs.filter(line => values.some(v => line.includes(v)))).toEqual([]);
+  });
+});
+
+describe('LinkedIn Confirm race protection', () => {
+  function deferredProfile(profile = PROFILE) {
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    const fetchProfile = vi.fn(async () => { await gate; return { status: 'found', profile }; });
+    return { fetchProfile, release };
+  }
+
+  it('manual title/location/photo changes made during lookup win', async () => {
+    put(ID, { ...CARD, title: '', city: '', state: '', country: '', location: '', photo_url: null });
+    const pending = deferredProfile();
+    const confirmation = confirmLinkedIn(UID, ID, URL, { fetchProfile: pending.fetchProfile });
+    await vi.waitFor(() => expect(pending.fetchProfile).toHaveBeenCalled());
+    userEdit(ID, {
+      title: 'User Title', city: 'Provo', state: 'Utah', location: 'Provo, Utah',
+      photo_url: 'https://example.com/user.jpg', photo_source: 'user',
+      enrichment_provenance: { title: 'user_accepted', location: 'user_accepted', photo_url: 'user_accepted' },
+    });
+    pending.release();
+    const result = await confirmation;
+    expect(result.status).toBe('linked');
+    expect(get(ID)).toMatchObject({
+      title: 'User Title', city: 'Provo', state: 'Utah', location: 'Provo, Utah',
+      photo_url: 'https://example.com/user.jpg', photo_source: 'user',
+    });
+    expect(get(ID).enrichment_provenance).toMatchObject({ title: 'user_accepted', location: 'user_accepted', photo_url: 'user_accepted', linkedin_url: 'user_confirmed' });
+  });
+
+  it('a newer LinkedIn confirmation/change wins and the stale confirmation stops', async () => {
+    put(ID, CARD);
+    const pending = deferredProfile();
+    const confirmation = confirmLinkedIn(UID, ID, URL, { fetchProfile: pending.fetchProfile });
+    await vi.waitFor(() => expect(pending.fetchProfile).toHaveBeenCalled());
+    userEdit(ID, {
+      linkedin_url: 'https://www.linkedin.com/in/newer-choice',
+      linkedin_url_normalized: 'linkedin.com/in/newer-choice',
+      enrichment_provenance: { linkedin_url: 'user_confirmed' },
+    });
+    pending.release();
+    expect(await confirmation).toEqual({ status: 'has_other' });
+    expect(get(ID).linkedin_url).toBe('https://www.linkedin.com/in/newer-choice');
   });
 });
 
@@ -347,8 +401,6 @@ describe('fetchLinkedInProfile: LinkedIn Link\'s exact lookup, as the signed-in 
     expect(await fetchLinkedInProfile(URL)).toEqual({ status: 'failed' });
   });
 });
-
-// ─── The lookup it reuses ───────────────────────────────────────────────────
 
 describe('findContactByLinkedInUrl: no name or URL in its logs or usage record', () => {
   const APOLLO_PERSON = {

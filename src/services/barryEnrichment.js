@@ -95,14 +95,14 @@ function proposedCompany(result) {
   };
 }
 
-function newCompanyRecord(candidate) {
+function newCompanyRecord(candidate, savedAt) {
   const apolloOrgId = readApolloOrgId(candidate);
   return createCompanyRecord({
     ...apolloIdFields(apolloOrgId),
     name: candidate.name,
     domain: normalizeDomain(candidate.domain) ?? null,
     linkedin_url: null,
-    saved_at: new Date().toISOString(),
+    saved_at: savedAt,
     source: SOURCE,
     status: COMPANY_STATUS.ACCEPTED,
     contact_count: 0,
@@ -127,6 +127,11 @@ export async function writeBarryEnrichment(
 ) {
   const ref = doc(db, 'users', uid, 'contacts', contact.id);
   const candidate = proposedCompany(result);
+  // Transaction callbacks may run more than once. Values used to identify or
+  // stamp a newly-created company must therefore be stable across retries.
+  const writeAt = new Date().toISOString();
+  const candidateApolloId = candidate ? readApolloOrgId(candidate) : null;
+  const fallbackCompanyId = candidate && !candidateApolloId ? `company_${Date.now()}` : null;
 
   // This phase may do several Firestore queries, but MUST NOT write. If the user
   // changes company while it runs, the transaction below rereads the contact and
@@ -163,7 +168,7 @@ export async function writeBarryEnrichment(
           if (companyData.status === COMPANY_STATUS.PENDING) {
             transaction.update(companyRef, {
               status: COMPANY_STATUS.ACCEPTED,
-              saved_at: companyData.saved_at ?? new Date().toISOString(),
+              saved_at: companyData.saved_at ?? writeAt,
               accepted_via: SOURCE,
             });
           }
@@ -175,14 +180,13 @@ export async function writeBarryEnrichment(
       }
 
       if (!companyId) {
-        const apolloOrgId = readApolloOrgId(candidate);
-        companyId = apolloOrgId || `company_${Date.now()}`;
+        companyId = candidateApolloId || fallbackCompanyId;
         const companyRef = doc(db, 'users', uid, 'companies', companyId);
         const companySnap = await transaction.get(companyRef);
 
         if (companySnap.exists()) {
           const existing = companySnap.data() ?? {};
-          const sameApollo = Boolean(apolloOrgId && readApolloOrgId(existing) === apolloOrgId);
+          const sameApollo = Boolean(candidateApolloId && readApolloOrgId(existing) === candidateApolloId);
           const sameName = sameText(existing.name, candidate.name);
           if (!sameApollo && !sameName) {
             // Unexpected occupant: keep the safe company_name fill but do not
@@ -190,7 +194,7 @@ export async function writeBarryEnrichment(
             companyId = null;
           }
         } else {
-          transaction.set(companyRef, newCompanyRecord(candidate));
+          transaction.set(companyRef, newCompanyRecord(candidate, writeAt));
         }
       }
 

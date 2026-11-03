@@ -26,6 +26,13 @@
  * Resolver-time safeguards that need workspace data (two companies with the
  * same name; a domain that already exists) belong to the company resolver,
  * not here.
+ *
+ * A PERSON'S OWN DOMAIN IS NOT A COMPANY'S
+ * ───────────────────────────────────────
+ * An independent professional's website and email often spell their name
+ * (kristinsokol.com, carla@carlalifferthdesign.com). That domain identifies
+ * the person, so it never becomes company evidence (PERSONAL_DOMAIN,
+ * NAME_IN_DOMAIN). The website and email are still saved on the contact.
  */
 
 import { nameKey } from '../utils/identityNormalization.js';
@@ -48,6 +55,8 @@ export const SAFEGUARDS = Object.freeze({
   PERSON_NAME_AS_COMPANY: 'PERSON_NAME_AS_COMPANY',
   COMPANY_NAME_TOO_SHORT: 'COMPANY_NAME_TOO_SHORT',
   WEAK_COMPANY_TEXT: 'WEAK_COMPANY_TEXT',
+  PERSONAL_DOMAIN: 'PERSONAL_DOMAIN',
+  NAME_IN_DOMAIN: 'NAME_IN_DOMAIN',
 });
 
 // ─── Lists ───────────────────────────────────────────────────────────────────
@@ -203,6 +212,53 @@ export function websiteSafeguards(website, { emails = [] } = {}) {
   return domainSafeguards(text);
 }
 
+/** Honorifics and letters after a name: not part of the name a domain spells. */
+const NAME_EXTRAS = new Set([
+  'dr', 'mr', 'mrs', 'ms', 'mx', 'miss', 'prof', 'jr', 'sr', 'ii', 'iii', 'iv',
+  'phd', 'md', 'mba', 'cpa', 'esq', 'rn', 'dds', 'pe',
+]);
+
+/**
+ * Does a domain spell the person's own name? Compared on the label before the
+ * public suffix, letters and digits only, so `carla-lifferth.com` reads as
+ * `carlalifferth`. Needs a first and a last name.
+ *
+ *   'personal'    the name and nothing else: first and last (carlalifferth),
+ *                 every printed name (carlajanelifferth), initials before the
+ *                 last name (clifferth, cjlifferth), last then first
+ *                 (lifferthcarla)
+ *   'name_based'  the first and last name together, with other words:
+ *                 carlalifferthdesign, studiocarlalifferth
+ *   null          anything else, including the last name alone
+ *                 (lifferthinteriors), which is how many family businesses
+ *                 are named
+ */
+export function ownDomainKind(input, personName) {
+  const stem = domainStem(input)?.replace(/[^a-z0-9]/g, '');
+  const names = (personNameKey(personName) ?? '').split(' ').filter(word => word && !NAME_EXTRAS.has(word));
+  if (!stem || names.length < 2) return null;
+  const first = names[0];
+  const last = names[names.length - 1];
+  const initials = names.slice(1, -1).map(word => word[0]).join('');
+  const spelled = new Set([first + last, names.join(''), first + initials + last, first[0] + last, first[0] + initials + last, last + first]);
+  if (spelled.has(stem)) return 'personal';
+  if (first.length >= 2 && last.length >= 2 && (stem.includes(first + last) || stem.includes(last + first))) return 'name_based';
+  return null;
+}
+
+/**
+ * Codes for a website or email host that spells the person's own name. Such a
+ * domain belongs to the person, not to a company: it never finds, links or
+ * creates one. A company the person works for, even one named after them, is
+ * the user's to choose.
+ */
+export function ownDomainSafeguards(input, personName) {
+  const kind = ownDomainKind(input, personName);
+  if (kind === 'personal') return [SAFEGUARDS.PERSONAL_DOMAIN];
+  if (kind === 'name_based') return [SAFEGUARDS.NAME_IN_DOMAIN];
+  return [];
+}
+
 function isTitleText(key) {
   const tokens = key.split(' ');
   return tokens.every(token => TITLE_WORDS.has(token)) && tokens.some(token => ROLE_WORDS.has(token));
@@ -262,6 +318,10 @@ function nameAgreesWithStem(key, stem) {
  * Never manufactures a display name: a domain from `sarah@acme.com` gives a
  * domain candidate and `name.display: null`, not "Acme".
  *
+ * A website or email whose domain spells the person's name (PERSONAL_DOMAIN,
+ * NAME_IN_DOMAIN) is never the company domain: `kristin@kristinsokol.com`
+ * says who the person is, not where they work.
+ *
  * @param {object} input
  * @param {object|null} input.companyName  the company.name field
  * @param {string|null} input.website       printed website text
@@ -275,15 +335,18 @@ export function assessCompanyEvidence({ companyName = null, website = null, emai
 
   if (typeof website === 'string' && website.trim()) {
     const websiteCodes = websiteSafeguards(website, { emails });
-    codes.push(...websiteCodes);
-    if (!websiteCodes.length) domain = { key: domainKey(website), from: 'website', usable: true };
+    const own = websiteCodes.length ? [] : ownDomainSafeguards(website, personName);
+    codes.push(...websiteCodes, ...own);
+    if (!websiteCodes.length && !own.length) domain = { key: domainKey(website), from: 'website', usable: true };
   }
 
   if (!domain.usable) {
     for (const email of emails) {
       const emailCodes = emailDomainSafeguards(email);
-      codes.push(...emailCodes);
-      if (!emailCodes.length && !domain.usable) {
+      // A role address (hello@) at the person's own domain is still theirs.
+      const own = emailCodes.some(code => code !== SAFEGUARDS.ROLE_EMAIL) ? [] : ownDomainSafeguards(emailHost(email), personName);
+      codes.push(...emailCodes, ...own);
+      if (!emailCodes.length && !own.length && !domain.usable) {
         domain = { key: domainKey(emailHost(email)), from: 'email_domain', usable: true };
       }
     }

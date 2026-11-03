@@ -38,6 +38,16 @@
  * Company empty and keeps the text as a suggestion the user can take. A weak
  * read that may still be a company (only in a logo, or unclear) stays filled
  * and marked "Check"; the save step then defaults to No company for it.
+ *
+ * A PERSON'S OWN DOMAIN DOES NOT CHOOSE A COMPANY
+ * ──────────────────────────────────────────────
+ * When the card's website or email spells the person's name (kristinsokol.com,
+ * carlalifferthdesign.com), the extraction marks that field PERSONAL_DOMAIN or
+ * NAME_IN_DOMAIN. The draft remembers its host (`personalDomain`). While the
+ * draft still holds it, that domain never finds, links or creates a company,
+ * and a company the card printed is marked "Check", so the save step starts
+ * at No company until the user chooses it. A business named after the person
+ * is still theirs to choose.
  */
 import { labelFromPrinted } from '../../utils/phoneLabels';
 import { makePhone } from '../../utils/contactPhones';
@@ -58,6 +68,12 @@ const KIND_LABELS = Object.freeze({ mobile: 'mobile', direct: 'direct', fax: 'fa
 export const NOT_A_COMPANY = Object.freeze([
   'PERSON_NAME_AS_COMPANY', 'TITLE_AS_COMPANY', 'GENERIC_COMPANY_NAME', 'COMPANY_NAME_TOO_SHORT', 'INFERRED_COMPANY_NAME',
 ]);
+
+/**
+ * Safeguard codes on a printed website or email (compared by value, like
+ * NOT_A_COMPANY) that mean its domain spells the person's name.
+ */
+export const OWN_DOMAIN = Object.freeze({ PERSONAL_DOMAIN: 'personal', NAME_IN_DOMAIN: 'name_based' });
 
 /** Levels the reader was unsure of: shown as "check this". */
 const UNSURE = new Set(['possible', 'unknown']);
@@ -123,6 +139,60 @@ export function socialProblems(draft) {
   });
 }
 
+const lower = value => (typeof value === 'string' ? value.trim().toLowerCase() : '');
+
+/** A website's host as typed or printed: no scheme, `www.`, path or trailing dot. */
+const websiteHost = value => lower(value).replace(/^[a-z][a-z0-9+.-]*:\/\//, '').replace(/^www\./, '').split(/[/?#]/)[0].replace(/\.$/, '');
+
+/** The host of an email address, or ''. */
+const emailHostOf = (value) => {
+  const email = lower(value);
+  return email.includes('@') ? websiteHost(email.slice(email.lastIndexOf('@') + 1)) : '';
+};
+
+/** 'personal' or 'name_based' when a field's checks say its domain spells the person's name. */
+function ownDomainKindOf(field) {
+  const checks = field?.extraction?.checks ?? [];
+  const code = Object.keys(OWN_DOMAIN).find(c => checks.includes(c));
+  return code ? OWN_DOMAIN[code] : null;
+}
+
+/**
+ * The person's own domain on the card: the hosts of the printed website and
+ * emails that spell their name, and the strongest kind among them.
+ */
+function personalDomainFrom(person, company) {
+  const flagged = [
+    [company.website, websiteHost],
+    ...(person.emails ?? []).map(email => [email, emailHostOf]),
+  ].map(([field, host]) => ({ kind: ownDomainKindOf(field), host: host(text(field)) })).filter(f => f.kind && f.host);
+  if (flagged.length === 0) return null;
+  return {
+    kind: flagged.some(f => f.kind === 'personal') ? 'personal' : 'name_based',
+    hosts: [...new Set(flagged.map(f => f.host))],
+  };
+}
+
+/**
+ * The person's own domain while the draft still uses it, or null. `website`
+ * and `email` say which of the two is at it; editing them away ends it.
+ *
+ * @returns {{ kind: 'personal' | 'name_based', domain: string, website: boolean, email: boolean } | null}
+ */
+export function personalDomainInUse(draft) {
+  const hosts = draft?.personalDomain?.hosts ?? [];
+  if (hosts.length === 0) return null;
+  const website = hosts.includes(websiteHost(draft.website));
+  const email = hosts.includes(emailHostOf(draft.email));
+  if (!website && !email) return null;
+  return {
+    kind: draft.personalDomain.kind,
+    domain: website ? websiteHost(draft.website) : emailHostOf(draft.email),
+    website,
+    email,
+  };
+}
+
 /** The name as printed, or its printed parts when only those were read. */
 function fullName(person) {
   const full = text(person.fullName);
@@ -145,10 +215,13 @@ export function draftsFromExtraction(extraction) {
   const companyText = text(company.name);
   const codes = Array.isArray(company.safeguards) ? company.safeguards : [];
   const notACompany = companyText ? NOT_A_COMPANY.find(code => codes.includes(code)) ?? null : null;
+  const personalDomain = personalDomainFrom(person, company);
   const toCheck = [
     ['name', person.fullName], ['title', person.title], ['company', notACompany ? null : company.name],
     ['email', person.emails?.[0]], ['linkedinUrl', person.linkedinUrl], ['website', company.website],
   ].filter(([, field]) => unsure(field)).map(([key]) => key);
+  // A company printed beside the person's own domain is the user's to confirm.
+  if (personalDomain && companyText && !notACompany && !toCheck.includes('company')) toCheck.push('company');
   if ((person.phones ?? []).some(unsure)) toCheck.push('phones');
 
   return [{
@@ -161,6 +234,7 @@ export function draftsFromExtraction(extraction) {
     otherEmails: emails.slice(1),
     linkedinUrl: text(person.linkedinUrl),
     website: text(company.website),
+    personalDomain,
     phones: (person.phones ?? []).map(phoneFromExtraction).filter(Boolean),
     socials: (person.socials ?? []).map(socialFromExtraction).filter(row => row.text),
     toCheck,
@@ -180,6 +254,6 @@ export function companyIsUnconfirmed(draft) {
 export function emptyDraft() {
   return {
     key: 'person-1', name: '', title: '', company: '', companySuggestion: null, email: '', otherEmails: [],
-    linkedinUrl: '', website: '', phones: [], socials: [], toCheck: [],
+    linkedinUrl: '', website: '', personalDomain: null, phones: [], socials: [], toCheck: [],
   };
 }

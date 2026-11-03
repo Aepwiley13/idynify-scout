@@ -9,7 +9,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import {
   draftsFromExtraction, emptyDraft, phoneFromExtraction, printedPhoneLabel, newSocialRow, socialProblems,
-  NOT_A_COMPANY, companyIsUnconfirmed,
+  NOT_A_COMPANY, companyIsUnconfirmed, personalDomainInUse, OWN_DOMAIN,
 } from '../components/capture/captureDraft.js';
 import { SAFEGUARDS } from '../capture/safeguards.js';
 import { assembleExtraction } from '../../netlify/functions/utils/capture/assembleExtraction.js';
@@ -268,5 +268,67 @@ describe('a company is not a name, a title or a brand (independent professionals
   it('NOT_A_COMPANY names real safeguard codes, and not WEAK_COMPANY_TEXT (a weak read, not something else)', () => {
     for (const code of NOT_A_COMPANY) expect(Object.values(SAFEGUARDS)).toContain(code);
     expect(NOT_A_COMPANY).not.toContain('WEAK_COMPANY_TEXT');
+  });
+
+  describe("the person's own domain", () => {
+    it('the server marks the website and the email that spell the name, and gives no company domain', () => {
+      const { extraction, draft } = card({ company: 'Kristin Sokol', website: 'kristinsokol.com', email: 'kristin@kristinsokol.com' });
+      expect(extraction.company.safeguards).toEqual(expect.arrayContaining(['PERSONAL_DOMAIN', 'PERSON_NAME_AS_COMPANY']));
+      expect(extraction.company.website.extraction.checks).toContain('PERSONAL_DOMAIN');
+      expect(extraction.person.emails[0].extraction.checks).toContain('PERSONAL_DOMAIN');
+      expect(extraction.company.domain.value).toBeNull();
+      // The website itself was read fine: the flag does not lower its level.
+      expect(extraction.company.website.extraction.level).toBe('likely');
+      expect(draft).toMatchObject({
+        website: 'kristinsokol.com', email: 'kristin@kristinsokol.com', company: '',
+        personalDomain: { kind: 'personal', hosts: ['kristinsokol.com'] },
+      });
+      expect(personalDomainInUse(draft)).toEqual({ kind: 'personal', domain: 'kristinsokol.com', website: true, email: true });
+    });
+
+    it('a company printed beside it is marked Check: the user confirms it', () => {
+      const { draft } = card({ name: 'Carla Lifferth', company: 'Lifferth Interiors', website: 'carlalifferth.com' });
+      expect(draft.company).toBe('Lifferth Interiors');
+      expect(draft.toCheck).toContain('company');
+      expect(companyIsUnconfirmed(draft)).toBe(true);
+    });
+
+    it('a business named after the person, at a domain with the name in it, is the user\'s to confirm too', () => {
+      const { extraction, draft } = card({ name: 'Carla Lifferth', company: 'Carla Lifferth Design', website: 'www.carlalifferthdesign.com' });
+      expect(extraction.company.safeguards).toContain('NAME_IN_DOMAIN');
+      expect(draft).toMatchObject({ company: 'Carla Lifferth Design', personalDomain: { kind: 'name_based', hosts: ['carlalifferthdesign.com'] } });
+      expect(companyIsUnconfirmed(draft)).toBe(true);
+    });
+
+    it('a business domain that only shares the last name is not the person\'s own', () => {
+      const { extraction, draft } = card({ name: 'Carla Lifferth', company: 'Lifferth Interiors', website: 'lifferthinteriors.com' });
+      expect(extraction.company.domain.value).toBe('lifferthinteriors.com');
+      expect(draft).toMatchObject({ company: 'Lifferth Interiors', personalDomain: null, toCheck: [] });
+      expect(personalDomainInUse(draft)).toBeNull();
+    });
+
+    it('only the field at the person\'s own domain is marked: a work email elsewhere is not', () => {
+      const { extraction, draft } = card({ website: 'kristinsokol.com', email: 'kristin@sokolstudio.com' });
+      expect(extraction.person.emails[0].extraction.checks).not.toContain('PERSONAL_DOMAIN');
+      expect(extraction.company.domain).toMatchObject({ value: 'sokolstudio.com', inferredFrom: 'email_domain' });
+      expect(personalDomainInUse(draft)).toEqual({ kind: 'personal', domain: 'kristinsokol.com', website: true, email: false });
+    });
+
+    it('editing the website away ends it; another address at the same domain keeps it', () => {
+      const { draft } = card({ website: 'https://www.KristinSokol.com/', email: 'kristin@kristinsokol.com' });
+      expect(personalDomainInUse({ ...draft, website: 'sokolstudio.com', email: '' })).toBeNull();
+      expect(personalDomainInUse({ ...draft, website: '', email: 'hello@KristinSokol.com' })).toMatchObject({ website: false, email: true, domain: 'kristinsokol.com' });
+      expect(personalDomainInUse({ ...draft, website: 'www.kristinsokol.com/about' })).toMatchObject({ website: true });
+    });
+
+    it('a draft without it (typed by hand, or older) has none', () => {
+      expect(emptyDraft().personalDomain).toBeNull();
+      expect(personalDomainInUse(emptyDraft())).toBeNull();
+      expect(personalDomainInUse({ website: 'kristinsokol.com' })).toBeNull();
+    });
+
+    it('OWN_DOMAIN names real safeguard codes', () => {
+      for (const code of Object.keys(OWN_DOMAIN)) expect(Object.values(SAFEGUARDS)).toContain(code);
+    });
   });
 });

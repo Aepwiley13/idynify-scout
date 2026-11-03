@@ -137,4 +137,98 @@ describe('barryICPConversation extraction functions are exported and reusable', 
     expect(result.step).toBe('confirming');
     expect(result.barryResponse.understood.targetTitles).toEqual(['CEO', 'Founder']);
   });
+
+  // #748: the example-company step's schema has no way to say "no example" —
+  // the model answers it literally, with a seed named "None provided".
+  describe('processFollowup, routed to the example-company step: "no example" is no seed (#748)', () => {
+    const askedForExample = [{ role: 'barry', content: 'Do you have an example company in mind?' }];
+
+    it.each([
+      ['None provided', 'lookalike'],
+      ['none', 'lookalike'],
+      ['N/A', 'lookalike'],
+      ['No example', 'lookalike'],
+      ['  none provided  ', 'lookalike'],   // padded, as a model reply could be
+    ])('a seed named %j is treated as no seed, and the strategy stops claiming lookalike', async (placeholderName, modelStrategy) => {
+      const anthropic = fakeAnthropic({
+        understood: {
+          industries: ['Computer Software'], companySizes: null, locations: null,
+          targetTitles: null, companyKeywords: null,
+          lookalikeSeed: { name: placeholderName, domain: null },
+        },
+        mappingExplanation: "I'll focus on the industry and the titles you give me.",
+        needsMoreInfo: true,
+        followUpQuestion: 'Who should I be finding at these companies?',
+        followUpType: 'titles',
+        searchStrategy: modelStrategy,
+        confidenceScore: 0.5,
+        readyToConfirm: false,
+      });
+
+      const result = await processFollowup(
+        anthropic, "I don't have a specific company in mind", 'awaiting_example', askedForExample, {}
+      );
+
+      expect(result.barryResponse.understood.lookalikeSeed).toBeNull();
+      expect(result.barryResponse.searchStrategy).toBe('industry_only');
+    });
+
+    it('a real company name is left exactly as the model reported it', async () => {
+      const anthropic = fakeAnthropic({
+        understood: {
+          industries: ['Computer Software'], companySizes: null, locations: null,
+          targetTitles: null, companyKeywords: null,
+          lookalikeSeed: { name: 'Lakeshore Grocers', domain: null },
+        },
+        mappingExplanation: "I'll prioritize companies similar to Lakeshore Grocers.",
+        needsMoreInfo: false, followUpQuestion: null, followUpType: null,
+        searchStrategy: 'lookalike', confidenceScore: 0.9, readyToConfirm: true,
+      });
+
+      const result = await processFollowup(
+        anthropic, 'Lakeshore Grocers is a good example', 'awaiting_example', askedForExample, {}
+      );
+
+      expect(result.barryResponse.understood.lookalikeSeed).toEqual({ name: 'Lakeshore Grocers', domain: null });
+      expect(result.barryResponse.searchStrategy).toBe('lookalike');
+    });
+
+    it('a non-lookalike strategy already reported for a placeholder seed is left as the model said', async () => {
+      // Only a false "lookalike" claim is corrected; a model that already
+      // chose industry_only or hybrid on its own is not second-guessed.
+      const anthropic = fakeAnthropic({
+        understood: {
+          industries: ['Computer Software'], companySizes: null, locations: null,
+          targetTitles: null, companyKeywords: null,
+          lookalikeSeed: { name: 'none provided', domain: null },
+        },
+        mappingExplanation: "I'll focus on the industry.",
+        needsMoreInfo: false, followUpQuestion: null, followUpType: null,
+        searchStrategy: 'hybrid', confidenceScore: 0.8, readyToConfirm: true,
+      });
+
+      const result = await processFollowup(
+        anthropic, "I don't have a specific company in mind", 'awaiting_example', askedForExample, {}
+      );
+
+      expect(result.barryResponse.understood.lookalikeSeed).toBeNull();
+      expect(result.barryResponse.searchStrategy).toBe('hybrid');
+    });
+
+    it('a reply with no understood block is returned as before, not thrown on', async () => {
+      const anthropic = fakeAnthropic({
+        mappingExplanation: 'Tell me a bit more about who you want to reach.',
+        needsMoreInfo: true, followUpQuestion: 'Which industry?', followUpType: 'industry',
+        searchStrategy: 'lookalike', confidenceScore: 0.2, readyToConfirm: false,
+      });
+
+      const result = await processFollowup(
+        anthropic, "I don't have a specific company in mind", 'awaiting_example', askedForExample, {}
+      );
+
+      expect(result.barryResponse.understood).toBeUndefined();
+      expect(result.barryResponse.searchStrategy).toBe('lookalike');
+      expect(result.step).toBe('clarifying');
+    });
+  });
 });

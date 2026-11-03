@@ -1,5 +1,5 @@
 /**
- * Social profiles on screen: the review's Social section, the save gate, and
+ * Social profiles on screen: the review's line per network, the save gate, and
  * the rows on the contact profile (display only). Every handle is fictional.
  */
 import { describe, it, expect, vi } from 'vitest';
@@ -46,27 +46,70 @@ function Review({ initial, onPeople }) {
   );
 }
 
-describe('review: the Social section', () => {
-  it('a bare @handle asks which network; Continue waits until the user chooses', async () => {
+describe('review: social profiles, one line per network', () => {
+  it('LinkedIn, Instagram and Facebook each show; a network the card did not print says "Not on card", without a warning', () => {
+    render(<Review initial={[person([row(1, '@KRISTINSOKOL', 'instagram')])]} />);
+    const group = screen.getByRole('group', { name: 'Social profiles' });
+    const lines = [...group.querySelectorAll('[data-testid^="capture-social-"]')].map(el => el.dataset.testid);
+    expect(lines).toEqual(['capture-social-linkedin', 'capture-social-instagram', 'capture-social-row', 'capture-social-facebook']);
+
+    expect(screen.getByLabelText('LinkedIn')).toHaveValue('');
+    expect(screen.getByLabelText('LinkedIn')).toHaveAttribute('placeholder', 'Not on card');
+    expect(screen.getByRole('textbox', { name: 'Instagram handle or profile address' })).toHaveValue('@KRISTINSOKOL');
+    expect(screen.getByTestId('capture-social-facebook')).toHaveTextContent('Not on card');
+    expect(screen.queryByText(/Which network is this\?/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
+  });
+
+  it('a card with no social profiles shows all three as "Not on card", and Continue is not held up', () => {
+    render(<Review initial={[person([])]} />);
+    expect(screen.getByLabelText('LinkedIn')).toHaveValue('');
+    expect(screen.getByTestId('capture-social-instagram')).toHaveTextContent('Not on card');
+    expect(screen.getByTestId('capture-social-facebook')).toHaveTextContent('Not on card');
+    expect(screen.queryAllByTestId('capture-social-row')).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
+  });
+
+  it('a bare @handle asks which network; Continue waits until the user chooses, then it moves under that network', async () => {
     const user = userEvent.setup();
     const seen = [];
     render(<Review initial={[person([row(1, '@KRISTINSOKOL', null)])]} onPeople={list => seen.push(list)} />);
 
     const platform = screen.getByRole('combobox', { name: 'Platform for @KRISTINSOKOL' });
     expect(platform).toHaveValue('');
+    expect(screen.getByTestId('capture-social-unplaced')).toHaveTextContent('Network not shown on the card');
     expect(screen.getByText(/Which network is this\?/)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled();
     expect(screen.getByText('Choose a network for each social profile, or remove it, to continue.')).toBeInTheDocument();
 
     await user.selectOptions(platform, 'instagram');
     expect(screen.queryByText(/Which network is this\?/)).toBeNull();
+    expect(screen.queryByTestId('capture-social-unplaced')).toBeNull();
+    expect(screen.getByTestId('capture-social-instagram')).toHaveTextContent('Instagram');
+    expect(screen.getByRole('textbox', { name: 'Instagram handle or profile address' })).toHaveValue('@KRISTINSOKOL');
     expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
     expect(seen.at(-1)[0].socials[0]).toMatchObject({ platform: 'instagram', text: '@KRISTINSOKOL', confirmed: true });
   });
 
-  it('a network the card showed is preselected and not yet confirmed', () => {
-    render(<Review initial={[person([row(1, 'instagram.com/kristinsokol', 'instagram')])]} />);
-    expect(screen.getByRole('combobox', { name: 'Platform for instagram.com/kristinsokol' })).toHaveValue('instagram');
+  it('a network the card showed is shown under that network and not yet confirmed', () => {
+    const seen = [];
+    render(<Review initial={[person([row(1, 'instagram.com/kristinsokol', 'instagram')])]} onPeople={list => seen.push(list)} />);
+    expect(screen.getByRole('textbox', { name: 'Instagram handle or profile address' })).toHaveValue('instagram.com/kristinsokol');
+    expect(screen.queryByRole('combobox', { name: /Platform for/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
+    expect(seen).toHaveLength(0);
+  });
+
+  it('adding a network the card did not print: Add Facebook, type the handle', async () => {
+    const user = userEvent.setup();
+    const seen = [];
+    render(<Review initial={[person([])]} onPeople={list => seen.push(list)} />);
+    await user.click(screen.getByRole('button', { name: 'Add Facebook' }));
+    expect(screen.getByTestId('capture-social-facebook')).not.toHaveTextContent('Not on card');
+    await user.type(screen.getByRole('textbox', { name: 'Facebook handle or profile address' }), 'sokol.studio');
+    expect(seen.at(-1)[0].socials).toEqual([
+      expect.objectContaining({ platform: 'facebook', text: 'sokol.studio', fromCard: false, confirmed: true }),
+    ]);
     expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
   });
 
@@ -74,18 +117,35 @@ describe('review: the Social section', () => {
     const user = userEvent.setup();
     const seen = [];
     render(<Review initial={[person([])]} onPeople={list => seen.push(list)} />);
-    await user.click(screen.getByRole('button', { name: /add social profile/ }));
-    await user.type(screen.getByRole('textbox', { name: 'Handle or profile address for new profile' }), 'facebook.com/sokol.studio');
+    await user.click(screen.getByRole('button', { name: 'Add Instagram' }));
+    const field = screen.getByRole('textbox', { name: 'Instagram handle or profile address' });
+    await user.type(field, 'facebook.com/sokol.studio');
+    // Still in the field while typing: the row stays put and keeps focus.
+    expect(field).toHaveFocus();
+    expect(field).toHaveValue('facebook.com/sokol.studio');
+    expect(screen.getByText('Not an Instagram handle or profile address.')).toBeInTheDocument();
+    await user.tab();
     expect(seen.at(-1)[0].socials[0]).toMatchObject({ platform: 'facebook', text: 'facebook.com/sokol.studio', fromCard: false, confirmed: true });
+    expect(screen.getByTestId('capture-social-instagram')).toHaveTextContent('Not on card');
+    expect(screen.getByRole('textbox', { name: 'Facebook handle or profile address' })).toHaveValue('facebook.com/sokol.studio');
   });
 
-  it('a handle can be removed; one that is not a handle for its network is flagged', async () => {
+  it('LinkedIn is typed into its own field, which the save reads as before', async () => {
+    const user = userEvent.setup();
+    const seen = [];
+    render(<Review initial={[person([])]} onPeople={list => seen.push(list)} />);
+    await user.type(screen.getByLabelText('LinkedIn'), 'linkedin.com/in/kristin-sokol');
+    expect(seen.at(-1)[0]).toMatchObject({ linkedinUrl: 'linkedin.com/in/kristin-sokol', socials: [] });
+  });
+
+  it('a handle can be removed, and its network goes back to "Not on card"; one that is not a handle for its network is flagged', async () => {
     const user = userEvent.setup();
     render(<Review initial={[person([row(1, '@kristinsokol', null), row(2, 'kristin sokol', 'facebook')])]} />);
     expect(screen.getByText('Not a Facebook handle or profile address.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove @kristinsokol' }));
     await user.click(screen.getByRole('button', { name: 'Remove kristin sokol' }));
     expect(screen.queryAllByTestId('capture-social-row')).toHaveLength(0);
+    expect(screen.getByTestId('capture-social-facebook')).toHaveTextContent('Not on card');
     expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled();
   });
 });

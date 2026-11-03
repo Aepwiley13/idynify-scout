@@ -58,10 +58,24 @@ vi.mock('firebase/firestore', async (importOriginal) => {
     }
     store.docs.set(ref.path, next);
   };
+  // confirmLinkedIn's final check and write run in here (#754): tx.get reads
+  // whatever the store holds at that instant, so a mutation made by a test's
+  // fetchProfile mock — standing in for a change from another tab, a manual
+  // edit, or Enrich, landing in the window between the initial read and this
+  // call — is exactly what the transaction sees as "latest".
+  const runTransaction = async (_db, fn) => {
+    const pending = [];
+    const out = await fn({
+      get: async ref => snapshot(ref.path),
+      update: (ref, data) => pending.push([ref, data]),
+    });
+    for (const [ref, data] of pending) await updateDoc(ref, data);
+    return out;
+  };
   const refuse = name => async () => { throw new Error(`${name} is not expected here`); };
   return {
-    ...real, collection, doc, where, limit, query, getDoc, getDocs, updateDoc,
-    setDoc: refuse('setDoc'), addDoc: refuse('addDoc'), deleteDoc: refuse('deleteDoc'), runTransaction: refuse('runTransaction'),
+    ...real, collection, doc, where, limit, query, getDoc, getDocs, updateDoc, runTransaction,
+    setDoc: refuse('setDoc'), addDoc: refuse('addDoc'), deleteDoc: refuse('deleteDoc'),
   };
 });
 vi.mock('../firebase/config', () => ({ db: {}, auth: { currentUser: { uid: 'u1' } } }));
@@ -242,6 +256,22 @@ describe('confirmLinkedIn: one write, after the user said so', () => {
     expect(store.writes).toEqual([]);
   });
 
+  it('a profile already on two other contacts (what a cross-contact race leaves): taken, nothing written', async () => {
+    // The cross-contact check is a query, outside the transaction, so two
+    // confirms on two different contacts at the same moment can both pass it.
+    // What that leaves behind is caught here: the next confirm is refused.
+    put(ID, CARD);
+    put('other_1', { name: 'K. Sokol', linkedin_url: URL, linkedin_url_normalized: 'linkedin.com/in/kristin-sokol' });
+    put('other_2', { name: 'Kristin S.', linkedin_url: URL, linkedin_url_normalized: 'linkedin.com/in/kristin-sokol' });
+    const fetchProfile = found();
+    const result = await confirmLinkedIn(UID, ID, URL, { fetchProfile });
+    expect(result.status).toBe('taken');
+    expect(result.by.count).toBe(2);
+    expect(['other_1', 'other_2']).toContain(result.by.contactId);
+    expect(fetchProfile).not.toHaveBeenCalled();
+    expect(store.writes).toEqual([]);
+  });
+
   it('found on another contact only by the stored form of its URL: still taken', async () => {
     put(ID, CARD);
     put('legacy_1', { name: 'Kristin', linkedin_url: 'http://www.linkedin.com/in/Kristin-Sokol/' });
@@ -307,6 +337,63 @@ describe('confirmLinkedIn: one write, after the user said so', () => {
     expect([...store.docs.keys()].some(p => p.includes('capture_operations'))).toBe(false);
     const values = ['Kristin', 'Sokol', 'Bright Path', 'kristin-sokol', 'Matchmaker', 'ap_123', 'brightpath'];
     expect(logs.filter(line => values.some(v => line.includes(v)))).toEqual([]);
+  });
+});
+
+describe('confirmLinkedIn: the final check and write run against the latest contact (#754)', () => {
+  it('a field filled while the profile is being fetched is not overwritten', async () => {
+    put(ID, CARD);
+    const fetchProfile = vi.fn(async () => {
+      // Lands in the window between confirmLinkedIn's initial read and its
+      // transaction: a manual edit, another confirm, or Enrich.
+      put(ID, { ...get(ID), location: 'Provo, UT' });
+      return { status: 'found', profile: PROFILE };
+    });
+    const result = await confirmLinkedIn(UID, ID, URL, { fetchProfile });
+    expect(result.status).toBe('linked');
+    expect(result.filled).not.toContain('location');
+    const saved = get(ID);
+    expect(saved.location).toBe('Provo, UT');
+    expect(saved.linkedin_url).toBe(URL);
+  });
+
+  it('the contact gains a different LinkedIn in that window: the transaction refuses, nothing is written', async () => {
+    put(ID, CARD);
+    const fetchProfile = vi.fn(async () => {
+      put(ID, { ...get(ID), linkedin_url: 'https://www.linkedin.com/in/someone-else' });
+      return { status: 'found', profile: PROFILE };
+    });
+    const writesBefore = store.writes.length;
+    const result = await confirmLinkedIn(UID, ID, URL, { fetchProfile });
+    expect(result).toEqual({ status: 'has_other' });
+    expect(store.writes.length).toBe(writesBefore);
+    expect(get(ID).linkedin_url).toBe('https://www.linkedin.com/in/someone-else');
+  });
+
+  it('the contact is deleted in that window: the transaction reports missing, nothing is written', async () => {
+    put(ID, CARD);
+    const fetchProfile = vi.fn(async () => {
+      store.docs.delete(path(ID));
+      return { status: 'found', profile: PROFILE };
+    });
+    const writesBefore = store.writes.length;
+    const result = await confirmLinkedIn(UID, ID, URL, { fetchProfile });
+    expect(result).toEqual({ status: 'missing' });
+    expect(store.writes.length).toBe(writesBefore);
+  });
+
+  it('the same profile is confirmed again in that window: the second write stands, still harmless', async () => {
+    put(ID, CARD);
+    const fetchProfile = vi.fn(async () => {
+      // A second confirm of the SAME profile already landed — the ordinary
+      // repeat case, just arriving mid-flight instead of as a second call.
+      const already = { ...get(ID), linkedin_url: URL, linkedin_url_normalized: 'linkedin.com/in/kristin-sokol', last_enriched_at: 'earlier' };
+      put(ID, already);
+      return { status: 'found', profile: PROFILE };
+    });
+    const result = await confirmLinkedIn(UID, ID, URL, { fetchProfile });
+    expect(result.status).toBe('linked');
+    expect(get(ID).linkedin_url).toBe(URL);
   });
 });
 

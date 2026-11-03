@@ -150,7 +150,7 @@ describe('Match: what the person sees before saving', () => {
     cont();
     expect((await screen.findByTestId('company-match')).textContent).toMatch(/Possible company match: Example Corp/);
     expect(screen.getByLabelText('Link to Example Corp').checked).toBe(true);
-    fireEvent.click(screen.getByLabelText("Don't link a company"));
+    fireEvent.click(screen.getByLabelText('No company'));
     fireEvent.click(screen.getByRole('button', { name: /Add Person/ }));
     await waitFor(() => expect(api.save).toHaveBeenCalled());
     expect(api.save.mock.calls[0][1].choices.company).toBe('none');

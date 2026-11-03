@@ -114,6 +114,37 @@ function SocialRows({ draft, onChange, inputStyle, T }) {
   );
 }
 
+/** Why the company text read from the card was not used as the company. */
+const NOT_A_COMPANY_REASON = Object.freeze({
+  PERSON_NAME_AS_COMPANY: "that's the person's name",
+  TITLE_AS_COMPANY: 'that looks like a job title',
+  GENERIC_COMPANY_NAME: "that's too general to be a company name",
+  COMPANY_NAME_TOO_SHORT: "that's too short to be a company name",
+  INFERRED_COMPANY_NAME: "it isn't printed as a company name",
+});
+
+/**
+ * Company text the card showed but that is not a company (the person's name,
+ * a job title…). Company stays empty, which saves no company; the user can
+ * still take the text.
+ */
+function CompanySuggestion({ suggestion, onUse, T }) {
+  return (
+    <div data-testid="capture-company-suggestion" style={{ fontSize: 13, color: T.textMuted, marginTop: 6, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+      <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+        The card shows “{suggestion.name}”, but {NOT_A_COMPANY_REASON[suggestion.reason] ?? "it doesn't look like a company"}, so no company is added.
+      </span>
+      <button
+        type="button"
+        onClick={onUse}
+        style={{ minHeight: 44, padding: '0 12px', borderRadius: 10, border: `1px solid ${T.border}`, background: 'transparent', color: T.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+      >
+        Use as company
+      </button>
+    </div>
+  );
+}
+
 function PersonDraft({ draft, index, count, onChange, T }) {
   const set = (key, value) => onChange({ ...draft, [key]: value, toCheck: draft.toCheck.filter(k => k !== key) });
   const inputStyle = {
@@ -144,9 +175,12 @@ function PersonDraft({ draft, index, count, onChange, T }) {
               autoComplete={input.autoComplete}
               autoCapitalize={input.type ? 'none' : undefined}
               spellCheck={false}
-              placeholder="Not on the card"
+              placeholder={key === 'company' ? 'No company' : 'Not on the card'}
               style={inputStyle}
             />
+            {key === 'company' && !draft.company && draft.companySuggestion && (
+              <CompanySuggestion suggestion={draft.companySuggestion} onUse={() => set('company', draft.companySuggestion.name)} T={T} />
+            )}
             {key === 'email' && draft.otherEmails.length > 0 && (
               <div style={{ fontSize: 12, color: T.textMuted, marginTop: 4 }}>
                 Also on the card: {draft.otherEmails.join(', ')}

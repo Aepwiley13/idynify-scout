@@ -14,6 +14,11 @@
  *   13 running Enrich again changes nothing
  *   14 no value in any log line
  * and that the profile no longer saves a pasted LinkedIn by itself.
+ *
+ * #738: the server writes the run in one transaction on the contact as it is
+ * stored at that moment, so a value or a provenance entry the contact gained
+ * after the profile loaded it is never lost. The in-memory Admin SDK below
+ * runs that transaction against the same store the browser's Firestore uses.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
@@ -23,7 +28,18 @@ import { fileURLToPath } from 'node:url';
 import { format } from 'node:util';
 
 // ── In-memory Firestore (paths → documents) ─────────────────────────────────
-const store = vi.hoisted(() => ({ docs: new Map(), writes: [] }));
+const store = vi.hoisted(() => ({ docs: new Map(), writes: [], transactions: 0, interfere: null }));
+
+/** Applies an update the way Firestore does: a dotted key is a field path. */
+const applyUpdate = vi.hoisted(() => (current, data) => {
+  const next = structuredClone(current);
+  for (const [key, value] of Object.entries(data)) {
+    const [head, ...rest] = key.split('.');
+    if (rest.length) next[head] = { ...(next[head] ?? {}), [rest.join('.')]: value };
+    else next[key] = value;
+  }
+  return next;
+});
 
 vi.mock('firebase/firestore', async (importOriginal) => {
   const real = await importOriginal();
@@ -62,20 +78,55 @@ vi.mock('firebase/firestore', async (importOriginal) => {
   const updateDoc = async (ref, data) => {
     if (!store.docs.has(ref.path)) throw new Error(`No document to update: ${ref.path}`);
     store.writes.push({ kind: 'update', path: ref.path, data: structuredClone(data) });
-    const next = structuredClone(store.docs.get(ref.path));
-    for (const [key, value] of Object.entries(data)) {
-      const [head, ...rest] = key.split('.');
-      if (rest.length) next[head] = { ...(next[head] ?? {}), [rest.join('.')]: value };
-      else next[key] = value;
-    }
-    store.docs.set(ref.path, next);
+    store.docs.set(ref.path, applyUpdate(store.docs.get(ref.path), data));
+  };
+  // The browser's transaction: only the company link uses one.
+  const runTransaction = async (_db, fn) => {
+    const pending = [];
+    const out = await fn({ get: async ref => snapshot(ref.path), update: (ref, data) => pending.push([ref, data]) });
+    for (const [ref, data] of pending) await updateDoc(ref, data);
+    return out;
   };
   const refuse = name => async () => { throw new Error(`${name} is not expected here`); };
   return {
-    ...real, collection, doc, where, limit, query, getDoc, getDocs, setDoc, updateDoc,
-    addDoc: refuse('addDoc'), deleteDoc: refuse('deleteDoc'), runTransaction: refuse('runTransaction'),
+    ...real, collection, doc, where, limit, query, getDoc, getDocs, setDoc, updateDoc, runTransaction,
+    addDoc: refuse('addDoc'), deleteDoc: refuse('deleteDoc'),
   };
 });
+// The server's Firestore (Admin SDK), over the same store. A transaction
+// re-runs when the document changed after it was read, as Firestore's does;
+// `store.interfere` makes such a change once, from "another device".
+vi.mock('../../netlify/functions/firebase-admin.js', () => ({
+  db: {
+    doc: path => ({ path }),
+    runTransaction: async (fn) => {
+      for (let attempt = 1; attempt <= 5; attempt += 1) {
+        store.transactions += 1;
+        const reads = new Map();
+        const pending = [];
+        const tx = {
+          get: async (ref) => {
+            const data = store.docs.get(ref.path);
+            reads.set(ref.path, JSON.stringify(data));
+            return { id: ref.path.split('/').pop(), exists: data !== undefined, data: () => structuredClone(data) };
+          },
+          update: (ref, data) => { pending.push([ref, data]); },
+        };
+        const out = await fn(tx);
+        if (store.interfere) { const change = store.interfere; store.interfere = null; change(); }
+        const stale = [...reads].some(([path, seen]) => JSON.stringify(store.docs.get(path)) !== seen);
+        if (stale) continue;
+        for (const [ref, data] of pending) {
+          if (!store.docs.has(ref.path)) throw new Error(`No document to update: ${ref.path}`);
+          store.writes.push({ kind: 'update', path: ref.path, data: structuredClone(data), by: 'server' });
+          store.docs.set(ref.path, applyUpdate(store.docs.get(ref.path), data));
+        }
+        return out;
+      }
+      throw new Error('Transaction kept conflicting');
+    },
+  },
+}));
 vi.mock('../firebase/config', () => ({ db: {}, auth: { currentUser: { uid: 'u1' } } }));
 vi.mock('../context/ImpersonationContext', () => ({
   getEffectiveUser: () => ({ uid: 'u1', getIdToken: async () => 'tok_u1' }),
@@ -147,18 +198,19 @@ function stubNetwork({ match = APOLLO_KRISTIN, google = [GOOGLE_KRISTIN], search
   });
 }
 
-/** Enrich as the profile does: the server's answer, written by writeBarryEnrichment. */
-async function enrichAndWrite(id) {
-  const contact = get(id);
-  const response = await handler({ httpMethod: 'POST', body: JSON.stringify({ userId: UID, authToken: 'tok', contact }) });
+/** Enrich as the profile does: the server writes the run, writeBarryEnrichment links a company. */
+async function enrichAndWrite(id, { contact = get(id), userId = UID } = {}) {
+  const response = await handler({ httpMethod: 'POST', body: JSON.stringify({ userId, authToken: 'tok', contact, contactId: id, save: true }) });
   const result = JSON.parse(response.body);
-  const written = await writeBarryEnrichment(UID, contact, result);
-  return { result, written };
+  const written = result.success ? await writeBarryEnrichment(UID, contact, result) : null;
+  return { response, result, written };
 }
 
 beforeEach(() => {
   store.docs.clear();
   store.writes.length = 0;
+  store.transactions = 0;
+  store.interfere = null;
   logs = [];
   for (const level of ['log', 'info', 'warn', 'error', 'debug']) vi.spyOn(console, level).mockImplementation((...a) => logs.push(format(...a)));
   vi.stubEnv('APOLLO_API_KEY', 'test-apollo');
@@ -258,10 +310,109 @@ describe('an empty company is linked through the company resolver', () => {     
     expect(get('c2').company_id).toBe('co_x');
   });
 
-  it('the write never carries a LinkedIn URL', async () => {
+  it('the browser writes nothing of the run itself, and never a LinkedIn URL', async () => {
     put('c4', { name: 'A' });
-    await writeBarryEnrichment(UID, get('c4'), { enrichedData: { headline: 'H', linkedin_url: 'https://www.linkedin.com/in/x', linkedin_url_normalized: 'linkedin.com/in/x' } });
-    expect(get('c4')).toEqual({ id: 'c4', name: 'A', headline: 'H' });
+    const written = await writeBarryEnrichment(UID, get('c4'), { enrichedData: { headline: 'H', linkedin_url: 'https://www.linkedin.com/in/x', linkedin_url_normalized: 'linkedin.com/in/x' } });
+    expect(written).toEqual({ headline: 'H' });
+    expect(store.writes).toEqual([]);
+    expect(get('c4')).toEqual({ id: 'c4', name: 'A' });
+  });
+});
+
+// ─── #738: written on the latest contact, in one transaction ────────────────
+
+describe('a change made after the profile loaded the contact is never lost (#738)', () => {
+  it('a title filled meanwhile stays; Enrich offers its own as a suggestion instead', async () => {
+    put(ID, { ...CARD, title: '', apollo_person_id: 'ap_123' });
+    const loaded = get(ID);                                   // what the profile holds
+    store.docs.set(contactPath(ID), { ...get(ID), title: 'Head of Growth' });   // another tab
+    stubNetwork({ google: [] });
+    const { result } = await enrichAndWrite(ID, { contact: loaded });
+    expect(get(ID).title).toBe('Head of Growth');
+    expect(result.suggestions).toContainEqual({ field: 'title', current: 'Head of Growth', suggested: 'Founder & CEO', actionable: true });
+    expect(result.enrichedData).not.toHaveProperty('title');
+  });
+
+  it('a provenance entry written meanwhile survives, next to the run\'s own', async () => {
+    put(ID, { ...CARD, title: '', apollo_person_id: 'ap_123', enrichment_provenance: { email: 'user_accepted' } });
+    const loaded = get(ID);
+    store.docs.set(contactPath(ID), { ...get(ID), enrichment_provenance: { email: 'user_accepted', linkedin_url: 'user_confirmed' } });
+    stubNetwork({ google: [] });
+    await enrichAndWrite(ID, { contact: loaded });
+    expect(get(ID).enrichment_provenance).toMatchObject({ email: 'user_accepted', linkedin_url: 'user_confirmed', title: expect.any(String) });
+    const serverWrite = store.writes.find(w => w.by === 'server');
+    expect(serverWrite.data).not.toHaveProperty('enrichment_provenance');
+    expect(Object.keys(serverWrite.data).filter(k => k.startsWith('enrichment_provenance.'))).toContain('enrichment_provenance.title');
+  });
+
+  it('a change while the write runs: the transaction runs again and decides on the new state', async () => {
+    put(ID, { ...CARD, title: '', email: '', apollo_person_id: 'ap_123' });
+    stubNetwork({ google: [] });
+    store.interfere = () => store.docs.set(contactPath(ID), { ...get(ID), title: 'Chief of Staff' });
+    const { result } = await enrichAndWrite(ID);
+    expect(store.transactions).toBe(2);
+    expect(get(ID).title).toBe('Chief of Staff');
+    expect(get(ID).email).toBe('k.sokol@other.example');            // still empty on the retry: filled
+    expect(result.enrichedData).not.toHaveProperty('title');
+  });
+
+  it('a contact deleted meanwhile is not recreated', async () => {
+    put(ID, { ...CARD, apollo_person_id: 'ap_123' });
+    const loaded = get(ID);
+    store.docs.delete(contactPath(ID));
+    stubNetwork({ google: [] });
+    const { response, result } = await enrichAndWrite(ID, { contact: loaded });
+    expect(response.statusCode).toBe(500);
+    expect(result).toMatchObject({ success: false, error: 'Contact not found' });
+    expect(store.docs.has(contactPath(ID))).toBe(false);
+    expect(store.writes).toEqual([]);
+  });
+
+  it('a company link set meanwhile stays: the link fills company_id only while it is empty', async () => {
+    put(ID, { ...CARD, company_name: null, company_id: null, apollo_person_id: 'ap_123' });
+    stubNetwork({ google: [] });
+    const ensureCompany = vi.fn(async () => {
+      store.docs.set(contactPath(ID), { ...get(ID), company_id: 'co_teammate' });   // a teammate linked one
+      return { companyId: 'org_9' };
+    });
+    const loaded = get(ID);
+    const response = await handler({ httpMethod: 'POST', body: JSON.stringify({ userId: UID, authToken: 'tok', contact: loaded, contactId: ID, save: true }) });
+    const written = await writeBarryEnrichment(UID, loaded, JSON.parse(response.body), { ensureCompany });
+    expect(ensureCompany).toHaveBeenCalledTimes(1);
+    expect(get(ID).company_id).toBe('co_teammate');
+    expect(written).not.toHaveProperty('company_id');
+  });
+});
+
+describe('who and what a saved run may write (#738)', () => {
+  it('the contact is the verified user\'s: a token for someone else writes nothing', async () => {
+    put(ID, { ...CARD, title: '', apollo_person_id: 'ap_123' });
+    stubNetwork({ google: [] });
+    const { response } = await enrichAndWrite(ID, { userId: 'someone_else' });
+    expect(response.statusCode).toBe(500);
+    expect(store.writes).toEqual([]);
+  });
+
+  it('a contact id that is not a plain id is refused before anything runs', async () => {
+    put(ID, CARD);
+    stubNetwork({ google: [] });
+    for (const contactId of ['../u2/contacts/x', 'a/b', '', null]) {
+      const response = await handler({ httpMethod: 'POST', body: JSON.stringify({ userId: UID, authToken: 'tok', contact: CARD, contactId, save: true }) });
+      expect(response.statusCode).toBe(500);
+    }
+    expect(store.transactions).toBe(0);
+    expect(fetchCalls.filter(c => c.href.includes('apollo'))).toEqual([]);
+  });
+
+  it('without save (Relationship First Value) nothing is written: the answer is for display', async () => {
+    put(ID, { ...CARD, title: '', apollo_person_id: 'ap_123' });
+    stubNetwork({ google: [] });
+    const response = await handler({ httpMethod: 'POST', body: JSON.stringify({ userId: UID, authToken: 'tok', contact: get(ID) }) });
+    const result = JSON.parse(response.body);
+    expect(result.enrichedData.title).toBe('Founder & CEO');
+    expect(store.transactions).toBe(0);
+    expect(store.writes).toEqual([]);
+    expect(get(ID).title).toBe('');
   });
 });
 
@@ -343,6 +494,7 @@ describe('logs and write paths', () => {
     const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
     const profile = readFileSync(resolve(repo, 'src/pages/Scout/ContactProfile.jsx'), 'utf8');
     expect(profile).toMatch(/writeBarryEnrichment\(user\.uid, contact, result\)/);
+    expect(profile).toMatch(/contactId: contact\.id,\s*save: true/);
     expect(profile).not.toMatch(/\.\.\.result\.enrichedData/);
     expect(profile).not.toMatch(/manualLinkedInUrl|handleManualLinkedInSubmit/);
     expect(profile).not.toMatch(/linkedin_url:\s*manual/);

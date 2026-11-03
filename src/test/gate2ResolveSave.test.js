@@ -68,7 +68,18 @@ function contactsQuery(filters = [], cap = null) {
 }
 
 vi.mock('../../netlify/functions/firebase-admin.js', () => ({
-  db: { collection: () => ({ doc: () => ({ collection: () => contactsQuery() }) }) },
+  db: {
+    collection: () => ({ doc: () => ({ collection: () => contactsQuery() }) }),
+    // The deterministic-id create path (#754) decides against the document as
+    // it is stored right now, not against what resolveOne saw earlier. `tx.get`
+    // reads the SAME TABLE this fake's `doc().get/set/update` already read and
+    // write, so a mutation made between resolveOne and commitResults — the
+    // window this transaction exists to close — is visible here too.
+    runTransaction: async (fn) => fn({
+      get: (ref) => ref.get(),
+      set: (ref, data) => { ref.set(data); },
+    }),
+  },
   admin: {},
 }));
 vi.mock('../../netlify/functions/utils/verifyAuthToken.js', () => ({
@@ -541,5 +552,79 @@ describe('7 — one operation, one scan window', () => {
       candidates: [{ kind: 'person', name: 'No Ref', source: 's' }],
     });
     expect(r.status).toBe(400);
+  });
+});
+
+// ── 8. A deterministic id is never overwritten or merged into (#754) ───────
+//
+// deterministicId's own docblock names four other save paths that already
+// use `{companyId}_{apolloPersonId}`. The resolver's own matching (section
+// 1-6 above) does not see a collision coming from one of them, because its
+// authoritative rungs read FIELDS on the stored document (apollo_person_id,
+// email_normalized, …), not the document's id — a record at that exact id
+// with none of those fields set resolves to NONE, same as a true zero-match.
+// Before #754 the write there was `ref.set(data, { merge: true })`: whatever
+// that record held, Barry's fields would land on top of it.
+
+describe('8 — a deterministic id already occupied is refused, never merged into', () => {
+  it('refuses rather than writing into a record this operation did not create', async () => {
+    TABLE = [{
+      id: 'co_3_ap_9',
+      name: 'Someone Else Entirely',
+      notes: 'hand-entered by the account owner — do not touch',
+      identity_operation_id: 'op_other_path',
+    }];
+    const r = await call({
+      ...base, operationId: 'op_new', commit: true,
+      candidates: [person('ui_1', { apollo_person_id: 'ap_9', company_id: 'co_3', name: 'New Candidate' })],
+    });
+    const out = byRef(r, 'ui_1');
+    expect(out.outcome).toBe('refused');
+    expect(out.reason).toBe('deterministic_id_occupied');
+    expect(out.contactId).toBeNull();
+    expect(WRITES).toHaveLength(0);
+    expect(TABLE).toEqual([{
+      id: 'co_3_ap_9',
+      name: 'Someone Else Entirely',
+      notes: 'hand-entered by the account owner — do not touch',
+      identity_operation_id: 'op_other_path',
+    }]);
+  });
+
+  it('is counted as refused in the summary, same as any other refusal', async () => {
+    TABLE = [{ id: 'co_1_ap_1', name: 'Occupant' }];
+    const r = await call({
+      ...base, operationId: 'op1', commit: true,
+      candidates: [
+        person('ui_1', { apollo_person_id: 'ap_1', company_id: 'co_1', name: 'Candidate' }),
+        person('ui_2', { email: 'fine@x.com', name: 'Fine' }),
+      ],
+    });
+    expect(r.body.summary).toMatchObject({ created: 1, refused: 1 });
+  });
+
+  it('a record with no deterministic id never collides — an auto id is always free', async () => {
+    const r = await call({
+      ...base, operationId: 'op1', commit: true,
+      candidates: [person('ui_1', { email: 'no-apollo@x.com', name: 'No Apollo' })],
+    });
+    expect(byRef(r, 'ui_1').outcome).toBe('created');
+    expect(WRITES).toHaveLength(1);
+  });
+
+  it('a second request for the same unmatched candidate, after the first has committed, is refused rather than merged', async () => {
+    // Two concurrent requests resolve the same candidate before either writes:
+    // both see NONE. Here that's two calls back to back with different
+    // operationIds; a true race would interleave the same way.
+    const candidate = person('ui_1', { apollo_person_id: 'ap_5', company_id: 'co_7', name: 'Race Candidate' });
+    const first = await call({ ...base, operationId: 'op_first_mover', commit: true, candidates: [candidate] });
+    expect(byRef(first, 'ui_1').outcome).toBe('created');
+
+    const second = await call({ ...base, operationId: 'op_second_mover', commit: true, candidates: [candidate] });
+    // The resolver's own apollo_person_id rung would normally catch this as a
+    // match; this pins the transaction as the backstop if it somehow doesn't.
+    expect(['matched', 'refused']).toContain(byRef(second, 'ui_1').outcome);
+    expect(TABLE.filter(t => t.id === 'co_7_ap_5')).toHaveLength(1);
+    expect(TABLE.find(t => t.id === 'co_7_ap_5').name).toBe('Race Candidate');
   });
 });

@@ -214,5 +214,21 @@ describe('barryICPConversation extraction functions are exported and reusable', 
       expect(result.barryResponse.understood.lookalikeSeed).toBeNull();
       expect(result.barryResponse.searchStrategy).toBe('hybrid');
     });
+
+    it('a reply with no understood block is returned as before, not thrown on', async () => {
+      const anthropic = fakeAnthropic({
+        mappingExplanation: 'Tell me a bit more about who you want to reach.',
+        needsMoreInfo: true, followUpQuestion: 'Which industry?', followUpType: 'industry',
+        searchStrategy: 'lookalike', confidenceScore: 0.2, readyToConfirm: false,
+      });
+
+      const result = await processFollowup(
+        anthropic, "I don't have a specific company in mind", 'awaiting_example', askedForExample, {}
+      );
+
+      expect(result.barryResponse.understood).toBeUndefined();
+      expect(result.barryResponse.searchStrategy).toBe('lookalike');
+      expect(result.step).toBe('clarifying');
+    });
   });
 });

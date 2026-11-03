@@ -930,8 +930,10 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
   // UI that renders this (BarryOnboarding.jsx, ICPSettings.jsx) already
   // guards on `lookalikeSeed?.name` or `searchStrategy === 'lookalike'`, so
   // this is the one place that needs to change.
+  // A reply with no `understood` block is left exactly as before: there is
+  // no seed to clear, and writing into it would throw.
   const seedName = (barryResponse.understood?.lookalikeSeed?.name ?? '').trim().toLowerCase();
-  if (NO_EXAMPLE_SEED_NAMES.has(seedName)) {
+  if (barryResponse.understood && NO_EXAMPLE_SEED_NAMES.has(seedName)) {
     barryResponse.understood.lookalikeSeed = null;
     if (barryResponse.searchStrategy === 'lookalike') {
       barryResponse.searchStrategy = 'industry_only';

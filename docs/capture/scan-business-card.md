@@ -51,7 +51,7 @@ Only a mobile, direct or home number can match a person (ADR-002). A main, work,
 | Company | Meaning | Save |
 |---|---|---|
 | Existing company | Matched by name (or by website when no name was printed) | Linked; a pending company is accepted, as every add path does |
-| Possible match | Same website or email domain, different printed name | "Link to …" or "No company" |
+| Possible match | Same website or email domain, different printed name; or found only by the person's own domain (below) | "Link to …" or "No company" |
 | New company | No match, and a name was printed | "New company: …" (created with `name_source: user`) or "No company" |
 | No company | No company name, and no existing company at that website | None created: a company is never named from a domain here |
 
@@ -61,6 +61,15 @@ Only a mobile, direct or home number can match a person (ADR-002). A main, work,
 
 - **Not a company:** the text is the person's name, a job title or the service line, too generic, too short, or not printed as a company. Company stays empty ("No company"), and the text is offered as a suggestion: "The card shows “Kristin Sokol”, but that's the person's name, so no company is added. **Use as company**".
 - **A weak read:** the text is only in a logo, or unclear (`WEAK_COMPANY_TEXT`). Company stays filled and marked Check. If the user leaves it as read, a new or possible company starts at "No company", so nothing is created unless the user chooses it. Editing the field makes it the user's, and it starts at "New company".
+
+**The person's own domain never chooses a company.** When the website or email spells the person's name, the extraction marks that field and the company (`PERSONAL_DOMAIN` for the name itself, such as `kristinsokol.com`, `kristin-sokol.com`, `ksokol.com` or `sokolkristin.com`; `NAME_IN_DOMAIN` for the name with other words, such as `kristinsokoldesign.com`), and it gives no company domain. The last name alone (`sokolstudio.com`) is not flagged: many family businesses use it. While the reviewed website or email is still at that domain:
+
+- Review says so under Company ("kristinsokol.com looks like Kristin's own website, so it isn't used to find or create a company."), with **Add a company** when Company is empty.
+- The domain is never used to find, link or create a company. When a company is named, or another website or work email is on the card, the lookup uses those alone. A company the user names is created without that website, so it can't later link other people to it; the website stays on the person.
+- When that domain is the only company signal, it is used just to offer a Saved Company that already has it: a possible match that starts at "No company" and is linked only when the user chooses it.
+- A company printed beside it is marked Check and starts at "No company" until the user edits it or chooses it at save. A business named after the person (Carla Lifferth Design) is still the user's to choose.
+
+Changing the website and email to other domains makes it an ordinary card again.
 
 An existing person keeps the company they already have. No company phone number is written.
 

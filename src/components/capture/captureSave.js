@@ -38,6 +38,17 @@
  * two people. On an existing contact they are added beside what it has, never
  * in place of it.
  *
+ * A PERSON'S OWN DOMAIN NEVER CHOOSES A COMPANY
+ * ────────────────────────────────────────────
+ * A website or email that spells the person's name (captureDraft.js,
+ * personalDomainInUse) is left out of the company lookup whenever anything
+ * else names a company: a company name, or another website or work domain.
+ * When it is the only company signal on the card, it is used just to offer a
+ * Saved Company that already has it, as a possible match the user must
+ * choose. It never links one on its own, and a company is never created from
+ * it. A new company named by the user gets no website from it either, so it
+ * cannot later link other people to that company.
+ *
  * SAVE LOOKS AGAIN
  * ────────────────
  * The workspace can change between showing a match and saving. Save resolves
@@ -53,7 +64,7 @@ import { buildUserAddedContact } from '../../schemas/userAddedContact';
 import { buildPhoneWrite, readContactPhones } from '../../utils/contactPhones';
 import { IdentityConflictError } from '../../utils/identityResolution';
 import { makeSocialProfile, mergeSocialProfiles, SOCIAL_SOURCES, SOCIAL_STATUS } from '../../utils/socialProfiles';
-import { socialProblems } from './captureDraft.js';
+import { socialProblems, personalDomainInUse } from './captureDraft.js';
 
 /** `source` / `addedFrom` on what a capture saves. Distinct from the legacy scanner's "Scanned Business Card". */
 export const CAPTURE_SOURCE = 'business_card';
@@ -103,9 +114,22 @@ export function socialProfilesFromDraft(draft, { addedAt = new Date().toISOStrin
   })).filter(Boolean);
 }
 
-/** The company signal on a draft, for resolveCompany and ensureCompanyForContact. */
+/**
+ * The company signal on a draft, for resolveCompany and ensureCompanyForContact.
+ * The person's own domain is dropped when another signal is there, and marks
+ * the candidate `ownDomainOnly` when it is the only one.
+ */
 function companyCandidate(draft) {
-  return { name: orNull(draft.company), domain: orNull(draft.website), email: orNull(draft.email) };
+  const name = orNull(draft.company);
+  const domain = orNull(draft.website);
+  const email = orNull(draft.email);
+  const own = personalDomainInUse(draft);
+  if (!own) return { name, domain, email, ownDomainOnly: false };
+  const otherSignal = Boolean(name)
+    || (!own.website && Boolean(normalizeDomain(domain)))
+    || (!own.email && Boolean(workDomainFromEmail(email)));
+  if (!otherSignal) return { name, domain, email, ownDomainOnly: true };
+  return { name, domain: own.website ? null : domain, email: own.email ? null : email, ownDomainOnly: false };
 }
 
 // ─── Matching (read-only) ───────────────────────────────────────────────────
@@ -153,14 +177,17 @@ export async function matchPerson(uid, draft) {
  * Which company this person belongs to: an existing one, a possible match
  * (same website or email domain, different printed name), a new one from the
  * printed name, or none. Read-only. A company is never named from a domain
- * here: with no printed name and no match there is no company.
+ * here: with no printed name and no match there is no company. A Saved Company
+ * found only by the person's own domain is a possible match
+ * (`via: 'personal_domain'`), never an existing one.
  */
 export async function matchCompany(uid, draft) {
-  const { name, domain, email } = companyCandidate(draft);
+  const { name, domain, email, ownDomainOnly } = companyCandidate(draft);
   if (!name && !normalizeDomain(domain) && !workDomainFromEmail(email)) return { status: 'none' };
   const match = await resolveCompany(uid, { name, domain, email }, { source: WRITE_PATH });
   if (match.companyId) {
     const existingName = match.existing?.name ?? null;
+    if (ownDomainOnly) return { status: 'possible', companyId: match.companyId, name: existingName, via: 'personal_domain' };
     // A domain match is reached only when the printed name matched nothing.
     if (match.signal === 'domain' && name) return { status: 'possible', companyId: match.companyId, name: existingName };
     return { status: 'existing', companyId: match.companyId, name: existingName ?? name };
@@ -191,10 +218,15 @@ function sameMatch(shown, fresh) {
 
 // ─── Saving ─────────────────────────────────────────────────────────────────
 
-/** Link, promote or create the company, as the user chose. Returns its id or null. */
-async function linkCompany(uid, draft, companyChoice) {
+/**
+ * Link, promote or create the company, as the user chose. Returns its id or
+ * null. `chosen` is true only when the user picked the company themselves.
+ */
+async function linkCompany(uid, draft, companyChoice, { chosen = false } = {}) {
   if (companyChoice === 'none') return null;
-  const candidate = companyCandidate(draft);
+  const { ownDomainOnly, ...candidate } = companyCandidate(draft);
+  // A company found only by the person's own domain is linked only when the user chose it.
+  if (ownDomainOnly && !chosen) return null;
   // No printed name: link only to a company that already exists (by website
   // or work email). ensureCompanyForContact would otherwise invent a name
   // from the domain, which a card did not print.
@@ -271,7 +303,8 @@ async function createOnce(uid, id, data) {
  * @param {object} args.draft         the reviewed person (captureDraft.js)
  * @param {object} args.shown         the person match the user saw (previewCapturePerson().person)
  * @param {object} [args.choices]     { person: 'new' | <contactId>, company: 'link' | 'none' }
- *                                    ('none': no company record and no company text)
+ *                                    ('none': no company record and no company text; a
+ *                                    company found only by the person's own domain needs 'link')
  *
  * @returns {Promise<
  *   { status: 'saved', contactId, companyId, outcome: 'created' | 'updated' | 'already_saved' }
@@ -316,6 +349,7 @@ export async function saveCapturePerson(uid, { operationId, index, draft, shown,
   }
 
   const companyChoice = choices.company === 'none' ? 'none' : 'link';
+  const chosen = choices.company === 'link';
   // No company means no company: neither a company record nor the card's
   // company text on the person.
   const written = companyChoice === 'none' ? { ...draft, company: '' } : draft;
@@ -325,13 +359,13 @@ export async function saveCapturePerson(uid, { operationId, index, draft, shown,
     const existing = targetId === decision.contactId ? decision.existing : (await getDoc(contactRef(uid, targetId))).data();
     if (!existing) return { status: 'changed', person: fresh };
     // An existing person keeps the company they have; a card only fills one in.
-    const companyId = existing.company_id || await linkCompany(uid, draft, companyChoice);
+    const companyId = existing.company_id || await linkCompany(uid, draft, companyChoice, { chosen });
     const patch = mergePatch(existing, { ...companyFree, ...(companyId ? { company_id: companyId } : {}) }, written);
     if (Object.keys(patch).length > 0) await updateDoc(contactRef(uid, targetId), patch);
     return { status: 'saved', contactId: targetId, companyId: companyId ?? null, outcome: 'updated' };
   }
 
-  const companyId = await linkCompany(uid, draft, companyChoice);
+  const companyId = await linkCompany(uid, draft, companyChoice, { chosen });
 
   // A new person. The user already answered "different person" to a possible
   // match, so the record is not flagged for a review that has been done.

@@ -627,4 +627,24 @@ describe('8 — a deterministic id already occupied is refused, never merged int
     expect(TABLE.filter(t => t.id === 'co_7_ap_5')).toHaveLength(1);
     expect(TABLE.find(t => t.id === 'co_7_ap_5').name).toBe('Race Candidate');
   });
+  it('two candidates in one request for the same person write one record, and the second never overwrites the first', async () => {
+    // Same Apollo person at the same company, so the same deterministic id.
+    // identity_operation_id proves "this operation wrote it", not "this
+    // clientRef wrote it" (clientRef is never persisted), so the second
+    // candidate takes the retry branch. That is safe: the id itself encodes
+    // the person and company, so it can only be the same person. Before this
+    // change the second write merged over the first.
+    const r = await call({
+      ...base, operationId: 'op1', commit: true,
+      candidates: [
+        person('ui_1', { apollo_person_id: 'ap_9', company_id: 'co_3', name: 'Dana Lee', email: 'dana@work.com' }),
+        person('ui_2', { apollo_person_id: 'ap_9', company_id: 'co_3', name: 'Dana Lee', email: 'dana@personal.com' }),
+      ],
+    });
+    expect(TABLE).toHaveLength(1);
+    expect(WRITES).toHaveLength(1);
+    expect(TABLE[0]).toMatchObject({ id: 'co_3_ap_9', email: 'dana@work.com', identity_operation_id: 'op1' });
+    expect(byRef(r, 'ui_1').contactId).toBe('co_3_ap_9');
+    expect(byRef(r, 'ui_2').contactId).toBe('co_3_ap_9');
+  });
 });

@@ -256,6 +256,22 @@ describe('confirmLinkedIn: one write, after the user said so', () => {
     expect(store.writes).toEqual([]);
   });
 
+  it('a profile already on two other contacts (what a cross-contact race leaves): taken, nothing written', async () => {
+    // The cross-contact check is a query, outside the transaction, so two
+    // confirms on two different contacts at the same moment can both pass it.
+    // What that leaves behind is caught here: the next confirm is refused.
+    put(ID, CARD);
+    put('other_1', { name: 'K. Sokol', linkedin_url: URL, linkedin_url_normalized: 'linkedin.com/in/kristin-sokol' });
+    put('other_2', { name: 'Kristin S.', linkedin_url: URL, linkedin_url_normalized: 'linkedin.com/in/kristin-sokol' });
+    const fetchProfile = found();
+    const result = await confirmLinkedIn(UID, ID, URL, { fetchProfile });
+    expect(result.status).toBe('taken');
+    expect(result.by.count).toBe(2);
+    expect(['other_1', 'other_2']).toContain(result.by.contactId);
+    expect(fetchProfile).not.toHaveBeenCalled();
+    expect(store.writes).toEqual([]);
+  });
+
   it('found on another contact only by the stored form of its URL: still taken', async () => {
     put(ID, CARD);
     put('legacy_1', { name: 'Kristin', linkedin_url: 'http://www.linkedin.com/in/Kristin-Sokol/' });

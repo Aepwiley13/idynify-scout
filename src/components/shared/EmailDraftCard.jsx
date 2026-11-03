@@ -132,9 +132,12 @@ export function EmailDraftCard({ preamble, subject, body, contactName, userId, t
     <div className={s.wrapper}>
       {preamble && (
         <div className={`${s.preamble} mb-3`}>
-          <ReactMarkdown className="prose prose-sm max-w-none [&>p]:mt-0 [&>p:last-child]:mb-0">
-            {preamble}
-          </ReactMarkdown>
+          {/* react-markdown 10 throws on a `className` prop (#745). */}
+          <div className="prose prose-sm max-w-none [&>p]:mt-0 [&>p:last-child]:mb-0">
+            <ReactMarkdown>
+              {preamble}
+            </ReactMarkdown>
+          </div>
         </div>
       )}
       <div className={s.card} style={{ background: s.cardBg }}>

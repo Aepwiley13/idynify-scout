@@ -456,6 +456,35 @@ describe('companies', () => {
     expect(companies()).toHaveLength(1);
   });
 
+  it('No company on a new person: no company record and no company text on the person', async () => {
+    const { shown, result } = await lookAndSave(draft(), { choices: { company: 'none' } });
+    expect(shown.company).toEqual({ status: 'new', name: 'Example Robotics' });
+    expect(result).toMatchObject({ status: 'saved', companyId: null, outcome: 'created' });
+    expect(companies()).toEqual([]);
+    expect(contacts()[0]).toMatchObject({ company: null, company_name: null, company_id: null, name: 'Avery Quinn' });
+  });
+
+  it('No company on an existing person without one: the card does not fill in the company text either', async () => {
+    putContact('c_1', { name: 'Avery Quinn', email: 'avery.quinn@example.com', email_normalized: 'avery.quinn@example.com' });
+    const { shown, result } = await lookAndSave(draft(), { choices: { company: 'none' } });
+    expect(shown.person).toMatchObject({ status: 'existing', contactId: 'c_1' });
+    expect(result).toMatchObject({ status: 'saved', contactId: 'c_1', companyId: null, outcome: 'updated' });
+    const saved = contacts().find(c => c.id === 'c_1');
+    expect(saved.company_name).toBeUndefined();
+    expect(saved.company_id).toBeUndefined();
+    expect(saved.title).toBe('Director of Partnerships');              // the rest of the card still fills in
+    expect(companies()).toEqual([]);
+  });
+
+  it('an independent person (no company text, a personal domain): no company to match, none created', async () => {
+    const solo = draft({ name: 'Kristin Sokol', title: 'Dating Strategy & Matchmaking', company: '', email: 'kristin@kristinsokol.com', website: 'kristinsokol.com', linkedinUrl: '', phones: [] });
+    const { shown, result } = await lookAndSave(solo);
+    expect(shown.company).toEqual({ status: 'none' });
+    expect(result).toMatchObject({ status: 'saved', companyId: null });
+    expect(companies()).toEqual([]);
+    expect(contacts()[0]).toMatchObject({ name: 'Kristin Sokol', company: null, company_name: null, company_id: null, website: 'kristinsokol.com' });
+  });
+
   it('no printed company name: linked only to a company that already has that website; never invented from a domain', async () => {
     const noName = () => draft({ company: '' });
     const { shown, result } = await lookAndSave(noName());

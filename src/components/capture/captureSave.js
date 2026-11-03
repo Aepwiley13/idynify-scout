@@ -271,6 +271,7 @@ async function createOnce(uid, id, data) {
  * @param {object} args.draft         the reviewed person (captureDraft.js)
  * @param {object} args.shown         the person match the user saw (previewCapturePerson().person)
  * @param {object} [args.choices]     { person: 'new' | <contactId>, company: 'link' | 'none' }
+ *                                    ('none': no company record and no company text)
  *
  * @returns {Promise<
  *   { status: 'saved', contactId, companyId, outcome: 'created' | 'updated' | 'already_saved' }
@@ -315,13 +316,17 @@ export async function saveCapturePerson(uid, { operationId, index, draft, shown,
   }
 
   const companyChoice = choices.company === 'none' ? 'none' : 'link';
+  // No company means no company: neither a company record nor the card's
+  // company text on the person.
+  const written = companyChoice === 'none' ? { ...draft, company: '' } : draft;
+  const companyFree = companyChoice === 'none' ? { ...candidate, company: null, company_name: null } : candidate;
 
   if (targetId) {
     const existing = targetId === decision.contactId ? decision.existing : (await getDoc(contactRef(uid, targetId))).data();
     if (!existing) return { status: 'changed', person: fresh };
     // An existing person keeps the company they have; a card only fills one in.
     const companyId = existing.company_id || await linkCompany(uid, draft, companyChoice);
-    const patch = mergePatch(existing, { ...candidate, ...(companyId ? { company_id: companyId } : {}) }, draft);
+    const patch = mergePatch(existing, { ...companyFree, ...(companyId ? { company_id: companyId } : {}) }, written);
     if (Object.keys(patch).length > 0) await updateDoc(contactRef(uid, targetId), patch);
     return { status: 'saved', contactId: targetId, companyId: companyId ?? null, outcome: 'updated' };
   }
@@ -336,7 +341,7 @@ export async function saveCapturePerson(uid, { operationId, index, draft, shown,
   }
   const data = buildUserAddedContact({
     identityFields,
-    person: { name: draft.name, email: draft.email, company: draft.company, title: draft.title, linkedin_url: draft.linkedinUrl },
+    person: { name: draft.name, email: draft.email, company: written.company, title: draft.title, linkedin_url: draft.linkedinUrl },
     companyId,
     source: CAPTURE_SOURCE,
     addedFrom: CAPTURE_SOURCE,

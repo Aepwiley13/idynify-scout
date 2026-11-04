@@ -1,6 +1,6 @@
 # Contact Hub features in IDYNIFY: revised plan (no migration)
 
-**Date:** 2026-11-04 · **Status:** proposed, for product-owner approval · **Nothing implemented or merged.**
+**Date:** 2026-11-04 · **Status:** direction approved 2026-11-04. S1 contract (ADR-007, §6) proposed. S2–S4 and B-R1 are draft PRs. **Nothing merged, deployed or enabled.**
 **Supersedes:** every migration part of `docs/audits/CONTACT_HUB_INTEGRATION_AUDIT.md` and `docs/contact-hub/GATE_0_1_REPORT.md`. Those documents stay as the record of what was considered.
 
 ## Scope (official change, 2026-11-04)
@@ -42,8 +42,7 @@
 | Field | Type | Notes |
 |---|---|---|
 | `schema_version` | `1` | |
-| `name` | string, 1–60 | Label, not identity. Two stickers may share a name; the UI warns. |
-| `name_key` | lowercase, whitespace collapsed | For the duplicate-name warning and search |
+| `name` | string, 1–60 | Label, not identity. Two stickers may share a name; the UI warns (comparison key computed client-side, not stored). |
 | `color` | `teal blue purple coral amber pink green gray` | |
 | `emoji` | string ≤ 16, or null | Image icons: not in this release |
 | `description` | string ≤ 280, or null | |
@@ -59,16 +58,20 @@
 |---|---|---|
 | `sticker_ids` | `string[]`, ≤ 50 | Membership. Filtered client-side in People (People already loads every contact), so no new index is needed. |
 | `sticker_assignments.<stickerId>` | `{assigned_at, assigned_by: 'user' \| 'csv_import'}` | Who added it and when |
+| `sticker_change` | `{op: 'add' \| 'remove', sticker_id, at}` | The one sticker the last write changed. It lets the rules check that sticker (§1.4). |
 
 ### 1.3 Write rules (one module per concern)
 - **`src/services/stickerService.js`** (registry): create, rename, recolor and emoji, archive, restore, list (live via `onSnapshot`; the collection is small).
-- **`src/services/contactStickers.js`** (membership) is the **only** writer of `sticker_ids` and `sticker_assignments`. `scripts/verifyWritePaths.mjs` gains a rule that fails the build otherwise.
-  - Add and remove run in a **transaction**:
+- **`src/services/stickers/stickerCore.js`** is the **only** writer of stickers and of `sticker_ids`, `sticker_assignments` and `sticker_change`. `stickerService.js` and `contactStickers.js` bind it to the web SDK.
+  - **Enforced:** `src/test/stickerWritePaths.test.js` (CI) and rule 5 of `scripts/verifyWritePaths.mjs`.
+  - **No Firebase import:** Firestore arrives as an adapter, so the emulator suite runs this exact code against the real rules.
+  - **Add and remove run in a transaction:**
     - read the sticker (it must exist under the same `users/{uid}` and be `active`)
     - read the contact as stored now
-    - write `arrayUnion` / `arrayRemove` and the assignment entry together
+    - write `arrayUnion` / `arrayRemove`, the assignment entry and `sticker_change` together
   - An archive that lands at the same moment makes the add fail with "This sticker was archived." Nothing is half-written.
-  - **Bulk add** (People selection) runs per contact. The result lists any failures; one failure never undoes the others.
+  - **Contention:** a stale write the server refuses with `permission-denied` is re-read and re-decided up to 4 times. A real refusal fails every time.
+  - **Bulk add** (People selection) runs one transaction per contact. The result lists any failures; one failure never undoes the others.
 - **Contact protection:**
   - Sticker fields are never written by enrichment, identity merges, CSV merge rules or Barry. Tests pin this.
   - A future duplicate-merge (the dedup sprint) must union memberships. Recorded in the ADR.
@@ -81,22 +84,22 @@
   - update: owner + enrolled + only `name`, `name_key`, `color`, `emoji`, `description`, `status`, `archived_at`, `updated_at` change
   - **delete: false**
 - **`sticker_enrollment/{uid}`:** no client read or write (Admin SDK only).
-- **Contacts:** the generic owner rule is unchanged. Rules also cap `sticker_ids` at 50 when present. Rules cannot check that each ID exists; `contactStickers.js` does that in its transaction, and the UI ignores unknown IDs.
-- **Required cases:**
-  - existing case 09 still ALLOW
-  - every existing case still passes
-  - sticker `set()` over an existing doc → DENY
-  - sticker delete → DENY
-  - another user's stickers → DENY
-  - an un-enrolled user's sticker write → DENY
-  - a 51st sticker ID → DENY
+- **Contacts:** any write that touches a membership field must:
+  - add or remove exactly one sticker, named in `sticker_change`
+  - keep one assignment per sticker, with no other assignment touched
+  - stay at 50 or fewer
+  - when adding, name an existing active sticker of the same user (checked with `get()`)
 
-### 1.5 Feature flag (the Capture pattern)
-- **Mode.** `STICKERS_MODE` = `off` \| `internal` \| `beta` \| `on`. Anything else means `off`. It is read only by a server `stickersConfig` function.
-- **Enrollment.** `beta` = admins plus users in `sticker_enrollment/{uid}` with `stage: 'beta'`.
-- **Client.** A `useStickersAvailability()` hook hides every sticker surface unless the server says `enabled`. It is never enabled while an admin is viewing as another user.
-- **Rules.** They check enrollment, so the feature cannot be used while dark, even by a crafted client.
-- **Production default:** `off`. Production navigation doesn't change until approval.
+  A contact is never created with stickers. Writes that don't touch these fields are unchanged.
+- **Implemented:** S2 (#762). Verified by `scripts/rules-check/stickers.mjs`: 115 cases, including the rollout matrix and the rollback variant.
+
+### 1.5 Feature flag
+- **Mode** in Firestore, not an env var, so the rules can read it: `feature_flags/stickers.mode` = `off` \| `internal` \| `beta` \| `on`. A missing document or any other value means `off`.
+- **Enrollment.** `beta` = admins (`users/{uid}.role` in `admin`, `super_admin`) plus users in `sticker_enrollment/{uid}` with `stage: 'beta'`. Both documents are server-only.
+- **One decision, two enforcers.** `decideStickerAccess()` in `src/constants/stickersAccess.js` is the decision. The rules (S2) and `stickersConfig` (S3) apply it to the same inputs, and a shared parity table is run against both.
+- **Env admin lists not used.** `ADMIN_USER_IDS` / `SUPER_ADMIN_USER_IDS` are invisible to the rules, so they don't grant sticker access.
+- **Client.** `useStickersAvailability()` hides every sticker surface unless the server says enabled and not read-only. It is never enabled while an admin is viewing as another user.
+- **Production default:** no flag document, so `off`. Production navigation doesn't change until approval.
 
 ### 1.6 Barry (last phase)
 - Barry may read the **names** of a contact's active stickers, and `person_type`, as relationship context.
@@ -135,10 +138,10 @@
 
 | # | Decision | Recommendation |
 |---|---|---|
-| **D1** | **Stickers vs tags.** Both would sit on the same profile. | Keep both, with distinct jobs, and **no automatic conversion**. **Stickers** are curated relationship categories with stable IDs, color, counts and a wall ("who they are to you": Board, Donor, Volunteer). **Tags** stay as free-text labels, including CSV import group tags. A per-tag "Turn into sticker" action can come later, user-initiated. |
-| **D2** | Email opt-outs (the Hub's "Unsubscribed"): in scope? | A separate track, not needed for stickers. If approved: a per-address opt-out record, a "Record unsubscribe" action on the profile, and enforcement at the final send boundary for cadence and marketing sends. Unknown is never treated as opt-in. |
-| **D3** | Relationship activity types (attended event, donation, volunteered) | Optional, phase 3. Logged through the existing timeline, with no new store. |
-| **D4** | Where QA happens | Rules and services are tested in the emulator in CI. Manual UI QA needs the isolated Firebase project (#664), because previews write production. Otherwise QA runs only in production behind the flag, on a designated enrolled account. |
+| **D1** ✅ decided: separate | **Stickers vs tags.** Both would sit on the same profile. | Keep both, with distinct jobs, and **no automatic conversion**. **Stickers** are curated relationship categories with stable IDs, color, counts and a wall ("who they are to you": Board, Donor, Volunteer). **Tags** stay as free-text labels, including CSV import group tags. A per-tag "Turn into sticker" action can come later, user-initiated. |
+| **D2** ✅ decided: separate engineering track | Email opt-outs (the Hub's "Unsubscribed"): in scope? | A separate track, not needed for stickers. If approved: a per-address opt-out record, a "Record unsubscribe" action on the profile, and enforcement at the final send boundary for cadence and marketing sends. Unknown is never treated as opt-in. |
+| **D3** ✅ decided: approved for a later phase | Relationship activity types (attended event, donation, volunteered) | Optional, phase 3. Logged through the existing timeline, with no new store. |
+| **D4** ✅ decided: isolated Firebase staging for manual QA; no feature writes against production | Where QA happens | Rules and services are tested in the emulator in CI. Manual UI QA needs the isolated Firebase project (#664), because previews write production. Otherwise QA runs only in production behind the flag, on a designated enrolled account. |
 
 ---
 
@@ -182,3 +185,31 @@ Already authorized. Paused per the 2026-11-04 scope change; it starts on your go
 **Tests:** normalization, secondary emails, duplicate detection after an edit, clearing, replacing, and concurrent edits.
 
 **Drift assessment:** a read-only script that counts drifted records. No production backfill.
+
+---
+
+## 6. S1: strengthened security contract (2026-11-04)
+
+ADR-007 (`docs/adr/ADR-007-native-stickers.md`) records the decisions. This section maps each requirement to what enforces it and what proves it.
+
+| Requirement | How it is met | Evidence |
+|---|---|---|
+| **Membership is transaction-safe** | Add and remove are Firestore transactions against the stored contact and sticker. The list changes with `arrayUnion` / `arrayRemove`. A stale write refused under contention is re-read and re-decided (up to 4 attempts). | `stickerCore.test.js`: concurrent adds, add vs archive, add vs edit, remove mid-add. `sticker-services.mjs` against the real rules, stable over 3 runs. Removing the retry, or writing a stale full list, fails the emulator suite. |
+| **Protected against unauthorized direct writes** | The rules refuse any membership write that doesn't change exactly one sticker named in `sticker_change`, with matching assignments, at most 50, and (for an add) an existing active sticker of the same user. One module writes membership, enforced by a CI source scan. | `stickers.mjs`: 26 membership cases (archived, nonexistent, other user's sticker, two at once, missing or mismatched `sticker_change`, client time, bad source, duplicate, tampered assignment, 51st, stale write, create with stickers, overwrite). `sticker-services.mjs`: a direct write that skips the service is refused. |
+| **Cross-user isolation** | Everything lives under `users/{uid}`, governed by `owns(userId)`. An added sticker is looked up under the same uid. Rollout documents are server-only. | `stickers.mjs`: another user cannot read, create, update or add U's stickers, nor write membership on U's contacts; U cannot add another user's sticker. `sticker-services.mjs`: the same through the service. |
+| **Rules match the feature-flag modes** | The mode, role and enrollment are read from Firestore by the rules and by `stickersConfig`, through one decision function. | `STICKER_ACCESS_MATRIX`, 19 rows: run against the rules in the emulator (38 cases, create and membership) and against the endpoint in Vitest. Env admin lists are proven ignored on both sides. |
+| **Concurrent updates and the 50 limit** | Transactions plus atomic array operations. The 50 limit is checked by the service and by the rules. | 49 + two concurrent adds → exactly 50 (unit and emulator). 50th allowed, 51st refused by the service, and a direct 51st write refused by the rules. |
+| **Server-side authorization, not only UI checks** | Every sticker write is decided by `firestore.rules` on the server. `stickersConfig` verifies the ID token and the impersonation session before answering. The UI hook is a convenience. | `stickers.mjs`, `sticker-services.mjs` (rules), `stickersConfig.test.js` (token, who may ask, read-only impersonation). |
+| **S2 rollback never broadens** | 1) set the mode to `off` (no deploy); 2) make `stickerRulesEnabled()` return false and deploy. Reverting the section is documented as **not** a rollback. | `stickers.mjs` runs the whole lockdown variant: every sticker write is denied, and contact, company, timeline and append-only writes behave exactly as before. Unwiring the switch fails 4 lockdown cases. |
+
+### PR status
+
+| PR | Scope | State |
+|---|---|---|
+| S1 | ADR-007 + this contract | draft (this branch) |
+| S2 | Rules + emulator suite | draft, Aepwiley13/idynify-scout#762 |
+| S3 | Rollout flag | draft, Aepwiley13/idynify-scout#764 (on S2) |
+| S4 | Services | draft, Aepwiley13/idynify-scout#763 (on S2) |
+| B-R1 | Email identity consistency | draft, Aepwiley13/idynify-scout#765 |
+
+**Stopped here** for review before the native UI phase (S5–S7).

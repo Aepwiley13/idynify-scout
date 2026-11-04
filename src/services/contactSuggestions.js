@@ -9,9 +9,10 @@
  * A company difference is information only and has no action. Provenance
  * entries are written by path, so every other entry stays.
  */
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, runTransaction, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { text } from '../utils/contactProtection';
+import { buildEmailWrite, hasAnyEmail } from '../utils/contactEmails';
 
 export const USER_ACCEPTED = 'user_accepted';
 
@@ -28,7 +29,10 @@ export async function acceptTitleSuggestion(uid, contactId, suggestion) {
 
 /**
  * Writes an email Enrich found on the company website, only while the contact
- * still has no email, and returns the fields written.
+ * still has no email, and returns the fields written. Decided in a
+ * transaction against the contact as stored, and written with emails[] and
+ * email_normalized (src/utils/contactEmails.js) so the identity engine
+ * matches it.
  */
 export async function acceptEmailSuggestion(uid, contactId, suggestion) {
   const email = text(suggestion?.suggested);
@@ -36,10 +40,15 @@ export async function acceptEmailSuggestion(uid, contactId, suggestion) {
     throw new Error('only an email suggestion can be accepted');
   }
   const ref = doc(db, 'users', uid, 'contacts', contactId);
-  const snap = await getDoc(ref);
-  const current = snap.exists() ? snap.data() : null;
-  if (!current || text(current.email) || text(current.work_email)) throw new Error('the contact already has an email');
-  const update = { email, 'enrichment_provenance.email': USER_ACCEPTED };
-  await updateDoc(ref, update);
-  return update;
+  return runTransaction(db, async (tx) => {
+    const snap = await tx.get(ref);
+    const current = snap.exists() ? snap.data() : null;
+    if (!current || hasAnyEmail(current)) throw new Error('the contact already has an email');
+    const update = {
+      ...buildEmailWrite([{ id: '0', value: email, label: 'work' }]),
+      'enrichment_provenance.email': USER_ACCEPTED,
+    };
+    tx.update(ref, update);
+    return update;
+  });
 }

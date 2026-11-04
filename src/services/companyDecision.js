@@ -44,7 +44,7 @@
 
 import {
   doc, getDoc, setDoc, updateDoc, deleteDoc,
-  collection, query, where, getDocs, serverTimestamp,
+  collection, query, where, getDocs, serverTimestamp, runTransaction,
 } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { prepareContactWrite, applyContactMerge } from './contactWriteGuard';
@@ -244,18 +244,108 @@ export async function resolveDecisionPersona(userId, activeICPId) {
   }
 }
 
+// ── Auto-discovered-people status (#N1) ─────────────────────────────────────
+//
+// Five fields on the company document, nothing else:
+//   auto_contact_status           'pending' | 'completed' | 'failed' | absent
+//   auto_contact_count            number | null  — only meaningful when completed
+//   auto_contact_search_id        string         — this attempt's own token
+//   auto_contact_search_started_at ISO string
+//   auto_contact_searched_at      ISO string | null
+//
+// Absent entirely means no attempt has ever been made for this company (it
+// predates this, or there was nothing to search with). "Stale" is not a
+// sixth stored value: it is `pending` whose start time is older than
+// AUTO_CONTACT_STALE_MS, evaluated at render time by resolveAutoContactState.
+
+export const AUTO_CONTACT_STALE_MS = 60_000;
+
+function mintSearchId() {
+  return `srch_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
+}
+
 /**
- * Persona people discovery after an approve.
+ * Turns the five raw fields into exactly one of five display states. Pure,
+ * and the ONLY place either surface (the Daily Discoveries toast, the saved
+ * company page) decides what to show — so the two can never disagree.
  *
- * The titles write is awaited; the contact search runs in the background and
- * never blocks or fails the decision that triggered it.
+ * `none` is distinct from every other state and is never rendered as a zero
+ * result: it means no attempt was ever recorded, not that one ran and found
+ * nobody.
+ */
+export function resolveAutoContactState(company, now = Date.now()) {
+  const status = company?.auto_contact_status;
+  if (status === 'completed') {
+    const count = typeof company.auto_contact_count === 'number' ? company.auto_contact_count : 0;
+    return count > 0 ? { kind: 'found', count } : { kind: 'none-found' };
+  }
+  if (status === 'failed') return { kind: 'failed' };
+  if (status === 'pending') {
+    const startedAt = company.auto_contact_search_started_at ? Date.parse(company.auto_contact_search_started_at) : null;
+    const age = Number.isFinite(startedAt) ? now - startedAt : Infinity;
+    return age > AUTO_CONTACT_STALE_MS ? { kind: 'stuck' } : { kind: 'searching' };
+  }
+  return { kind: 'none' };
+}
+
+/**
+ * Persona people discovery after an approve, or a user-initiated retry of a
+ * stuck or failed one (see retryPeopleDiscovery below) — the same entry
+ * point for both; a retry is just another call with the same inputs.
+ *
+ * The titles write is awaited, as before. Starting an attempt is itself
+ * transactional: inside one transaction it reads the company's current
+ * status and refuses — writes nothing, returns `{ attempted: false }` —
+ * only when another attempt is already `pending` AND not yet stale. A
+ * completed, failed, or stale-pending company is always free to start a
+ * fresh one. If that claiming write itself fails (requirement: a failed
+ * write is handled explicitly, not ignored), the error is logged and
+ * nothing further runs — the search is never kicked off behind a status
+ * the UI has no record of.
+ *
+ * Every later write — found, none found, failed — happens inside its own
+ * transaction that checks `auto_contact_search_id` still matches the id
+ * this call minted. A response for an attempt a retry has since superseded
+ * is discarded, never written; so is a thrown search error.
  */
 export async function triggerPeopleDiscovery({ user, company, icpTitles, activeICPId, causeId }) {
-  if (!user?.uid || !company?.id || !icpTitles?.length) return;
+  if (!user?.uid || !company?.id || !icpTitles?.length) return { attempted: false };
   const companyRef = doc(db, 'users', user.uid, 'companies', company.id);
   const formattedTitles = icpTitles.map((title, index) => ({ title, rank: index + 1, score: 100 - (index * 10) }));
   await updateDoc(companyRef, { selected_titles: formattedTitles, titles_updated_at: new Date().toISOString(), titles_source: 'icp_auto' });
-  if (!company.apollo_organization_id) return;
+  if (!company.apollo_organization_id) return { attempted: false };
+
+  const searchId = mintSearchId();
+  const startedAt = new Date().toISOString();
+
+  let claimed;
+  try {
+    claimed = await runTransaction(db, async (tx) => {
+      const snap = await tx.get(companyRef);
+      if (!snap.exists()) return false;
+      const current = snap.data();
+      if (resolveAutoContactState(current).kind === 'searching') return false; // genuinely in flight — do not stomp it
+      tx.update(companyRef, {
+        auto_contact_status: 'pending',
+        auto_contact_count: null,
+        auto_contact_search_id: searchId,
+        auto_contact_search_started_at: startedAt,
+        auto_contact_searched_at: null,
+      });
+      return true;
+    });
+  } catch (err) {
+    console.error('[companyDecision] could not record the start of people discovery:', err.message);
+    return { attempted: false };
+  }
+  if (!claimed) return { attempted: false };
+
+  /** Writes an outcome only while `searchId` is still this company's current attempt. */
+  const settle = (data) => runTransaction(db, async (tx) => {
+    const snap = await tx.get(companyRef);
+    if (!snap.exists() || snap.data().auto_contact_search_id !== searchId) return;
+    tx.update(companyRef, data);
+  }).catch(err => console.error('[companyDecision] could not record the people-discovery outcome:', err.message));
 
   const authToken = await user.getIdToken();
   fetch('/.netlify/functions/searchPeople', {
@@ -263,56 +353,86 @@ export async function triggerPeopleDiscovery({ user, company, icpTitles, activeI
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ userId: user.uid, authToken, organizationId: company.apollo_organization_id, titles: icpTitles, maxResults: 3 }),
   }).then(res => res.json()).then(async result => {
-    if (result.success && result.people?.length > 0) {
-      for (const person of result.people) {
-        const contactId = `${company.id}_${person.id}`;
-
-        // Identity resolution before every auto-discovered write. This runs in
-        // the BACKGROUND after a decision, so a duplicate created here is one
-        // the user never saw made and has no reason to look for.
-        const decision = await prepareContactWrite(user.uid, {
-          contactId,
-          apollo_person_id: person.id,
-          email: person.email,
-          linkedin_url: person.linkedin_url,
-          name: person.name,
-          company_id: company.id,
-          company_name: company.name,
-          source: 'icp_auto_discovery',
-        }, { source: 'DailyLeads.autoDiscovery', recordStatus: RECORD_STATUS.SUGGESTED });
-
-        if (decision.action === 'merge') {
-          await applyContactMerge(user.uid, decision);
-          continue;
-        }
-
-        await setDoc(doc(db, 'users', user.uid, 'contacts', contactId), {
-          ...person,
-          // Identity envelope after the spread, never from it: `person` is an
-          // enrichment API payload and carries no archival state, no normalized
-          // identifiers and no status dimensions.
-          ...decision.fields,
-          company_id: company.id, company_name: company.name,
-          lead_owner: user.uid, status: 'suggested', source: 'icp_auto_discovery',
-          discovered_at: new Date().toISOString(),
-        });
-
-        // Shadow (Sprint 2), after the legacy write. This search ran because of
-        // an ICP, so the person was genuinely encountered under it — a DIRECT
-        // association. activeICPId is the ICP the company was just decided under.
-        if (activeICPId) {
-          await recordPersonEncounter({
-            userId: user.uid,
-            contactId,
-            icpId: activeICPId,
-            causeId,
-            source: 'icp_auto_discovery',
-          });
-        }
-      }
-      await updateDoc(companyRef, { auto_contact_status: 'completed', auto_contact_count: result.people.length, auto_contact_searched_at: new Date().toISOString() });
+    if (!result.success) {
+      await settle({ auto_contact_status: 'failed', auto_contact_count: null, auto_contact_searched_at: new Date().toISOString() });
+      return;
     }
-  }).catch(err => console.error('Background contact search failed:', err));
+    // Counts contacts THIS call actually persisted (created or merged), never
+    // `result.people.length` — the API's suggestions are not the same fact as
+    // what ended up saved and company-linked.
+    let savedCount = 0;
+    for (const person of (result.people || [])) {
+      const contactId = `${company.id}_${person.id}`;
+
+      // Identity resolution before every auto-discovered write. This runs in
+      // the BACKGROUND after a decision, so a duplicate created here is one
+      // the user never saw made and has no reason to look for.
+      const decision = await prepareContactWrite(user.uid, {
+        contactId,
+        apollo_person_id: person.id,
+        email: person.email,
+        linkedin_url: person.linkedin_url,
+        name: person.name,
+        company_id: company.id,
+        company_name: company.name,
+        source: 'icp_auto_discovery',
+      }, { source: 'DailyLeads.autoDiscovery', recordStatus: RECORD_STATUS.SUGGESTED });
+
+      if (decision.action === 'merge') {
+        await applyContactMerge(user.uid, decision);
+        savedCount += 1;
+        continue;
+      }
+
+      await setDoc(doc(db, 'users', user.uid, 'contacts', contactId), {
+        ...person,
+        // Identity envelope after the spread, never from it: `person` is an
+        // enrichment API payload and carries no archival state, no normalized
+        // identifiers and no status dimensions.
+        ...decision.fields,
+        company_id: company.id, company_name: company.name,
+        lead_owner: user.uid, status: 'suggested', source: 'icp_auto_discovery',
+        discovered_at: new Date().toISOString(),
+      });
+      savedCount += 1;
+
+      // Shadow (Sprint 2), after the legacy write. This search ran because of
+      // an ICP, so the person was genuinely encountered under it — a DIRECT
+      // association. activeICPId is the ICP the company was just decided under.
+      if (activeICPId) {
+        await recordPersonEncounter({
+          userId: user.uid,
+          contactId,
+          icpId: activeICPId,
+          causeId,
+          source: 'icp_auto_discovery',
+        });
+      }
+    }
+    await settle({ auto_contact_status: 'completed', auto_contact_count: savedCount, auto_contact_searched_at: new Date().toISOString() });
+  }).catch(async err => {
+    console.error('Background contact search failed:', err);
+    await settle({ auto_contact_status: 'failed', auto_contact_count: null, auto_contact_searched_at: new Date().toISOString() });
+  });
+
+  return { attempted: true, searchId };
+}
+
+/**
+ * Retries a stuck or failed auto-discovery from the saved company page.
+ * Reconstructs the search from what the original attempt already stored on
+ * the company (`selected_titles`, `swipedForICPId`, `swipedAt`) rather than
+ * re-resolving the persona — a retry repeats the same search, it does not
+ * renegotiate what to search for.
+ */
+export async function retryPeopleDiscovery({ user, company }) {
+  const icpTitles = (company?.selected_titles || []).map(t => t.title).filter(Boolean);
+  if (!icpTitles.length) return { attempted: false };
+  return triggerPeopleDiscovery({
+    user, company, icpTitles,
+    activeICPId: company.swipedForICPId ?? null,
+    causeId: company.swipedAt ?? new Date().toISOString(),
+  });
 }
 
 /**
@@ -353,7 +473,11 @@ export async function undoCompanyDecision({ userId, companyId }) {
 /** Undo, step two (approvals only): retract what people discovery added. */
 export async function undoApprovalSideEffects({ userId, companyId }) {
   const companyRef = doc(db, 'users', userId, 'companies', companyId);
-  await updateDoc(companyRef, { selected_titles: null, titles_updated_at: null, titles_source: null, auto_contact_status: null, auto_contact_count: null, auto_contact_searched_at: null });
+  await updateDoc(companyRef, {
+    selected_titles: null, titles_updated_at: null, titles_source: null,
+    auto_contact_status: null, auto_contact_count: null, auto_contact_searched_at: null,
+    auto_contact_search_id: null, auto_contact_search_started_at: null,
+  });
   const autoContactsQuery = query(collection(db, 'users', userId, 'contacts'), where('company_id', '==', companyId), where('source', '==', 'icp_auto_discovery'));
   const autoContactDocs = await getDocs(autoContactsQuery);
   for (const contactDoc of autoContactDocs.docs) await deleteDoc(contactDoc.ref);
@@ -362,5 +486,6 @@ export async function undoApprovalSideEffects({ userId, companyId }) {
 export default {
   DECISION_SURFACE, DECISION_ICP_BASIS, resolveDecisionIcp,
   recordCompanyDecision, skipCompany, resolveDecisionPersona,
-  triggerPeopleDiscovery, approveCompany, undoCompanyDecision, undoApprovalSideEffects,
+  triggerPeopleDiscovery, retryPeopleDiscovery, resolveAutoContactState, AUTO_CONTACT_STALE_MS,
+  approveCompany, undoCompanyDecision, undoApprovalSideEffects,
 };

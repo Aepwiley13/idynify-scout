@@ -65,6 +65,12 @@ vi.mock('firebase/firestore', () => ({
     const tx = {
       get: async (ref) => snap(ref),
       set: (ref, data, opts) => { staged.push([ref.__path, data, opts]); },
+      // Partial update, same contract as the plain updateDoc mock above:
+      // merges into the existing document, throws if there isn't one.
+      update: (ref, data) => {
+        if (!STORE.has(ref.__path)) throw new Error(`no document: ${ref.__path}`);
+        staged.push([ref.__path, data, { merge: true }]);
+      },
     };
     const result = await fn(tx);
     for (const [p, data, opts] of staged) {

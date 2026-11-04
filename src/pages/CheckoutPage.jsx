@@ -62,9 +62,26 @@ export default function CheckoutPage() {
 
       // Check if Stripe is configured (production mode)
       const isStripeConfigured = import.meta.env.VITE_STRIPE_ENABLED === 'true';
+      // Billing hardening PR 1: the new authenticated checkout endpoint ships dark behind this
+      // flag. Default (unset, or anything other than 'session') keeps today's live Payment Link
+      // path unchanged — merging this does not change production checkout behavior by itself.
+      const useSessionCheckout = import.meta.env.VITE_STRIPE_CHECKOUT_MODE === 'session';
 
-      if (isStripeConfigured) {
-        // PRODUCTION MODE: Redirect to Stripe Payment Link
+      if (isStripeConfigured && useSessionCheckout) {
+        console.log('🔐 Starting authenticated Checkout Session...');
+        const idToken = await user.getIdToken();
+        const response = await fetch('/.netlify/functions/create-checkout-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+          body: JSON.stringify({ tier }),
+        });
+        const result = await response.json();
+        if (!response.ok || !result.url) {
+          throw new Error(result.error || 'Failed to start checkout');
+        }
+        window.location.href = result.url;
+      } else if (isStripeConfigured) {
+        // PRODUCTION MODE (default): Redirect to Stripe Payment Link
         console.log('🔐 Redirecting to Stripe Payment Link...');
 
         const paymentLinks = {

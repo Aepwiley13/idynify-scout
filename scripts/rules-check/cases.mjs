@@ -101,13 +101,25 @@ const SERVER_CONTROLLED = {
   subscriptionStatus: 'active', selectedTier: 'pro', status: 'active', credits: 99999,
   monthlyCredits: 99999, tierLimits: { teamSeats: 99 }, features: { mobilePhone: true },
   billingCycleDate: 1, stripeCustomerId: 'cus_someone_else', stripeSubscriptionId: 'sub_x',
+  // billing hardening PR 1: stripe-webhook.js / create-checkout-session.js
+  currentPeriodStart: 'x', currentPeriodEnd: 'x', cancelAtPeriodEnd: true, pauseCollection: true,
+  billingDate: 'x', nextBillingDate: 'x',
+  pendingCheckout: { status: 'open', operationId: 'op_someone_elses', sessionUrl: 'https://evil.example' },
 };
 
-// Exactly what Signup.jsx writes when it creates the document.
+// Exactly what Signup.jsx writes when it creates the document — legacy numeric credits shape.
 const signup = (tier) => ({
   email: 'new@example.test', createdAt: new Date(0), selectedTier: tier, subscriptionTier: tier,
   status: 'pending_payment', hasCompletedPayment: false,
   credits: tier === 'pro' ? 1250 : 400, monthlyCredits: tier === 'pro' ? 1250 : 400,
+});
+
+// The new Signup.jsx shape (billing hardening PR 1) — credits as an object with known history.
+const signupObject = (tier, creditsOverride) => ({
+  email: 'new@example.test', createdAt: new Date(0), selectedTier: tier, subscriptionTier: tier,
+  status: 'pending_payment', hasCompletedPayment: false,
+  credits: creditsOverride ?? { total: tier === 'pro' ? 1250 : 400, used: 0, remaining: tier === 'pro' ? 1250 : 400, resetDate: null },
+  monthlyCredits: tier === 'pro' ? 1250 : 400,
 });
 
 // P: a signed-up, unpaid user. A: an admin. SA: a super admin.
@@ -149,6 +161,17 @@ const USER_DOC_CASES = [
   // Signup creates the document with its billing fields, exactly as Signup.jsx writes them.
   ['new  signup, starter (400 credits)', 'ALLOW', create(signup('starter'))],
   ['new  signup, pro (1250 credits)', 'ALLOW', create(signup('pro'))],
+  // Billing hardening PR 1: the new object credits shape is accepted too — dual-accept,
+  // not a replacement, because an already-open tab on the old bundle can still submit the
+  // legacy shape after this deploys.
+  ['new  signup, starter, object credits shape', 'ALLOW', create(signupObject('starter'))],
+  ['new  signup, pro, object credits shape', 'ALLOW', create(signupObject('pro'))],
+  ['new  signup, object credits wrong total', 'DENY', create(signupObject('starter', { total: 1250, used: 0, remaining: 1250, resetDate: null }))],
+  ['new  signup, object credits remaining != total', 'DENY', create(signupObject('starter', { total: 400, used: 0, remaining: 399, resetDate: null }))],
+  ['new  signup, object credits used != 0', 'DENY', create(signupObject('starter', { total: 400, used: 1, remaining: 400, resetDate: null }))],
+  ['new  signup, object credits resetDate not null', 'DENY', create(signupObject('starter', { total: 400, used: 0, remaining: 400, resetDate: '2026-01-01' }))],
+  ['new  signup, object credits extra key', 'DENY', create(signupObject('starter', { total: 400, used: 0, remaining: 400, resetDate: null, bonus: 1 }))],
+  ['new  signup, object credits missing key', 'DENY', create(signupObject('starter', { total: 400, used: 0, remaining: 400 }))],
   ['new  first write is a profile merge', 'ALLOW', create({ preferences: { theme: 'dark' } }, { merge: true })],
   // Only the tiers the app sells: starter and pro (Homepage.jsx, CheckoutPage.jsx, stripe-webhook.js).
   ['new  signup, unknown tier team', 'DENY', create(signup('team'))],
@@ -284,6 +307,44 @@ const LINKEDIN_CASES = [
 ];
 const firstLinkedInCase = CASES.length + 1;
 CASES.push(...LINKEDIN_CASES.map(([name, expect, run], i) => [`${firstLinkedInCase + i}  ${name}`, expect, run]));
+
+// ── Billing hardening PR 1: server-only collections ─────────────────────────
+// stripeWebhookEvents (dedup ledger), stripeWebhookPendingEvents (parked
+// subscription events), billingAllocations (credit-grant marker),
+// billingCheckoutOperations (the durable per-checkout operation record later
+// webhook processing verifies incoming events against), billingAmbiguousAccounts
+// (append-only audit trail). A client that could write any of these could
+// fake an event as applied, grant itself credits, forge its own "proof" of a
+// purchase, or erase the audit trail.
+await env.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, 'stripeWebhookEvents/evt_1'), { type: 'checkout.session.completed', appliedAt: 'x' });
+  await setDoc(doc(db, 'stripeWebhookPendingEvents/cus_1/events/evt_2'), { type: 'customer.subscription.created' });
+  await setDoc(doc(db, 'billingAllocations/sub_1'), { uid: U, tier: 'pro' });
+  await setDoc(doc(db, 'billingCheckoutOperations/op_1'), { uid: U, tier: 'pro', priceId: 'price_pro' });
+  await setDoc(doc(db, 'billingAmbiguousAccounts/flag_1'), { uid: U, reason: 'customer_mismatch' });
+});
+
+const BILLING_HARDENING_CASES = [
+  ['stripeWebhookEvents          read', 'DENY', () => getDoc(doc(me, 'stripeWebhookEvents/evt_1'))],
+  ['stripeWebhookEvents          forge as applied', 'DENY', () => setDoc(doc(me, 'stripeWebhookEvents/evt_forged'), { type: 'x', appliedAt: 'x' })],
+  ['stripeWebhookEvents          clear one', 'DENY', () => deleteDoc(doc(me, 'stripeWebhookEvents/evt_1'))],
+  ['stripeWebhookPendingEvents   read', 'DENY', () => getDoc(doc(me, 'stripeWebhookPendingEvents/cus_1/events/evt_2'))],
+  ['stripeWebhookPendingEvents   write', 'DENY', () => setDoc(doc(me, 'stripeWebhookPendingEvents/cus_1/events/evt_3'), { type: 'x' })],
+  ['billingAllocations           read', 'DENY', () => getDoc(doc(me, 'billingAllocations/sub_1'))],
+  ['billingAllocations           self-grant', 'DENY', () => setDoc(doc(me, 'billingAllocations/sub_forged'), { uid: U, tier: 'pro' })],
+  ['billingAllocations           erase marker', 'DENY', () => deleteDoc(doc(me, 'billingAllocations/sub_1'))],
+  ['billingCheckoutOperations    read', 'DENY', () => getDoc(doc(me, 'billingCheckoutOperations/op_1'))],
+  ['billingCheckoutOperations    forge own proof', 'DENY', () => setDoc(doc(me, 'billingCheckoutOperations/op_forged'), { uid: U, customerId: 'cus_someone_else', priceId: 'price_pro' })],
+  ['billingCheckoutOperations    tamper existing', 'DENY', () => updateDoc(doc(me, 'billingCheckoutOperations/op_1'), { priceId: 'price_pro_annual' })],
+  ['billingAmbiguousAccounts     read', 'DENY', () => getDoc(doc(me, 'billingAmbiguousAccounts/flag_1'))],
+  ['billingAmbiguousAccounts     erase a flag', 'DENY', () => deleteDoc(doc(me, 'billingAmbiguousAccounts/flag_1'))],
+  // Admin SDK writes go through, same as every other server-only collection above.
+  ['admin sdk  marks a webhook event applied', 'ALLOW', asAdminSdk(db => setDoc(doc(db, 'stripeWebhookEvents/evt_admin'), { type: 'x', appliedAt: 'x' }))],
+  ['admin sdk  grants a credit allocation', 'ALLOW', asAdminSdk(db => setDoc(doc(db, 'billingAllocations/sub_admin'), { uid: U, tier: 'pro' }))],
+];
+const firstBillingCase = CASES.length + 1;
+CASES.push(...BILLING_HARDENING_CASES.map(([name, expect, run], i) => [`${firstBillingCase + i}  ${name}`, expect, run]));
 
 let pass = 0, fail = 0;
 const failures = [];

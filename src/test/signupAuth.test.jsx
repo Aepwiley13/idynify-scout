@@ -14,9 +14,9 @@
  *     parameter stopped flowing, nothing on screen would look wrong, and a
  *     customer who chose Pro would silently be created as Starter.
  *
- *   · The setDoc payload (test 12). `credits` is written as a number here and
- *     replaced by an object at checkout. That inconsistency is documented debt
- *     this sprint must not disturb, so the payload is asserted field by field.
+ *   · The setDoc payload (test 12). Billing hardening PR 1 changed `credits` from a bare
+ *     number to the same object shape checkout writes — asserted field by field so a future
+ *     change here is deliberate, not a drift back into the old number/object split.
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -417,7 +417,7 @@ describe('signup — tier survives a UI that no longer mentions it', () => {
     const payload = setDocMock.mock.calls[0][1];
     expect(payload.selectedTier).toBe('pro');
     expect(payload.subscriptionTier).toBe('pro');
-    expect(payload.credits).toBe(1250);
+    expect(payload.credits).toEqual({ total: 1250, used: 0, remaining: 1250, resetDate: null });
     expect(payload.monthlyCredits).toBe(1250);
     await waitFor(() => expect(screen.getByText('CHECKOUT')).toBeInTheDocument());
   });
@@ -430,7 +430,7 @@ describe('signup — tier survives a UI that no longer mentions it', () => {
     await waitFor(() => expect(setDocMock).toHaveBeenCalled());
     const payload = setDocMock.mock.calls[0][1];
     expect(payload.selectedTier).toBe('starter');
-    expect(payload.credits).toBe(400);
+    expect(payload.credits).toEqual({ total: 400, used: 0, remaining: 400, resetDate: null });
   });
 
   it('no tier parameter still defaults to starter', async () => {
@@ -441,7 +441,7 @@ describe('signup — tier survives a UI that no longer mentions it', () => {
     expect(setDocMock.mock.calls[0][1].selectedTier).toBe('starter');
   });
 
-  it('writes exactly the fields production writes today, with credits as a number', async () => {
+  it('writes exactly the fields production writes today, with credits as an object (billing hardening PR 1)', async () => {
     const user = userEvent.setup();
     await renderSignup('?tier=starter');
     await fill(user);
@@ -457,9 +457,12 @@ describe('signup — tier survives a UI that no longer mentions it', () => {
     expect(payload.status).toBe('pending_payment');
     expect(payload.hasCompletedPayment).toBe(false);
     expect(payload.createdAt).toBeInstanceOf(Date);
-    // Documented debt: a number at signup, an object after checkout. Not this
-    // sprint's to fix — and not this sprint's to change either.
-    expect(typeof payload.credits).toBe('number');
+    // Fixed in billing hardening PR 1: this used to write a bare number, later overwritten by an
+    // incompatible object shape at checkout. Now it writes the same object shape checkout does —
+    // a real allocation with known history, not a guess. firestore.rules' signupBilling() still
+    // accepts the OLD numeric shape too, for any already-open tab still running the previous
+    // bundle — that's a rules-level compatibility concern, not something this test needs to cover.
+    expect(payload.credits).toEqual({ total: 400, used: 0, remaining: 400, resetDate: null });
   });
 });
 

@@ -1,5 +1,9 @@
 # Contact Hub native integration: Gate 0 and Gate 1 report
 
+> **Superseded in part (2026-11-04):** the Contact Hub is now a reference application only, and no data will be migrated.
+> Every migration section below is cancelled. The current plan is `docs/contact-hub/NATIVE_STICKERS_PLAN.md`.
+> The Hub security findings still apply to the live Hub, and now belong to a separate project.
+
 **Date:** 2026-11-04
 **Scope:** Analysis and contracts only. Nothing was implemented, merged or deployed. No production data was read or changed.
 **Approved direction:** an individual-first Contact Hub, native to IDYNIFY's People and Contact Profile (audit option C). It stays inside the existing `users/{uid}` boundaries, with no team sharing.

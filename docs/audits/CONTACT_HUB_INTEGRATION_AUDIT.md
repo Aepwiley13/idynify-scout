@@ -1,5 +1,9 @@
 # Contact Hub → IDYNIFY integration: architecture audit
 
+> **Superseded in part (2026-11-04):** the Contact Hub is now a reference application only, and no data will be migrated.
+> Every migration section below is cancelled. The current plan is `docs/contact-hub/NATIVE_STICKERS_PLAN.md`.
+> The Hub security findings still apply to the live Hub, and now belong to a separate project.
+
 **Date:** 2026-11-04
 **Type:** Audit only. Nothing was built, migrated, deployed or merged. No production data was read or changed.
 **Verdict:** **NO-GO for migration today.** Approve Option C (integrate into People and Contact Profile), then start Phase 0 and Phase 1, both read-only.

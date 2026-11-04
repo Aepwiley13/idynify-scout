@@ -7,6 +7,12 @@ No production project, no credentials, no access to real data.
   `criteriaVersions`, and the server-controlled fields on `users/{uid}` (role,
   permissions, suspension, billing): every profile write the app makes still
   succeeds, and no client can add, change or remove one of those fields.
+- `stickers.mjs` — the sticker rules (ADR-007): the registry (create-only
+  IDs, no delete), contact membership (one sticker per write, only an existing
+  active sticker of the same user, at most 50, stale writes refused), the
+  rollout modes from `src/constants/stickersAccess.js`, cross-user isolation,
+  and the **rollback variant** (`stickerRulesEnabled()` returning false), which
+  must deny every sticker write and nothing else.
 - `write-semantics.mjs` — **what a write does** to the fields it was not told
   about. Guards the rediscovery `updateMask`.
 

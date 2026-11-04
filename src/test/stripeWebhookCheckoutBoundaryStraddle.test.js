@@ -1,10 +1,13 @@
 /**
- * Runs against a REAL Firestore emulator. A checkout session created before this PR's deploy
- * epoch but delivered/completed after it must not be auto-granted (its own provenance may
- * legitimately be absent) and must not auto-top-up or reset an existing balance — it's flagged
- * for manual reconciliation, with the payment details preserved in the flagged record.
+ * Runs against a REAL Firestore emulator — `npm run test:billing-emulator`. Plain `npm test`
+ * skips this file. A checkout session created before this PR's deploy epoch but
+ * delivered/completed after it must not be auto-granted (its own provenance may legitimately be
+ * absent) and must not auto-top-up or reset an existing balance — it's flagged for manual
+ * reconciliation, with the payment details preserved in the flagged record.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+
+const FIRESTORE_EMULATOR_AVAILABLE = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 
 const scenario = vi.hoisted(() => ({ handlers: {} }));
 
@@ -18,24 +21,30 @@ vi.mock('stripe', () => {
   return { default: FakeStripe };
 });
 
-const { db, wipeBillingCollections, fakeHttpEvent } = await import('./helpers/billingTestUtils.js');
-const { handler } = await import('../../netlify/functions/stripe-webhook.js');
+describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
+  'stripe-webhook: checkout opened before deploy, completed after (run via: npm run test:billing-emulator)',
+  () => {
+    let db, wipeBillingCollections, fakeHttpEvent, handler;
 
-beforeEach(async () => {
-  await wipeBillingCollections();
-  scenario.handlers = {
-    customersRetrieve: async (id) => ({ id, metadata: {} }),
-    subscriptionsRetrieve: async (id) => ({
-      id, customer: 'cus_straddle', status: 'active', created: 500000000, // before the epoch too
-      current_period_start: 500000000, current_period_end: 503000000, cancel_at_period_end: false,
-      items: { data: [{ price: { id: 'price_starter' } }] }, metadata: {},
-    }),
-    listLineItems: async () => ({ data: [{ price: { id: 'price_starter' } }] }),
-  };
-});
+    beforeAll(async () => {
+      ({ db, wipeBillingCollections, fakeHttpEvent } = await import('./helpers/billingTestUtils.js'));
+      ({ handler } = await import('../../netlify/functions/stripe-webhook.js'));
+    });
 
-describe('stripe-webhook: checkout opened before deploy, completed after', () => {
-  it('a pre-epoch session delivered post-epoch is flagged, not granted, and does not touch an existing balance', async () => {
+    beforeEach(async () => {
+      await wipeBillingCollections();
+      scenario.handlers = {
+        customersRetrieve: async (id) => ({ id, metadata: {} }),
+        subscriptionsRetrieve: async (id) => ({
+          id, customer: 'cus_straddle', status: 'active', created: 500000000, // before the epoch too
+          current_period_start: 500000000, current_period_end: 503000000, cancel_at_period_end: false,
+          items: { data: [{ price: { id: 'price_starter' } }] }, metadata: {},
+        }),
+        listLineItems: async () => ({ data: [{ price: { id: 'price_starter' } }] }),
+      };
+    });
+
+    it('a pre-epoch session delivered post-epoch is flagged, not granted, and does not touch an existing balance', async () => {
     await db.collection('users').doc('uid_straddle').set({
       email: 's@example.test', credits: { total: 400, used: 50, remaining: 350, resetDate: null },
     });
@@ -91,5 +100,6 @@ describe('stripe-webhook: checkout opened before deploy, completed after', () =>
     } finally {
       process.env.BILLING_LEDGER_EPOCH_UNIX = original;
     }
-  });
-});
+    });
+  },
+);

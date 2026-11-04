@@ -1,12 +1,15 @@
 /**
- * Runs against a REAL Firestore emulator with real transactions — this is the one explicitly
- * asked for: mocked transaction callbacks cannot prove concurrency/fencing behavior, only that
- * the code calls the right function. Two genuinely concurrent webhook deliveries for the SAME
- * subscription must not corrupt the final state — Firestore's own optimistic concurrency control
- * (every write inside runTransaction, including the live Stripe re-fetch, is redone in full on
- * contention) is what this test actually exercises.
+ * Runs against a REAL Firestore emulator with real transactions — `npm run test:billing-emulator`.
+ * Plain `npm test` skips this file. This is the one explicitly asked for: mocked transaction
+ * callbacks cannot prove concurrency/fencing behavior, only that the code calls the right
+ * function. Two genuinely concurrent webhook deliveries for the SAME subscription must not
+ * corrupt the final state — Firestore's own optimistic concurrency control (every write inside
+ * runTransaction, including the live Stripe re-fetch, is redone in full on contention) is what
+ * this test actually exercises.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+
+const FIRESTORE_EMULATOR_AVAILABLE = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 
 const scenario = vi.hoisted(() => ({ handlers: {} }));
 
@@ -19,14 +22,20 @@ vi.mock('stripe', () => {
   return { default: FakeStripe };
 });
 
-const { db, wipeBillingCollections, fakeHttpEvent } = await import('./helpers/billingTestUtils.js');
-const { handler } = await import('../../netlify/functions/stripe-webhook.js');
+describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
+  'stripe-webhook: real concurrent reconciliation for the same subscription (run via: npm run test:billing-emulator)',
+  () => {
+  let db, wipeBillingCollections, fakeHttpEvent, handler;
 
-beforeEach(async () => {
-  await wipeBillingCollections();
-});
+  beforeAll(async () => {
+    ({ db, wipeBillingCollections, fakeHttpEvent } = await import('./helpers/billingTestUtils.js'));
+    ({ handler } = await import('../../netlify/functions/stripe-webhook.js'));
+  });
 
-describe('stripe-webhook: real concurrent reconciliation for the same subscription', () => {
+  beforeEach(async () => {
+    await wipeBillingCollections();
+  });
+
   it('two concurrent delivery for two different events on the same subscription both land cleanly, not corrupted', async () => {
     await db.collection('users').doc('uid_race').set({
       email: 'race@example.test', stripeCustomerId: 'cus_race', stripeSubscriptionId: 'sub_race',
@@ -93,4 +102,5 @@ describe('stripe-webhook: real concurrent reconciliation for the same subscripti
     const ledgerDocs = await Promise.all(events.map((e) => db.collection('stripeWebhookEvents').doc(e.id).get()));
     expect(ledgerDocs.every((d) => d.exists)).toBe(true);
   });
-});
+  },
+);

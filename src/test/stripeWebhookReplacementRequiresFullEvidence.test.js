@@ -1,9 +1,12 @@
 /**
- * Runs against a REAL Firestore emulator. A subscription replacement (a different subscription
- * id than what's on file) requires EVERY condition — same customer, known price, verified newer,
- * and operation-record-backed provenance — not any one of them alone.
+ * Runs against a REAL Firestore emulator — `npm run test:billing-emulator`. Plain `npm test`
+ * skips this file. A subscription replacement (a different subscription id than what's on file)
+ * requires EVERY condition — same customer, known price, verified newer, and
+ * operation-record-backed provenance — not any one of them alone.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+
+const FIRESTORE_EMULATOR_AVAILABLE = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 
 const scenario = vi.hoisted(() => ({ handlers: {} }));
 
@@ -17,16 +20,7 @@ vi.mock('stripe', () => {
   return { default: FakeStripe };
 });
 
-const { db, wipeBillingCollections, fakeHttpEvent } = await import('./helpers/billingTestUtils.js');
-const { handler } = await import('../../netlify/functions/stripe-webhook.js');
-
 const ON_FILE_DEAD = { id: 'sub_onfile', customer: 'cus_r1', status: 'canceled', created: 1000000000 };
-
-async function seedUser(overrides = {}) {
-  await db.collection('users').doc('uid_r1').set({
-    email: 'r1@example.test', stripeCustomerId: 'cus_r1', stripeSubscriptionId: 'sub_onfile', ...overrides,
-  });
-}
 
 function incomingEvent(subscriptionOverrides = {}) {
   const subscription = {
@@ -41,25 +35,39 @@ function incomingEvent(subscriptionOverrides = {}) {
   };
 }
 
-beforeEach(async () => {
-  await wipeBillingCollections();
-  scenario.handlers = {
-    customersRetrieve: async (id) => ({ id, metadata: {} }),
-    subscriptionsRetrieve: async (id) => (id === 'sub_onfile' ? ON_FILE_DEAD : incomingSub),
-  };
-});
+describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
+  'stripe-webhook: replacement requires every piece of evidence together (run via: npm run test:billing-emulator)',
+  () => {
+  let db, wipeBillingCollections, fakeHttpEvent, handler;
+  let incomingSub;
 
-let incomingSub;
+  beforeAll(async () => {
+    ({ db, wipeBillingCollections, fakeHttpEvent } = await import('./helpers/billingTestUtils.js'));
+    ({ handler } = await import('../../netlify/functions/stripe-webhook.js'));
+  });
 
-async function run(subscriptionOverrides) {
-  const { event, subscription } = incomingEvent(subscriptionOverrides);
-  incomingSub = subscription;
-  scenario.handlers.subscriptionsRetrieve = async (id) => (id === 'sub_onfile' ? ON_FILE_DEAD : subscription);
-  await handler(fakeHttpEvent(event));
-  return db.collection('users').doc('uid_r1').get();
-}
+  beforeEach(async () => {
+    await wipeBillingCollections();
+    scenario.handlers = {
+      customersRetrieve: async (id) => ({ id, metadata: {} }),
+      subscriptionsRetrieve: async (id) => (id === 'sub_onfile' ? ON_FILE_DEAD : incomingSub),
+    };
+  });
 
-describe('stripe-webhook: replacement requires every piece of evidence together', () => {
+  async function seedUser(overrides = {}) {
+    await db.collection('users').doc('uid_r1').set({
+      email: 'r1@example.test', stripeCustomerId: 'cus_r1', stripeSubscriptionId: 'sub_onfile', ...overrides,
+    });
+  }
+
+  async function run(subscriptionOverrides) {
+    const { event, subscription } = incomingEvent(subscriptionOverrides);
+    incomingSub = subscription;
+    scenario.handlers.subscriptionsRetrieve = async (id) => (id === 'sub_onfile' ? ON_FILE_DEAD : subscription);
+    await handler(fakeHttpEvent(event));
+    return db.collection('users').doc('uid_r1').get();
+  }
+
   it('different customer blocks the switch even with provenance and a newer timestamp', async () => {
     await seedUser();
     await db.collection('billingCheckoutOperations').doc('op_r1').set({
@@ -120,4 +128,5 @@ describe('stripe-webhook: replacement requires every piece of evidence together'
     const userDoc = await db.collection('users').doc('uid_r1').get();
     expect(userDoc.data().stripeSubscriptionId).toBe('sub_onfile');
   });
-});
+  },
+);

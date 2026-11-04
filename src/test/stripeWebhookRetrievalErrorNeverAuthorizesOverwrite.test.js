@@ -1,9 +1,12 @@
 /**
- * Runs against a REAL Firestore emulator. A Stripe retrieval error while checking the on-file
- * subscription must never be read as "the on-file subscription doesn't exist" — that would
- * silently authorize an overwrite on the same grounds as a genuinely dead subscription.
+ * Runs against a REAL Firestore emulator — `npm run test:billing-emulator`. Plain `npm test`
+ * skips this file. A Stripe retrieval error while checking the on-file subscription must never
+ * be read as "the on-file subscription doesn't exist" — that would silently authorize an
+ * overwrite on the same grounds as a genuinely dead subscription.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+
+const FIRESTORE_EMULATOR_AVAILABLE = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 
 const scenario = vi.hoisted(() => ({ handlers: {} }));
 
@@ -17,14 +20,20 @@ vi.mock('stripe', () => {
   return { default: FakeStripe };
 });
 
-const { db, wipeBillingCollections, fakeHttpEvent } = await import('./helpers/billingTestUtils.js');
-const { handler } = await import('../../netlify/functions/stripe-webhook.js');
+describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
+  'stripe-webhook: a retrieval error never authorizes an overwrite (run via: npm run test:billing-emulator)',
+  () => {
+  let db, wipeBillingCollections, fakeHttpEvent, handler;
 
-beforeEach(async () => {
-  await wipeBillingCollections();
-});
+  beforeAll(async () => {
+    ({ db, wipeBillingCollections, fakeHttpEvent } = await import('./helpers/billingTestUtils.js'));
+    ({ handler } = await import('../../netlify/functions/stripe-webhook.js'));
+  });
 
-describe('stripe-webhook: a retrieval error never authorizes an overwrite', () => {
+  beforeEach(async () => {
+    await wipeBillingCollections();
+  });
+
   it('returns a retryable 500, writes nothing, and does not mark the event applied', async () => {
     await db.collection('users').doc('uid_err').set({
       email: 'e@example.test', stripeCustomerId: 'cus_err', stripeSubscriptionId: 'sub_onfile_err',
@@ -60,4 +69,5 @@ describe('stripe-webhook: a retrieval error never authorizes an overwrite', () =
     expect(ambiguous.docs).toHaveLength(0); // a bare retrieval error isn't durably logged either —
                                              // it's exactly what Stripe's own redelivery resolves
   });
-});
+  },
+);

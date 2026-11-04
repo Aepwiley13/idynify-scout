@@ -1,9 +1,12 @@
 /**
- * Runs against a REAL Firestore emulator with real transactions. Ownership (customer identity)
- * and product validity are checked UNCONDITIONALLY on every reconciliation path — a first-ever
- * binding and a same-subscription update, not only the replacement branch.
+ * Runs against a REAL Firestore emulator with real transactions — `npm run test:billing-emulator`.
+ * Plain `npm test` skips this file. Ownership (customer identity) and product validity are
+ * checked UNCONDITIONALLY on every reconciliation path — a first-ever binding and a
+ * same-subscription update, not only the replacement branch.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
+
+const FIRESTORE_EMULATOR_AVAILABLE = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 
 const scenario = vi.hoisted(() => ({ handlers: {} }));
 
@@ -16,14 +19,20 @@ vi.mock('stripe', () => {
   return { default: FakeStripe };
 });
 
-const { db, wipeBillingCollections, fakeHttpEvent } = await import('./helpers/billingTestUtils.js');
-const { handler } = await import('../../netlify/functions/stripe-webhook.js');
+describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
+  'stripe-webhook: ownership validated on every path, not only the replacement branch (run via: npm run test:billing-emulator)',
+  () => {
+  let db, wipeBillingCollections, fakeHttpEvent, handler;
 
-beforeEach(async () => {
-  await wipeBillingCollections();
-});
+  beforeAll(async () => {
+    ({ db, wipeBillingCollections, fakeHttpEvent } = await import('./helpers/billingTestUtils.js'));
+    ({ handler } = await import('../../netlify/functions/stripe-webhook.js'));
+  });
 
-describe('stripe-webhook: ownership validated on every path, not only the replacement branch', () => {
+  beforeEach(async () => {
+    await wipeBillingCollections();
+  });
+
   it('a first-ever binding with a customer that mismatches an ALREADY-recorded one is rejected', async () => {
     await db.collection('users').doc('uid_own1').set({ email: 'o1@example.test', stripeCustomerId: 'cus_already_on_file' });
     scenario.handlers.subscriptionsRetrieve = async () => ({
@@ -100,4 +109,5 @@ describe('stripe-webhook: ownership validated on every path, not only the replac
     const userDoc = await db.collection('users').doc('uid_own4').get();
     expect(userDoc.data().stripeSubscriptionId).toBeUndefined();
   });
-});
+  },
+);

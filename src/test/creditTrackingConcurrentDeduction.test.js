@@ -1,21 +1,29 @@
 /**
- * Runs against a REAL Firestore emulator with real transactions — two concurrent deductions
- * against the same starting balance must not lose an update (a plain read-then-write, which the
- * original code did, loses one of two concurrent decrements).
+ * Runs against a REAL Firestore emulator with real transactions — `npm run test:billing-emulator`.
+ * Plain `npm test` skips this file. Two concurrent deductions against the same starting balance
+ * must not lose an update (a plain read-then-write, which the original code did, loses one of two
+ * concurrent decrements).
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 
+const FIRESTORE_EMULATOR_AVAILABLE = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 process.env.FIREBASE_PROJECT_ID ||= 'demo-billing-tests';
 
-const { db } = await import('../../netlify/functions/firebase-admin.js');
-const { deductCredits } = await import('../../netlify/functions/utils/creditTracking.js');
+describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
+  'creditTracking: concurrent deductions are transactional (run via: npm run test:billing-emulator)',
+  () => {
+  let db, deductCredits;
 
-beforeEach(async () => {
-  const snap = await db.collection('users').get();
-  await Promise.all(snap.docs.map((d) => d.ref.delete()));
-});
+  beforeAll(async () => {
+    ({ db } = await import('../../netlify/functions/firebase-admin.js'));
+    ({ deductCredits } = await import('../../netlify/functions/utils/creditTracking.js'));
+  });
 
-describe('creditTracking: concurrent deductions are transactional', () => {
+  beforeEach(async () => {
+    const snap = await db.collection('users').get();
+    await Promise.all(snap.docs.map((d) => d.ref.delete()));
+  });
+
   it('two concurrent deductions on an object-shaped account both land — no lost update', async () => {
     await db.collection('users').doc('uid_conc_1').set({
       email: 'c1@example.test', credits: { total: 1000, used: 0, remaining: 1000, resetDate: null },
@@ -56,4 +64,5 @@ describe('creditTracking: concurrent deductions are transactional', () => {
     const doc = await db.collection('users').doc('uid_conc_3').get();
     expect(doc.data().credits).toBe(5);
   }, 30000);
-});
+  },
+);

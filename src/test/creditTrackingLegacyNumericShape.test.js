@@ -1,22 +1,30 @@
 /**
- * Runs against a REAL Firestore emulator. The original creditTracking.js only guarded against
- * `credits` being entirely absent — a numeric-shaped account passed that guard and then silently
- * wrote NaN (`undefined.remaining` arithmetic). This asserts the fix: correct arithmetic on
- * whichever shape is actually stored, with no total/used ever fabricated for a numeric account.
+ * Runs against a REAL Firestore emulator — `npm run test:billing-emulator`. Plain `npm test`
+ * skips this file. The original creditTracking.js only guarded against `credits` being entirely
+ * absent — a numeric-shaped account passed that guard and then silently wrote NaN
+ * (`undefined.remaining` arithmetic). This asserts the fix: correct arithmetic on whichever
+ * shape is actually stored, with no total/used ever fabricated for a numeric account.
  */
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 
+const FIRESTORE_EMULATOR_AVAILABLE = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 process.env.FIREBASE_PROJECT_ID ||= 'demo-billing-tests';
 
-const { db } = await import('../../netlify/functions/firebase-admin.js');
-const { deductCredits, refundCredits, getCreditBalance } = await import('../../netlify/functions/utils/creditTracking.js');
+describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
+  'creditTracking: legacy numeric credits shape (run via: npm run test:billing-emulator)',
+  () => {
+  let db, deductCredits, refundCredits, getCreditBalance;
 
-beforeEach(async () => {
-  const snap = await db.collection('users').get();
-  await Promise.all(snap.docs.map((d) => d.ref.delete()));
-});
+  beforeAll(async () => {
+    ({ db } = await import('../../netlify/functions/firebase-admin.js'));
+    ({ deductCredits, refundCredits, getCreditBalance } = await import('../../netlify/functions/utils/creditTracking.js'));
+  });
 
-describe('creditTracking: legacy numeric credits shape', () => {
+  beforeEach(async () => {
+    const snap = await db.collection('users').get();
+    await Promise.all(snap.docs.map((d) => d.ref.delete()));
+  });
+
   it('deducting from a numeric account writes a correct number back, never NaN', async () => {
     await db.collection('users').doc('uid_num_1').set({ email: 'n1@example.test', credits: 50 });
     const result = await deductCredits('uid_num_1', 'enrichCompanyFull', 1); // cost 10
@@ -65,4 +73,5 @@ describe('creditTracking: legacy numeric credits shape', () => {
     const doc = await db.collection('users').doc('uid_obj_1').get();
     expect(doc.data().credits).toEqual({ total: 400, used: 11, remaining: 389, resetDate: null });
   });
-});
+  },
+);

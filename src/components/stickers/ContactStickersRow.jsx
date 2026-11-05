@@ -28,7 +28,12 @@ export const UNDO_MS = 6000;
 export default function ContactStickersRow({ contact, onUpdate }) {
   const stickers = useStickers();
   if (!stickers.ready || !contact?.id) return null;
-  return <Row contact={contact} onUpdate={onUpdate} stickers={stickers} />;
+  // One Row per contact. The full-page profile keeps this component mounted
+  // when the route moves to another contact, while a notice's Undo or Retry
+  // (page-level, StickersProvider) can still be pressed. Keyed, that action
+  // belongs to the old Row, which still points at the contact it was raised
+  // for, so it can never write to the contact now on screen.
+  return <Row key={contact.id} contact={contact} onUpdate={onUpdate} stickers={stickers} />;
 }
 
 function Row({ contact, onUpdate, stickers }) {

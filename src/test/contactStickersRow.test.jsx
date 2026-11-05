@@ -288,6 +288,34 @@ describe('S5 Stickers row', () => {
     await waitFor(() => expect(chipNames()).toEqual(['Board', 'Donor']));
   });
 
+  it('QA review: Undo pressed after moving to another contact re-adds to the contact it was removed from', async () => {
+    // The full-page profile keeps the same component when the route changes contact.
+    fake.current.state.registry = [BOARD, DONOR];
+    fake.current.state.config = config();
+    const user = userEvent.setup();
+    const pat = contactWith([BOARD.id]);
+    const sam = { id: 'c2', name: 'Sam', sticker_ids: [DONOR.id], tags: [] };
+    function SwitchingHost() {
+      const [contact, setContact] = useState(pat);
+      return (
+        <StickersProvider uid="u1">
+          <ContactStickersRow contact={contact} onUpdate={setContact} />
+          <button type="button" onClick={() => setContact(sam)}>Open Sam</button>
+        </StickersProvider>
+      );
+    }
+    render(<SwitchingHost />);
+    await screen.findByRole('list', { name: 'Stickers' });
+    await user.click(screen.getByRole('button', { name: 'Remove sticker Board' }));
+    const undo = await within(screen.getByRole('status')).findByRole('button', { name: 'Undo' });
+    await user.click(screen.getByRole('button', { name: 'Open Sam' }));
+    await waitFor(() => expect(chipNames()).toEqual(['Donor']));
+    await user.click(undo);
+    await waitFor(() => expect(fake.current.callsOf('addSticker')).toHaveLength(1));
+    expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id]]);
+    expect(chipNames()).toEqual(['Donor']);
+  });
+
   it('QA D-1: when access is revoked, the row disappears but the explanation stays on screen', async () => {
     fake.current.state.impl.add = async () => { throw stickerError('permission_denied', 'write_denied'); };
     const { user, container } = await renderRow(contactWith([]));

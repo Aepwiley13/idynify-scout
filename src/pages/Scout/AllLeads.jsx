@@ -4,7 +4,7 @@
  * UI: idynify-v5 design (cards + Gmail-style list toggle, Person modal, Contact Profile).
  * Data: Firebase Firestore (all original data loading preserved).
  */
-import { useEffect, useState, useRef } from 'react';
+import { useCallback, useEffect, useState, useRef } from 'react';
 import { collection, getDocs, doc, updateDoc, arrayUnion, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useNavigate } from 'react-router-dom';
@@ -38,6 +38,14 @@ import { MAX_BULK_CONTACTS } from '../../utils/cadenceSend';
 import { isHiddenFromPeople } from '../../utils/csvContactImport';
 import { loadIntoHunter } from '../../utils/loadIntoHunter';
 import { needsName } from '../../utils/contactDisplayName';
+import { StickersProvider } from '../../components/stickers/StickersContext';
+import { useStickers } from '../../components/stickers/stickersRegistry';
+import StickerFilterChip from '../../components/stickers/StickerFilterChip';
+import ContactCardStickers from '../../components/stickers/ContactCardStickers';
+import BulkStickerAction from '../../components/stickers/BulkStickerAction';
+import StickersWall from '../../components/stickers/StickersWall';
+import { readUrlSticker, writeUrlSticker, resolveStickerFilter, hasSticker, matchesStickerName } from '../../components/stickers/peopleStickers';
+import { withMembershipChange } from '../../services/stickers/stickerCore';
 
 /** `?tag=` from the current URL, or null. No router hook: AllLeads mounts under several shells. */
 function readUrlTag() {
@@ -739,6 +747,9 @@ function AllLeadsCard({
           {mode === 'hunter' ? getHunterLastAction(contact) : getLastAction(contact)}
         </div>
 
+        {/* Stickers (ADR-007): nothing unless available */}
+        <ContactCardStickers contact={contact} max={2} style={{ marginBottom: 6 }} />
+
         {/* Tags */}
         {Array.isArray(contact.tags) && contact.tags.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 7 }}>
@@ -1068,6 +1079,7 @@ function AllLeadsRow({ contact, company, selected, onClick, onCompanyClick, onAr
       </div>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7 }}>
         <span style={{ fontSize: 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1 }}>{contact.title}</span>
+        <ContactCardStickers contact={contact} max={1} style={{ flexShrink: 0, flexWrap: 'nowrap' }} />
         {Array.isArray(contact.tags) && contact.tags.slice(0, 2).map(tag => {
           const tc = getTagColor(tag);
           return (
@@ -1197,7 +1209,7 @@ function ContactProfileView({ contactId, onBack }) {
 // mode: 'people' (all contacts, context-aware CTA)
 //       'scout'  (unengaged only, always pink Engage)
 //       'hunter' (active_mission only, purple Follow Up + Return to Scout)
-export default function AllLeads({ mode = 'people', activeFilter = null }) {
+function AllLeadsPage({ mode = 'people', activeFilter = null }) {
   const T = useT();
   const { isProTier } = useSubscription();
   const navigate = useNavigate();
@@ -1241,6 +1253,15 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
   // window.location rather than a router hook: AllLeads mounts under several
   // shells and this must not require a router to render.
   const [tagFilter, setTagFilter] = useState(readUrlTag);
+  // Sticker filter (ADR-007, S6): seeded from ?sticker=, kept in the address
+  // bar without navigating. Applies only to a known, active sticker.
+  const [stickerFilterId, setStickerFilterIdState] = useState(readUrlSticker);
+  const setStickerFilterId = useCallback((id) => { setStickerFilterIdState(id); writeUrlSticker(id); }, []);
+  const stickers = useStickers();
+  const [bulkStickerRunning, setBulkStickerRunning] = useState(false);
+  // The Stickers view (S7) is a third view; Cards or List, whichever was
+  // last used, is where a sticker tile takes you back to.
+  const lastListView = useRef('cards');
   // The group this view was opened for, fixed at mount. An import can match
   // contacts that are archived (or whose company is), which every People view
   // hides. Inside that import's own tag view — and only there — they are
@@ -1548,6 +1569,14 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
     if (listSelected === contactId) setListSelected(null);
   }
 
+  // The side-panel Contact Profile reports each saved update (stickers, tags,
+  // fields). Merge it into the loaded list, as the other in-place edits here
+  // do, so the card and row reflect it without a reload or a listener.
+  function handlePanelContactChange(updated) {
+    if (!updated?.id) return;
+    setContacts(prev => prev.map(c => (c.id === updated.id ? { ...c, ...updated } : c)));
+  }
+
   // Bulk: toggle one contact in/out of selectedIds
   function toggleSelect(contactId) {
     setSelectedIds(prev => {
@@ -1661,6 +1690,8 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
     }
   }
   // 'all' — no engagement filter
+  // What the current tab shows: the sticker filter counts against this.
+  const tabContacts = filtered;
 
   // Data quality filter (from "More" dropdown)
   if (dataFilter === 'has-email') filtered = filtered.filter(c => !!(c.email || c.work_email));
@@ -1697,6 +1728,12 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
   // Tag filter
   if (tagFilter) filtered = filtered.filter(c => Array.isArray(c.tags) && c.tags.includes(tagFilter));
 
+  // Sticker filter: an unknown or archived id applies nothing and shows a notice.
+  const { sticker: stickerFilter, notice: stickerNotice } = stickers.ready
+    ? resolveStickerFilter(stickerFilterId, stickers.byId)
+    : { sticker: null, notice: false };
+  if (stickerFilter) filtered = filtered.filter(c => hasSticker(c, stickerFilter.id));
+
   // All unique tags across loaded contacts (for the tag picker)
   const allContactTags = [...new Set(contacts.flatMap(c => Array.isArray(c.tags) ? c.tags : []))].sort();
 
@@ -1721,7 +1758,8 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
         (c.email || c.work_email || '').toLowerCase().includes(lower) ||
         (digitsOnly && (c.phone_mobile || c.phone_direct || c.phone || '').replace(/\D/g, '').includes(digitsOnly)) ||
         (c.linkedin_url || '').toLowerCase().includes(lower) ||
-        (Array.isArray(c.tags) && c.tags.some(t => t.toLowerCase().includes(lower)));
+        (Array.isArray(c.tags) && c.tags.some(t => t.toLowerCase().includes(lower))) ||
+        (stickers.ready && matchesStickerName(c, stickers.byId, lower));
     });
   }
 
@@ -1774,7 +1812,10 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
   };
 
   // Count active filters for badge
-  const activeFilterCount = [industryFilter, warmthFilter, sourceFilter, smartFilter, dataFilter, tagFilter, warmSignalFilter].filter(Boolean).length;
+  // The Stickers view only while stickers are available; otherwise Cards (AT-7-01).
+  const view = viewMode === 'stickers' && !stickers.ready ? 'cards' : viewMode;
+
+  const activeFilterCount = [industryFilter, warmthFilter, sourceFilter, smartFilter, dataFilter, tagFilter, stickerFilter, warmSignalFilter].filter(Boolean).length;
 
   if (loading) {
     return (
@@ -1868,11 +1909,12 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
 
           {/* View toggle */}
           <div style={{ display: 'flex', gap: 4, background: T.surface, borderRadius: 8, padding: 3 }}>
-            {[['cards', '⊞ Cards'], ['list', '☰ List']].map(([m, l]) => (
+            {[['cards', '⊞ Cards'], ['list', '☰ List'], ...(stickers.ready ? [['stickers', '◈ Stickers']] : [])].map(([m, l]) => (
               <button
                 key={m}
-                onClick={() => { setViewMode(m); if (m === 'cards') { setPanelContactId(null); setListSelected(null); } }}
-                style={{ padding: '5px 13px', minHeight: 44, borderRadius: 6, border: 'none', background: viewMode === m ? BRAND.pink : 'transparent', color: viewMode === m ? '#fff' : T.textMuted, fontSize: 11, fontWeight: viewMode === m ? 700 : 400, cursor: 'pointer', transition: 'all 0.15s' }}
+                aria-pressed={view === m ? 'true' : 'false'}
+                onClick={() => { setViewMode(m); if (m !== 'stickers') lastListView.current = m; if (m === 'cards' || m === 'stickers') { setPanelContactId(null); setListSelected(null); } }}
+                style={{ padding: '5px 13px', minHeight: 44, borderRadius: 6, border: 'none', background: view === m ? BRAND.pink : 'transparent', color: view === m ? '#fff' : T.textMuted, fontSize: 11, fontWeight: view === m ? 700 : 400, cursor: 'pointer', transition: 'all 0.15s' }}
               >{l}</button>
             ))}
           </div>
@@ -2096,6 +2138,9 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
           )}
         </div>
 
+        {/* ── Sticker filter (ADR-007): renders nothing unless available ── */}
+        <StickerFilterChip selected={stickerFilter} contacts={tabContacts} onSelect={setStickerFilterId} />
+
         {/* ── More filters (data quality — secondary) ── */}
         <div style={{ position: 'relative', flexShrink: 0 }}>
           <button
@@ -2139,7 +2184,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
         {/* Active filter count badge */}
         {activeFilterCount > 0 && (
           <button
-            onClick={() => { setIndustryFilter(null); setWarmthFilter(null); setSourceFilter(null); setSmartFilter(null); setDataFilter(null); setTagFilter(null); setWarmSignalFilter(false); }}
+            onClick={() => { setIndustryFilter(null); setWarmthFilter(null); setSourceFilter(null); setSmartFilter(null); setDataFilter(null); setTagFilter(null); setStickerFilterId(null); setWarmSignalFilter(false); }}
             style={{ padding: '4px 10px', minHeight: 44, borderRadius: 20, border: `1px solid ${BRAND.pink}40`, background: `${BRAND.pink}12`, color: BRAND.pink, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
           >
             <X size={9} />{activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} — Clear
@@ -2191,6 +2236,13 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
         </div>
       )}
 
+      {stickerNotice && (
+        <div className="stk-notice" role="status" style={{ color: T.textMuted, borderBottom: `1px solid ${T.border}` }}>
+          That sticker is archived or no longer exists.
+          <button type="button" onClick={() => setStickerFilterId(null)}>Show everyone</button>
+        </div>
+      )}
+
       {/* ── Bulk selection banner ── */}
       {bulkMode && selectedIds.size === 0 && (
         <div style={{
@@ -2218,11 +2270,16 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
             minWidth: 0,
           }}
         >
-          {finalContacts.length === 0 ? (
+          {view === 'stickers' ? (
+            <StickersWall
+              contacts={tabContacts}
+              onOpenSticker={(id) => { setStickerFilterId(id); setViewMode(lastListView.current); }}
+            />
+          ) : finalContacts.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 40, color: T.textFaint }}>
               <p style={{ fontSize: 13 }}>No contacts match your current filters.</p>
             </div>
-          ) : viewMode === 'cards' ? (
+          ) : view === 'cards' ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(210px,1fr))', gap: 12 }}>
               {finalContacts.map(c => (
                 <AllLeadsCard
@@ -2410,6 +2467,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
               autoEngage={panelAutoEngage}
               autoEngageContext={firstTouchContext?.contactId === panelContactId ? firstTouchContext : null}
               onReadyForHunter={handleReadyForHunter}
+              onContactChange={handlePanelContactChange}
               onClose={() => isMobile ? closeMobileProfile() : (() => {
                 setPanelContactId(null);
                 setListSelected(null);
@@ -2433,12 +2491,13 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
           display: 'flex', alignItems: 'center', gap: 10,
           boxShadow: `0 8px 32px ${T.isDark ? '#00000099' : '#00000025'}`,
           zIndex: 100, animation: 'fadeUp 0.15s ease',
-          whiteSpace: 'nowrap',
+          whiteSpace: 'nowrap', flexWrap: 'wrap', justifyContent: 'center', width: 'max-content', maxWidth: 'calc(100vw - 32px)', boxSizing: 'border-box',
         }}>
           <span style={{ fontSize: 12, fontWeight: 700, color: BRAND.pink }}>{selectedIds.size} selected</span>
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => setBulkBrigadeOpen(o => !o)}
+              disabled={bulkStickerRunning}
               style={{ padding: '6px 14px', borderRadius: 8, border: `1px solid ${T.border2}`, background: T.surface, color: T.textMuted, fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
             >
               Assign Brigade ▾
@@ -2474,14 +2533,25 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
               </div>
             )}
           </div>
+          <BulkStickerAction
+            selectedIds={selectedIds}
+            nameOf={(id) => { const c = contacts.find(x => x.id === id); return c?.name || c?.email || 'Unnamed contact'; }}
+            onApplied={(stickerId, ids) => {
+              const changed = new Set(ids);
+              setContacts(prev => prev.map(c => (changed.has(c.id) ? withMembershipChange(c, stickerId, 'add') : c)));
+            }}
+            onReduceSelection={(ids) => setSelectedIds(new Set(ids))}
+            onRunningChange={setBulkStickerRunning}
+          />
           <button
             onClick={() => exportSelectedToCSV(finalContacts.filter(c => selectedIds.has(c.id)))}
+            disabled={bulkStickerRunning}
             style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: `linear-gradient(135deg,${BRAND.cyan},#009aa0)`, color: '#fff', fontSize: 11, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}
           ><Download size={12} />Export</button>
           <div style={{ position: 'relative' }}>
             <button
               onClick={() => selectedIds.size <= MAX_CONTACTS && setShowBulkCompose(true)}
-              disabled={selectedIds.size > MAX_CONTACTS}
+              disabled={bulkStickerRunning || selectedIds.size > MAX_CONTACTS}
               title={selectedIds.size > MAX_CONTACTS ? `Maximum ${MAX_CONTACTS} contacts per bulk send` : ''}
               style={{
                 padding: '6px 14px', borderRadius: 8, border: 'none',
@@ -2496,6 +2566,7 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
           </div>
           <button
             onClick={() => { setSelectedIds(new Set()); setBulkBrigadeOpen(false); }}
+            disabled={bulkStickerRunning}
             style={{ padding: '6px 11px', borderRadius: 8, border: `1px solid ${T.border}`, background: 'transparent', color: T.textFaint, fontSize: 11, cursor: 'pointer' }}
           >Clear</button>
         </div>
@@ -2626,5 +2697,23 @@ export default function AllLeads({ mode = 'people', activeFilter = null }) {
         />
       )}
     </div>
+  );
+}
+
+/**
+ * People, with the page's one sticker registry (ADR-007, S6). Only the
+ * People page (mode "people") gets sticker filtering and bulk add; the other
+ * modules that reuse this list (Scout, Hunter, Sniper, Basecamp) are
+ * unchanged, because without a provider every sticker surface renders
+ * nothing. A Contact Profile opened in the side panel reuses this provider
+ * rather than subscribing again.
+ */
+export default function AllLeads(props) {
+  const stickerUid = useActiveUserId();
+  if ((props.mode ?? 'people') !== 'people') return <AllLeadsPage {...props} />;
+  return (
+    <StickersProvider uid={stickerUid}>
+      <AllLeadsPage {...props} />
+    </StickersProvider>
   );
 }

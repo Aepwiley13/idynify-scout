@@ -119,6 +119,9 @@ export default function ContactProfile({
   returnTo = null,
   returnLabel = 'Back to People',
   banner = null,
+  // Told about each saved update (stickers, tags, fields), so a list showing
+  // this contact can reflect it without a reload or a listener of its own.
+  onContactChange = null,
 } = {}) {
   const { contactId: paramContactId } = useParams();
   const contactId = propContactId || paramContactId;
@@ -330,6 +333,7 @@ export default function ContactProfile({
 
   function handleContactUpdate(updatedContact) {
     setContact(updatedContact);
+    onContactChange?.(updatedContact);
   }
 
   /**

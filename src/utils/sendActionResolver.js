@@ -629,8 +629,22 @@ export async function executeSendAction({
     }
   });
 
-  // State Machine: Message sent → Awaiting Reply (only on successful send/handoff)
-  if (sendResult.result === SEND_RESULT.SENT || sendResult.result === SEND_RESULT.OPENED) {
+  // State Machine: Message sent → Awaiting Reply.
+  //
+  // This module's own contract, above: "Opened" = app handoff occurred,
+  // distinct from "Sent" = external confirmation received. For text, call,
+  // LinkedIn and (when Calendar isn't connected) calendar, Opened is the only
+  // terminal state that channel ever reaches, so it has always driven the
+  // state machine — there's nothing more confirmed to wait for.
+  //
+  // Email is different: a real send (Gmail API, confirmed) exists as an
+  // alternative, so "Opened" there means only that a mail client was handed
+  // a pre-filled draft — the user may edit it, abandon it, or never send it.
+  // Treating that the same as a confirmed send moved contacts into Awaiting
+  // Reply, and started their 3-day follow-up clock, for messages that may
+  // never have been sent at all.
+  const isUnconfirmedEmailHandoff = channel === CHANNELS.EMAIL && sendResult.result === SEND_RESULT.OPENED;
+  if (!isUnconfirmedEmailHandoff && (sendResult.result === SEND_RESULT.SENT || sendResult.result === SEND_RESULT.OPENED)) {
     updateContactStatus({
       userId,
       contactId: contact.id,

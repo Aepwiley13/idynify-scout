@@ -453,9 +453,24 @@ describe('adding one sticker to many contacts', () => {
     expect(result).toEqual({
       added: ['k1', 'k3'],
       already: ['k2'],
-      failed: [{ contactId: 'gone', code: STICKER_ERRORS.CONTACT_NOT_FOUND }, { contactId: 'full', code: STICKER_ERRORS.LIMIT_REACHED }],
+      failed: [
+        { contactId: 'gone', code: STICKER_ERRORS.CONTACT_NOT_FOUND, reason: null },
+        { contactId: 'full', code: STICKER_ERRORS.LIMIT_REACHED, reason: null },
+      ],
     });
     expect(contact('k3').sticker_ids).toEqual([S1]);
+  });
+
+  it('reports progress as each contact finishes', async () => {
+    const seen = [];
+    await store.addStickerToContacts(UID, ['k1', 'gone', 'k1', 'k3'], S1, { onProgress: (done, total) => seen.push([done, total]) });
+    expect(seen).toEqual([[1, 3], [2, 3], [3, 3]]);
+  });
+
+  it('a refusal keeps its reason, so the screen can tell revoked access from contention', async () => {
+    mem.hooks.denyCommits = 100;
+    const result = await store.addStickerToContacts(UID, ['k1'], S1);
+    expect(result.failed).toEqual([{ contactId: 'k1', code: STICKER_ERRORS.PERMISSION_DENIED, reason: DENIAL_REASONS.WRITE_DENIED }]);
   });
 });
 

@@ -188,6 +188,47 @@
   border: 0;
 }
 
+.stk-picker--above { top: auto; bottom: calc(100% + 8px); }
+
+/* ── People: filter, cards, bulk (S6) ───────────────────────────────────── */
+.stk-filter { position: relative; flex-shrink: 0; display: inline-flex; align-items: center; gap: 2px; }
+.stk-filter-btn {
+  display: flex; align-items: center; gap: 5px; padding: 5px 11px; min-height: 44px; border-radius: 20px;
+  font-size: 10px; cursor: pointer; white-space: nowrap; font-family: inherit;
+}
+.stk-dot--outline { background: transparent; border: 1.5px solid currentColor; box-sizing: border-box; }
+.stk-filter-clear {
+  background: none; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  min-width: 28px; min-height: 44px; padding: 0;
+}
+.stk-filter-pop {
+  position: absolute; top: calc(100% + 6px); left: 0; min-width: 190px; max-height: 320px; overflow-y: auto;
+  border-radius: 11px; padding: 5px; z-index: 50; display: flex; flex-direction: column; gap: 1px;
+}
+.stk-filter-title { font-size: 9px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; padding: 4px 9px 6px; }
+.stk-filter-empty { font-size: 11px; padding: 6px 10px; font-style: italic; }
+.stk-filter-item {
+  display: flex; align-items: center; gap: 7px; border: none; border-radius: 7px; padding: 6px 10px;
+  font-size: 12px; cursor: pointer; text-align: left; font-family: inherit;
+}
+.stk-filter-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stk-filter-count { font-size: 10px; }
+.stk-notice { display: flex; align-items: center; gap: 8px; padding: 8px 22px; font-size: 12px; }
+.stk-notice button { background: none; border: none; cursor: pointer; font-family: inherit; font-size: 12px; text-decoration: underline; color: inherit; min-height: 32px; }
+
+.stk-card-row { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.stk-card-more { font-size: 9px; font-weight: 600; }
+
+.stk-bulk { position: relative; }
+.stk-bulk-summary {
+  position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+  width: min(340px, calc(100vw - 32px)); border-radius: 10px; padding: 10px 12px; font-size: 12px;
+  white-space: normal; box-shadow: 0 8px 24px #00000030; display: flex; flex-direction: column; gap: 6px;
+}
+.stk-bulk-summary-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.stk-bulk-summary-actions { display: flex; gap: 12px; }
+.stk-bulk-details { margin: 0; padding-left: 16px; max-height: 160px; overflow-y: auto; font-size: 11px; display: flex; flex-direction: column; gap: 3px; }
+
 /* Touch: every target at least 44px (the app's convention). */
 @media (max-width: 768px) {
   .stk-chip { min-height: 44px; padding: 0 4px 0 12px; font-size: 12px; }
@@ -199,6 +240,9 @@
   .stk-sheet-close, .stk-toast-action, .stk-toast-close { min-width: 44px; min-height: 44px; }
   .stk-toast-region { left: 16px; right: 16px; bottom: 16px; }
   .stk-toast { max-width: none; }
+  .stk-filter-item { min-height: 44px; font-size: 14px; }
+  .stk-filter-clear { min-width: 44px; }
+  .stk-bulk-summary { position: fixed; left: 16px; right: 16px; bottom: 96px; width: auto; transform: none; }
 }
 
 @media (prefers-reduced-motion: reduce) {

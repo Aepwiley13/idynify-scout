@@ -392,24 +392,33 @@ export function createStickerStore({ db, fs }) {
 
   /**
    * Add one sticker to many contacts (People's bulk bar). One transaction per
-   * contact: a failure on one never undoes or blocks the others.
-   * @returns {Promise<{added: string[], already: string[], failed: Array<{contactId: string, code: string}>}>}
+   * contact: a failure on one never undoes or blocks the others. A failure
+   * carries its code and, for a refusal, the reason (DENIAL_REASONS), so the
+   * screen can tell revoked access from contention. onProgress(done, total)
+   * is called as each contact finishes.
+   * @returns {Promise<{added: string[], already: string[], failed: Array<{contactId: string, code: string, reason: string|null}>}>}
    */
-  async function addStickerToContacts(uid, contactIds, stickerId, { assignedBy = 'user', concurrency = 5 } = {}) {
+  async function addStickerToContacts(uid, contactIds, stickerId, { assignedBy = 'user', concurrency = 5, onProgress = null } = {}) {
     requireUid(uid);
     requireStickerId(stickerId);
     const unique = [...new Set(contactIds)];
+    let done = 0;
     const results = await mapWithConcurrency(unique, concurrency, async (contactId) => {
+      let result;
       try {
-        return { contactId, ...(await addSticker(uid, contactId, stickerId, { assignedBy })) };
+        result = { contactId, ...(await addSticker(uid, contactId, stickerId, { assignedBy })) };
       } catch (err) {
-        return { contactId, status: 'failed', code: toStickerError(err).code };
+        const error = toStickerError(err);
+        result = { contactId, status: 'failed', code: error.code, reason: error.reason ?? null };
       }
+      done += 1;
+      onProgress?.(done, unique.length);
+      return result;
     });
     return {
       added: results.filter((r) => r.status === 'added').map((r) => r.contactId),
       already: results.filter((r) => r.status === 'already').map((r) => r.contactId),
-      failed: results.filter((r) => r.status === 'failed').map(({ contactId, code }) => ({ contactId, code })),
+      failed: results.filter((r) => r.status === 'failed').map(({ contactId, code, reason }) => ({ contactId, code, reason })),
     };
   }
 

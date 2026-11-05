@@ -32,6 +32,7 @@ export default function StickerPicker({
   onClose,
   ignoreRef = null,
   label = 'Add a sticker',
+  placement = 'below',
 }) {
   const T = useT();
   const isMobile = useIsMobile();
@@ -220,7 +221,7 @@ export default function StickerPicker({
   return (
     <div
       ref={rootRef}
-      className="stk-picker stk-picker--popover"
+      className={`stk-picker stk-picker--popover${placement === 'above' ? ' stk-picker--above' : ''}`}
       style={{ background: T.cardBg, border: `1px solid ${T.border}`, boxShadow: `0 8px 24px ${T.isDark ? '#00000080' : '#00000018'}` }}
     >
       {body}

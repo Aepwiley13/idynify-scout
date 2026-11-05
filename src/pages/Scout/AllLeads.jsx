@@ -43,6 +43,7 @@ import { useStickers } from '../../components/stickers/stickersRegistry';
 import StickerFilterChip from '../../components/stickers/StickerFilterChip';
 import ContactCardStickers from '../../components/stickers/ContactCardStickers';
 import BulkStickerAction from '../../components/stickers/BulkStickerAction';
+import StickersWall from '../../components/stickers/StickersWall';
 import { readUrlSticker, writeUrlSticker, resolveStickerFilter, hasSticker, matchesStickerName } from '../../components/stickers/peopleStickers';
 import { withMembershipChange } from '../../services/stickers/stickerCore';
 
@@ -1258,6 +1259,9 @@ function AllLeadsPage({ mode = 'people', activeFilter = null }) {
   const setStickerFilterId = useCallback((id) => { setStickerFilterIdState(id); writeUrlSticker(id); }, []);
   const stickers = useStickers();
   const [bulkStickerRunning, setBulkStickerRunning] = useState(false);
+  // The Stickers view (S7) is a third view; Cards or List, whichever was
+  // last used, is where a sticker tile takes you back to.
+  const lastListView = useRef('cards');
   // The group this view was opened for, fixed at mount. An import can match
   // contacts that are archived (or whose company is), which every People view
   // hides. Inside that import's own tag view — and only there — they are
@@ -1800,6 +1804,9 @@ function AllLeadsPage({ mode = 'people', activeFilter = null }) {
   };
 
   // Count active filters for badge
+  // The Stickers view only while stickers are available; otherwise Cards (AT-7-01).
+  const view = viewMode === 'stickers' && !stickers.ready ? 'cards' : viewMode;
+
   const activeFilterCount = [industryFilter, warmthFilter, sourceFilter, smartFilter, dataFilter, tagFilter, stickerFilter, warmSignalFilter].filter(Boolean).length;
 
   if (loading) {
@@ -1894,11 +1901,12 @@ function AllLeadsPage({ mode = 'people', activeFilter = null }) {
 
           {/* View toggle */}
           <div style={{ display: 'flex', gap: 4, background: T.surface, borderRadius: 8, padding: 3 }}>
-            {[['cards', '⊞ Cards'], ['list', '☰ List']].map(([m, l]) => (
+            {[['cards', '⊞ Cards'], ['list', '☰ List'], ...(stickers.ready ? [['stickers', '◈ Stickers']] : [])].map(([m, l]) => (
               <button
                 key={m}
-                onClick={() => { setViewMode(m); if (m === 'cards') { setPanelContactId(null); setListSelected(null); } }}
-                style={{ padding: '5px 13px', minHeight: 44, borderRadius: 6, border: 'none', background: viewMode === m ? BRAND.pink : 'transparent', color: viewMode === m ? '#fff' : T.textMuted, fontSize: 11, fontWeight: viewMode === m ? 700 : 400, cursor: 'pointer', transition: 'all 0.15s' }}
+                aria-pressed={view === m ? 'true' : 'false'}
+                onClick={() => { setViewMode(m); if (m !== 'stickers') lastListView.current = m; if (m === 'cards' || m === 'stickers') { setPanelContactId(null); setListSelected(null); } }}
+                style={{ padding: '5px 13px', minHeight: 44, borderRadius: 6, border: 'none', background: view === m ? BRAND.pink : 'transparent', color: view === m ? '#fff' : T.textMuted, fontSize: 11, fontWeight: view === m ? 700 : 400, cursor: 'pointer', transition: 'all 0.15s' }}
               >{l}</button>
             ))}
           </div>
@@ -2254,11 +2262,16 @@ function AllLeadsPage({ mode = 'people', activeFilter = null }) {
             minWidth: 0,
           }}
         >
-          {finalContacts.length === 0 ? (
+          {view === 'stickers' ? (
+            <StickersWall
+              contacts={tabContacts}
+              onOpenSticker={(id) => { setStickerFilterId(id); setViewMode(lastListView.current); }}
+            />
+          ) : finalContacts.length === 0 ? (
             <div style={{ textAlign: 'center', padding: 40, color: T.textFaint }}>
               <p style={{ fontSize: 13 }}>No contacts match your current filters.</p>
             </div>
-          ) : viewMode === 'cards' ? (
+          ) : view === 'cards' ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(210px,1fr))', gap: 12 }}>
               {finalContacts.map(c => (
                 <AllLeadsCard

@@ -229,6 +229,75 @@
 .stk-bulk-summary-actions { display: flex; gap: 12px; }
 .stk-bulk-details { margin: 0; padding-left: 16px; max-height: 160px; overflow-y: auto; font-size: 11px; display: flex; flex-direction: column; gap: 3px; }
 
+/* ── Stickers view (S7) ─────────────────────────────────────────────────── */
+.stk-wall { display: flex; flex-direction: column; gap: 14px; }
+.stk-wall-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.stk-wall-title { font-size: 15px; font-weight: 700; margin: 0; }
+.stk-wall-empty { font-size: 13px; margin: 8px 0; }
+.stk-wall-grid {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px;
+}
+.stk-tile { position: relative; border-radius: 14px; overflow: visible; display: flex; min-height: 110px; }
+.stk-tile-band { position: absolute; left: 0; top: 0; bottom: 0; width: 6px; border-radius: 14px 0 0 14px; }
+.stk-tile-main {
+  flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left;
+  background: none; border: none; cursor: pointer; padding: 14px 40px 14px 18px; font-family: inherit; border-radius: 14px;
+  min-width: 0;
+}
+.stk-tile-top { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+.stk-tile-emoji { font-size: 18px; line-height: 1; }
+.stk-tile-name { font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stk-tile-desc { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.stk-tile-count { font-size: 12px; font-weight: 700; margin-top: auto; }
+.stk-tile-menu-btn {
+  position: absolute; top: 6px; right: 6px; width: 32px; height: 32px; border-radius: 8px;
+  background: none; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+}
+.stk-tile-menu {
+  position: absolute; top: 40px; right: 6px; z-index: 30; min-width: 140px; border-radius: 10px; padding: 4px;
+  display: flex; flex-direction: column; box-shadow: 0 8px 24px #00000030;
+}
+.stk-tile-menu-item { background: none; border: none; text-align: left; padding: 8px 10px; border-radius: 7px; font-size: 13px; cursor: pointer; font-family: inherit; }
+.stk-tile-menu-item:hover, .stk-tile-menu-item:focus-visible { background: rgba(59, 130, 246, 0.1); }
+.stk-wall-archived { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.stk-wall-archived-list { list-style: none; margin: 0; padding: 0; width: 100%; max-width: 480px; }
+.stk-wall-archived-list li { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; }
+.stk-wall-archived-list li .stk-tile-name { flex: 1; font-weight: 500; font-size: 13px; }
+
+.stk-btn {
+  display: inline-flex; align-items: center; gap: 5px; padding: 7px 12px; border-radius: 8px; font-size: 12px; font-weight: 600;
+  background: none; cursor: pointer; font-family: inherit;
+}
+.stk-btn--primary { background: #e8197d; color: #fff; border: none; }
+.stk-btn--danger { background: #dc2626; color: #fff; border: none; }
+.stk-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* ── Dialog ─────────────────────────────────────────────────────────────── */
+.stk-dialog-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); z-index: 80; }
+.stk-dialog {
+  position: fixed; z-index: 81; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(420px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto;
+  border-radius: 14px; padding: 18px; box-shadow: 0 20px 48px #00000040; box-sizing: border-box;
+}
+.stk-dialog-title { font-size: 16px; font-weight: 700; margin: 0 0 12px; }
+.stk-dialog-text { font-size: 13px; line-height: 1.5; margin: 0 0 16px; }
+.stk-dialog-form { display: flex; flex-direction: column; gap: 6px; }
+.stk-field-label { font-size: 12px; font-weight: 600; margin-top: 6px; }
+.stk-field { border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit; outline: none; width: 100%; box-sizing: border-box; resize: vertical; }
+.stk-field--short { width: 96px; }
+.stk-field-note { font-size: 11px; margin: 0; }
+.stk-field-error { font-size: 12px; color: #dc2626; margin: 4px 0 0; }
+.stk-swatches { border: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.stk-swatches legend { padding: 0; margin-bottom: 4px; }
+.stk-swatch { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; }
+.stk-swatch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.stk-swatch:focus-within { outline: 2px solid #3b82f6; outline-offset: 1px; }
+.stk-swatch-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+.stk-swatch-label { font-size: 11px; }
+.stk-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.stk-tile-main:focus-visible, .stk-tile-menu-btn:focus-visible, .stk-btn:focus-visible, .stk-field:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+
 /* Touch: every target at least 44px (the app's convention). */
 @media (max-width: 768px) {
   .stk-chip { min-height: 44px; padding: 0 4px 0 12px; font-size: 12px; }
@@ -242,6 +311,11 @@
   .stk-toast { max-width: none; }
   .stk-filter-item { min-height: 44px; font-size: 14px; }
   .stk-filter-clear { min-width: 44px; }
+  .stk-tile-menu-btn { width: 44px; height: 44px; top: 2px; right: 2px; }
+  .stk-tile-menu-item, .stk-btn { min-height: 44px; }
+  .stk-swatches { grid-template-columns: repeat(2, 1fr); }
+  .stk-swatch { min-height: 44px; }
+  .stk-field { min-height: 44px; font-size: 16px; }
   .stk-bulk-summary { position: fixed; left: 16px; right: 16px; bottom: 96px; width: auto; transform: none; }
 }
 

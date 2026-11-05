@@ -83,15 +83,14 @@ export default function FollowUpCard({ notification, userId, onDismiss }) {
     setActing(true);
     onDismiss(id);
     try {
+      // Dismissing a reminder is task management, not a confirmed
+      // interaction — it closes the follow-up, nothing more. It used to
+      // also force contact_status to 'Engaged' here, bypassing the state
+      // machine's own priority check entirely (it could even regress a
+      // contact already further along). Logging an actual completed
+      // interaction has its own path — PersistentEngageBar's "Brief Barry".
       const notifRef = doc(db, 'users', userId, 'notifications', id);
       await updateDoc(notifRef, { read: true, resolvedAt: Timestamp.now() });
-
-      if (contactId) {
-        await updateDoc(doc(db, 'users', userId, 'contacts', contactId), {
-          contact_status: 'Engaged',
-          contact_status_updated_at: new Date().toISOString()
-        });
-      }
     } catch (err) {
       console.error('[FollowUpCard] Mark done failed:', err);
       // onSnapshot will re-render the card if the write failed

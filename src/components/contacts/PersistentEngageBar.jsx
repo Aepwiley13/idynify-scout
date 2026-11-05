@@ -375,6 +375,18 @@ export default function PersistentEngageBar({ contact, onEngageClick, collapsed,
         }
       });
 
+      // This IS the "explicitly logged completed interaction" category —
+      // a real interaction that happened outside the app, confirmed after
+      // the fact. Priority-gated (not in alwaysApplyTriggers), so it can
+      // advance a New contact to Engaged but never regresses one already
+      // further along.
+      await updateContactStatus({
+        userId: user.uid,
+        contactId: contact.id,
+        trigger: STATUS_TRIGGERS.MANUAL_INTERACTION_LOGGED,
+        currentStatus: contact.contact_status
+      });
+
       setBriefSaved(true);
       setBriefingSaving(false);
       setShowBriefBarry(false);

@@ -231,13 +231,18 @@ export const getPath = {
  * Default for legacy contacts (no contact_status field): 'New'
  *
  * Auto-Update Rules:
- *   Contact created        → 'New'
- *   Engage clicked         → 'Engaged'
- *   Campaign assigned      → 'In Campaign'
- *   Mission assigned       → 'Active Mission'
- *   Message sent           → 'Awaiting Reply'
- *   Manual complete action → 'Mission Complete'
+ *   Contact created           → 'New'
+ *   Manual interaction logged → 'Engaged'
+ *   Campaign assigned         → 'In Campaign'
+ *   Mission assigned          → 'Active Mission'
+ *   Message sent              → 'Awaiting Reply'
+ *   Manual complete action    → 'Mission Complete'
  *   (Dormant reserved for future inactivity detection)
+ *
+ * Opening an engagement composer, generating or saving a draft, creating a
+ * Barry mission, planning outreach, or moving a workflow stage does NOT
+ * touch this field — none of those is a confirmed interaction. See
+ * contactStateMachine.js's header for the full rationale.
  *
  * Transitions only advance forward in priority unless the trigger
  * is MESSAGE_SENT or MANUAL_COMPLETE (which always apply).

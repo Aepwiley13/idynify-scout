@@ -47,9 +47,13 @@ import { ACTORS } from '../../src/constants/timelineEvents.js';
  * Stage → contact_status coercion, mirroring barryPipelineAction.moveStage so
  * the two verbs cannot disagree about what arriving in a stage means.
  * Moving back to Scout forces no status change: re-activation is not a demotion.
+ * Moving to Hunter forces no status change either: arriving in Hunter is
+ * workflow intent — planning outreach, not a confirmed interaction — unlike
+ * the other three stages, each of which represents something that actually
+ * happened (a reply, a close, a cooldown) to get there.
  */
 const STAGE_STATUS_MAP = {
-  [STAGE.HUNTER]: 'Engaged',
+  [STAGE.HUNTER]: null,
   [STAGE.SNIPER]: 'In Conversation',
   [STAGE.BASECAMP]: 'Active Customer',
   [STAGE.FALLBACK]: 'Dormant',

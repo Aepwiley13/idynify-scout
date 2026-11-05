@@ -20,7 +20,8 @@ import {
 } from '../../utils/sendActionResolver';
 import ContactCalendarView from './ContactCalendarView';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
-import { updateContactStatus, STATUS_TRIGGERS, getContactStatus } from '../../utils/contactStateMachine';
+import { logEngageSessionStarted } from '../../utils/engagementHistoryLogger';
+import { updateContactStatus, STATUS_TRIGGERS, getContactStatus, withEngagementGuard, engagementGuardKey } from '../../utils/contactStateMachine';
 import { getSequencePlan } from '../../utils/sequenceEngine';
 import { generateContactRecommendations, dismissRecommendation } from '../../utils/recommendationEngine';
 import BarryRecommendationCard from './BarryRecommendationCard';
@@ -187,15 +188,16 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
       // Load existing intent from contact
       setEngagementIntent(contact?.engagementIntent || 'prospect');
 
-      // State Machine: Engage clicked → Engaged
+      // Opening the drawer is preparation, not a confirmed interaction —
+      // logged as its own event, never as a contact_status change. See
+      // contactStateMachine.js's header for why ENGAGE_CLICKED isn't a
+      // status trigger at all any more.
       const user = getEffectiveUser();
       if (user && contact?.id) {
-        updateContactStatus({
-          userId: user.uid,
-          contactId: contact.id,
-          trigger: STATUS_TRIGGERS.ENGAGE_CLICKED,
-          currentStatus: getContactStatus(contact)
-        });
+        withEngagementGuard(
+          engagementGuardKey(user.uid, contact.id, 'engage_session_started'),
+          () => logEngageSessionStarted(user.uid, contact.id, { goal: null, channel: null }),
+        );
       }
     }
   }, [isOpen, contact]);

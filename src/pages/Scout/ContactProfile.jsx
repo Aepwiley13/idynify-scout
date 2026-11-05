@@ -46,7 +46,8 @@ import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
 import { archivePerson } from '../../services/peopleService';
 import './ContactProfile.css';
-import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { getEffectiveUser, useActiveUserId } from '../../context/ImpersonationContext';
+import { StickersProvider } from '../../components/stickers/StickersContext';
 import { useShell } from '../../context/ShellContext';
 import { MODULES } from '../../constants/navigationModel';
 import { openCompany, openContact, ENTRY_POINTS } from '../../utils/navigation';
@@ -128,6 +129,9 @@ export default function ContactProfile({
   // that have not been migrated yet, so the embedded panel usages in AllLeads,
   // CompanyProfileView and MissionControl keep working unchanged.
   const shell = useShell();
+  // The sticker registry's owner. While an admin views as someone else,
+  // stickers are unavailable, so this uid is never used for that session.
+  const stickerUid = useActiveUserId();
   const isPanelMode = !!onClose;
   const [contact, setContact] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -798,14 +802,16 @@ export default function ContactProfile({
                 <ArrowRight size={12} className="contact-company-arrow" />
               </div>
             )}
-            <IdentityCard
-              key={contact.photo_url || 'no-photo'}
-              contact={contact}
-              onRefreshPhoto={handleRefreshPhoto}
-              photoRefreshLoading={photoRefreshLoading}
-              photoRefreshError={photoRefreshError}
-              onUpdate={handleContactUpdate}
-            />
+            <StickersProvider uid={stickerUid}>
+              <IdentityCard
+                key={contact.photo_url || 'no-photo'}
+                contact={contact}
+                onRefreshPhoto={handleRefreshPhoto}
+                photoRefreshLoading={photoRefreshLoading}
+                photoRefreshError={photoRefreshError}
+                onUpdate={handleContactUpdate}
+              />
+            </StickersProvider>
             <RecessiveActions contact={contact} />
             {barryContext ? (
               <MeetSection

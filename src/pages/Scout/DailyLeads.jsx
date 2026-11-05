@@ -2586,8 +2586,9 @@ export default function DailyLeads({ onNavigate }) {
       setLastSwipeDate(today);
       if (isInterested) {
         setTotalAcceptedCompanies(totalAcceptedCompanies + 1);
-        setActionToast({ message: `${company.name} saved`, type: 'success' });
-        setTimeout(() => setActionToast(null), 2500);
+        // The toast's wording is set after people discovery has actually been
+        // attempted (below), not here — "looking for people" is never shown
+        // unless a search genuinely started.
       }
       setLastSwipe({ company, direction, index: currentIndex, previousSwipeCount: dailySwipeCount });
       setShowUndo(true);
@@ -2602,8 +2603,21 @@ export default function DailyLeads({ onNavigate }) {
       // below is skipped rather than falling back to someone else's persona.
       const swipeIcp = await resolveSearchIcp(user);
       const icpTitles = swipeIcp.profile?.targetTitles || [];
+      let discoveryAttempted = false;
       if (direction === 'right' && icpTitles.length > 0) {
-        await triggerPeopleDiscovery({ user, company, icpTitles, activeICPId, causeId: swipedAt });
+        const discoveryOutcome = await triggerPeopleDiscovery({ user, company, icpTitles, activeICPId, causeId: swipedAt });
+        discoveryAttempted = Boolean(discoveryOutcome?.attempted);
+      }
+      if (isInterested) {
+        // Honest either way: "looking for people" only when a search actually
+        // started (requirement: never invent a count or treat unfinished
+        // discovery as zero results). The real, live-updating answer lives on
+        // the saved company page, not in this 2.5-second toast.
+        setActionToast({
+          message: discoveryAttempted ? `${company.name} saved — looking for people` : `${company.name} saved`,
+          type: 'success',
+        });
+        setTimeout(() => setActionToast(null), 2500);
       }
       if (direction === 'right' && !hasSeenTitleSetup) {
         const titlePrefsRef = doc(db, 'users', user.uid, 'contactScoring', 'titlePreferences');

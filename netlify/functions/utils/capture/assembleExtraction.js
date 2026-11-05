@@ -17,7 +17,9 @@
  *     that is not in the printed full name (an invented initial) is dropped
  *   - the company domain is derived here from printed text (a clean website,
  *     else a work email), never read from the extractor, and never from a
- *     free-mail, ISP, role or shared-host address
+ *     free-mail, ISP, role or shared-host address, or a domain that spells
+ *     the person's name (that website or email carries PERSONAL_DOMAIN or
+ *     NAME_IN_DOMAIN in its checks, so review knows which one it is)
  *   - nothing is invented: a field not printed is unknown, and a company name
  *     is never made up from a domain
  *   - a social's platform is the one its printed address names; else the one
@@ -37,6 +39,7 @@ import {
 } from '../../../../src/capture/validators.js';
 import {
   SAFEGUARDS, classifyEmailKind, websiteSafeguards, companyNameSafeguards, assessCompanyEvidence, emailDomainSafeguards,
+  domainSafeguards, ownDomainSafeguards,
 } from '../../../../src/capture/safeguards.js';
 import { computeExtractionLevel, LEVEL_ORDER } from '../../../../src/capture/confidence.js';
 import { nameKey } from '../../../../src/utils/identityNormalization.js';
@@ -94,7 +97,7 @@ function namePartField(text, fullName, overridden) {
   return field({ text, value, normalized, overridden, ceiling: fullName.value !== null ? fullName.extraction.level : 'confirmed' });
 }
 
-function emailFields(texts, overridden) {
+function emailFields(texts, { overridden, personName }) {
   const seen = new Set();
   const out = [];
   for (const text of texts) {
@@ -104,8 +107,11 @@ function emailFields(texts, overridden) {
     const key = check.normalized ?? value.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
+    // An address at the person's own domain, a role address (hello@) included.
+    const host = check.ok ? emailHost(check.normalized) : null;
+    const own = host && !domainSafeguards(host).length ? ownDomainSafeguards(host, personName) : [];
     out.push(makeEmailField(
-      fieldParams({ text, value, normalized: check.ok ? check.normalized : null, checks: check.checks, witnessed: true, overridden }),
+      fieldParams({ text, value, normalized: check.ok ? check.normalized : null, checks: check.checks, safeguards: own, witnessed: true, overridden }),
       classifyEmailKind(value),
     ));
   }
@@ -173,12 +179,14 @@ function socialFields(texts, overridden) {
   return out;
 }
 
-function websiteField(text, emails, overridden) {
+function websiteField(text, emails, { overridden, personName }) {
   const value = clean(text.raw);
   if (!value) return makeField();
   const safeguards = websiteSafeguards(value, { emails });
   // An email's local part or an address read as a website is not a website at all.
   if (safeguards.includes(SAFEGUARDS.WEBSITE_FROM_EMAIL)) return makeField();
+  // The person's own website is still their website; it is just not a company's.
+  if (!safeguards.length) safeguards.push(...ownDomainSafeguards(value, personName));
   const check = validateUrl(value);
   return field({ text, value, normalized: check.normalized, checks: check.checks, safeguards, witnessed: true, overridden });
 }
@@ -252,13 +260,13 @@ export function assembleExtraction(reading, {
   const p = reading.person;
   const c = reading.company;
 
-  const emails = emailFields(p.emails, overridden);
   const fullName = textField(p.fullName, { overridden });
   const title = textField(p.title, { overridden });
-  const website = websiteField(c.website, emails.map(e => e.value), overridden);
   const givenName = namePartField(p.givenName, fullName, overridden);
   const familyName = namePartField(p.familyName, fullName, overridden);
   const personName = fullName.value ?? ([givenName.value, familyName.value].filter(Boolean).join(' ') || null);
+  const emails = emailFields(p.emails, { overridden, personName });
+  const website = websiteField(c.website, emails.map(e => e.value), { overridden, personName });
 
   // The domain comes from what is printed; the company name is judged against it.
   const evidenceInputs = {

@@ -66,6 +66,27 @@
 // until there's actual evidence it's safe to remove).
 // Deleting the user document is not allowed from a client.
 //
+// ─── STICKERS (docs/adr/ADR-007-native-stickers.md) ─────────────────────────
+//   users/{uid}/stickers/{stickerId}    the user's sticker definitions
+//   users/{uid}/contacts/{id}           sticker_ids, sticker_assignments and
+//                                       sticker_change: a contact's membership
+//   feature_flags/stickers              the rollout mode (server-only)
+//   sticker_enrollment/{uid}            the beta list (server-only)
+// Every sticker write needs the rollout mode to allow this user, read here
+// from feature_flags/stickers so these rules and the stickersConfig function
+// give the same answer (src/constants/stickersAccess.js holds the table both
+// suites test). Stickers are never deleted. A membership write changes
+// exactly one sticker, names it in sticker_change, and may only add a sticker
+// that exists, belongs to the same user and is active.
+//
+// ROLLBACK NEVER BROADENS. Do not revert this section: the generic blocks
+// below would then let the owner write stickers and membership without any
+// of these checks. To turn every sticker write off, set
+// feature_flags/stickers.mode to "off" (no deploy). If the rules themselves
+// are at fault, make stickerRulesEnabled() return false and deploy: that
+// denies every sticker write and changes nothing else.
+// scripts/rules-check/stickers.mjs tests both.
+
 // ─── BEFORE CHANGING THIS FILE ──────────────────────────────────────────────
 // CI runs the suite in scripts/rules-check on every PR. Run it locally
 // too — it needs a JDK 21+ and takes under a minute. Case 09 is the one that
@@ -150,6 +171,131 @@ service cloud.firestore {
       return coll == 'integrations' && docId == 'linkedin';
     }
 
+    // ── Stickers (ADR-007) ──────────────────────────────────────────────────
+
+    // The rollback switch. Returning false denies every sticker write and
+    // changes nothing else; scripts/rules-check/stickers.mjs runs the suite
+    // against that variant too.
+    function stickerRulesEnabled() {
+      return true;
+    }
+
+    // The rollout mode. A missing document or any other value is "off".
+    function stickersMode() {
+      let flag = /databases/$(database)/documents/feature_flags/stickers;
+      return exists(flag) ? get(flag).data.get('mode', 'off') : 'off';
+    }
+
+    // Platform admins, from users/{uid}.role only (a server-controlled field).
+    // The ADMIN_USER_IDS environment list that other admin checks also honour
+    // is invisible here, so stickersConfig does not use it either.
+    function isStickerAdmin() {
+      let me = /databases/$(database)/documents/users/$(request.auth.uid);
+      return exists(me) && get(me).data.get('role', '') in ['admin', 'super_admin'];
+    }
+
+    function isStickerEnrolled() {
+      let row = /databases/$(database)/documents/sticker_enrollment/$(request.auth.uid);
+      return exists(row) && get(row).data.get('stage', '') == 'beta';
+    }
+
+    // off: nobody · internal: admins · beta: admins and enrolled users · on: everyone
+    function stickerWritesAllowed() {
+      let mode = stickersMode();
+      return stickerRulesEnabled() && request.auth != null && (
+        mode == 'on'
+        || (mode == 'beta' && (isStickerAdmin() || isStickerEnrolled()))
+        || (mode == 'internal' && isStickerAdmin()));
+    }
+
+    function stickerEditableFields() {
+      return ['name', 'color', 'emoji', 'description', 'status', 'archived_at', 'updated_at'];
+    }
+
+    function stickerFields() {
+      return stickerEditableFields().concat(['schema_version', 'created_at', 'created_by']);
+    }
+
+    function validStickerValues(d) {
+      return d.name is string && d.name.size() >= 1 && d.name.size() <= 60
+        && d.color in ['teal', 'blue', 'purple', 'coral', 'amber', 'pink', 'green', 'gray']
+        && (d.emoji == null || (d.emoji is string && d.emoji.size() <= 16))
+        && (d.description == null || (d.description is string && d.description.size() <= 280))
+        && (d.status == 'active' ? d.archived_at == null : (d.status == 'archived' && d.archived_at is timestamp))
+        && d.updated_at == request.time;
+    }
+
+    function validNewSticker(stickerId, d) {
+      return stickerId.matches('^[A-Za-z0-9]{20}$')
+        && d.keys().hasAll(stickerFields()) && d.keys().hasOnly(stickerFields())
+        && d.schema_version == 1
+        && d.created_by == request.auth.uid
+        && d.created_at == request.time
+        && d.status == 'active'
+        && validStickerValues(d);
+    }
+
+    function validStickerUpdate(d, before) {
+      return d.diff(before).affectedKeys().hasOnly(stickerEditableFields())
+        && validStickerValues(d);
+    }
+
+    function stickerMembershipKeys() {
+      return ['sticker_ids', 'sticker_assignments', 'sticker_change'];
+    }
+
+    // Does this write add, change or remove a membership field?
+    function touchesStickerMembership() {
+      return request.resource != null && (resource == null
+        ? request.resource.data.keys().hasAny(stickerMembershipKeys())
+        : request.resource.data.diff(resource.data).affectedKeys().hasAny(stickerMembershipKeys()));
+    }
+
+    function activeStickerOf(userId, stickerId) {
+      let path = /databases/$(database)/documents/users/$(userId)/stickers/$(stickerId);
+      return stickerId is string && exists(path) && get(path).data.status == 'active';
+    }
+
+    function validAssignment(a) {
+      return a is map
+        && a.keys().hasAll(['assigned_at', 'assigned_by']) && a.keys().hasOnly(['assigned_at', 'assigned_by'])
+        && a.assigned_at == request.time
+        && a.assigned_by in ['user', 'csv_import'];
+    }
+
+    // Exactly one sticker added or removed, named in sticker_change, with one
+    // assignment per sticker and no other assignment touched. At most 50.
+    function validMembershipChange(userId) {
+      let before = resource.data.get('sticker_ids', []);
+      let after = request.resource.data.get('sticker_ids', []);
+      let beforeAssignments = resource.data.get('sticker_assignments', {});
+      let assignments = request.resource.data.get('sticker_assignments', {});
+      let change = request.resource.data.get('sticker_change', {});
+      let added = after.toSet().difference(before.toSet());
+      let removed = before.toSet().difference(after.toSet());
+      return after is list && after.size() <= 50 && after.toSet().size() == after.size()
+        && assignments is map && assignments.keys().size() == after.size() && assignments.keys().hasAll(after)
+        && change is map
+        && change.keys().hasAll(['op', 'sticker_id', 'at']) && change.keys().hasOnly(['op', 'sticker_id', 'at'])
+        && change.at == request.time
+        && assignments.diff(beforeAssignments).affectedKeys().hasOnly([change.sticker_id])
+        && ((change.op == 'add'
+              && added.size() == 1 && added.hasAll([change.sticker_id]) && removed.size() == 0
+              && activeStickerOf(userId, change.sticker_id)
+              && validAssignment(assignments[change.sticker_id]))
+          || (change.op == 'remove'
+              && removed.size() == 1 && removed.hasAll([change.sticker_id]) && added.size() == 0));
+    }
+
+    // Applied to every write under users/{uid}/contacts. A write that leaves
+    // the membership fields alone costs nothing extra. A new contact never
+    // starts with stickers: they are added afterwards, one at a time.
+    function contactStickersOk(coll, userId) {
+      return coll != 'contacts'
+        || !touchesStickerMembership()
+        || (resource != null && stickerWritesAllowed() && validMembershipChange(userId));
+    }
+
     match /users/{userId} {
       allow read: if owns(userId);
       allow create: if owns(userId)
@@ -176,11 +322,26 @@ service cloud.firestore {
       match /{coll}/{docId} {
         allow read:   if owns(userId) && coll != 'capture_operations';
         allow create: if owns(userId) && coll != 'capture_operations'
-                      && !serverOwnedIntegration(coll, docId);
+                      && coll != 'stickers'
+                      && !serverOwnedIntegration(coll, docId)
+                      && contactStickersOk(coll, userId);
         allow update, delete: if owns(userId)
                               && coll != 'lineageEvents'
                               && coll != 'capture_operations'
-                              && !serverOwnedIntegration(coll, docId);
+                              && coll != 'stickers'
+                              && !serverOwnedIntegration(coll, docId)
+                              && contactStickersOk(coll, userId);
+      }
+
+      // A user's stickers (ADR-007). The generic blocks exclude this
+      // collection, so these are the only rules that apply to it.
+      match /stickers/{stickerId} {
+        allow read:   if owns(userId);
+        allow create: if owns(userId) && stickerWritesAllowed()
+                      && validNewSticker(stickerId, request.resource.data);
+        allow update: if owns(userId) && stickerWritesAllowed()
+                      && validStickerUpdate(request.resource.data, resource.data);
+        allow delete: if false;
       }
 
       // One level inside an ICP profile: criteriaVersions is append-only,
@@ -204,7 +365,9 @@ service cloud.firestore {
                      && coll != 'icpProfiles'
                      && coll != 'lineageEvents'
                      && coll != 'capture_operations'
-                     && !serverOwnedIntegration(coll, docId);
+                     && coll != 'stickers'
+                     && !serverOwnedIntegration(coll, docId)
+                     && contactStickersOk(coll, userId);
       }
     }
 
@@ -293,6 +456,17 @@ service cloud.firestore {
       allow read, write: if false;
     }
     match /billingAmbiguousAccounts/{docId} {
+      allow read, write: if false;
+    }
+
+    // Sticker rollout (ADR-007), server-only. A client that could write
+    // feature_flags/stickers could turn the feature on for itself, and one
+    // that could write sticker_enrollment could enroll itself. Rules still
+    // read both through get(), which read rules do not limit.
+    match /feature_flags/{flag} {
+      allow read, write: if false;
+    }
+    match /sticker_enrollment/{userId} {
       allow read, write: if false;
     }
   }

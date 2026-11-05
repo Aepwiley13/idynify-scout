@@ -2,8 +2,24 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
+import { loadCompanyFactsForBarry, formatCompanyFactsBlock, resolveDisplayCompanyFields } from './utils/barryCompanyFacts.js';
 import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
 import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
+
+/**
+ * A minimal RECON-shaped messaging block built from JUST the deciding ICP's
+ * own messaging — for when compileReconForPrompt has nothing to wrap it in
+ * (see the call site: no dashboard document, or one with zero completed
+ * RECON sections). Deliberately not added to reconCompiler.js itself: that
+ * module is shared by other Barry endpoints this fix has no reason to touch.
+ */
+function formatIcpMessagingOnly(icpMessaging) {
+  const entries = Object.entries(icpMessaging || {}).filter(([, v]) => typeof v === 'string' && v.trim());
+  if (!entries.length) return '';
+  const formatKey = (key) => key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase());
+  const lines = entries.map(([key, value]) => `- ${formatKey(key)}: ${value}`);
+  return `\nMESSAGING & VALUE PROPOSITION (the deciding ICP's own voice):\n${lines.join('\n')}\n`;
+}
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -16,7 +32,7 @@ export const handler = async (event) => {
   }
 
   try {
-    const { userId, authToken, contact, companyData } = JSON.parse(event.body);
+    const { userId, authToken, contact } = JSON.parse(event.body);
 
     if (!userId || !authToken || !contact) {
       throw new Error('Missing required parameters');
@@ -60,15 +76,42 @@ export const handler = async (event) => {
 
     console.log('✅ Auth token verified');
 
-    // ─── Fetch RECON training data ───
+    // ─── Load verified company facts + the deciding ICP, if any ───
+    // Reads the actual company document this contact belongs to — never the
+    // client-supplied payload the frontend used to pass (always null in
+    // practice, which is why this panel used to have nothing to ground on).
+    let companyFacts = { facts: {}, icpId: null, companyFound: false };
+    try {
+      companyFacts = await loadCompanyFactsForBarry(db, userId, contact?.company_id);
+    } catch (companyError) {
+      console.warn('⚠️ Could not load company facts (non-fatal):', companyError.message);
+    }
+    const { facts: verifiedCompanyFacts, icpId, companyFound } = companyFacts;
+
+    // ─── Fetch RECON training data + the deciding ICP's messaging ───
     let reconContext = '';
     try {
-      const dashboardDoc = await db.collection('dashboards').doc(userId).get();
+      const [dashboardDoc, icpDoc] = await Promise.all([
+        db.collection('dashboards').doc(userId).get(),
+        icpId ? db.collection('users').doc(userId).collection('icpProfiles').doc(icpId).get() : null,
+      ]);
+      // No icpId means no company, or a company decided with no explicit
+      // surface ICP — proceed without ICP messaging rather than guess one.
+      const icpMessaging = icpDoc?.exists ? (icpDoc.data()?.messaging || null) : null;
       if (dashboardDoc.exists) {
-        reconContext = compileReconForPrompt(dashboardDoc.data());
-        if (reconContext) {
-          console.log('🧠 RECON training data loaded and compiled');
-        }
+        reconContext = compileReconForPrompt(dashboardDoc.data(), icpMessaging);
+      }
+      // compileReconForPrompt requires at least one of the dashboard's OWN
+      // RECON sections to be completed before it emits anything at all —
+      // including icpMessaging, which has nothing to do with whether the
+      // user separately finished RECON onboarding. Without this, a real
+      // deciding ICP's voice was silently dropped whenever there was no
+      // dashboard document (or one with nothing completed yet) to carry it.
+      if (!reconContext && icpMessaging) {
+        reconContext = formatIcpMessagingOnly(icpMessaging);
+      }
+      if (reconContext) {
+        console.log('🧠 RECON training data loaded and compiled');
       }
     } catch (reconError) {
       // Non-fatal — Barry works without RECON, just less personalized
@@ -81,11 +124,22 @@ export const handler = async (event) => {
     });
 
     // Prepare contact data for Barry
+    //
+    // Company/industry come from resolveDisplayCompanyFields, never a plain
+    // `contact.company_name || verifiedCompanyFacts.industry` fallback chain:
+    // once a real company record is found, ITS facts are authoritative for
+    // every field it covers — present or "Unknown" — and must not be
+    // quietly overridden by a stale or conflicting cached field on the
+    // contact doc. The contact-level fields are consulted ONLY when no
+    // company record exists at all (see the function's own doc comment).
+    const displayCompany = resolveDisplayCompanyFields(verifiedCompanyFacts, companyFound, {
+      name: contact.company_name, industry: contact.company_industry,
+    });
     const contactSummary = {
       name: contact.name || 'Unknown',
       title: contact.title || 'Not specified',
-      company: contact.company_name || 'Unknown company',
-      industry: contact.company_industry || companyData?.industry || 'Not specified',
+      company: displayCompany.name || 'Unknown company',
+      industry: displayCompany.industry || 'Not specified',
       seniority: contact.seniority || 'Not specified',
       department: contact.department || (contact.departments && contact.departments[0]) || 'Not specified',
       location: [contact.city, contact.state, contact.country].filter(Boolean).join(', ') || 'Not specified',
@@ -105,16 +159,16 @@ export const handler = async (event) => {
       engagement_intent: contact.engagementIntent || null
     };
 
-    // Prepare company context (if available)
-    const companyContext = companyData ? {
-      name: companyData.name || contact.company_name,
-      industry: companyData.industry || contact.company_industry,
-      size: companyData.size || 'Unknown',
-      description: companyData.description || 'Not available',
-      website: companyData.website || 'Not available',
-      // founded_year explicitly included so Barry never guesses company age
-      founded_year: companyData.founded_year || null
-    } : null;
+    // Company context block: rendered only when a real company record was
+    // found — not merely when a company_id was given (a dangling id with no
+    // document behind it has nothing to verify, and falls back to the plain
+    // contact-level fields above instead, via resolveDisplayCompanyFields;
+    // showing a block full of "Unknown" lines on top of that fallback would
+    // contradict it). Once a record IS found, a field it doesn't verify is
+    // stated as unknown here, never left out — an omitted field invites a
+    // guess, an explicit "Unknown" instruction constrains one. See
+    // loadCompanyFactsForBarry for the conflict rule.
+    const companyFactsBlock = companyFound ? formatCompanyFactsBlock(verifiedCompanyFacts) : null;
 
     // Build the prompt for Barry — now with RECON context
     const prompt = `You are Barry, a contextual intelligence guide helping a user prepare for a first conversation with another person.
@@ -144,13 +198,8 @@ Use these classifications to calibrate tone, depth, and framing:
 - Delegate → orient around the person they represent, not just them
 If fields are missing, do not guess — work with what is available.
 ` : ''}
-${companyContext ? `COMPANY CONTEXT:
-Company: ${companyContext.name}
-Industry: ${companyContext.industry}
-Size: ${companyContext.size}
-Founded: ${companyContext.founded_year ? companyContext.founded_year : 'Unknown — do not reference company age or founding year'}
-Description: ${companyContext.description}
-Website: ${companyContext.website}
+${companyFactsBlock ? `COMPANY CONTEXT (verified from the company record — treat any "Unknown" line as a hard constraint, not an invitation to infer):
+${companyFactsBlock}
 ` : ''}
 
 YOUR TASK:
@@ -252,7 +301,7 @@ Generate the contextual layer now. Respond ONLY with valid JSON.`;
       responseTime,
       metadata: {
         contactName: contact.name,
-        hasCompanyData: !!companyData,
+        hasCompanyData: !!companyFactsBlock,
         hasReconData: !!reconContext
       }
     });

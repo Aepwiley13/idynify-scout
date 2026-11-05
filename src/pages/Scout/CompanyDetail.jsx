@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, setDoc, updateDoc, arrayUnion, onSnapshot } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { archiveCompanyWithCascade, restoreCompanyWithCascade } from '../../services/companyArchiveService';
 import { Search, X, CheckCircle, UserPlus, Mail, Phone, Linkedin, Briefcase, Award, Clock, Shield, Target, Building2, Users, Globe, DollarSign, Calendar, MapPin, Tag, FileText, Facebook, Twitter, ChevronDown, ChevronUp, Archive, RotateCcw, RefreshCw, Code, ExternalLink, Loader, User } from 'lucide-react';
@@ -15,7 +15,7 @@ import { prepareContactWrite, applyContactMerge } from '../../services/contactWr
 import { RECORD_STATUS } from '../../constants/statusModel';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { calculateICPScore, DEFAULT_WEIGHTS } from '../../utils/icpScoring';
-import { DECISION_SURFACE, approveCompany } from '../../services/companyDecision';
+import { DECISION_SURFACE, approveCompany, retryPeopleDiscovery, resolveAutoContactState, msUntilStale } from '../../services/companyDecision';
 
 /**
  * @param {object}   props
@@ -93,6 +93,64 @@ export default function CompanyDetail({
     loadCompanyData();
     loadApprovedContacts();
   }, [companyId]);
+
+  // Auto-discovered people (#N1): a scoped, read-only listener on just this
+  // one company document, independent of loadCompanyData's one-time read
+  // above. Its only job is keeping the found/none/searching/stuck/failed
+  // state current without a manual refresh. Unsubscribed on unmount or when
+  // companyId changes, the same as any other subscription in this file.
+  const [autoContactState, setAutoContactState] = useState({ kind: 'none' });
+  const [retryingDiscovery, setRetryingDiscovery] = useState(false);
+
+  useEffect(() => {
+    const user = getEffectiveUser();
+    if (!user || !companyId) return undefined;
+    const companyRef = doc(db, 'users', user.uid, 'companies', companyId);
+    // The Suggested Contacts section below is loaded once by loadApprovedContacts,
+    // not live — the moment a search completes with people found, re-load it so
+    // newly auto-discovered people appear without the user refreshing the page.
+    let previousStatus;
+    // A document write is what the listener reacts to — the passage of time
+    // to the 60s stale threshold is not one. One lightweight client-side
+    // timer, rescheduled on every snapshot, carries the page from Searching
+    // to Stuck on its own while it stays open, no refresh and no new
+    // server-side mechanism needed. Cleared whenever a fresher snapshot
+    // arrives (a real completion, failure, or retry) or on unmount.
+    let staleTimer = null;
+    const scheduleStaleCheck = (data) => {
+      if (staleTimer) { clearTimeout(staleTimer); staleTimer = null; }
+      const remaining = msUntilStale(data);
+      if (remaining === null) return; // not pending, or no valid start time — nothing to schedule
+      // +50ms margin: the boundary msUntilStale and resolveAutoContactState
+      // share is inclusive at exactly 60s ("searching"), so firing a hair
+      // past it is what actually crosses into "stuck".
+      staleTimer = setTimeout(() => setAutoContactState(resolveAutoContactState(data)), Math.max(0, remaining) + 50);
+    };
+    const unsubscribe = onSnapshot(
+      companyRef,
+      (snap) => {
+        const data = snap.exists() ? snap.data() : null;
+        const next = resolveAutoContactState(data);
+        setAutoContactState(next);
+        if (next.kind === 'found' && previousStatus !== 'completed') loadApprovedContacts();
+        previousStatus = data?.auto_contact_status;
+        scheduleStaleCheck(data);
+      },
+      (err) => console.error('[CompanyDetail] auto-contact status listener failed:', err.message),
+    );
+    return () => { unsubscribe(); if (staleTimer) clearTimeout(staleTimer); };
+  }, [companyId]);
+
+  async function handleRetryDiscovery() {
+    const user = getEffectiveUser();
+    if (!user || !company || retryingDiscovery) return;
+    setRetryingDiscovery(true);
+    try {
+      await retryPeopleDiscovery({ user, company });
+    } finally {
+      setRetryingDiscovery(false);
+    }
+  }
 
   // Load company data and selected titles
   async function loadCompanyData() {
@@ -1580,6 +1638,55 @@ export default function CompanyDetail({
             )}
           </div>
         )}
+
+      {/* Barry's automatic search, after a Match (#N1) — separate from the manual
+          title search below, which has its own state and its own history. */}
+      {autoContactState.kind !== 'none' && (
+        <div
+          className="auto-contact-status"
+          style={{
+            margin: '0 0 16px', padding: '12px 16px', borderRadius: 10,
+            border: '1px solid rgba(255,255,255,0.1)', display: 'flex',
+            alignItems: 'center', justifyContent: 'space-between', gap: 12,
+          }}
+        >
+          {autoContactState.kind === 'searching' && (
+            <span>Looking for people at this company who match your ICP…</span>
+          )}
+          {autoContactState.kind === 'found' && (
+            <span>
+              Found {autoContactState.count} {autoContactState.count === 1 ? 'person' : 'people'} — see Suggested Contacts below.
+            </span>
+          )}
+          {autoContactState.kind === 'none-found' && (
+            <span>No contacts found for these titles. Use Find Contacts below to search manually.</span>
+          )}
+          {autoContactState.kind === 'stuck' && (
+            <>
+              <span>This search seems stuck.</span>
+              <button type="button" onClick={handleRetryDiscovery} disabled={retryingDiscovery}>
+                {retryingDiscovery ? 'Retrying…' : 'Try again'}
+              </button>
+            </>
+          )}
+          {autoContactState.kind === 'failed' && (
+            <>
+              <span>Something went wrong searching for people.</span>
+              <button type="button" onClick={handleRetryDiscovery} disabled={retryingDiscovery}>
+                {retryingDiscovery ? 'Retrying…' : 'Try again'}
+              </button>
+            </>
+          )}
+          {autoContactState.kind === 'inconsistent' && (
+            <>
+              <span>This search result doesn't look right — not shown as "no contacts found".</span>
+              <button type="button" onClick={handleRetryDiscovery} disabled={retryingDiscovery}>
+                {retryingDiscovery ? 'Retrying…' : 'Try again'}
+              </button>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Title Search Section */}
       <div className="title-search-section">

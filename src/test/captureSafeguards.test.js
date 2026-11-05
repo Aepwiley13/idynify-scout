@@ -11,6 +11,7 @@ import { makeField } from '../capture/contract.js';
 import {
   SAFEGUARDS, CAPTURE_FREE_EMAIL_DOMAINS, CAPTURE_ISP_EMAIL_DOMAINS, isSharedHost, classifyEmailKind,
   domainSafeguards, emailDomainSafeguards, websiteSafeguards, companyNameSafeguards, assessCompanyEvidence,
+  ownDomainKind, ownDomainSafeguards,
 } from '../capture/safeguards.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -189,6 +190,92 @@ describe('assessCompanyEvidence — what card evidence alone allows', () => {
     expect(assessCompanyEvidence({})).toEqual({
       codes: [], domain: { key: null, from: null, usable: false },
       name: { key: null, display: null, usable: false }, creationCeiling: 'UNKNOWN',
+    });
+  });
+});
+
+describe("a person's own domain is not a company's", () => {
+  const CARLA = 'Carla Lifferth';
+
+  it.each([
+    ['carlalifferth.com', 'personal'],
+    ['carla-lifferth.com', 'personal'],                  // hyphens and dots do not matter
+    ['www.carlalifferth.co.uk', 'personal'],
+    ['carla.lifferth.com', null],                        // judged on the registrable domain, lifferth.com
+    ['https://www.CarlaLifferth.com/about', 'personal'],
+    ['clifferth.com', 'personal'],                       // first initial, last name
+    ['lifferthcarla.com', 'personal'],                   // last name first
+    ['carlalifferthdesign.com', 'name_based'],           // the name plus other words
+    ['studiocarlalifferth.com', 'name_based'],
+    ['lifferthinteriors.com', null],                     // the last name alone: a family business may use it
+    ['lifferth.com', null],
+    ['carla.com', null],                                 // the first name alone
+    ['brightpath.com', null],
+    ['gmail.com', null],
+  ])('%s → %s', (domain, kind) => {
+    expect(ownDomainKind(domain, CARLA)).toBe(kind);
+  });
+
+  it('middle names and initials, honorifics and letters after the name', () => {
+    expect(ownDomainKind('carlajanelifferth.com', 'Carla Jane Lifferth')).toBe('personal');
+    expect(ownDomainKind('carlajlifferth.com', 'Carla Jane Lifferth')).toBe('personal');
+    expect(ownDomainKind('cjlifferth.com', 'Carla Jane Lifferth')).toBe('personal');
+    expect(ownDomainKind('carlalifferth.com', 'Dr. Carla Lifferth, PhD')).toBe('personal');
+    expect(ownDomainKind('joseobrien.com', "José O'Brien")).toBe('personal');
+  });
+
+  it('needs a first and a last name, and a real domain', () => {
+    expect(ownDomainKind('cher.com', 'Cher')).toBeNull();
+    expect(ownDomainKind('carlalifferth.com', null)).toBeNull();
+    expect(ownDomainKind('carlalifferth', CARLA)).toBeNull();
+    expect(ownDomainKind(null, CARLA)).toBeNull();
+  });
+
+  it('codes: PERSONAL_DOMAIN for the name itself, NAME_IN_DOMAIN for the name with other words', () => {
+    expect(ownDomainSafeguards('carlalifferth.com', CARLA)).toEqual([SAFEGUARDS.PERSONAL_DOMAIN]);
+    expect(ownDomainSafeguards('carlalifferthdesign.com', CARLA)).toEqual([SAFEGUARDS.NAME_IN_DOMAIN]);
+    expect(ownDomainSafeguards('lifferthinteriors.com', CARLA)).toEqual([]);
+  });
+
+  it('a website at the person\'s own domain is never the company domain', () => {
+    expect(assessCompanyEvidence({ website: 'kristinsokol.com', emails: ['kristin@kristinsokol.com'], personName: 'Kristin Sokol' })).toEqual({
+      codes: [SAFEGUARDS.PERSONAL_DOMAIN], domain: { key: null, from: null, usable: false },
+      name: { key: null, display: null, usable: false }, creationCeiling: 'UNKNOWN',
+    });
+  });
+
+  it('nor is a role address at it (hello@)', () => {
+    expect(assessCompanyEvidence({ emails: ['hello@kristinsokol.com'], personName: 'Kristin Sokol' })).toMatchObject({
+      codes: [SAFEGUARDS.ROLE_EMAIL, SAFEGUARDS.PERSONAL_DOMAIN], domain: { usable: false }, creationCeiling: 'UNKNOWN',
+    });
+  });
+
+  it('a work email at another domain is still company evidence', () => {
+    expect(assessCompanyEvidence({ website: 'kristinsokol.com', emails: ['kristin@sokolstudio.com'], personName: 'Kristin Sokol' })).toMatchObject({
+      codes: [SAFEGUARDS.PERSONAL_DOMAIN], domain: { key: 'sokolstudio.com', from: 'email_domain', usable: true },
+    });
+  });
+
+  it('a business named after the person, at a domain with the name in it, needs confirmation, never NEW_CONFIRMED', () => {
+    const evidence = assessCompanyEvidence({
+      companyName: printed('Carla Lifferth Design'), website: 'carlalifferthdesign.com', personName: CARLA,
+    });
+    expect(evidence).toMatchObject({
+      codes: [SAFEGUARDS.NAME_IN_DOMAIN, SAFEGUARDS.MISSING_DOMAIN],
+      domain: { usable: false }, name: { display: 'Carla Lifferth Design', usable: true },
+      creationCeiling: 'NEW_REQUIRES_CONFIRMATION',
+    });
+  });
+
+  it('a business domain that only shares the last name is unchanged', () => {
+    expect(assessCompanyEvidence({
+      companyName: printed('Lifferth Interiors'), website: 'lifferthinteriors.com', personName: CARLA,
+    })).toMatchObject({ codes: [], domain: { key: 'lifferthinteriors.com', usable: true }, creationCeiling: 'NEW_CONFIRMED' });
+  });
+
+  it('without a person name nothing changes', () => {
+    expect(assessCompanyEvidence({ website: 'kristinsokol.com' })).toMatchObject({
+      codes: [], domain: { key: 'kristinsokol.com', from: 'website', usable: true },
     });
   });
 });

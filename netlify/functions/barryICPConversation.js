@@ -43,6 +43,14 @@ const SPECIFICITY_TRIGGERS = [
   "provider", "providers"
 ];
 
+// processExampleCompany's own output schema has no way to say "no example":
+// the seed is always an object with a name. A user who has none gets back a
+// seed literally named one of these (#748). Checked case-insensitively,
+// trimmed.
+const NO_EXAMPLE_SEED_NAMES = new Set([
+  'none', 'none provided', 'n/a', 'na', 'no example', 'no company', ''
+]);
+
 // Example companies for broad industries (used as suggestions)
 const EXAMPLE_COMPANIES = {
   "Marketing and Advertising": [
@@ -911,6 +919,25 @@ OUTPUT: Respond only with valid JSON matching the schema below. No text outside 
     barryResponse.understood.foundedAgeRange = (minAge === null && maxAge === null)
       ? null
       : { minAge, maxAge };
+  }
+
+  // This step's schema (above) has no way to say "no example company": the
+  // seed is always an object with a name, and searchStrategy is hardcoded to
+  // "lookalike". A user who has none gets a seed named "None provided" (#748).
+  // The model is answering the schema correctly; the schema has no correct
+  // answer for this case. Treat a placeholder name as no seed at all, and
+  // stop claiming a lookalike strategy that has nothing to anchor on — every
+  // UI that renders this (BarryOnboarding.jsx, ICPSettings.jsx) already
+  // guards on `lookalikeSeed?.name` or `searchStrategy === 'lookalike'`, so
+  // this is the one place that needs to change.
+  // A reply with no `understood` block is left exactly as before: there is
+  // no seed to clear, and writing into it would throw.
+  const seedName = (barryResponse.understood?.lookalikeSeed?.name ?? '').trim().toLowerCase();
+  if (barryResponse.understood && NO_EXAMPLE_SEED_NAMES.has(seedName)) {
+    barryResponse.understood.lookalikeSeed = null;
+    if (barryResponse.searchStrategy === 'lookalike') {
+      barryResponse.searchStrategy = 'industry_only';
+    }
   }
 
   // Same rule on the follow-up path: titles are reported as missing, never

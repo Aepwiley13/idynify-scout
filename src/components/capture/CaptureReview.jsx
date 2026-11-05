@@ -8,11 +8,13 @@
  * changed, never guessed. Social profiles list LinkedIn, Instagram and
  * Facebook each, with "Not on card" for a network the card did not print; a
  * handle the card printed without its network waits for the user to choose
- * one. Nothing here saves or reads Firestore.
+ * one. When the card's website or email spells the person's name, a line
+ * under Company says it isn't used to find or create a company, with a way to
+ * add one. Nothing here saves or reads Firestore.
  */
 import { AlertTriangle, Plus, X } from 'lucide-react';
 import ContactPhones from '../contacts/ContactPhones';
-import { newSocialRow, socialProblems } from './captureDraft.js';
+import { newSocialRow, socialProblems, personalDomainInUse } from './captureDraft.js';
 import { parseSocialReference, platformLabel, REVIEW_SOCIAL_PLATFORMS } from '../../utils/socialProfiles';
 import '../contacts/IdentityCard.css';
 import './CaptureReview.css';
@@ -197,12 +199,47 @@ function CompanySuggestion({ suggestion, onUse, T }) {
   );
 }
 
+/** The first name to use in a sentence, skipping an honorific ("Dr."). */
+function firstNameOf(name) {
+  const words = (name ?? '').trim().split(/\s+/).filter(word => word && !/^(dr|mr|mrs|ms|mx|prof)\.?$/i.test(word));
+  return words[0] ?? '';
+}
+
+/**
+ * Under Company, while the card's website or email spells the person's name:
+ * that domain is the person's, so it does not find or create a company. A
+ * company they work for, even one named after them, is the user's to add.
+ */
+function PersonalDomainNote({ own, name, onAdd, T }) {
+  const first = firstNameOf(name);
+  const whose = first ? `${first}'s` : "the person's";
+  const what = own.kind === 'name_based'
+    ? `${own.domain} has ${whose} name in it`
+    : `${own.domain} looks like ${whose} own ${own.website ? 'website' : 'email domain'}`;
+  return (
+    <div data-testid="capture-personal-domain" style={{ fontSize: 13, color: T.textMuted, marginTop: 6, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8 }}>
+      <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{what}, so it isn't used to find or create a company.</span>
+      {onAdd && (
+        <button
+          type="button"
+          onClick={onAdd}
+          style={{ minHeight: 44, padding: '0 12px', borderRadius: 10, border: `1px solid ${T.border}`, background: 'transparent', color: T.text, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+        >
+          Add a company
+        </button>
+      )}
+    </div>
+  );
+}
+
 function PersonDraft({ draft, index, count, onChange, T }) {
   const set = (key, value) => onChange({ ...draft, [key]: value, toCheck: draft.toCheck.filter(k => k !== key) });
   const inputStyle = {
     width: '100%', boxSizing: 'border-box', padding: '10px 12px', borderRadius: 10, fontSize: 16,
     border: `1px solid ${T.border}`, background: T.input ?? T.cardBg, color: T.text,
   };
+  const ownDomain = personalDomainInUse(draft);
+  const companyId = `capture-${draft.key}-company`;
 
   return (
     <section
@@ -232,6 +269,14 @@ function PersonDraft({ draft, index, count, onChange, T }) {
             />
             {key === 'company' && !draft.company && draft.companySuggestion && (
               <CompanySuggestion suggestion={draft.companySuggestion} onUse={() => set('company', draft.companySuggestion.name)} T={T} />
+            )}
+            {key === 'company' && ownDomain && (!draft.company || draft.toCheck.includes('company')) && (
+              <PersonalDomainNote
+                own={ownDomain}
+                name={draft.name}
+                onAdd={!draft.company && !draft.companySuggestion ? () => document.getElementById(companyId)?.focus() : null}
+                T={T}
+              />
             )}
             {key === 'email' && draft.otherEmails.length > 0 && (
               <div style={{ fontSize: 12, color: T.textMuted, marginTop: 4 }}>

@@ -499,6 +499,82 @@ describe('companies', () => {
   });
 });
 
+describe("a person's own domain never chooses a company", () => {
+  // As draftsFromExtraction leaves it when the card's website and email spell the name.
+  const OWN = { kind: 'personal', hosts: ['kristinsokol.com'] };
+  const solo = (over = {}) => draft({
+    name: 'Kristin Sokol', title: 'Dating Strategy & Matchmaking', company: '', email: 'kristin@kristinsokol.com',
+    website: 'kristinsokol.com', linkedinUrl: '', phones: [], personalDomain: OWN, ...over,
+  });
+  // The production case: an earlier scan saved the person's name as a company, with their website.
+  const putNameCompany = () => putCompany('co_name', { name: 'Kristin Sokol', domain: 'kristinsokol.com', website_url: 'kristinsokol.com', status: 'accepted' });
+
+  it('a Saved Company holding that domain is only offered, never linked on its own', async () => {
+    putNameCompany();
+    const { shown, result } = await lookAndSave(solo());
+    expect(shown.company).toEqual({ status: 'possible', companyId: 'co_name', name: 'Kristin Sokol', via: 'personal_domain' });
+    // Saved without choosing it (no company choice at all): nothing linked.
+    expect(result).toMatchObject({ status: 'saved', companyId: null, outcome: 'created' });
+    expect(contacts()[0]).toMatchObject({ company: null, company_name: null, company_id: null, website: 'kristinsokol.com' });
+    expect(companies().map(c => c.id)).toEqual(['co_name']);
+  });
+
+  it('the same draft without the flag (a business domain) still links by domain, as before', async () => {
+    putNameCompany();
+    const { shown, result } = await lookAndSave(solo({ personalDomain: null }));
+    expect(shown.company).toEqual({ status: 'existing', companyId: 'co_name', name: 'Kristin Sokol' });
+    expect(result.companyId).toBe('co_name');
+  });
+
+  it('No company links nothing; choosing Link links it', async () => {
+    putNameCompany();
+    const { result: declined } = await lookAndSave(solo(), { choices: { company: 'none' } });
+    expect(declined.companyId).toBeNull();
+    const { result: chosen } = await lookAndSave(solo(), { op: OP2, choices: { company: 'link' } });
+    expect(chosen.companyId).toBe('co_name');
+  });
+
+  it('a company the user names is found by its name only, and created without the personal website', async () => {
+    putNameCompany();
+    const named = solo({ company: 'Sokol Matchmaking' });
+    const { shown, result } = await lookAndSave(named, { choices: { company: 'link' } });
+    // Not offered co_name just because it shares the person's own domain.
+    expect(shown.company).toEqual({ status: 'new', name: 'Sokol Matchmaking' });
+    expect(result.status).toBe('saved');
+    const created = companies().find(c => c.id === result.companyId);
+    expect(created).toMatchObject({ name: 'Sokol Matchmaking', domain: null, website_url: null, name_source: 'user' });
+    expect(contacts()[0]).toMatchObject({ company_id: result.companyId, company_name: 'Sokol Matchmaking', website: 'kristinsokol.com' });
+  });
+
+  it('a company the user names that is already saved under that name is linked', async () => {
+    putCompany('co_sm', { name: 'Sokol Matchmaking', status: 'accepted' });
+    const { shown, result } = await lookAndSave(solo({ company: 'Sokol Matchmaking' }), { choices: { company: 'link' } });
+    expect(shown.company).toEqual({ status: 'existing', companyId: 'co_sm', name: 'Sokol Matchmaking' });
+    expect(result.companyId).toBe('co_sm');
+  });
+
+  it('a work email at another domain is still used to find the company', async () => {
+    putCompany('co_studio', { name: 'Sokol Studio', domain: 'sokolstudio.com', status: 'accepted' });
+    putNameCompany();
+    const { shown, result } = await lookAndSave(solo({ email: 'kristin@sokolstudio.com' }));
+    expect(shown.company).toEqual({ status: 'existing', companyId: 'co_studio', name: 'Sokol Studio' });
+    expect(result.companyId).toBe('co_studio');
+  });
+
+  it('once the user changes the website to a business one, it is used as before', async () => {
+    putCompany('co_studio', { name: 'Sokol Studio', domain: 'sokolstudio.com', status: 'accepted' });
+    const { shown } = await lookAndSave(solo({ website: 'sokolstudio.com', email: '' }));
+    expect(shown.company).toEqual({ status: 'existing', companyId: 'co_studio', name: 'Sokol Studio' });
+  });
+
+  it('nothing saved with that domain: no company, and none is ever created from it', async () => {
+    const { shown, result } = await lookAndSave(solo(), { choices: { company: 'link' } });
+    expect(shown.company).toEqual({ status: 'none' });
+    expect(result.companyId).toBeNull();
+    expect(companies()).toEqual([]);
+  });
+});
+
 describe('social profiles', () => {
   const row = (n, text, platform, over = {}) => ({ id: `social-${n}`, platform, text, observed: text, fromCard: true, confirmed: false, unsure: false, ...over });
   const KRISTIN = { name: 'Kristin Sokol', email: 'kristin@sokolstudio.example', company: 'Sokol Studio', linkedinUrl: '', website: '', title: '', phones: [] };

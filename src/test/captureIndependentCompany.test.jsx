@@ -4,6 +4,7 @@
  * is not one (the person's name, a service line…) and offers it as a
  * suggestion; the match step always lets the user choose No company, and
  * starts there for a company read only weakly that the user has not confirmed.
+ * A website or email that spells the person's name never chooses a company.
  * Every person and company here is fictional.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -137,6 +138,96 @@ describe('match: a new company is a choice, and No company is always one of the 
     render(<Flow initial={[person({ name: 'Avery Quinn', company: 'Example Robotics', toCheck: ['company'] })]} />);
     await user.click(screen.getByRole('button', { name: 'Continue' }));
     expect(await screen.findByTestId('company-match')).toHaveTextContent('Existing company: Example Robotics');
+    await user.click(screen.getByRole('button', { name: /Add Person/ }));
+    expect(api.save).toHaveBeenCalledWith('u1', expect.objectContaining({ choices: { person: null, company: 'link' } }));
+  });
+});
+
+describe("the person's own website or email domain never chooses a company", () => {
+  const OWN = { kind: 'personal', hosts: ['kristinsokol.example'] };
+
+  it('Company empty: the review says why the domain is not used, and "Add a company" goes to Company', async () => {
+    const user = userEvent.setup();
+    render(<Flow initial={[person({ personalDomain: OWN })]} />);
+    expect(screen.getByTestId('capture-personal-domain'))
+      .toHaveTextContent("kristinsokol.example looks like Kristin's own website, so it isn't used to find or create a company.");
+
+    await user.click(screen.getByRole('button', { name: 'Add a company' }));
+    const company = screen.getByLabelText('Company');
+    expect(company).toHaveFocus();
+    await user.type(company, 'Sokol Matchmaking');
+    // The user named a company: nothing more to say.
+    expect(screen.queryByTestId('capture-personal-domain')).toBeNull();
+  });
+
+  it('beside the "not a company" suggestion, the suggestion keeps its own button', () => {
+    render(<Flow initial={[person({ personalDomain: OWN, companySuggestion: { name: 'Kristin Sokol', reason: 'PERSON_NAME_AS_COMPANY' } })]} />);
+    expect(screen.getByTestId('capture-company-suggestion')).toBeInTheDocument();
+    expect(screen.getByTestId('capture-personal-domain')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Use as company' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add a company' })).toBeNull();
+  });
+
+  it('a domain with the name and other words, and an email domain, are each worded for what they are', () => {
+    const { unmount } = render(<Flow initial={[person({
+      name: 'Carla Lifferth', website: 'www.carlalifferthdesign.example', personalDomain: { kind: 'name_based', hosts: ['carlalifferthdesign.example'] },
+    })]} />);
+    expect(screen.getByTestId('capture-personal-domain')).toHaveTextContent("carlalifferthdesign.example has Carla's name in it, so it isn't used");
+    unmount();
+    render(<Flow initial={[person({ website: '', personalDomain: OWN })]} />);
+    expect(screen.getByTestId('capture-personal-domain')).toHaveTextContent("kristinsokol.example looks like Kristin's own email domain");
+  });
+
+  it('once the website and email are changed to others, it is an ordinary card again', async () => {
+    const user = userEvent.setup();
+    render(<Flow initial={[person({ personalDomain: OWN, email: '' })]} />);
+    const website = screen.getByLabelText('Website');
+    await user.clear(website);
+    await user.type(website, 'sokolstudio.example');
+    expect(screen.queryByTestId('capture-personal-domain')).toBeNull();
+  });
+
+  it('a company printed beside it is marked Check and starts at No company; choosing it saves it', async () => {
+    const user = userEvent.setup();
+    api.preview.mockResolvedValue({ person: newPerson, company: { status: 'new', name: 'Sokol Matchmaking' } });
+    render(<Flow initial={[person({ company: 'Sokol Matchmaking', toCheck: ['company'], personalDomain: OWN })]} />);
+    expect(screen.getByLabelText(/^Company/)).toHaveValue('Sokol Matchmaking');
+    expect(screen.getByText('Check')).toBeInTheDocument();
+    expect(screen.getByTestId('capture-personal-domain')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Add a company' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    expect(await screen.findByRole('radio', { name: 'No company' })).toBeChecked();
+    const add = screen.getByRole('radio', { name: /New company: Sokol Matchmaking/ });
+    expect(add).not.toBeChecked();
+    expect(screen.getByText("kristinsokol.example has the person's name in it, so this company isn't added unless you choose it.")).toBeInTheDocument();
+    expect(screen.queryByText(/unclear or only in a logo/)).toBeNull();
+
+    await user.click(add);
+    await user.click(screen.getByRole('button', { name: /Add Person/ }));
+    expect(api.save).toHaveBeenCalledWith('u1', expect.objectContaining({ choices: { person: null, company: 'link' } }));
+  });
+
+  it('a Saved Company found only by that domain starts at No company, and is linked only when chosen', async () => {
+    const user = userEvent.setup();
+    api.preview.mockResolvedValue({ person: newPerson, company: { status: 'possible', companyId: 'co_name', name: 'Kristin Sokol', via: 'personal_domain' } });
+    render(<Flow initial={[person({ personalDomain: OWN })]} />);
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+
+    expect(await screen.findByRole('radio', { name: 'No company' })).toBeChecked();
+    expect(screen.getByTestId('company-match')).toHaveTextContent(
+      "Possible company match: Kristin Sokol has the same website or email domain. That domain has the person's name in it, so the company is linked only if you choose it.",
+    );
+    await user.click(screen.getByRole('button', { name: /Add Person/ }));
+    expect(api.save).toHaveBeenLastCalledWith('u1', expect.objectContaining({ choices: { person: null, company: 'none' } }));
+  });
+
+  it('choosing "Link to …" sends the explicit choice', async () => {
+    const user = userEvent.setup();
+    api.preview.mockResolvedValue({ person: newPerson, company: { status: 'possible', companyId: 'co_name', name: 'Kristin Sokol', via: 'personal_domain' } });
+    render(<Flow initial={[person({ personalDomain: OWN })]} />);
+    await user.click(screen.getByRole('button', { name: 'Continue' }));
+    await user.click(await screen.findByRole('radio', { name: 'Link to Kristin Sokol' }));
     await user.click(screen.getByRole('button', { name: /Add Person/ }));
     expect(api.save).toHaveBeenCalledWith('u1', expect.objectContaining({ choices: { person: null, company: 'link' } }));
   });

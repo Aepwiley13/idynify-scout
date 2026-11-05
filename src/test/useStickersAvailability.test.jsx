@@ -1,0 +1,93 @@
+/**
+ * useStickersAvailability: sticker controls show only when the server says
+ * enabled and not read-only, never while an admin is viewing as another user,
+ * and never on an error or while the answer is unknown.
+ */
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { renderHook, waitFor, act } from '@testing-library/react';
+
+const fetchStickersConfig = vi.hoisted(() => vi.fn());
+const effectiveUser = vi.hoisted(() => ({ value: { uid: 'U' } }));
+
+vi.mock('../components/stickers/stickersApi.js', () => ({ fetchStickersConfig }));
+vi.mock('../context/ImpersonationContext', () => ({
+  getEffectiveUser: () => effectiveUser.value,
+  useImpersonation: () => ({ isImpersonating: Boolean(effectiveUser.value?.contextImpersonating) }),
+}));
+
+import { useStickersAvailability, useStickersAvailabilityControl } from '../components/stickers/useStickersAvailability.js';
+
+beforeEach(() => {
+  fetchStickersConfig.mockReset();
+  effectiveUser.value = { uid: 'U' };
+});
+
+describe('useStickersAvailability', () => {
+  it('is checking, then available, when enabled and writable', async () => {
+    fetchStickersConfig.mockResolvedValue({ status: 200, body: { enabled: true, mode: 'beta', readOnly: false } });
+    const { result } = renderHook(() => useStickersAvailability());
+    expect(result.current).toBe('checking');
+    await waitFor(() => expect(result.current).toBe('available'));
+  });
+
+  it.each([
+    ['disabled', { status: 200, body: { enabled: false, mode: 'off', readOnly: false } }],
+    ['read-only', { status: 200, body: { enabled: true, mode: 'on', readOnly: true } }],
+    ['an error status', { status: 403, body: { error: 'forbidden' } }],
+    ['no body', { status: 200, body: null }],
+    ['enabled as a string', { status: 200, body: { enabled: 'true' } }],
+  ])('is unavailable when %s', async (_label, answer) => {
+    fetchStickersConfig.mockResolvedValue(answer);
+    const { result } = renderHook(() => useStickersAvailability());
+    await waitFor(() => expect(result.current).toBe('unavailable'));
+  });
+
+  it('is unavailable when the request fails', async () => {
+    fetchStickersConfig.mockRejectedValue(new Error('network'));
+    const { result } = renderHook(() => useStickersAvailability());
+    await waitFor(() => expect(result.current).toBe('unavailable'));
+  });
+
+  it('never asks, and is unavailable, while an admin views as another user', async () => {
+    effectiveUser.value = { uid: 'U', _isImpersonated: true };
+    const { result } = renderHook(() => useStickersAvailability());
+    expect(result.current).toBe('unavailable');
+    expect(fetchStickersConfig).not.toHaveBeenCalled();
+  });
+
+  it('recheck() asks again, and an answer that access is gone makes it unavailable', async () => {
+    fetchStickersConfig.mockResolvedValue({ status: 200, body: { enabled: true, mode: 'beta', readOnly: false } });
+    const { result } = renderHook(() => useStickersAvailabilityControl());
+    await waitFor(() => expect(result.current.state).toBe('available'));
+    fetchStickersConfig.mockResolvedValue({ status: 200, body: { enabled: false, mode: 'beta', readOnly: false } });
+    act(() => result.current.recheck());
+    await waitFor(() => expect(result.current.state).toBe('unavailable'));
+    expect(fetchStickersConfig).toHaveBeenCalledTimes(2);
+  });
+
+  it('recheck() never asks while an admin views as another user', async () => {
+    effectiveUser.value = { uid: 'U', _isImpersonated: true };
+    const { result } = renderHook(() => useStickersAvailabilityControl());
+    act(() => result.current.recheck());
+    expect(result.current.state).toBe('unavailable');
+    expect(fetchStickersConfig).not.toHaveBeenCalled();
+  });
+
+  it('QA D-2: viewing as someone, known only from the impersonation context, never asks the server', async () => {
+    effectiveUser.value = { uid: 'U', contextImpersonating: true };
+    const { result } = renderHook(() => useStickersAvailabilityControl());
+    expect(result.current.state).toBe('unavailable');
+    await act(async () => {});
+    expect(fetchStickersConfig).not.toHaveBeenCalled();
+  });
+
+  it('QA D-2: a view-as session that starts after mount makes it unavailable at once, with no new request', async () => {
+    fetchStickersConfig.mockResolvedValue({ status: 200, body: { enabled: true, mode: 'beta', readOnly: false } });
+    const { result, rerender } = renderHook(() => useStickersAvailabilityControl());
+    await waitFor(() => expect(result.current.state).toBe('available'));
+    effectiveUser.value = { uid: 'U', contextImpersonating: true };
+    rerender();
+    expect(result.current.state).toBe('unavailable');
+    expect(fetchStickersConfig).toHaveBeenCalledTimes(1);
+  });
+});

@@ -8,7 +8,9 @@
  *                 company) / No company. A company the card showed only weakly
  *                 (a logo, an unclear read) that the user did not confirm
  *                 starts at No company: a company is never created for it
- *                 unless the user chooses to.
+ *                 unless the user chooses to. So does one printed beside the
+ *                 person's own website or email domain, and a Saved Company
+ *                 found only by that domain.
  *   Add Person    save (captureSave.js), then hand the saved ids back
  *
  * Editing a detail after the check makes the match stale: Continue again.
@@ -19,7 +21,7 @@ import { useState } from 'react';
 import { Loader, UserPlus, UserCheck, AlertTriangle, Building2, RotateCcw } from 'lucide-react';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { previewCapturePerson, saveCapturePerson } from './captureSave.js';
-import { socialProblems, companyIsUnconfirmed } from './captureDraft.js';
+import { socialProblems, companyIsUnconfirmed, personalDomainInUse } from './captureDraft.js';
 
 const MATCHED_ON = Object.freeze({
   email: 'email', phone: 'phone number', linkedin_url: 'LinkedIn', apollo_person_id: 'Apollo ID', name_company: 'name and company',
@@ -107,7 +109,15 @@ function PersonMatch({ match, choice, setChoice, onOpen, T }) {
   );
 }
 
-function CompanyMatch({ match, choice, setChoice, weak, T }) {
+/** Why a company the card showed starts at No company, as one line; null when it does not. */
+function unchosenNote(draft) {
+  if (!companyIsUnconfirmed(draft)) return null;
+  const own = personalDomainInUse(draft);
+  if (own) return `${own.domain} has the person's name in it, so this company isn't added unless you choose it.`;
+  return "The company on the card was unclear or only in a logo, so it isn't added unless you choose it.";
+}
+
+function CompanyMatch({ match, choice, setChoice, note, T }) {
   const { person, company } = match;
   const line = { display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 14, color: T.text, minWidth: 0 };
   const radio = { display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0', minHeight: 44, fontSize: 14, cursor: 'pointer' };
@@ -132,7 +142,9 @@ function CompanyMatch({ match, choice, setChoice, weak, T }) {
       <div style={line} data-testid="company-match">
         {icon}
         <div role="radiogroup" aria-label="Link this company?" style={{ minWidth: 0 }}>
-          <span style={text}><strong>Possible company match:</strong> {company.name} (same website or email domain, different name).</span>
+          {company.via === 'personal_domain'
+            ? <span style={text}><strong>Possible company match:</strong> {company.name} has the same website or email domain. That domain has the person's name in it, so the company is linked only if you choose it.</span>
+            : <span style={text}><strong>Possible company match:</strong> {company.name} (same website or email domain, different name).</span>}
           <label style={radio}>
             <input type="radio" name="capture-company" checked={choice.company !== 'none'} onChange={() => setChoice({ ...choice, company: 'link' })} />
             <span style={text}>Link to {company.name}</span>
@@ -147,11 +159,7 @@ function CompanyMatch({ match, choice, setChoice, weak, T }) {
       <div style={line} data-testid="company-match">
         {icon}
         <div role="radiogroup" aria-label="Add this company?" style={{ minWidth: 0 }}>
-          {weak && (
-            <span style={{ ...text, display: 'block', color: T.textMuted }}>
-              The company on the card was unclear or only in a logo, so it isn't added unless you choose it.
-            </span>
-          )}
+          {note && <span style={{ ...text, display: 'block', color: T.textMuted }}>{note}</span>}
           <label style={radio}>
             <input type="radio" name="capture-company" checked={choice.company !== 'none'} onChange={() => setChoice({ ...choice, company: 'link' })} />
             <span style={text}><strong>New company:</strong> {company.name}, added to Saved Companies</span>
@@ -164,8 +172,13 @@ function CompanyMatch({ match, choice, setChoice, weak, T }) {
   return <div style={line} data-testid="company-match">{icon}<span>No company.</span></div>;
 }
 
-/** The company choice a match starts at: No company for a weak read the user has not confirmed. */
+/**
+ * The company choice a match starts at: No company for a company the user has
+ * not confirmed (a weak read, or one beside the person's own domain), and for
+ * a Saved Company found only by the person's own domain.
+ */
 function startingCompanyChoice(match, draft) {
+  if (match.company?.via === 'personal_domain') return 'none';
   const offered = ['new', 'possible'].includes(match.company?.status);
   return offered && companyIsUnconfirmed(draft) ? 'none' : 'link';
 }
@@ -282,7 +295,7 @@ export default function CaptureSavePanel({ operationId, people, onSaved, T }) {
             match={match}
             choice={choices[i]}
             setChoice={next => setChoices(list => list.map((c, j) => (j === i ? next : c)))}
-            weak={companyIsUnconfirmed(people[i])}
+            note={unchosenNote(people[i])}
             T={T}
           />
         </div>

@@ -308,8 +308,16 @@ describe('where the writes are', () => {
 
   it('linkedinConfirm updates one contact, and only that way; nothing there logs', () => {
     const src = read('src/components/capture/linkedinConfirm.js');
-    expect(src).not.toMatch(/setDoc|addDoc|deleteDoc|runTransaction|writeBatch|console\./);
-    expect(src.match(/updateDoc\(/g)).toHaveLength(2);                 // the confirm, and a taken suggestion
+    expect(src).not.toMatch(/setDoc|addDoc|deleteDoc|writeBatch|console\./);
+    // confirmLinkedIn's final check and write run in a transaction (#754), so
+    // the contact's own state is re-read and re-decided against right up to
+    // the write, never the copy read at the top of the function. Exactly one
+    // transaction, and exactly the two writes this file has always made: the
+    // confirm (now tx.update, inside that transaction) and a taken suggestion
+    // (still a plain updateDoc — acceptLinkedInSuggestion is unchanged).
+    expect(src.match(/runTransaction\(/g)).toHaveLength(1);
+    expect(src.match(/tx\.update\(/g)).toHaveLength(1);
+    expect(src.match(/updateDoc\(/g)).toHaveLength(1);                 // acceptLinkedInSuggestion only
     expect(read('src/components/capture/linkedinEnrichment.js')).not.toMatch(/firebase|fetch\(|console\./);
   });
 });

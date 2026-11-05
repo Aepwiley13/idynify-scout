@@ -298,13 +298,13 @@ async function commitResults(userId, results, candidatesByRef, { operationId, ac
     }
 
     if (result.outcome === OUTCOME.CREATED) {
-      // This operation already wrote it on a previous attempt.
+      // This operation already wrote it on a previous attempt (recognised at
+      // resolveOne, via the RESOLUTION.REVIEW path).
       if (result._alreadyWritten) continue;
 
       const id = deterministicId(candidate);
       const ref = id ? contacts.doc(id) : contacts.doc();
-
-      await ref.set({
+      const payload = {
         ...identityFields(candidate),
         ...createStatusFields({
           recordStatus: RECORD_STATUS.ACTIVE,
@@ -326,8 +326,44 @@ async function commitResults(userId, results, candidatesByRef, { operationId, ac
         identity_operation_id: operationId,
         identity_actor: actor,
         addedAt: new Date().toISOString(),
-      }, { merge: true });
+      };
 
+      if (!id) {
+        // No deterministic id: an auto id is always free by construction —
+        // nothing to collide with.
+        await ref.set(payload);
+        result.contactId = ref.id;
+        continue;
+      }
+
+      // A deterministic id can already be occupied: by this exact operation's
+      // own earlier attempt at THIS clientRef (a safe, idempotent retry), or
+      // by an unrelated record another save path wrote under the same
+      // {companyId}_{apolloPersonId} convention (deterministicId's own
+      // docblock names four other callers of it). Only the first is safe to
+      // touch. Create-only, decided inside a transaction against the document
+      // as it is stored right now — never a blind merge into whatever is
+      // there, which would silently overwrite a stranger's canonical fields.
+      const outcome = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(ref);
+        if (!snap.exists) {
+          tx.set(ref, payload);
+          return 'created';
+        }
+        if (snap.data().identity_operation_id === operationId) return 'retry';
+        return 'occupied';
+      });
+
+      if (outcome === 'occupied') {
+        result.outcome = OUTCOME.REFUSED;
+        result.contactId = null;
+        result.reason = 'deterministic_id_occupied';
+        result.detail = 'another record already exists at this identity; nothing was changed';
+        continue;
+      }
+
+      // 'retry': this operation's own prior write stands, untouched — the
+      // same no-op shape as the RESOLUTION.REVIEW retry path above.
       result.contactId = ref.id;
       continue;
     }

@@ -13,8 +13,21 @@
  * Nothing is attached without the user's confirmation, and nothing the
  * contact already holds is replaced. A differing title comes back as a
  * suggestion the user can take (acceptLinkedInSuggestion).
+ *
+ * The cross-contact checks (step 2, and the Apollo id check below) are
+ * necessarily best-effort: a Firestore transaction can only guard one
+ * document, and "does any other contact already have this" is a query
+ * across many. What a transaction CAN guard is step 1 and step 4 together:
+ * between the read above and the write, the contact's own state must not
+ * have changed underneath this call (another tab, a manual edit, Enrich).
+ * So the final check and the write run inside one transaction, against the
+ * contact as it is stored at that moment — the same shape #750 used for
+ * Barry Enrich (#738). If the contact gained a different LinkedIn URL in
+ * that window, the transaction refuses (`has_other`) rather than silently
+ * overwriting it; if a field was filled meanwhile, `enrichmentFromProfile`
+ * is recomputed against that latest state, so it is never re-filled.
  */
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, runTransaction } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { resolveContact, RESOLUTION } from '../../services/contactIdentityService';
@@ -91,9 +104,21 @@ export async function confirmLinkedIn(uid, contactId, linkedinUrl, { fetchProfil
   const apolloIdTaken = Boolean(apolloId && !contact.apollo_person_id
     && await otherHolder(uid, contactId, { apollo_person_id: apolloId }).catch(() => true));
 
-  const { patch, filled, suggestions } = enrichmentFromProfile(contact, url, profile, { apolloIdTaken });
-  await updateDoc(ref, patch);
-  return { status: 'linked', profileStatus: fetched.status, filled, suggestions };
+  // Final identity check and write, against the contact as it is stored at
+  // this moment — not the copy read above. A change in between (another
+  // confirm, a manual edit, Enrich) is decided against fresh, never lost.
+  return runTransaction(db, async (tx) => {
+    const latestSnap = await tx.get(ref);
+    if (!latestSnap.exists()) return { status: 'missing' };
+    const latest = { id: latestSnap.id, ...latestSnap.data() };
+
+    const latestOwn = normalizeLinkedInUrl(latest.linkedin_url);
+    if (latestOwn && latestOwn !== normalizeLinkedInUrl(url)) return { status: 'has_other' };
+
+    const { patch, filled, suggestions } = enrichmentFromProfile(latest, url, profile, { apolloIdTaken });
+    tx.update(ref, patch);
+    return { status: 'linked', profileStatus: fetched.status, filled, suggestions };
+  });
 }
 
 /** Take a suggestion the user tapped (the title today): their choice, recorded as theirs. */

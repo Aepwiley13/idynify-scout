@@ -7,7 +7,7 @@
  * Nothing is optimistic (U3): a chip is pending until its transaction
  * resolves, and the row then shows the confirmed change.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { addSticker, removeSticker } from '../../services/contactStickers';
@@ -18,7 +18,6 @@ import {
 import { useStickers } from './stickersRegistry';
 import StickerChip from './StickerChip';
 import StickerPicker from './StickerPicker';
-import StickerToast from './StickerToast';
 import { describeStickerError, logStickerFailure } from './stickerMessages';
 import { readRecentStickerIds, rememberRecentSticker } from './recentStickers';
 import { nextStickerColor } from './stickerPalette';
@@ -29,15 +28,19 @@ export const UNDO_MS = 6000;
 export default function ContactStickersRow({ contact, onUpdate }) {
   const stickers = useStickers();
   if (!stickers.ready || !contact?.id) return null;
-  return <Row contact={contact} onUpdate={onUpdate} stickers={stickers} />;
+  // One Row per contact. The full-page profile keeps this component mounted
+  // when the route moves to another contact, while a notice's Undo or Retry
+  // (page-level, StickersProvider) can still be pressed. Keyed, that action
+  // belongs to the old Row, which still points at the contact it was raised
+  // for, so it can never write to the contact now on screen.
+  return <Row key={contact.id} contact={contact} onUpdate={onUpdate} stickers={stickers} />;
 }
 
 function Row({ contact, onUpdate, stickers }) {
-  const { uid, byId, active, all, recheck } = stickers;
+  const { uid, byId, active, all, recheck, notify } = stickers;
   const T = useT();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(() => new Map());
-  const [toast, setToast] = useState(null);
   const [recentIds, setRecentIds] = useState(() => readRecentStickerIds(uid));
   const buttonRef = useRef(null);
   const latest = useRef(contact);
@@ -48,8 +51,8 @@ function Row({ contact, onUpdate, stickers }) {
   useEffect(() => { registry.current = byId; }, [byId]);
   useEffect(() => () => { mounted.current = false; }, []);
 
-  const dismiss = useCallback(() => setToast(null), []);
-  const say = (next) => { if (mounted.current) setToast({ ...next, id: Date.now() + Math.random() }); };
+  // Page-level notice (StickersProvider): it stays even if this row goes away.
+  const say = notify;
 
   const stored = storedStickerIds(contact);
   const assigned = new Set(stored);
@@ -168,7 +171,6 @@ function Row({ contact, onUpdate, stickers }) {
           ) : null}
         </li>
       </ul>
-      <StickerToast toast={toast} onDismiss={dismiss} />
     </div>
   );
 }

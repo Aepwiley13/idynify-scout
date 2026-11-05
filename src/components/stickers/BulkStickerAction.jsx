@@ -22,7 +22,7 @@ import { nextStickerColor } from './stickerPalette';
 import './stickers.css';
 
 export default function BulkStickerAction({ selectedIds, nameOf = (id) => id, onApplied, onReduceSelection, onRunningChange, buttonStyle = {} }) {
-  const { ready, uid, active, all, recheck } = useStickers();
+  const { ready, uid, active, all, recheck, notify } = useStickers();
   const T = useT();
   const [open, setOpen] = useState(false);
   const [running, setRunning] = useState(null);
@@ -53,7 +53,11 @@ export default function BulkStickerAction({ selectedIds, nameOf = (id) => id, on
     if (outcome.failed.length) {
       for (const f of outcome.failed) logStickerFailure('bulk_add', f);
       onReduceSelection?.(outcome.failed.map((f) => f.contactId));
-      if (outcome.failed.some((f) => f.code === STICKER_ERRORS.PERMISSION_DENIED && f.reason === DENIAL_REASONS.WRITE_DENIED)) recheck();
+      if (outcome.failed.some((f) => f.code === STICKER_ERRORS.PERMISSION_DENIED && f.reason === DENIAL_REASONS.WRITE_DENIED)) {
+        // The bulk bar disappears if access is gone; the page-level notice stays.
+        notify({ tone: 'error', message: describeStickerError({ code: STICKER_ERRORS.PERMISSION_DENIED, reason: DENIAL_REASONS.WRITE_DENIED }).message, duration: 8000 });
+        recheck();
+      }
     }
     setResult(outcome);
   }

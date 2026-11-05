@@ -65,7 +65,7 @@ As QA-Beta, mode `beta`, desktop and then a phone (or 390 px wide).
 | Q3.1 | Open the Sticker filter | Active stickers, each with a count matching the cards; archived contacts not counted |
 | Q3.2 | Choose one | Only those people; the address bar gains `?sticker=…`; reload keeps it; ✕ clears it |
 | Q3.3 | Sticker filter plus Tag filter | Only people with both; the filter badge counts 2; "Clear filters" clears both |
-| Q3.4 | Search a sticker name | Matching people listed; an archived sticker's name matches nobody |
+| Q3.4 | Search a sticker name that no contact's name, title or company contains (not "Board" or "Volunteer": the synthetic contacts include Board Chairs and Volunteer Leads) | Only that sticker's holders listed; an archived sticker's name matches nobody |
 | Q3.5 | Cards and List | Up to 2 chips on a card, 1 on a row, "+n" for more; before tags |
 | Q3.6 | Start Cadence → select about 25 → Add sticker → choose | "Adding… n of 25", other bulk buttons disabled, then the summary |
 | Q3.7 | Repeat Q3.6 while another tab archives that sticker | Late ones counted "not changed" with the archived message; Details names them; the selection narrows to them; Retry runs for them only |

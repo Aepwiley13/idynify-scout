@@ -20,7 +20,7 @@ vi.mock('../services/contactStickers', () => ({
   removeSticker: (...a) => fake.current.services.removeSticker(...a),
   addStickerToContacts: (...a) => fake.current.services.addStickerToContacts(...a),
 }));
-vi.mock('../context/ImpersonationContext', () => ({ getEffectiveUser: () => ({ uid: 'u1' }) }));
+vi.mock('../context/ImpersonationContext', () => ({ getEffectiveUser: () => ({ uid: 'u1' }), useImpersonation: () => ({ isImpersonating: false }) }));
 
 import { StickersProvider } from '../components/stickers/StickersContext';
 import { useStickers } from '../components/stickers/stickersRegistry';
@@ -185,6 +185,18 @@ describe('BulkStickerAction', () => {
     await user.click(within(region).getByRole('button', { name: 'Details' }));
     expect(region).toHaveTextContent("Stickers can't be changed right now.");
     await waitFor(() => expect(fake.current.state.configFetches).toBe(2));
+  });
+
+  it('QA D-1: revoked during a bulk add, the page still says why after the bulk bar goes away', async () => {
+    const user = userEvent.setup();
+    fake.current.state.impl.bulk = async (_uid, ids) => ({ added: [], already: [], failed: ids.map((contactId) => ({ contactId, code: 'permission_denied', reason: 'write_denied' })) });
+    render(<Host initial={['k1']} spy={{ applied: [] }} />);
+    const button = await screen.findByRole('button', { name: 'Add sticker' });
+    fake.current.state.config = config({ enabled: false, mode: 'off', readOnly: false });
+    await user.click(button);
+    await user.click(screen.getByRole('option', { name: 'Board' }));
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Add sticker' })).toBeNull());
+    expect(screen.getAllByRole('status').some((el) => el.textContent.includes("Stickers can't be changed right now."))).toBe(true);
   });
 
   it('create inline makes the sticker, then adds it to the selection', async () => {

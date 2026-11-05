@@ -291,7 +291,6 @@ export default function ContactProfile({
           userId: user.uid,
           authToken: authToken,
           contact: contactData,
-          companyData: null // TODO: Load company data if needed
         })
       });
 

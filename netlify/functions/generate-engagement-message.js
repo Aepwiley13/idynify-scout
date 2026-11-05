@@ -10,6 +10,7 @@ import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
 import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
 import { OUTBOUND_COPY_RULES } from './utils/outboundCopyRules.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
+import { loadCompanyFactsForBarry, formatCompanyFactsBlock } from './utils/barryCompanyFacts.js';
 
 /**
  * GENERATE ENGAGEMENT MESSAGE - Barry AI Intelligence Engine
@@ -141,6 +142,20 @@ export const handler = async (event) => {
       }
     }
 
+    // 1b. Load verified company facts + the deciding ICP, if any — from the
+    // actual company document, never from a client-supplied string. Only
+    // `company_name`/`company_industry` strings off the contact doc reached
+    // this prompt before; nothing here ever read the company collection.
+    let verifiedCompanyFacts = {};
+    let icpId = null;
+    try {
+      const companyLookup = await loadCompanyFactsForBarry(db, userId, fullContact.company_id);
+      verifiedCompanyFacts = companyLookup.facts;
+      icpId = companyLookup.icpId;
+    } catch (companyError) {
+      console.warn('⚠️ Could not load company facts (non-fatal):', companyError.message);
+    }
+
     // 2. Load RECON data (Sections 3, 5, 8, 9)
     let section3 = null;
     let section5 = null;
@@ -170,6 +185,25 @@ export const handler = async (event) => {
       }
     } catch (reconError) {
       console.log('⚠️ No RECON data available');
+    }
+
+    // 2b. Load the deciding ICP's messaging, if the company was decided
+    // under one. Same precedence generate-engagement-message's sibling
+    // endpoints already use: the ICP's own messaging stands in for the
+    // generic Section 9 aggregate when present; a missing icpId proceeds
+    // with Section 9 alone, never a guessed ICP.
+    let icpMessaging = null;
+    if (icpId) {
+      try {
+        const icpDoc = await db.collection('users').doc(userId).collection('icpProfiles').doc(icpId).get();
+        icpMessaging = icpDoc.exists ? (icpDoc.data()?.messaging || null) : null;
+        if (icpMessaging) {
+          reconLoaded = true;
+          console.log('✅ Deciding ICP messaging loaded');
+        }
+      } catch (icpError) {
+        console.log('⚠️ Could not load ICP messaging (non-fatal):', icpError.message);
+      }
     }
 
     // 3. Load user profile (company name, etc.)
@@ -282,9 +316,16 @@ export const handler = async (event) => {
     const lastName = fullContact.lastName || '';
     const fullName = `${firstName} ${lastName}`.trim();
     const title = fullContact.title || fullContact.current_position_title || '';
-    const company = fullContact.company_name || fullContact.current_company_name || '';
-    const industry = fullContact.company_industry || fullContact.industry || '';
+    const company = fullContact.company_name || fullContact.current_company_name || verifiedCompanyFacts.name || '';
+    const industry = fullContact.company_industry || fullContact.industry || verifiedCompanyFacts.industry || '';
     const seniority = fullContact.seniority || '';
+
+    // Company facts block: rendered whenever this contact has a company_id
+    // to look up. A field the company document doesn't have is stated as
+    // unknown, never left out — see loadCompanyFactsForBarry for the
+    // same-source-disagrees rule and formatCompanyFactsBlock for why an
+    // absent fact still gets an explicit line.
+    const companyFactsBlock = fullContact.company_id ? formatCompanyFactsBlock(verifiedCompanyFacts) : null;
 
     // Build RECON context string
     let reconContext = '';
@@ -302,10 +343,13 @@ USER'S CUSTOMER INTELLIGENCE (from RECON):
         console.log('✅ Section 5 pain points context assembled');
       }
 
-      if (section9?.data && section9.status === 'completed') {
-        const s9 = section9.data;
+      // The deciding ICP's own messaging stands in for the generic
+      // dashboard aggregate when present — same precedence
+      // compileReconForPrompt uses for the Meet-panel/sequence-step paths.
+      const s9 = icpMessaging || (section9?.data && section9.status === 'completed' ? section9.data : null);
+      if (s9) {
         reconContext += `
-USER'S MESSAGING PREFERENCES:
+USER'S MESSAGING PREFERENCES${icpMessaging ? ' (the deciding ICP\'s own voice)' : ''}:
 - Email tone: ${s9.emailTone || 'Professional'}
 - Email length: ${s9.emailLength || 'Short'}
 - Key messages to emphasize: ${Array.isArray(s9.keyMessages) ? s9.keyMessages.join(', ') : 'Not specified'}
@@ -313,7 +357,7 @@ USER'S MESSAGING PREFERENCES:
 - Social proof emphasis: ${s9.socialProofEmphasis || 'Moderate'}
 - Personalization level: ${s9.personalizationLevel || 'Highly personalized'}
 `;
-        console.log('✅ Section 9 messaging preferences context assembled');
+        console.log('✅ Section 9 messaging preferences context assembled' + (icpMessaging ? ' (deciding ICP)' : ''));
       }
     }
 
@@ -423,7 +467,10 @@ CONTACT INFORMATION:
 - Email: ${fullContact.email || 'Not available'}
 - Phone: ${fullContact.phone || fullContact.phone_mobile || 'Not available'}
 - LinkedIn: ${fullContact.linkedin_url || 'Not available'}${jobStartDateLine}
-
+${companyFactsBlock ? `
+CONTACT'S COMPANY (verified from the company record — treat any "Unknown" line as a hard constraint, not an invitation to infer):
+${companyFactsBlock}
+` : ''}
 RELATIONSHIP CONTEXT:
 ${toneGuidance}
 ${structuredContext.relationship_type || structuredContext.warmth_level || structuredContext.strategic_value ? `

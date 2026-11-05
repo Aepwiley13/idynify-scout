@@ -22,7 +22,7 @@
 | E3 | The rules on staging are `main`'s | `node scripts/staging/stagingRulesDeploy.mjs --env=… --project=<staging-id> --apply`, from `main` at the commit under test |
 | E4 | **One project everywhere** | Browser: every `firestore.googleapis.com` request names `projects/<staging-id>`. Functions: the preflight's `same-project` check. Sign-in: the preflight's `auth-domain` check, and the login page's auth requests go to `<staging-id>.firebaseapp.com`. Rules: the deploy wrapper printed `Target: <staging-id>`. |
 | E5 | Test accounts exist: QA-Admin (`role: 'admin'`), QA-Beta, QA-User, QA-Other | runbook §3.2 |
-| E6 | Test contacts: about 30 for QA-Beta (one archived, some with tags), a few for QA-Other | runbook §3.3 |
+| E6 | Test contacts: import `docs/staging/synthetic-contacts.csv` (30 fictional people, `example.test` addresses) as QA-Beta; archive one; add tags to a few; a few contacts for QA-Other | runbook §3.3 |
 
 If any entry check fails: stop. Do not continue against a partly isolated setup.
 
@@ -91,8 +91,8 @@ As QA-Beta, mode `beta`, desktop and then a phone (or 390 px wide).
 |---|---|---|
 | Q5.1 | Mode `off` (rollout tool), reload | All sticker surfaces gone; contacts, tags, notes, timeline work |
 | Q5.2 | Mode back to `beta` | The same stickers come back |
-| Q5.3 | Deploy the lockdown variant (`stickerRulesEnabled()` → false) to **staging** with the wrapper; mode `on` | Every sticker add, remove, create and edit refused; contact edits, notes, timeline, archive still work |
-| Q5.4 | Redeploy `main`'s rules to staging | Stickers work again |
+| Q5.3 | Edit `firestore.rules` locally so `stickerRulesEnabled()` returns false, then deploy it to **staging** with the wrapper and `--allow-modified-rules`; mode `on` | Every sticker add, remove, create and edit refused; contact edits, notes, timeline, archive still work |
+| Q5.4 | Discard the local edit (`git checkout firestore.rules`) and redeploy `main`'s rules to staging | The wrapper names the commit with no local changes; stickers work again |
 
 ## 6. Regression (no stickers involved)
 

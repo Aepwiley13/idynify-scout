@@ -18,14 +18,14 @@
 | I1 | **A separate Firebase project.** Its id contains `staging` or `stg`, and it is not `idynify-scout-dev`. | Firebase console, project settings |
 | I2 | **No production or Contact Hub data.** Only the test accounts and test contacts made here. | Nothing is imported except the test CSV in §3.3 |
 | I3 | **Its own service account.** The key file stays on the operator's machine. It is never committed, never put in a client build, never pasted into chat. | `git status` is clean; the key path is outside the repo |
-| I4 | **The app points at it, front and back.** Either local `netlify dev` with a staging `.env` (recommended: no hosting to set up), or a **separate** Netlify site. Not a context on the production site, because its other variables (Gmail, Stripe, Apollo) are production. | §2 pre-flight, every session |
+| I4 | **The app points at it, front and back.** Either local `npx netlify dev --offline` from a fresh, **unlinked** clone with no root `.env` (recommended: no hosting to set up), or a **separate** Netlify site. Not a context on the production site, and never a linked clone: `netlify dev` would inject the production site's variables (Gmail, Stripe, Apollo). The preflight refuses a linked clone or a root `.env`. | §2 pre-flight, every session |
 | I5 | **Integrations unset.** Gmail, Apollo, Stripe, Twilio and Barry keys are left empty. Stickers need none of them. | The staging `.env` contains only the variables in §3.1 |
 
 ---
 
 ## 2. Pre-flight, at the start of every session
 
-0. **The env file.** Before starting `netlify dev`, run:
+0. **The env file and the checkout.** Before starting `npx netlify dev --offline`, run this from the clone you will start it in:
    ```bash
    PRODUCTION_FIREBASE_PROJECT_ID=idynify-scout-dev node scripts/staging/stagingPreflight.mjs --env=/path/outside/repo/.env.staging
    ```
@@ -36,7 +36,7 @@
    - every integration key (I5) is empty
    - git would not commit the file
 1. **Front end.** In DevTools → Network, filter `firestore.googleapis.com`. Every request path contains `projects/<staging-id>/`.
-2. **Back end.** `FIREBASE_PROJECT_ID` in the environment serving the functions is `<staging-id>`. For `netlify dev`, that's the `.env` you started it with.
+2. **Back end.** `FIREBASE_PROJECT_ID` in the environment serving the functions is `<staging-id>`. Load the env file into the shell (`set -a; . <file>; set +a`), then start `npx netlify dev --offline` from the same shell. `--offline` keeps the CLI from fetching any Netlify site's variables.
 3. **Signed in as a test account** (§3.2), never a real one.
 
 **If any check shows `idynify-scout-dev` or anything not ending in your staging id: stop, sign out, and report it. Do not continue.**
@@ -44,6 +44,8 @@
 ---
 
 ## 3. One-time setup (once the project exists)
+
+The owner's short path is `STICKERS_STAGING_SETUP.md`; this section is the detail.
 
 ### 3.1 Environment (`.env` for `netlify dev`, outside git)
 Start from `docs/staging/stickers-staging.env.example`. Copy it **outside the repository** (`.env.staging` is also git-ignored) and fill in:

@@ -15,14 +15,18 @@
  *       name the same project, and the auth domain is that project's
  *   I5  every integration key is empty: Gmail, Stripe, Apollo, LinkedIn,
  *       Barry, email, search and the env admin lists
+ *   I6  nothing else feeds the app: this checkout is not linked to a Netlify
+ *       site (`netlify dev` would inject that site's variables, which are
+ *       production's) and has no root .env file Vite would load alongside
  *
  *   PRODUCTION_FIREBASE_PROJECT_ID=<production id> node scripts/staging/stagingPreflight.mjs --env=/path/outside/repo/.env.staging
+ *   (optional) --checkout=<clone the app will run from>; default: this repository
  *
  * Exit 0 only when every check passes.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { resolve, relative, isAbsolute } from 'node:path';
+import { resolve, relative, isAbsolute, join } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import process from 'node:process';
 
@@ -68,8 +72,10 @@ const filled = (value) => typeof value === 'string' && value.trim() !== '';
  * @param {object} options
  * @param {string|null} options.productionProjectId
  * @param {boolean} options.fileCommittable  true when git would commit the env file
+ * @param {boolean} options.linkedSite       true when this checkout is linked to a Netlify site
+ * @param {string[]} options.rootEnvFiles     .env files in the checkout root that Vite would load
  */
-export function checkStagingEnv(env, { productionProjectId = null, fileCommittable = false } = {}) {
+export function checkStagingEnv(env, { productionProjectId = null, fileCommittable = false, linkedSite = false, rootEnvFiles = [] } = {}) {
   const results = [];
   const add = (id, ok, message) => results.push({ id, ok, message });
   const project = env.VITE_FIREBASE_PROJECT_ID ?? '';
@@ -107,12 +113,28 @@ export function checkStagingEnv(env, { productionProjectId = null, fileCommittab
 
   add('file-not-committable', !fileCommittable,
     fileCommittable ? 'This env file is inside the repository and not ignored: git could commit it. Move it outside the repo.' : 'Git would not commit this env file.');
+
+  add('netlify-unlinked', !linkedSite,
+    linkedSite ? 'This checkout is linked to a Netlify site (.netlify/state.json): `netlify dev` would inject that site\'s variables. Use an unlinked clone, or run `netlify unlink`.' : 'This checkout is not linked to a Netlify site.');
+  add('no-root-env', rootEnvFiles.length === 0,
+    rootEnvFiles.length ? `Vite would also load ${rootEnvFiles.join(', ')} from this checkout. Remove or move them before starting the app.` : 'No other .env file in this checkout.');
   return results;
 }
 
 /** The repository this script belongs to (worked out when asked, not at load). */
 export function repoRoot() {
   return resolve(fileURLToPath(new URL('../..', import.meta.url)));
+}
+
+/** .env files Vite loads in development, present in the checkout root. */
+export const VITE_DEV_ENV_FILES = Object.freeze(['.env', '.env.local', '.env.development', '.env.development.local']);
+
+/** What else would feed `netlify dev` from this checkout: { linkedSite, rootEnvFiles }. */
+export function checkoutInputs(root = repoRoot()) {
+  return {
+    linkedSite: existsSync(join(root, '.netlify', 'state.json')),
+    rootEnvFiles: VITE_DEV_ENV_FILES.filter((name) => existsSync(join(root, name))),
+  };
 }
 
 /** True when the file is inside the repository and git would not ignore it. */
@@ -129,6 +151,8 @@ export function committable(file, root = repoRoot()) {
 
 function main() {
   const arg = process.argv.slice(2).find((a) => a.startsWith('--env='));
+  const checkoutArg = process.argv.slice(2).find((a) => a.startsWith('--checkout='));
+  const checkout = checkoutArg ? resolve(checkoutArg.slice('--checkout='.length)) : repoRoot();
   if (!arg) {
     console.error('Refused: pass --env=<path to the staging env file>.');
     return 1;
@@ -144,10 +168,11 @@ function main() {
   const results = checkStagingEnv(env, {
     productionProjectId: process.env.PRODUCTION_FIREBASE_PROJECT_ID ?? null,
     fileCommittable: committable(file),
+    ...checkoutInputs(checkout),
   });
   for (const r of results) console.log(`  ${r.ok ? '✓' : '✗'} ${r.id.padEnd(22)} ${r.message}`);
   const failed = results.filter((r) => !r.ok).length;
-  console.log(failed ? `\nRefused: ${failed} check(s) failed. Do not start the app against this file.` : '\nPreflight passed. Run the in-browser checks in runbook §2 next.');
+  console.log(failed ? `\nRefused: ${failed} check(s) failed. Do not start the app against this file.` : '\nPreflight passed. Start the app with `npx netlify dev --offline` from this checkout, then run the in-browser checks in runbook §2.');
   return failed ? 1 : 0;
 }
 

@@ -44,6 +44,13 @@ describe('planRulesDeploy', () => {
     expect(plan.problems.join(' ')).toMatch(reason);
   });
 
+  it('refuses a locally modified firestore.rules unless the lockdown drill asks for it', () => {
+    const refused = planRulesDeploy({ env: env(), ...ok, rulesModified: true });
+    expect(refused.ok).toBe(false);
+    expect(refused.problems.join(' ')).toMatch(/uncommitted changes/);
+    expect(planRulesDeploy({ env: env(), ...ok, rulesModified: true, allowModifiedRules: true }).ok).toBe(true);
+  });
+
   it('refuses an env file whose browser and functions disagree', () => {
     const plan = planRulesDeploy({ env: env({ FIREBASE_PROJECT_ID: 'other-staging' }), ...ok });
     expect(plan.ok).toBe(false);
@@ -79,6 +86,7 @@ describe('the tool itself', () => {
     expect(status).toBe(0);
     expect(out).toContain(`--only firestore:rules --project ${P}`);
     expect(out).toContain('Dry run: nothing was deployed.');
+    expect(out).toMatch(/Rules: {2}firestore\.rules at [0-9a-f]{7}/);
   });
 
   it('refuses a mismatched --project with exit 1', () => {

@@ -60,6 +60,29 @@ async function setPendingCheckoutIfFenced(userRef, operationId, pendingCheckoutF
   });
 }
 
+/**
+ * Round-10 fix: `customerId`/`sessionId` on the operation record, and `stripeCustomerId` on the
+ * user doc, used to be written with bare `.update()` calls right after a successful Stripe call —
+ * no re-check that this invocation's claim was still the one the account is tracking. An obsolete
+ * worker (its claim superseded by a newer operationId while it was still mid-flight against
+ * Stripe) could still bind a stale result onto the account: `stripeCustomerId` in particular is
+ * unscoped, global user state with no ownership check of its own, so an obsolete worker writing
+ * it could clobber whatever a newer, live claim had already established. Every such write now
+ * re-reads `pendingCheckout` inside one transaction, alongside the write, and refuses to write
+ * anything if a different operationId is now current — the same ownership check §6b's webhook
+ * reconciliation applies to its own writes, just applied here to checkout's own binding writes.
+ */
+async function bindIfFenced(userRef, operationId, { opRef, opFields, userFields } = {}) {
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(userRef);
+    const current = snap.data()?.pendingCheckout;
+    if (!current || current.operationId !== operationId) return { fenced: true };
+    if (opFields) tx.update(opRef, opFields);
+    if (userFields) tx.update(userRef, userFields);
+    return { fenced: false };
+  });
+}
+
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return respond(405, { error: 'Method not allowed' });
@@ -186,8 +209,16 @@ export const handler = async (event) => {
           { idempotencyKey: `cust-create-${claim.operationId}` }
         );
         customerId = customer.id;
-        await opRef.update({ customerId });
-        await userRef.update({ stripeCustomerId: customerId });
+        const bind = await bindIfFenced(userRef, claim.operationId, {
+          opRef, opFields: { customerId }, userFields: { stripeCustomerId: customerId },
+        });
+        if (bind.fenced) {
+          // A newer claim has taken over this account since this invocation started — this
+          // worker is obsolete. The Stripe customer it just created is real but orphaned from
+          // this account's tracked state; it is not bound here, and is left for reconciliation
+          // rather than guessed into place.
+          return respond(409, { error: 'checkout_operation_superseded' });
+        }
       } catch (err) {
         if (err?.type === 'StripeIdempotencyError') {
           return respond(425, { error: 'checkout_in_progress' }); // genuinely still running elsewhere
@@ -262,7 +293,10 @@ export const handler = async (event) => {
           },
           { idempotencyKey: `checkout-session-${claim.operationId}` }
         );
-        await opRef.update({ sessionId: session.id });
+        const bind = await bindIfFenced(userRef, claim.operationId, { opRef, opFields: { sessionId: session.id } });
+        if (bind.fenced) {
+          return respond(409, { error: 'checkout_operation_superseded' });
+        }
         sessionUrl = session.url;
       } catch (err) {
         if (err?.type === 'StripeIdempotencyError') {
@@ -282,7 +316,10 @@ export const handler = async (event) => {
         (s) => s.metadata?.checkoutOperationId === claim.operationId
       );
       if (matched) {
-        await opRef.update({ sessionId: matched.id });
+        const bind = await bindIfFenced(userRef, claim.operationId, { opRef, opFields: { sessionId: matched.id } });
+        if (bind.fenced) {
+          return respond(409, { error: 'checkout_operation_superseded' });
+        }
         sessionUrl = matched.url;
       } else {
         await writeAmbiguous(uid, 'checkout_session_recovery_expired', { operationId: claim.operationId, customerId });
@@ -300,4 +337,4 @@ export const handler = async (event) => {
 };
 
 // Exported for tests.
-export const __internal = { setPendingCheckoutIfFenced };
+export const __internal = { setPendingCheckoutIfFenced, bindIfFenced };

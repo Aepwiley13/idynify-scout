@@ -337,7 +337,15 @@ async function handleCheckoutCompleted(stripe, stripeEvent) {
       const userRef = db.collection('users').doc(resolvedUid);
       const userSnap = await tx.get(userRef);
       const currentLock = userSnap.data()?.billingLock;
-      if (currentLock?.operationId !== lockOperationId) return; // lock stolen as stale — discard
+      // Round-10 fix: losing the lock does NOT mean this event was applied elsewhere — another
+      // worker may be mid-flight on a completely different event, or may itself fail. Returning
+      // normally here used to let the handler fall through to `ok()` (HTTP 200) with the event
+      // never marked applied, which told Stripe the delivery succeeded and stopped redelivery —
+      // permanently losing the event. Throwing makes this retryable instead: Stripe redelivers,
+      // and a later attempt gets a fresh chance to actually hold the lock.
+      if (currentLock?.operationId !== lockOperationId) {
+        throw new RetryableWebhookError(new Error(`billing lock lost for ${resolvedUid} before commit (checkout.session.completed)`));
+      }
 
       const eventRef = db.collection('stripeWebhookEvents').doc(eventId);
       const eventSnap = await tx.get(eventRef);
@@ -466,7 +474,12 @@ async function applySubscriptionLifecycleEvent(stripe, { eventType, eventId, sub
     const userRef = db.collection('users').doc(resolvedUid);
     const userSnap = await tx.get(userRef);
     const currentLock = userSnap.data()?.billingLock;
-    if (currentLock?.operationId !== lockOperationId) return; // lock stolen as stale — discard
+    // Round-10 fix: same reasoning as handleCheckoutCompleted above — losing the lock must be
+    // retryable, never a silent 200. A lost lock here used to fall through to `ok()` with the
+    // event never marked applied, permanently dropping it once Stripe stopped redelivering.
+    if (currentLock?.operationId !== lockOperationId) {
+      throw new RetryableWebhookError(new Error(`billing lock lost for ${resolvedUid} before commit (${eventType})`));
+    }
 
     let eventSnap = null;
     if (markLedger) {

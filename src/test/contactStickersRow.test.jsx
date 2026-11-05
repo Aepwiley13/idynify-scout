@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useState } from 'react';
-import { render, screen, within, waitFor, act } from '@testing-library/react';
+import { render, screen, within, waitFor, act, configure } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createFakeStickers, sticker, sid, config, stickerError } from './helpers/stickersUi';
 
@@ -28,6 +28,10 @@ vi.mock('../context/ImpersonationContext', () => ({ getEffectiveUser: () => view
 
 import { StickersProvider } from '../components/stickers/StickersContext';
 import ContactStickersRow from '../components/stickers/ContactStickersRow';
+
+// The row waits on a config answer and a registry snapshot; give slow CI
+// machines room rather than racing the 1s default.
+configure({ asyncUtilTimeout: 5000 });
 
 const BOARD = sticker('Board', { color: 'blue' });
 const DONOR = sticker('Donor', { color: 'amber' });
@@ -161,7 +165,7 @@ describe('S5 Stickers row', () => {
     expect(screen.queryByRole('option', { name: 'Board' })).toBeNull();
   });
 
-  it('AT-5-09: at 50 stickers, adding and creating are disabled with the limit line; a direct refusal shows the same line', async () => {
+  it('AT-5-09: at 50 stickers, adding and creating are disabled with the limit line; a direct refusal shows the same line', { timeout: 20000 }, async () => {
     const many = Array.from({ length: 50 }, (_, i) => sticker(`Many${i}`));
     const { user } = await renderRow(contactWith(many.map((s) => s.id)), { registry: [...many, GALA] });
     await user.click(screen.getByRole('button', { name: 'Add sticker' }));

@@ -110,12 +110,17 @@ export function checkStagingEnv(env, { productionProjectId = null, fileCommittab
   return results;
 }
 
+/** The repository this script belongs to (worked out when asked, not at load). */
+export function repoRoot() {
+  return resolve(fileURLToPath(new URL('../..', import.meta.url)));
+}
+
 /** True when the file is inside the repository and git would not ignore it. */
-function committable(file, repoRoot) {
-  const rel = relative(repoRoot, file);
+export function committable(file, root = repoRoot()) {
+  const rel = relative(root, file);
   if (rel.startsWith('..') || isAbsolute(rel)) return false;
   try {
-    execFileSync('git', ['-C', repoRoot, 'check-ignore', '-q', rel], { stdio: 'ignore' });
+    execFileSync('git', ['-C', root, 'check-ignore', '-q', rel], { stdio: 'ignore' });
     return false;
   } catch {
     return true;
@@ -136,10 +141,9 @@ function main() {
     console.error(`Refused: could not read the env file (${err.code ?? 'error'}).`);
     return 1;
   }
-  const repoRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
   const results = checkStagingEnv(env, {
     productionProjectId: process.env.PRODUCTION_FIREBASE_PROJECT_ID ?? null,
-    fileCommittable: committable(file, repoRoot),
+    fileCommittable: committable(file),
   });
   for (const r of results) console.log(`  ${r.ok ? '✓' : '✗'} ${r.id.padEnd(22)} ${r.message}`);
   const failed = results.filter((r) => !r.ok).length;

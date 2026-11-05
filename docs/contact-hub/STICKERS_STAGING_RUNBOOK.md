@@ -81,12 +81,28 @@ Record each uid; the tool takes uids.
 
 ### 3.4 Rules and the rollout mode
 
-**Rules.** Deploy to **staging only**, from the S3 branch (which contains S2 and S4), and only with the owner's approval for this staging deploy:
+**Rules.** Deploy `main`'s rules to **staging only**, with `scripts/staging/stagingRulesDeploy.mjs`. It takes the project from the env file the app runs with, so the browser, the functions, sign-in and the rules all use the same project. It refuses unless:
+- the env file passes every preflight check
+- `--project` repeats that file's project
+- the deploy credential (`GOOGLE_APPLICATION_CREDENTIALS`) belongs to it
+- it is listed in `STICKERS_STAGING_PROJECTS`
+- it is not `PRODUCTION_FIREBASE_PROJECT_ID`
+
+It deploys `firestore:rules` only, and is a dry run unless `--apply`:
 ```bash
-npx --yes firebase-tools@15 deploy --only firestore:rules --project <staging-id>
+node scripts/staging/stagingRulesDeploy.mjs --env=/path/outside/repo/.env.staging --project=<staging-id>
 ```
-- The repo has **no `.firebaserc`**, so a deploy without `--project` fails. Keep it that way: never run `firebase use --add`.
-- Deploy `firestore:rules` only: no indexes, functions or hosting.
+Read the target and command it prints, then add `--apply`.
+- The repo has **no `.firebaserc`**, so a bare `firebase deploy` fails. Keep it that way: never run `firebase use --add`.
+
+**One project everywhere.** Before testing, confirm all four:
+
+| Layer | Check |
+|---|---|
+| Browser | DevTools → Network: every `firestore.googleapis.com` request names `projects/<staging-id>` |
+| Functions | Preflight `same-project`: `FIREBASE_PROJECT_ID` = `VITE_FIREBASE_PROJECT_ID` |
+| Sign-in | Preflight `auth-domain`; the login page's auth requests go to `<staging-id>.firebaseapp.com`. In the staging console, enable Email/Password and keep `localhost` in Authorized domains |
+| Rules | The deploy wrapper printed `Target: <staging-id>` |
 
 **Rollout mode and beta list.** Use `scripts/staging/stickersStaging.mjs`, which writes only `feature_flags/stickers` and `sticker_enrollment/{uid}`. It refuses any target it cannot prove is non-production:
 - `--project` must be listed in `STICKERS_STAGING_PROJECTS`
@@ -148,7 +164,9 @@ Reload the app after each mode change: the availability answer is read once per 
    - **Pass:** every sticker add, remove, create and edit is refused; contact edits, notes, timeline and archive still work.
    - Redeploy the normal rules.
 
-### 4.5 UI checks (once S5–S7 exist)
+### 4.5 UI checks
+The full sign-off checklist is `STICKERS_QA_PLAN.md`.
+
 - Run every **[S]** test in `STICKERS_UI_SPEC.md`: AT-5-17, AT-6-12, AT-6-13, AT-7-11.
 - The 50-sticker limit is proven in the emulator. In staging, check its message only if you have prepared a contact with 50.
 

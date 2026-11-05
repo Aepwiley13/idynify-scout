@@ -25,6 +25,16 @@
 
 ## 2. Pre-flight, at the start of every session
 
+0. **The env file.** Before starting `netlify dev`, run:
+   ```bash
+   PRODUCTION_FIREBASE_PROJECT_ID=idynify-scout-dev node scripts/staging/stagingPreflight.mjs --env=/path/outside/repo/.env.staging
+   ```
+   It must print **Preflight passed.** It refuses a file unless all of these hold (it connects to nothing and prints no secret):
+   - the browser and the functions name the same project
+   - that id contains `staging` or `stg` and is not production
+   - the auth domain and the service account belong to that project
+   - every integration key (I5) is empty
+   - git would not commit the file
 1. **Front end.** In DevTools → Network, filter `firestore.googleapis.com`. Every request path contains `projects/<staging-id>/`.
 2. **Back end.** `FIREBASE_PROJECT_ID` in the environment serving the functions is `<staging-id>`. For `netlify dev`, that's the `.env` you started it with.
 3. **Signed in as a test account** (§3.2), never a real one.
@@ -36,6 +46,7 @@
 ## 3. One-time setup (once the project exists)
 
 ### 3.1 Environment (`.env` for `netlify dev`, outside git)
+Start from `docs/staging/stickers-staging.env.example`. Copy it **outside the repository** (`.env.staging` is also git-ignored) and fill in:
 ```
 VITE_FIREBASE_API_KEY=<staging web config>
 VITE_FIREBASE_AUTH_DOMAIN=<staging-id>.firebaseapp.com
@@ -50,6 +61,7 @@ FIREBASE_PRIVATE_KEY=<staging service account key>
 - `vite.config.js` refuses to build without the six `VITE_FIREBASE_*` values.
 - `requireProjectId()` refuses to start a function without `FIREBASE_PROJECT_ID`.
 - There is no fallback to production on either side.
+- `scripts/staging/stagingPreflight.mjs` (§2, step 0) checks the file before every session.
 
 ### 3.2 Test accounts (staging Auth, email and password)
 

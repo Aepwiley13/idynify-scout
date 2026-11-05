@@ -25,6 +25,12 @@ vi.mock('firebase/firestore', () => ({
   arrayUnion: vi.fn((...v) => v),
   addDoc: vi.fn(async () => ({ id: 'x' })),
   serverTimestamp: vi.fn(() => ({})),
+  // Imported by the sticker services People now loads (S6); unused here.
+  setDoc: vi.fn(async () => {}),
+  runTransaction: vi.fn(async () => {}),
+  deleteField: vi.fn(() => ({})),
+  onSnapshot: vi.fn(() => () => {}),
+  arrayRemove: vi.fn((...v) => v),
 }));
 vi.mock('../firebase/config', () => ({
   db: {},

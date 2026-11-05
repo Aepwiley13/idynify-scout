@@ -17,9 +17,32 @@ The detailed operator steps are in `STICKERS_STAGING_RUNBOOK.md`. This page is t
    - Enable **Email/Password**.
    - Under Settings → Authorized domains, keep `localhost`.
 4. **Web app.** Project settings → General → Your apps → Add app → Web. Copy the six config values (apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId).
-5. **Service account key.** Project settings → Service accounts → Generate new private key.
-   - Save the JSON file **outside any repository**, for example in `~/idynify-staging/`.
-   - Never commit it, email it, or paste it into chat.
+5. **Service account (least privilege, staging only).** Don't use the default `firebase-adminsdk` account, whose access is much broader. In the Google Cloud console, with **the staging project selected**:
+   1. IAM & Admin → Service accounts → Create: `stickers-staging-qa`.
+   2. Grant it these roles **on the staging project only**, and nothing on any other project:
+
+      | Role | Why |
+      |---|---|
+      | Cloud Datastore User (`roles/datastore.user`) | `stickersConfig` reads the flag, the user and the enrollment; the setup tools write the rollout documents and QA-Admin's role |
+      | Firebase Rules Admin (`roles/firebaserules.admin`) | deploy `firestore.rules` |
+      | Firebase Authentication Viewer (`roles/firebaseauth.viewer`) | "view as" (`adminStartImpersonation`) looks the user up |
+      | Firebase Viewer (`roles/firebase.viewer`) | firebase-tools reads the project before a deploy |
+      | Service Usage Consumer (`roles/serviceusage.serviceUsageConsumer`) | firebase-tools checks the rules API is enabled |
+
+      Not Owner, Editor, Firebase Admin or any token-creator role. If `--validate` in step D reports a missing permission, add that one only.
+   3. Keys → Add key → Create new key → JSON. Keep the file **outside any repository**. Never commit it, email it, or paste it into chat.
+   4. **Delete the key when QA is finished** (Keys → delete).
+
+   **Where the key goes:**
+   - *Your own machine:* `export GOOGLE_APPLICATION_CREDENTIALS=<path to the key file>`.
+   - *A Claude Code cloud session:* its only in-process secret store is an environment variable. In the session's environment settings, add `STAGING_SERVICE_ACCOUNT_KEY` set to the key file's contents as base64, which fits on one line:
+     - macOS: `base64 -i key.json | pbcopy`
+     - Linux: `base64 -w0 key.json`
+     - Windows PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("key.json")) | Set-Clipboard`
+
+     It loads when the session next starts. Remove the variable when QA is finished.
+
+   Set one or the other, never both: the tools refuse both. They check the key belongs to the staging project, never print it, and never write it into the env file. The rules deploy hands it to firebase-tools as a private temporary file, deleted as soon as firebase-tools exits (`scripts/staging/stagingCredentials.mjs`).
 6. **Access.** Only you and the QA tester need access. Don't add production collaborators.
 
 ## B. A clean checkout
@@ -35,18 +58,16 @@ The detailed operator steps are in `STICKERS_STAGING_RUNBOOK.md`. This page is t
 2. Fill in:
    - the six `VITE_FIREBASE_*` values from A4
    - `FIREBASE_PROJECT_ID`: the same project id
-   - from the JSON key in A5: `FIREBASE_CLIENT_EMAIL` = `client_email`, and `FIREBASE_PRIVATE_KEY` = `private_key`, in quotes, keeping the `\n`s
+   - **no key:** the functions' account comes from the A5 credential. (Putting `FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY` in the file still works if no A5 credential is set, but keeps a key in a file.)
 3. Leave every other variable out.
-4. Check it:
+4. Check it, with the A5 credential set:
    ```bash
    PRODUCTION_FIREBASE_PROJECT_ID=idynify-scout-dev node scripts/staging/stagingPreflight.mjs --env=$HOME/idynify-staging/.env.staging
    ```
    It must end with **Preflight passed.**
 
 ## D. Rules on staging (with your approval for this staging deploy)
-```bash
-export GOOGLE_APPLICATION_CREDENTIALS=$HOME/idynify-staging/<key file>.json
-```
+With the A5 credential set (`GOOGLE_APPLICATION_CREDENTIALS` or `STAGING_SERVICE_ACCOUNT_KEY`):
 ```bash
 export STICKERS_STAGING_PROJECTS=<staging-id>
 ```
@@ -56,15 +77,15 @@ export PRODUCTION_FIREBASE_PROJECT_ID=idynify-scout-dev
 ```bash
 node scripts/staging/stagingRulesDeploy.mjs --env=$HOME/idynify-staging/.env.staging --project=<staging-id>
 ```
-Check the printed target, and that the rules are `main` at a commit with no local changes. Then run the same command with `--apply`.
+Check the printed target, the credential line, and that the rules are `main` at a commit with no local changes. Then run the same command:
+1. with `--validate`: firebase-tools checks the credential, its permissions and the rules against the staging project, and deploys nothing;
+2. then with `--apply`.
 
 ## E. Start the app on staging
 ```bash
-set -a; . $HOME/idynify-staging/.env.staging; set +a
+PRODUCTION_FIREBASE_PROJECT_ID=idynify-scout-dev node scripts/staging/stagingDev.mjs --env=$HOME/idynify-staging/.env.staging
 ```
-```bash
-npx netlify dev --offline
-```
+It re-runs the preflight, refuses on any failure, and starts `netlify dev --offline`. The app gets only the env file, the staging account (in memory), and from your shell nothing that is Firebase, a credential or an integration. Behind an HTTPS proxy that does not carry gRPC (a cloud session), add `--rest`.
 - Open http://localhost:8888.
 - In DevTools → Network, every `firestore.googleapis.com` request must name `projects/<staging-id>`. If anything names `idynify-scout-dev`, stop.
 

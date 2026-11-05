@@ -22,6 +22,12 @@
  *   PRODUCTION_FIREBASE_PROJECT_ID=<production id> node scripts/staging/stagingPreflight.mjs --env=/path/outside/repo/.env.staging
  *   (optional) --checkout=<clone the app will run from>; default: this repository
  *
+ * The functions' service account can come from the env file
+ * (FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY) or, kept out of files, from
+ * STAGING_SERVICE_ACCOUNT_KEY or GOOGLE_APPLICATION_CREDENTIALS
+ * (stagingCredentials.mjs). Then the key must belong to the env file's
+ * project, and the file must not also hold a private key.
+ *
  * Exit 0 only when every check passes.
  */
 import { readFileSync, existsSync } from 'node:fs';
@@ -29,6 +35,7 @@ import { execFileSync } from 'node:child_process';
 import { resolve, relative, isAbsolute, join } from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import process from 'node:process';
+import { readStagingCredential, withCredential, checkCredential, CredentialRefusal } from './stagingCredentials.mjs';
 
 export const FIREBASE_WEB_KEYS = Object.freeze([
   'VITE_FIREBASE_API_KEY', 'VITE_FIREBASE_AUTH_DOMAIN', 'VITE_FIREBASE_PROJECT_ID',
@@ -165,14 +172,27 @@ function main() {
     console.error(`Refused: could not read the env file (${err.code ?? 'error'}).`);
     return 1;
   }
-  const results = checkStagingEnv(env, {
-    productionProjectId: process.env.PRODUCTION_FIREBASE_PROJECT_ID ?? null,
-    fileCommittable: committable(file),
-    ...checkoutInputs(checkout),
-  });
+  let credential;
+  try {
+    credential = readStagingCredential(process.env);
+  } catch (err) {
+    if (!(err instanceof CredentialRefusal)) throw err;
+    console.error(`Refused: ${err.message}`);
+    return 1;
+  }
+  const results = [
+    ...checkStagingEnv(withCredential(env, credential), {
+      productionProjectId: process.env.PRODUCTION_FIREBASE_PROJECT_ID ?? null,
+      fileCommittable: committable(file),
+      ...checkoutInputs(checkout),
+    }),
+    ...checkCredential(env, credential),
+  ];
   for (const r of results) console.log(`  ${r.ok ? '✓' : '✗'} ${r.id.padEnd(22)} ${r.message}`);
   const failed = results.filter((r) => !r.ok).length;
-  console.log(failed ? `\nRefused: ${failed} check(s) failed. Do not start the app against this file.` : '\nPreflight passed. Start the app with `npx netlify dev --offline` from this checkout, then run the in-browser checks in runbook §2.');
+  console.log(failed
+    ? `\nRefused: ${failed} check(s) failed. Do not start the app against this file.`
+    : '\nPreflight passed. Start the app with `node scripts/staging/stagingDev.mjs --env=<this file>` (it re-runs these checks), or `npx netlify dev --offline` with the env file loaded; then run the in-browser checks in runbook §2.');
   return failed ? 1 : 0;
 }
 

@@ -19,9 +19,19 @@
  * which returns all three fields together, and the writers apply it in a
  * transaction against the contact as stored (src/services/contactEmailService.js).
  *
- * Only the PRIMARY address is an identity today; the other entries are shown
- * and kept but not matched (ADR-002). This module does not change that.
+ * KNOWN LIMITATIONS — unchanged by this module, tracked in issue #768, pinned
+ * by src/test/emailIdentityCrossRecord.test.js:
+ *   - Only the PRIMARY address is an identity (ADR-002). The other entries are
+ *     shown and kept but not matched, so an import of a contact's secondary
+ *     address creates a second contact.
+ *   - A save does not look at other contacts. Making an address primary that
+ *     another contact already has leaves two contacts with one identity; the
+ *     next import of it is refused as ambiguous (IdentityConflictError),
+ *     never merged onto the wrong one.
+ *   - Barry Enrich (contactProtection.enrichmentPatch) fills `email` without
+ *     the other two fields.
  *
+
  * Pure: no Firebase import, so the read-only drift script can use it too.
  */
 import { normalizeEmail } from './identityNormalization.js';

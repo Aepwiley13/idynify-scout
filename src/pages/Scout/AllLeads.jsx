@@ -1565,6 +1565,14 @@ function AllLeadsPage({ mode = 'people', activeFilter = null }) {
     if (listSelected === contactId) setListSelected(null);
   }
 
+  // The side-panel Contact Profile reports each saved update (stickers, tags,
+  // fields). Merge it into the loaded list, as the other in-place edits here
+  // do, so the card and row reflect it without a reload or a listener.
+  function handlePanelContactChange(updated) {
+    if (!updated?.id) return;
+    setContacts(prev => prev.map(c => (c.id === updated.id ? { ...c, ...updated } : c)));
+  }
+
   // Bulk: toggle one contact in/out of selectedIds
   function toggleSelect(contactId) {
     setSelectedIds(prev => {
@@ -2446,6 +2454,7 @@ function AllLeadsPage({ mode = 'people', activeFilter = null }) {
               autoEngage={panelAutoEngage}
               autoEngageContext={firstTouchContext?.contactId === panelContactId ? firstTouchContext : null}
               onReadyForHunter={handleReadyForHunter}
+              onContactChange={handlePanelContactChange}
               onClose={() => isMobile ? closeMobileProfile() : (() => {
                 setPanelContactId(null);
                 setListSelected(null);

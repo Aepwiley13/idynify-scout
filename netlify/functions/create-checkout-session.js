@@ -40,6 +40,26 @@ async function listAllPages(listFn, params, predicate) {
   }
 }
 
+/**
+ * Round-9 fix (finding 3): every write to `pendingCheckout` after the initial claim — success,
+ * failure, or "needs reconciliation" — re-reads the CURRENT claim inside a transaction and only
+ * writes if its operationId still matches the one this invocation is resolving. An invocation
+ * whose claim has since been superseded by a genuinely newer one (because this one was abandoned
+ * and recovered under a fresh operationId) discards its result instead of overwriting or
+ * clearing a claim it no longer owns.
+ */
+async function setPendingCheckoutIfFenced(userRef, operationId, pendingCheckoutFields) {
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(userRef);
+    const current = snap.data()?.pendingCheckout;
+    // Fenced only when a DIFFERENT claim already exists — "nothing to fence against yet" (no
+    // pendingCheckout at all) is a legitimate first write, not a conflict.
+    if (current && current.operationId !== operationId) return { fenced: true };
+    tx.set(userRef, { pendingCheckout: pendingCheckoutFields }, { merge: true });
+    return { fenced: false };
+  });
+}
+
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return respond(405, { error: 'Method not allowed' });
@@ -95,13 +115,21 @@ export const handler = async (event) => {
   try {
     claim = await db.runTransaction(async (tx) => {
       const snap = await tx.get(userRef);
-      const existing = snap.data()?.pendingCheckout;
+      const data = snap.data() ?? {};
+      const existing = data.pendingCheckout;
 
       if (existing?.status === 'open') {
         return { kind: 'reuse_open', operationId: existing.operationId };
       }
       if (existing?.status === 'creating') {
         return { kind: 'recover', operationId: existing.operationId };
+      }
+      if (existing?.status === 'needs_reconciliation') {
+        // Round-9 fix (finding 3): an uncertain prior outcome stays blocked, permanently, until a
+        // human clears it — never silently falls through to minting a fresh operation, which is
+        // exactly what would risk creating a second Stripe customer/session alongside one that
+        // might already exist from the stuck attempt.
+        return { kind: 'blocked', operationId: existing.operationId };
       }
 
       const operationId = randomUUID();
@@ -111,7 +139,13 @@ export const handler = async (event) => {
         successUrl: `${event.headers?.origin || 'https://idynify.com'}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
         cancelUrl: `${event.headers?.origin || 'https://idynify.com'}/checkout/cancel`,
         createdAt: new Date().toISOString(),
-        customerId: null, sessionId: null, subscriptionId: null,
+        // Round-9 fix (finding 2): seed from the user's own already-verified Stripe customer, if
+        // one exists, instead of always starting from null. Starting from null meant customer
+        // resolution always called customers.create for a fresh claim, creating a SECOND Stripe
+        // customer for anyone who already had one — and the duplicate-subscription listing later
+        // then checked that brand-new, empty customer and never found the original's subscriptions.
+        customerId: data.stripeCustomerId ?? null,
+        sessionId: null, subscriptionId: null,
       });
       tx.set(userRef, { pendingCheckout: { status: 'creating', operationId, claimedAt: new Date().toISOString() } }, { merge: true });
       return { kind: 'fresh', operationId };
@@ -119,6 +153,10 @@ export const handler = async (event) => {
   } catch (err) {
     console.error('Checkout claim transaction failed:', err);
     return respond(500, { error: 'checkout_claim_failed' });
+  }
+
+  if (claim.kind === 'blocked') {
+    return respond(409, { error: 'checkout_needs_manual_reconciliation' });
   }
 
   if (claim.kind === 'reuse_open') {
@@ -160,9 +198,12 @@ export const handler = async (event) => {
     } else {
       // Beyond the idempotency window with no customerId recorded: a customer-scoped listing is
       // impossible without a customer id, and an account-wide search is not a safe substitute
-      // (Stripe Search is eventually consistent — a negative result never proves absence). Stop.
+      // (Stripe Search is eventually consistent — a negative result never proves absence). This
+      // is a genuinely UNCERTAIN outcome — stop, and keep it blocked (not just "failed") so a
+      // repeated request can't mint a fresh operation alongside a customer that might already
+      // exist from this one.
       await writeAmbiguous(uid, 'checkout_customer_recovery_expired', { operationId: claim.operationId });
-      await userRef.set({ pendingCheckout: { status: 'failed', operationId: claim.operationId } }, { merge: true });
+      await setPendingCheckoutIfFenced(userRef, claim.operationId, { status: 'needs_reconciliation', operationId: claim.operationId });
       return respond(409, { error: 'checkout_needs_manual_reconciliation' });
     }
   } else if (userData.stripeCustomerId && userData.stripeCustomerId !== customerId) {
@@ -175,7 +216,10 @@ export const handler = async (event) => {
     if (customer.metadata?.firebaseUID && customer.metadata.firebaseUID !== uid) {
       console.error('Customer ownership mismatch', { uid, customerId });
       await writeAmbiguous(uid, 'customer_ownership_mismatch', { customerId });
-      await userRef.set({ pendingCheckout: { status: 'failed', operationId: claim.operationId } }, { merge: true });
+      // A definite (not uncertain) rejection — the data is simply wrong and needs a human to fix
+      // the account's stripeCustomerId, but retrying doesn't risk creating a duplicate Stripe
+      // object, so 'failed' (not 'needs_reconciliation') is the correct, narrower block here.
+      await setPendingCheckoutIfFenced(userRef, claim.operationId, { status: 'failed', operationId: claim.operationId });
       return respond(409, { error: 'contact_support' });
     }
   } catch (err) {
@@ -189,7 +233,7 @@ export const handler = async (event) => {
     (sub) => !['canceled', 'incomplete_expired'].includes(sub.status) && sub.id !== op.subscriptionId
   );
   if (blockingSub) {
-    await userRef.set({ pendingCheckout: { status: 'failed', operationId: claim.operationId } }, { merge: true });
+    await setPendingCheckoutIfFenced(userRef, claim.operationId, { status: 'failed', operationId: claim.operationId });
     return respond(409, { error: 'already_subscribed' });
   }
 
@@ -229,7 +273,9 @@ export const handler = async (event) => {
       }
     } else {
       // Beyond the window: the customer IS known, so an exact, bounded lookup is possible and is
-      // the only thing attempted — matched by this operation's own id, never "similar tier".
+      // the only thing attempted — matched by this operation's own id, never "similar tier". Also
+      // a genuinely UNCERTAIN outcome if nothing is found — kept blocked, same reasoning as the
+      // customer-recovery-expired branch above.
       const matched = await listAllPages(
         (params) => stripe.checkout.sessions.list(params),
         { customer: customerId, limit: 100 },
@@ -240,15 +286,18 @@ export const handler = async (event) => {
         sessionUrl = matched.url;
       } else {
         await writeAmbiguous(uid, 'checkout_session_recovery_expired', { operationId: claim.operationId, customerId });
-        await userRef.set({ pendingCheckout: { status: 'failed', operationId: claim.operationId } }, { merge: true });
+        await setPendingCheckoutIfFenced(userRef, claim.operationId, { status: 'needs_reconciliation', operationId: claim.operationId });
         return respond(409, { error: 'checkout_needs_manual_reconciliation' });
       }
     }
   }
 
-  await userRef.set({
-    pendingCheckout: { status: 'open', operationId: claim.operationId, sessionUrl, claimedAt: new Date().toISOString() },
-  }, { merge: true });
+  await setPendingCheckoutIfFenced(userRef, claim.operationId, {
+    status: 'open', operationId: claim.operationId, sessionUrl, claimedAt: new Date().toISOString(),
+  });
 
   return respond(200, { url: sessionUrl });
 };
+
+// Exported for tests.
+export const __internal = { setPendingCheckoutIfFenced };

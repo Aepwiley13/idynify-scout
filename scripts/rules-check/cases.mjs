@@ -105,6 +105,7 @@ const SERVER_CONTROLLED = {
   currentPeriodStart: 'x', currentPeriodEnd: 'x', cancelAtPeriodEnd: true, pauseCollection: true,
   billingDate: 'x', nextBillingDate: 'x',
   pendingCheckout: { status: 'open', operationId: 'op_someone_elses', sessionUrl: 'https://evil.example' },
+  billingLock: { operationId: 'op_someone_elses', acquiredAt: 'x' },
 };
 
 // Exactly what Signup.jsx writes when it creates the document — legacy numeric credits shape.

@@ -94,13 +94,24 @@ describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
     }));
 
     const results = await Promise.all(events.map((e) => handler(fakeHttpEvent(e))));
-    expect(results.every((r) => r.statusCode === 200)).toBe(true);
+    // With a bounded-attempt account lock now serializing all 20, some genuinely can't acquire it
+    // in time under this much simultaneous contention — that's the CORRECT, intended behavior
+    // ("if still contended, return non-2xx so Stripe's own retry redelivers it later"), not a
+    // failure. The invariant that matters is: nothing corrupts, nothing silently vanishes — every
+    // result is either a clean 200 (applied) or a retryable 500 (Stripe will redeliver it), never
+    // anything else, and the account converges on the one value every event agrees on anyway.
+    expect(results.every((r) => r.statusCode === 200 || r.statusCode === 500)).toBe(true);
+    expect(results.some((r) => r.statusCode === 200)).toBe(true); // at least one genuinely succeeded
 
     const userDoc = await db.collection('users').doc('uid_race2').get();
     expect(userDoc.data().subscriptionStatus).toBe('past_due');
 
+    // Only the events that actually got a 200 are marked applied — a 500 must NOT be marked
+    // applied (that's exactly what makes it safe for Stripe to retry).
     const ledgerDocs = await Promise.all(events.map((e) => db.collection('stripeWebhookEvents').doc(e.id).get()));
-    expect(ledgerDocs.every((d) => d.exists)).toBe(true);
-  });
+    const appliedCount = ledgerDocs.filter((d) => d.exists).length;
+    const successCount = results.filter((r) => r.statusCode === 200).length;
+    expect(appliedCount).toBe(successCount);
+  }, 30000);
   },
 );

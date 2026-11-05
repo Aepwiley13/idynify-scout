@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import Stripe from 'stripe';
 import { db } from './firebase-admin.js';
 import { isKnownIdynifyPrice, priceIdOfSession, priceIdOfSubscription, knownPriceIds } from './utils/billingPrices.js';
@@ -7,14 +8,15 @@ import { describeSubscription, isBlockingStatus } from '../../src/utils/billingE
 // requires every tx.get() to happen before any tx.set()/tx.update() in the same transaction —
 // mixing them throws "Firestore transactions require all reads to be executed before all
 // writes." (caught by the emulator integration suite, not by a mock). So every transaction below
-// is structured as: (1) read everything via tx.get, and await any Stripe calls needed to decide,
-// (2) compute a decision with pure functions that touch neither Firestore nor Stripe, (3) apply
-// every tx.set/tx.update at the end.
+// is structured as: (1) read everything via tx.get, (2) compute a decision with pure functions
+// that touch neither Firestore nor Stripe, (3) apply every tx.set/tx.update at the end.
 
 const TIER_CREDITS = {
   starter: { credits: 400, companies: 40, contacts: 120, support: '48-hour email' },
   pro: { credits: 1250, companies: 125, contacts: 375, support: '24-hour email' },
 };
+
+const DEAD_SUBSCRIPTION_STATUSES = new Set(['canceled', 'incomplete_expired']);
 
 function tierForPrice(priceId) {
   return priceId === process.env.STRIPE_PRICE_PRO ? 'pro' : 'starter';
@@ -41,6 +43,43 @@ function retryable(err) {
   return { statusCode: 500, body: JSON.stringify({ error: 'retry' }) };
 }
 
+// ── Account-level serialization (round-9 fix) ──────────────────────────────────────────────────
+//
+// Firestore's own optimistic concurrency only protects against conflicting FIRESTORE writes
+// between a transaction's own read and its commit — it has no visibility into staleness of the
+// EXTERNAL Stripe data a decision is based on. Without this, worker A can fetch an OLDER Stripe
+// snapshot, pause, read the user doc AFTER worker B has already fetched a NEWER snapshot and
+// committed it, and then overwrite B's newer write with A's stale one — Firestore sees A's own
+// read-then-write as internally consistent and raises no conflict, because nothing touched the
+// document between A's own read and A's own write. This lock is what actually closes that gap:
+// only one worker may be in the fetch-Stripe-then-decide-then-write critical section for a given
+// account at a time.
+const ACCOUNT_LOCK_STALE_MS = 60_000;
+const ACCOUNT_LOCK_MAX_ATTEMPTS = 5;
+const ACCOUNT_LOCK_RETRY_DELAY_MS = 150;
+
+async function acquireAccountLock(uid) {
+  const userRef = db.collection('users').doc(uid);
+  for (let attempt = 0; attempt < ACCOUNT_LOCK_MAX_ATTEMPTS; attempt++) {
+    const candidateOperationId = randomUUID();
+    const acquired = await db.runTransaction(async (tx) => {
+      const snap = await tx.get(userRef);
+      const lock = snap.data()?.billingLock;
+      const fresh = Boolean(lock) && Date.now() - Date.parse(lock.acquiredAt) < ACCOUNT_LOCK_STALE_MS;
+      if (fresh) return null;
+      // Stale-lock stealing is safe here specifically because the protected operation (fetch
+      // from Stripe, then decide, then write) has no external creation side-effect — redoing a
+      // GET is always safe, unlike checkout's Stripe object *creation*, which needs idempotency
+      // keys and bounded recovery instead of a timeout (see create-checkout-session.js).
+      tx.set(userRef, { billingLock: { operationId: candidateOperationId, acquiredAt: new Date().toISOString() } }, { merge: true });
+      return candidateOperationId;
+    });
+    if (acquired) return acquired;
+    await new Promise((resolve) => setTimeout(resolve, ACCOUNT_LOCK_RETRY_DELAY_MS * (attempt + 1)));
+  }
+  return null;
+}
+
 // ── Stripe subscription-field reading — never a blind guess ──────────────────────────────────
 
 function resolvePeriod(subscription) {
@@ -57,21 +96,36 @@ function resolvePeriod(subscription) {
   return { start: candidates[0].current_period_start, end: candidates[0].current_period_end };
 }
 
+/**
+ * Round-9 fix (finding 1): a canceled/fully-expired subscription must clear `hasCompletedPayment`
+ * — the original pre-hardening code did this explicitly on `customer.subscription.deleted`, and
+ * the collapsed handler dropped it. Deliberately narrow: only the two terminal/dead statuses flip
+ * it to false; every other status (past_due, unpaid, incomplete, paused, trialing, ...) leaves it
+ * untouched, exactly matching the original `customer.subscription.updated` handler, which never
+ * touched `hasCompletedPayment` at all. Generalizing this to the full entitlement model (e.g.
+ * revoking on past_due) would be deciding the failed-payment-grace question this effort has
+ * deliberately deferred — not this fix's job.
+ */
 function buildNormalizedFields(subscription) {
   const { start, end } = resolvePeriod(subscription);
-  return {
+  const fields = {
     subscriptionStatus: subscription.status,
     currentPeriodStart: start != null ? new Date(start * 1000).toISOString() : null,
     currentPeriodEnd: end != null ? new Date(end * 1000).toISOString() : null,
     cancelAtPeriodEnd: subscription.cancel_at_period_end === true,
     pauseCollection: Boolean(subscription.pause_collection),
   };
+  if (DEAD_SUBSCRIPTION_STATUSES.has(subscription.status)) {
+    fields.hasCompletedPayment = false;
+  }
+  return fields;
 }
 
 /**
  * A Firestore transaction can only write a given document reference once. 'update' writes that
- * target the same ref (e.g. a credit grant and a reconciliation write both touching the user
- * doc) are merged into a single shallow-assigned update rather than issued as two calls.
+ * target the same ref (e.g. a credit grant, a reconciliation write, and the lock release all
+ * touching the user doc) are merged into a single shallow-assigned update rather than issued as
+ * separate calls.
  */
 function mergeWritesByRef(writes) {
   const byPath = new Map();
@@ -88,9 +142,6 @@ function ambiguousWriteFor({ uid, reason, details }) {
 }
 
 // ── Pure decision: operation-record validate-then-extend (no I/O) ─────────────────────────────
-//
-// `opData` is null if no operationId was named at all (legacy path — nothing to validate), or the
-// already-fetched document data (or undefined if the named record doesn't exist).
 
 function decideOperationRecord(operationId, opData, { resolvedUid, customerId, priceId, sessionId, subscriptionId }) {
   if (!operationId) return { valid: true, updateFields: null, ambiguousReason: null };
@@ -111,8 +162,6 @@ function decideOperationRecord(operationId, opData, { resolvedUid, customerId, p
   return { valid: true, updateFields: Object.keys(updates).length > 0 ? updates : null, ambiguousReason: null };
 }
 
-// ── Pure decision: replacement authorization (no I/O — operationRecordData pre-fetched) ───────
-
 function decideReplacementAuthorized(subscription, resolvedUid, customerId, operationRecordData) {
   const operationId = subscription.metadata?.checkoutOperationId;
   if (!operationId) return false; // bare uid metadata is never sufficient
@@ -125,14 +174,29 @@ function decideReplacementAuthorized(subscription, resolvedUid, customerId, oper
   );
 }
 
-// ── Pure decision: 6b ownership/product/replacement reconciliation (no I/O) ───────────────────
-//
-// `onFile` is the already-fetched Stripe subscription currently on file (or null if not needed —
-// i.e. userData has no stripeSubscriptionId, or it already matches). `operationRecordData` is the
-// already-fetched billingCheckoutOperations doc for subscription.metadata.checkoutOperationId, if
-// any (or null).
+/**
+ * Round-9 fix (finding 4, continued): computes whether an incoming subscription is a *verified
+ * replacement* for whatever different subscription is currently on file. Pulled out as its own
+ * function — not inlined into decideReconciliation — specifically so it can also gate allocation
+ * eligibility (finding 5): both questions must use the exact same verdict, or allocation and
+ * reconciliation can disagree about the same incoming subscription and commit inconsistent state
+ * together in one transaction.
+ */
+function decideReplacementStatus({ userData, subscription, onFile, operationRecordData, resolvedUid }) {
+  if (!userData?.stripeSubscriptionId || userData.stripeSubscriptionId === subscription.id) {
+    return { kind: 'not_a_replacement' };
+  }
+  if (!onFile) return { kind: 'retry_error' };
+  const onFileIsDead = DEAD_SUBSCRIPTION_STATUSES.has(onFile.status);
+  const verifiedNewer = subscription.created > onFile.created;
+  const authorized = decideReplacementAuthorized(subscription, resolvedUid, subscription.customer, operationRecordData);
+  if (onFileIsDead && verifiedNewer && authorized) return { kind: 'authorized' };
+  return { kind: 'unauthorized' };
+}
 
-function decideReconciliation({ userData, subscription, onFile, operationRecordData, resolvedUid }) {
+// ── Pure decision: 6b ownership/product/replacement reconciliation (no I/O) ───────────────────
+
+function decideReconciliation({ userData, subscription, replacementStatus, resolvedUid }) {
   if (!userData) return { action: 'flagAmbiguous', reason: 'user_not_found', details: { subscriptionId: subscription.id } };
 
   if (!isKnownIdynifyPrice(subscription)) {
@@ -148,24 +212,14 @@ function decideReconciliation({ userData, subscription, onFile, operationRecordD
 
   const normalizedFields = buildNormalizedFields(subscription);
 
-  if (!userData.stripeSubscriptionId || userData.stripeSubscriptionId === subscription.id) {
+  if (replacementStatus.kind === 'not_a_replacement') {
     return {
       action: 'apply',
       fields: { stripeCustomerId: subscription.customer, stripeSubscriptionId: subscription.id, ...normalizedFields },
     };
   }
-
-  // A different subscription is on file — a genuine replacement, authorized separately.
-  if (!onFile) {
-    // Caller should always have fetched this when stripeSubscriptionId differs; treat a missing
-    // fetch as a retrieval failure rather than silently authorizing anything.
-    return { action: 'retryError' };
-  }
-  const onFileIsDead = ['canceled', 'incomplete_expired'].includes(onFile.status);
-  const verifiedNewer = subscription.created > onFile.created;
-  const authorized = decideReplacementAuthorized(subscription, resolvedUid, subscription.customer, operationRecordData);
-
-  if (onFileIsDead && verifiedNewer && authorized) {
+  if (replacementStatus.kind === 'retry_error') return { action: 'retryError' };
+  if (replacementStatus.kind === 'authorized') {
     return { action: 'apply', fields: { stripeSubscriptionId: subscription.id, ...normalizedFields } };
   }
   return {
@@ -174,22 +228,21 @@ function decideReconciliation({ userData, subscription, onFile, operationRecordD
   };
 }
 
-// ── Pure decision: 6c allocation eligibility (no I/O — onFileForConflict pre-fetched) ─────────
-
-function decideAllocationEligibility({ userData, customerId, priceId, subscriptionId, onFileForConflict }) {
+/**
+ * Round-9 fix (finding 5): takes the SAME `replacementStatus` reconciliation uses, rather than
+ * recomputing a weaker, independent "is the on-file subscription currently blocking" check. The
+ * previous version let allocation succeed (grant credits, set hasCompletedPayment) for a
+ * different-but-dead on-file subscription purely because it wasn't "blocking" — without the
+ * verified-newer-plus-provenance bar reconciliation requires for the exact same subscription,
+ * which could reject it in the same transaction. Both now stand or fall together.
+ */
+function decideAllocationEligibility({ userData, customerId, priceId, replacementStatus }) {
   if (!isKnownIdynifyPrice(priceId)) return { ok: false, reason: 'unknown_price' };
   if (userData?.stripeCustomerId && userData.stripeCustomerId !== customerId) {
     return { ok: false, reason: 'customer_mismatch' };
   }
-  if (userData?.stripeSubscriptionId && userData.stripeSubscriptionId !== subscriptionId) {
-    if (!onFileForConflict) return { ok: false, reason: 'onfile_retrieve_failed' };
-    const normalized = describeSubscription({
-      status: onFileForConflict.status,
-      cancelAtPeriodEnd: onFileForConflict.cancel_at_period_end === true,
-      pauseCollection: Boolean(onFileForConflict.pause_collection),
-    });
-    if (isBlockingStatus(normalized.normalizedState)) return { ok: false, reason: 'conflicting_subscription' };
-  }
+  if (replacementStatus.kind === 'retry_error') return { ok: false, reason: 'onfile_retrieve_failed' };
+  if (replacementStatus.kind === 'unauthorized') return { ok: false, reason: 'replacement_not_authorized' };
   return { ok: true };
 }
 
@@ -264,23 +317,33 @@ async function handleCheckoutCompleted(stripe, stripeEvent) {
   const operationId = session.metadata?.checkoutOperationId ?? null;
   const subscriptionId = session.subscription;
 
+  // Round-9 fix (finding 4): serialize per account BEFORE fetching Stripe, so no other worker
+  // for this uid can be mid-fetch/decide concurrently.
+  const lockOperationId = await acquireAccountLock(resolvedUid);
+  if (!lockOperationId) return retryable(new Error(`account lock contention for ${resolvedUid}`));
+
+  let subscription = null;
+  if (subscriptionId) {
+    try {
+      subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    } catch (err) {
+      return retryable(err);
+    }
+  }
+
   try {
     await db.runTransaction(async (tx) => {
-      // ── READ PHASE (Firestore reads + Stripe re-fetches — all redone on any retry) ──────
+      // ── READ PHASE ──────────────────────────────────────────────────────────────────────
+      const userRef = db.collection('users').doc(resolvedUid);
+      const userSnap = await tx.get(userRef);
+      const currentLock = userSnap.data()?.billingLock;
+      if (currentLock?.operationId !== lockOperationId) return; // lock stolen as stale — discard
+
       const eventRef = db.collection('stripeWebhookEvents').doc(eventId);
       const eventSnap = await tx.get(eventRef);
-      if (eventSnap.exists) return; // genuine duplicate delivery
-
-      // Re-fetched live, not trusted from the event payload, for the same reason subscription
-      // lifecycle events are: a Firestore-triggered retry of this whole callback should see
-      // Stripe's then-current state, not a stale snapshot captured before the retry.
-      let subscription = null;
-      if (subscriptionId) {
-        try {
-          subscription = await stripe.subscriptions.retrieve(subscriptionId);
-        } catch (err) {
-          throw new RetryableWebhookError(err);
-        }
+      if (eventSnap.exists) {
+        tx.set(userRef, { billingLock: null }, { merge: true }); // still release, nothing else to do
+        return;
       }
 
       const opRef = operationId ? db.collection('billingCheckoutOperations').doc(operationId) : null;
@@ -290,11 +353,9 @@ async function handleCheckoutCompleted(stripe, stripeEvent) {
       const allocationRef = subscriptionId ? db.collection('billingAllocations').doc(subscriptionId) : null;
       const allocationSnap = allocationRef ? await tx.get(allocationRef) : null;
 
-      const userRef = db.collection('users').doc(resolvedUid);
-      const userSnap = await tx.get(userRef);
       const userData = userSnap.exists ? userSnap.data() : null;
 
-      // Stripe reads needed to decide (not Firestore — fine to await here, before any writes).
+      // Stripe reads needed to decide (not Firestore — fine to await here, we hold the lock).
       let onFile = null;
       const differentSubOnFile = userData?.stripeSubscriptionId && userData.stripeSubscriptionId !== subscriptionId;
       if (differentSubOnFile) {
@@ -306,7 +367,7 @@ async function handleCheckoutCompleted(stripe, stripeEvent) {
       }
 
       // ── DECIDE PHASE (pure) ─────────────────────────────────────────────────────────────
-      const writes = [];
+      const writes = [{ ref: userRef, type: 'update', data: { billingLock: null } }];
       const ambiguous = [];
 
       const opDecision = decideOperationRecord(operationId, opData, {
@@ -315,6 +376,12 @@ async function handleCheckoutCompleted(stripe, stripeEvent) {
       if (opDecision.ambiguousReason) {
         ambiguous.push({ uid: resolvedUid, reason: opDecision.ambiguousReason, details: { operationId, sessionId: session.id } });
       }
+
+      // Round-9 fix (finding 5): one shared verdict feeds both allocation and reconciliation.
+      const replacementStatus = subscription
+        ? decideReplacementStatus({ userData, subscription, onFile, operationRecordData: opDecision.valid ? opData : null, resolvedUid })
+        : { kind: 'not_a_replacement' };
+      if (replacementStatus.kind === 'retry_error') throw new RetryableWebhookError(new Error('on-file subscription retrieval failed'));
 
       if (subscriptionId) {
         const epochRaw = process.env.BILLING_LEDGER_EPOCH_UNIX;
@@ -330,17 +397,12 @@ async function handleCheckoutCompleted(stripe, stripeEvent) {
         } else if (operationId && !opDecision.valid) {
           // claims new-flow provenance but it didn't check out — already flagged above
         } else {
-          const eligible = decideAllocationEligibility({
-            userData, customerId: session.customer, priceId, subscriptionId, onFileForConflict: onFile,
-          });
+          const eligible = decideAllocationEligibility({ userData, customerId: session.customer, priceId, replacementStatus });
           if (!eligible.ok) {
             ambiguous.push({ uid: resolvedUid, reason: eligible.reason, details: { sessionId: session.id, subscriptionId } });
           } else if (session.payment_status !== 'paid') {
             ambiguous.push({ uid: resolvedUid, reason: 'not_paid', details: { sessionId: session.id, subscriptionId } });
           } else {
-            // Either the new-flow path (operationId validated) or the legacy Payment Link path
-            // (no operationId at all, structurally) — both reach here only after the same
-            // ownership/price/eligibility/payment gate above.
             const { fields } = creditGrantFields(priceId);
             writes.push({ ref: userRef, type: 'update', data: fields });
             writes.push({ ref: allocationRef, type: 'set', data: { uid: resolvedUid, priceId, grantedAt: new Date().toISOString() } });
@@ -349,18 +411,12 @@ async function handleCheckoutCompleted(stripe, stripeEvent) {
       }
 
       if (subscription) {
-        const recon = decideReconciliation({
-          userData, subscription, onFile, operationRecordData: opDecision.valid ? opData : null, resolvedUid,
-        });
-        if (recon.action === 'retryError') throw new RetryableWebhookError(new Error('on-file subscription retrieval failed'));
+        const recon = decideReconciliation({ userData, subscription, replacementStatus, resolvedUid });
         if (recon.action === 'apply') writes.push({ ref: userRef, type: 'update', data: recon.fields });
         else if (recon.action === 'flagAmbiguous') ambiguous.push({ uid: resolvedUid, reason: recon.reason, details: recon.details });
       }
 
       // ── WRITE PHASE ──────────────────────────────────────────────────────────────────────
-      // A transaction can only write to a given document reference once — the allocation grant
-      // and the reconciliation write can both target userRef, so 'update' writes to the same ref
-      // are merged into a single call rather than issued twice.
       if (opRef && opDecision.updateFields) tx.update(opRef, opDecision.updateFields);
       for (const { ref, data } of mergeWritesByRef(writes)) tx.update(ref, data);
       for (const w of writes.filter((w) => w.type === 'set')) tx.set(w.ref, w.data);
@@ -388,34 +444,44 @@ async function resolveCandidateUid(subscription) {
 }
 
 /**
- * Shared by the live dispatch path and draining — one transaction, read-then-write.
- *
- * Takes `subscriptionId`, not a pre-fetched subscription object, and re-fetches it live from
- * Stripe INSIDE the transaction callback — not before. This is what makes processing
- * order-independent: Firestore automatically retries a transaction's entire callback on
- * contention, so a retry re-fetches Stripe's then-current state rather than replaying a stale
- * snapshot captured before the retry. Two events for the same subscription, delivered in either
- * order or even genuinely concurrently, both converge on whatever Stripe considers current at
- * the moment they actually commit — never a stale embedded event payload.
+ * Shared by the live dispatch path and draining. Round-9 fix (finding 4): the account lock is
+ * acquired BEFORE the Stripe re-fetch, held through fetch+decide, and released as part of the
+ * same commit that applies the decision — closing the race where a slower worker's older
+ * snapshot could otherwise land after a faster worker's newer one with no Firestore conflict to
+ * stop it.
  */
 async function applySubscriptionLifecycleEvent(stripe, { eventType, eventId, subscriptionId, resolvedUid, markLedger, pendingRefToClear }) {
+  const lockOperationId = await acquireAccountLock(resolvedUid);
+  if (!lockOperationId) throw new RetryableWebhookError(new Error(`account lock contention for ${resolvedUid}`));
+
+  let subscription;
+  try {
+    subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  } catch (err) {
+    throw new RetryableWebhookError(err);
+  }
+
   await db.runTransaction(async (tx) => {
-    // ── READ PHASE (Firestore reads + the Stripe re-fetch — both redone on any retry) ──
+    // ── READ PHASE ──
+    const userRef = db.collection('users').doc(resolvedUid);
+    const userSnap = await tx.get(userRef);
+    const currentLock = userSnap.data()?.billingLock;
+    if (currentLock?.operationId !== lockOperationId) return; // lock stolen as stale — discard
+
     let eventSnap = null;
     if (markLedger) {
       eventSnap = await tx.get(db.collection('stripeWebhookEvents').doc(eventId));
-      if (eventSnap.exists) return;
+      if (eventSnap.exists) {
+        tx.set(userRef, { billingLock: null }, { merge: true });
+        return;
+      }
     }
     if (pendingRefToClear) {
       const stillParked = await tx.get(pendingRefToClear);
-      if (!stillParked.exists) return; // already drained by a concurrent run
-    }
-
-    let subscription;
-    try {
-      subscription = await stripe.subscriptions.retrieve(subscriptionId);
-    } catch (err) {
-      throw new RetryableWebhookError(err);
+      if (!stillParked.exists) {
+        tx.set(userRef, { billingLock: null }, { merge: true });
+        return;
+      }
     }
 
     const operationId = subscription.metadata?.checkoutOperationId ?? null;
@@ -423,8 +489,6 @@ async function applySubscriptionLifecycleEvent(stripe, { eventType, eventId, sub
     const opSnap = opRef ? await tx.get(opRef) : null;
     const opData = opSnap ? (opSnap.exists ? opSnap.data() : undefined) : null;
 
-    const userRef = db.collection('users').doc(resolvedUid);
-    const userSnap = await tx.get(userRef);
     const userData = userSnap.exists ? userSnap.data() : null;
 
     let onFile = null;
@@ -438,7 +502,7 @@ async function applySubscriptionLifecycleEvent(stripe, { eventType, eventId, sub
     }
 
     // ── DECIDE PHASE (pure) ──
-    const writes = [];
+    const writes = [{ ref: userRef, type: 'update', data: { billingLock: null } }];
     const ambiguous = [];
 
     const opDecision = decideOperationRecord(operationId, opData, {
@@ -448,17 +512,18 @@ async function applySubscriptionLifecycleEvent(stripe, { eventType, eventId, sub
     if (opDecision.ambiguousReason) {
       ambiguous.push({ uid: resolvedUid, reason: opDecision.ambiguousReason, details: { operationId, subscriptionId: subscription.id } });
     } else {
-      const recon = decideReconciliation({
+      const replacementStatus = decideReplacementStatus({
         userData, subscription, onFile, operationRecordData: opDecision.valid ? opData : null, resolvedUid,
       });
-      if (recon.action === 'retryError') throw new RetryableWebhookError(new Error('on-file subscription retrieval failed'));
+      if (replacementStatus.kind === 'retry_error') throw new RetryableWebhookError(new Error('on-file subscription retrieval failed'));
+      const recon = decideReconciliation({ userData, subscription, replacementStatus, resolvedUid });
       if (recon.action === 'apply') writes.push({ ref: userRef, type: 'update', data: recon.fields });
       else if (recon.action === 'flagAmbiguous') ambiguous.push({ uid: resolvedUid, reason: recon.reason, details: recon.details });
     }
 
     // ── WRITE PHASE ──
     if (opRef && opDecision.updateFields) tx.update(opRef, opDecision.updateFields);
-    for (const w of writes) tx.update(w.ref, w.data);
+    for (const { ref, data } of mergeWritesByRef(writes)) tx.update(ref, data);
     for (const flag of ambiguous) {
       const { ref, data } = ambiguousWriteFor(flag);
       tx.set(ref, data);
@@ -571,6 +636,6 @@ export const handler = async (event) => {
 // Exported for tests.
 export const __internal = {
   decideOperationRecord, decideReconciliation, decideAllocationEligibility, decideReplacementAuthorized,
-  buildNormalizedFields, resolvePeriod, tierForPrice, resolveCandidateUid, drainPendingEvents,
-  applySubscriptionLifecycleEvent, RetryableWebhookError,
+  decideReplacementStatus, buildNormalizedFields, resolvePeriod, tierForPrice, resolveCandidateUid,
+  drainPendingEvents, applySubscriptionLifecycleEvent, acquireAccountLock, RetryableWebhookError,
 };

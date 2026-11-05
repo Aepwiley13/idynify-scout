@@ -91,7 +91,7 @@ service cloud.firestore {
               'monthlyCredits', 'tierLimits', 'features', 'billingCycleDate',
               'stripeCustomerId', 'stripeSubscriptionId',
               'currentPeriodStart', 'currentPeriodEnd', 'cancelAtPeriodEnd',
-              'pauseCollection', 'billingDate', 'nextBillingDate', 'pendingCheckout'];
+              'pauseCollection', 'billingDate', 'nextBillingDate', 'pendingCheckout', 'billingLock'];
     }
 
     // The billing fields Signup.jsx writes when it creates the document.

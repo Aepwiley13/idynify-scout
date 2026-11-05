@@ -265,27 +265,56 @@ function mintSearchId() {
 }
 
 /**
- * Turns the five raw fields into exactly one of five display states. Pure,
- * and the ONLY place either surface (the Daily Discoveries toast, the saved
- * company page) decides what to show — so the two can never disagree.
+ * Turns the five raw fields into exactly one of six display states —
+ * `none`, `searching`, `found`, `none-found`, `stuck`, `failed`, and
+ * `inconsistent`. Pure, and the ONLY place either surface (the Daily
+ * Discoveries toast, the saved company page) decides what to show — so the
+ * two can never disagree.
  *
  * `none` is distinct from every other state and is never rendered as a zero
  * result: it means no attempt was ever recorded, not that one ran and found
- * nobody.
+ * nobody. `inconsistent` is the same guarantee for the other direction: a
+ * `completed` record whose count isn't a valid non-negative integer is
+ * never read as zero either — it's a malformed record, shown as its own
+ * state, not defaulted into a claim the data doesn't actually support.
  */
 export function resolveAutoContactState(company, now = Date.now()) {
   const status = company?.auto_contact_status;
   if (status === 'completed') {
-    const count = typeof company.auto_contact_count === 'number' ? company.auto_contact_count : 0;
+    const count = company.auto_contact_count;
+    // "None found" is a claim about a verified fact, not a default for
+    // anything that isn't a positive number. A missing, null, NaN,
+    // fractional or negative count means the record itself doesn't support
+    // that claim — shown as `inconsistent`, never silently read as zero.
+    const validCount = typeof count === 'number' && Number.isInteger(count) && count >= 0;
+    if (!validCount) return { kind: 'inconsistent' };
     return count > 0 ? { kind: 'found', count } : { kind: 'none-found' };
   }
   if (status === 'failed') return { kind: 'failed' };
   if (status === 'pending') {
-    const startedAt = company.auto_contact_search_started_at ? Date.parse(company.auto_contact_search_started_at) : null;
-    const age = Number.isFinite(startedAt) ? now - startedAt : Infinity;
-    return age > AUTO_CONTACT_STALE_MS ? { kind: 'stuck' } : { kind: 'searching' };
+    // Exactly at the 60s mark is still "searching" — matches
+    // msUntilStale's own >= 0 boundary, and the timer below fires a beat
+    // past it, never at it, so the two never momentarily disagree.
+    return msUntilStale(company, now) >= 0 ? { kind: 'searching' } : { kind: 'stuck' };
   }
   return { kind: 'none' };
+}
+
+/**
+ * How many milliseconds until a `pending` attempt would become `stuck`, as
+ * of `now` — 0 or negative once it already has. `null` when there is
+ * nothing to schedule against: not pending, or no valid start time.
+ *
+ * The one place both `resolveAutoContactState` (a document write, reacted
+ * to by a listener) and the saved company page's client-side timer (the
+ * passage of time itself, which a listener never sees on its own) agree on
+ * when "stuck" begins — so the two can't drift apart.
+ */
+export function msUntilStale(company, now = Date.now()) {
+  if (company?.auto_contact_status !== 'pending') return null;
+  const startedAt = company.auto_contact_search_started_at ? Date.parse(company.auto_contact_search_started_at) : null;
+  if (!Number.isFinite(startedAt)) return null;
+  return AUTO_CONTACT_STALE_MS - (now - startedAt);
 }
 
 /**
@@ -347,6 +376,26 @@ export async function triggerPeopleDiscovery({ user, company, icpTitles, activeI
     tx.update(companyRef, data);
   }).catch(err => console.error('[companyDecision] could not record the people-discovery outcome:', err.message));
 
+  /**
+   * Whether this attempt is still the company's current one, checked fresh
+   * against Firestore. A superseded attempt must not write contact data at
+   * all — losing only the right to report its count (what `settle` alone
+   * guarded before) still let a stale response create or merge real
+   * records nobody asked for anymore. Called once, immediately before any
+   * contact write, which closes the window that mattered: a retry is only
+   * ever allowed once the original has gone stale (requirement 2 above), so
+   * the realistic race is the original's slow response finally arriving
+   * after that retry already started — and this check catches it before a
+   * single setDoc or merge runs. It does not re-check between individual
+   * people in the loop that follows; narrowing that further would need a
+   * transactional claim per person, which is more machinery than this
+   * search — at most 3 results — warrants.
+   */
+  const isCurrentAttempt = async () => {
+    const snap = await getDoc(companyRef);
+    return snap.exists() && snap.data().auto_contact_search_id === searchId;
+  };
+
   const authToken = await user.getIdToken();
   fetch('/.netlify/functions/searchPeople', {
     method: 'POST',
@@ -357,6 +406,13 @@ export async function triggerPeopleDiscovery({ user, company, icpTitles, activeI
       await settle({ auto_contact_status: 'failed', auto_contact_count: null, auto_contact_searched_at: new Date().toISOString() });
       return;
     }
+    // A newer attempt may have started while this fetch was in flight. If
+    // so, stop here — before touching a single contact — rather than save
+    // stale suggestions under a search the company no longer considers
+    // current. `settle` below would already no-op in this case; this is
+    // what stops the WRITES, not only the report of them.
+    if (!(await isCurrentAttempt())) return;
+
     // Counts contacts THIS call actually persisted (created or merged), never
     // `result.people.length` — the API's suggestions are not the same fact as
     // what ended up saved and company-linked.
@@ -486,6 +542,6 @@ export async function undoApprovalSideEffects({ userId, companyId }) {
 export default {
   DECISION_SURFACE, DECISION_ICP_BASIS, resolveDecisionIcp,
   recordCompanyDecision, skipCompany, resolveDecisionPersona,
-  triggerPeopleDiscovery, retryPeopleDiscovery, resolveAutoContactState, AUTO_CONTACT_STALE_MS,
+  triggerPeopleDiscovery, retryPeopleDiscovery, resolveAutoContactState, msUntilStale, AUTO_CONTACT_STALE_MS,
   approveCompany, undoCompanyDecision, undoApprovalSideEffects,
 };

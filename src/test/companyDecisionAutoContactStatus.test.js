@@ -42,7 +42,7 @@ vi.mock('firebase/firestore', () => ({
       .map(([k, v]) => ({ id: k.split('/').pop(), data: () => v, ref: { __path: k } }));
     return { empty: docs.length === 0, docs };
   },
-  setDoc: async (ref, data) => { STORE.set(ref.__path, data); },
+  setDoc: vi.fn(async (ref, data) => { STORE.set(ref.__path, data); }),
   updateDoc: async (ref, data) => {
     // 'TX' is reserved for runTransaction below — this is the plain updateDoc
     // used only for the titles write, before any transaction runs.
@@ -87,10 +87,11 @@ vi.mock('../services/icpRelationshipService', () => ({
 vi.mock('../services/companyEnrichment', () => ({ enrichAcceptedCompany: async () => {} }));
 
 const {
-  triggerPeopleDiscovery, retryPeopleDiscovery, resolveAutoContactState,
+  triggerPeopleDiscovery, retryPeopleDiscovery, resolveAutoContactState, msUntilStale,
   undoApprovalSideEffects, AUTO_CONTACT_STALE_MS,
 } = await import('../services/companyDecision');
 const { applyContactMerge } = await import('../services/contactWriteGuard');
+const { setDoc } = await import('firebase/firestore');
 
 const UID = 'u1';
 const companyPath = (id) => `users/${UID}/companies/${id}`;
@@ -114,6 +115,7 @@ beforeEach(() => {
   FAIL_NEXT_UPDATE = null;
   vi.restoreAllMocks();
   applyContactMerge.mockClear();
+  setDoc.mockClear();
 });
 
 // ── resolveAutoContactState: pure, every boundary ───────────────────────────
@@ -154,6 +156,55 @@ describe('resolveAutoContactState: the one place either surface decides what to 
     const now = Date.parse('2026-11-04T18:05:40.000Z');
     const company = { auto_contact_status: 'pending', auto_contact_search_started_at: '2026-11-04T17:58:40.000Z' };
     expect(resolveAutoContactState(company, now)).toEqual({ kind: 'stuck' });
+  });
+
+  it('completed, but the count is not a valid non-negative integer: inconsistent, never read as zero', () => {
+    const base = { auto_contact_status: 'completed' };
+    expect(resolveAutoContactState({ ...base })).toEqual({ kind: 'inconsistent' }); // field missing entirely
+    expect(resolveAutoContactState({ ...base, auto_contact_count: null })).toEqual({ kind: 'inconsistent' });
+    expect(resolveAutoContactState({ ...base, auto_contact_count: '0' })).toEqual({ kind: 'inconsistent' }); // string, not number
+    expect(resolveAutoContactState({ ...base, auto_contact_count: NaN })).toEqual({ kind: 'inconsistent' });
+    expect(resolveAutoContactState({ ...base, auto_contact_count: -1 })).toEqual({ kind: 'inconsistent' }); // negative
+    expect(resolveAutoContactState({ ...base, auto_contact_count: 1.5 })).toEqual({ kind: 'inconsistent' }); // fractional
+    expect(resolveAutoContactState({ ...base, auto_contact_count: Infinity })).toEqual({ kind: 'inconsistent' });
+    // Sanity: a genuinely valid zero or positive count is unaffected by the new check.
+    expect(resolveAutoContactState({ ...base, auto_contact_count: 0 })).toEqual({ kind: 'none-found' });
+    expect(resolveAutoContactState({ ...base, auto_contact_count: 4 })).toEqual({ kind: 'found', count: 4 });
+  });
+});
+
+// ── msUntilStale: the one clock both the write path and the client timer share ──
+
+describe('msUntilStale: shared by resolveAutoContactState and the saved company page\'s own timer', () => {
+  it('not pending at all: null — nothing to schedule a timer against', () => {
+    expect(msUntilStale(null)).toBeNull();
+    expect(msUntilStale({})).toBeNull();
+    expect(msUntilStale({ auto_contact_status: 'completed', auto_contact_search_started_at: '2026-11-04T18:00:00.000Z' })).toBeNull();
+    expect(msUntilStale({ auto_contact_status: 'failed' })).toBeNull();
+  });
+
+  it('pending but no usable start time: null, not a crash and not a false "stale"', () => {
+    expect(msUntilStale({ auto_contact_status: 'pending' })).toBeNull();
+    expect(msUntilStale({ auto_contact_status: 'pending', auto_contact_search_started_at: null })).toBeNull();
+    expect(msUntilStale({ auto_contact_status: 'pending', auto_contact_search_started_at: 'not-a-date' })).toBeNull();
+  });
+
+  it('pending, fresh: a positive remaining time, exactly STALE_MS minus elapsed', () => {
+    const started = Date.parse('2026-11-04T18:02:00.000Z');
+    const company = { auto_contact_status: 'pending', auto_contact_search_started_at: '2026-11-04T18:02:00.000Z' };
+    expect(msUntilStale(company, started + 10_000)).toBe(AUTO_CONTACT_STALE_MS - 10_000);
+  });
+
+  it('pending, exactly at the boundary: zero — matches resolveAutoContactState\'s own >= 0 cutoff', () => {
+    const started = Date.parse('2026-11-04T18:02:00.000Z');
+    const company = { auto_contact_status: 'pending', auto_contact_search_started_at: '2026-11-04T18:02:00.000Z' };
+    expect(msUntilStale(company, started + AUTO_CONTACT_STALE_MS)).toBe(0);
+  });
+
+  it('pending, past the boundary: negative — the CompanyDetail timer uses this to know it already fired late', () => {
+    const started = Date.parse('2026-11-04T18:02:00.000Z');
+    const company = { auto_contact_status: 'pending', auto_contact_search_started_at: '2026-11-04T18:02:00.000Z' };
+    expect(msUntilStale(company, started + AUTO_CONTACT_STALE_MS + 5_000)).toBe(-5_000);
   });
 });
 
@@ -320,6 +371,40 @@ describe('triggerPeopleDiscovery: retries and transaction conflicts', () => {
     expect(finalState.auto_contact_search_id).toBe(secondId);
     expect(finalState.auto_contact_status).toBe('completed');
     expect(finalState.auto_contact_count).toBe(1); // NOT 2 — the ghost response never landed
+
+    // Not merely under-reported — never written at all. Neither ghost person
+    // reached a create (setDoc) or a merge, and no contact document for
+    // either of them exists in the store.
+    expect(setDoc).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'c1_px' }), expect.anything());
+    expect(setDoc).not.toHaveBeenCalledWith(expect.objectContaining({ id: 'c1_py' }), expect.anything());
+    expect(STORE.has(`users/${UID}/contacts/c1_px`)).toBe(false);
+    expect(STORE.has(`users/${UID}/contacts/c1_py`)).toBe(false);
+  });
+
+  it('a late answer cannot save or merge contacts even when the superseded search is the ONLY one — proves the guard checks freshness, not just "a newer attempt exists"', async () => {
+    // Same race, but this time the ghost people are routed through the merge
+    // path, not create — the guard must block both write shapes, not just setDoc.
+    seedCompany('c1');
+    let resolveFirstFetch;
+    globalThis.fetch = vi.fn(() => new Promise(r => { resolveFirstFetch = r; }));
+    await triggerPeopleDiscovery({ user: USER, company: read('c1'), icpTitles: ['CEO'], activeICPId: null });
+    const firstId = read('c1').auto_contact_search_id;
+
+    STORE.set(companyPath('c1'), { ...read('c1'), auto_contact_search_started_at: new Date(Date.now() - AUTO_CONTACT_STALE_MS - 1000).toISOString() });
+    globalThis.fetch = vi.fn(async () => ({ json: async () => ({ success: true, people: [] }) }));
+    await triggerPeopleDiscovery({ user: USER, company: read('c1'), icpTitles: ['CEO'], activeICPId: null });
+    await flushMicrotasks();
+    expect(read('c1').auto_contact_search_id).not.toBe(firstId);
+
+    applyContactMerge.mockClear();
+    setDoc.mockClear();
+    NEXT_DECISIONS = [{ action: 'merge', existingContactId: 'ghost_existing' }];
+    resolveFirstFetch({ json: async () => ({ success: true, people: [{ id: 'pz', name: 'Ghost3' }] }) });
+    await flushMicrotasks();
+
+    expect(applyContactMerge).not.toHaveBeenCalled();
+    expect(setDoc).not.toHaveBeenCalled();
+    expect(read('c1').auto_contact_count).toBe(0); // the second (real) attempt's own genuine zero, untouched
   });
 
   it('the company was deleted while a search was in flight: the late answer finds nothing to write to, and does not throw', async () => {

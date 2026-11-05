@@ -15,7 +15,7 @@ import { prepareContactWrite, applyContactMerge } from '../../services/contactWr
 import { RECORD_STATUS } from '../../constants/statusModel';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { calculateICPScore, DEFAULT_WEIGHTS } from '../../utils/icpScoring';
-import { DECISION_SURFACE, approveCompany, retryPeopleDiscovery, resolveAutoContactState } from '../../services/companyDecision';
+import { DECISION_SURFACE, approveCompany, retryPeopleDiscovery, resolveAutoContactState, msUntilStale } from '../../services/companyDecision';
 
 /**
  * @param {object}   props
@@ -110,6 +110,22 @@ export default function CompanyDetail({
     // not live — the moment a search completes with people found, re-load it so
     // newly auto-discovered people appear without the user refreshing the page.
     let previousStatus;
+    // A document write is what the listener reacts to — the passage of time
+    // to the 60s stale threshold is not one. One lightweight client-side
+    // timer, rescheduled on every snapshot, carries the page from Searching
+    // to Stuck on its own while it stays open, no refresh and no new
+    // server-side mechanism needed. Cleared whenever a fresher snapshot
+    // arrives (a real completion, failure, or retry) or on unmount.
+    let staleTimer = null;
+    const scheduleStaleCheck = (data) => {
+      if (staleTimer) { clearTimeout(staleTimer); staleTimer = null; }
+      const remaining = msUntilStale(data);
+      if (remaining === null) return; // not pending, or no valid start time — nothing to schedule
+      // +50ms margin: the boundary msUntilStale and resolveAutoContactState
+      // share is inclusive at exactly 60s ("searching"), so firing a hair
+      // past it is what actually crosses into "stuck".
+      staleTimer = setTimeout(() => setAutoContactState(resolveAutoContactState(data)), Math.max(0, remaining) + 50);
+    };
     const unsubscribe = onSnapshot(
       companyRef,
       (snap) => {
@@ -118,10 +134,11 @@ export default function CompanyDetail({
         setAutoContactState(next);
         if (next.kind === 'found' && previousStatus !== 'completed') loadApprovedContacts();
         previousStatus = data?.auto_contact_status;
+        scheduleStaleCheck(data);
       },
       (err) => console.error('[CompanyDetail] auto-contact status listener failed:', err.message),
     );
-    return () => unsubscribe();
+    return () => { unsubscribe(); if (staleTimer) clearTimeout(staleTimer); };
   }, [companyId]);
 
   async function handleRetryDiscovery() {
@@ -1655,6 +1672,14 @@ export default function CompanyDetail({
           {autoContactState.kind === 'failed' && (
             <>
               <span>Something went wrong searching for people.</span>
+              <button type="button" onClick={handleRetryDiscovery} disabled={retryingDiscovery}>
+                {retryingDiscovery ? 'Retrying…' : 'Try again'}
+              </button>
+            </>
+          )}
+          {autoContactState.kind === 'inconsistent' && (
+            <>
+              <span>This search result doesn't look right — not shown as "no contacts found".</span>
               <button type="button" onClick={handleRetryDiscovery} disabled={retryingDiscovery}>
                 {retryingDiscovery ? 'Retrying…' : 'Try again'}
               </button>

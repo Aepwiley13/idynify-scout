@@ -44,6 +44,7 @@ import { saveContactEmailEdit } from '../../services/contactEmailService';
 import { readContactEmails, applyEmailEdit, pickEmailFields } from '../../utils/contactEmails';
 import ContactPhones from './ContactPhones';
 import ContactIdentityViewer from './ContactIdentityViewer';
+import ContactStickersRow from '../stickers/ContactStickersRow';
 import { hasRealContactPhoto, resolveContactPhotoSources, contactDisplayName } from '../../utils/contactPhoto';
 import { readContactPhones, primaryPhone, buildPhoneWrite } from '../../utils/contactPhones';
 import { readSocialProfiles, SOCIAL_STATUS } from '../../utils/socialProfiles';
@@ -1133,6 +1134,9 @@ export default function IdentityCard({
             T={T}
           />
         </div>
+
+        {/* ── Stickers (ADR-007): renders nothing unless available ── */}
+        <ContactStickersRow contact={contact} onUpdate={onUpdate} />
 
         {/* ── Tags section ── */}
         <div className="idc-tags-section" ref={tagWrapRef}>

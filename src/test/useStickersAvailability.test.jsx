@@ -4,7 +4,7 @@
  * and never on an error or while the answer is unknown.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 
 const fetchStickersConfig = vi.hoisted(() => vi.fn());
 const effectiveUser = vi.hoisted(() => ({ value: { uid: 'U' } }));
@@ -12,7 +12,7 @@ const effectiveUser = vi.hoisted(() => ({ value: { uid: 'U' } }));
 vi.mock('../components/stickers/stickersApi.js', () => ({ fetchStickersConfig }));
 vi.mock('../context/ImpersonationContext', () => ({ getEffectiveUser: () => effectiveUser.value }));
 
-import { useStickersAvailability } from '../components/stickers/useStickersAvailability.js';
+import { useStickersAvailability, useStickersAvailabilityControl } from '../components/stickers/useStickersAvailability.js';
 
 beforeEach(() => {
   fetchStickersConfig.mockReset();
@@ -49,6 +49,24 @@ describe('useStickersAvailability', () => {
     effectiveUser.value = { uid: 'U', _isImpersonated: true };
     const { result } = renderHook(() => useStickersAvailability());
     expect(result.current).toBe('unavailable');
+    expect(fetchStickersConfig).not.toHaveBeenCalled();
+  });
+
+  it('recheck() asks again, and an answer that access is gone makes it unavailable', async () => {
+    fetchStickersConfig.mockResolvedValue({ status: 200, body: { enabled: true, mode: 'beta', readOnly: false } });
+    const { result } = renderHook(() => useStickersAvailabilityControl());
+    await waitFor(() => expect(result.current.state).toBe('available'));
+    fetchStickersConfig.mockResolvedValue({ status: 200, body: { enabled: false, mode: 'beta', readOnly: false } });
+    act(() => result.current.recheck());
+    await waitFor(() => expect(result.current.state).toBe('unavailable'));
+    expect(fetchStickersConfig).toHaveBeenCalledTimes(2);
+  });
+
+  it('recheck() never asks while an admin views as another user', async () => {
+    effectiveUser.value = { uid: 'U', _isImpersonated: true };
+    const { result } = renderHook(() => useStickersAvailabilityControl());
+    act(() => result.current.recheck());
+    expect(result.current.state).toBe('unavailable');
     expect(fetchStickersConfig).not.toHaveBeenCalled();
   });
 });

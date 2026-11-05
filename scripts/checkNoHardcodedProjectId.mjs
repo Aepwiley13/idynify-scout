@@ -73,6 +73,8 @@ const ALLOWED = new Map([
    'Fixture. Asserts two configs sharing a projectId but differing by API key stay distinguishable.'],
   ['scripts/rules-check/cases.mjs',
    'Emulator fixture. Firebase reserves the "demo-" prefix for projects that cannot reach a real backend, so this literal is safe by construction.'],
+  ['scripts/rules-check/stickers.mjs',
+   'Emulator fixture, as cases.mjs: two "demo-" projects (live rules and the rollback variant), which cannot reach a real backend.'],
 ]);
 
 /** A line that is only a comment cannot configure anything. */

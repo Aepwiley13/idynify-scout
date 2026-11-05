@@ -13,6 +13,11 @@ No production project, no credentials, no access to real data.
   rollout modes from `src/constants/stickersAccess.js`, cross-user isolation,
   and the **rollback variant** (`stickerRulesEnabled()` returning false), which
   must deny every sticker write and nothing else.
+- `sticker-services.mjs` — the app's own sticker code
+  (`src/services/stickers/stickerCore.js`) against those rules: create, rename,
+  archive, add and remove, concurrent adds and removes, an add racing an
+  archive, the 50-sticker limit under contention, bulk add, cross-user
+  attempts, a direct write that skips the service, and the rollout modes.
 - `write-semantics.mjs` — **what a write does** to the fields it was not told
   about. Guards the rediscovery `updateMask`.
 

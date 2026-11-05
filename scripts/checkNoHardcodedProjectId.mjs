@@ -75,6 +75,8 @@ const ALLOWED = new Map([
    'Emulator fixture. Firebase reserves the "demo-" prefix for projects that cannot reach a real backend, so this literal is safe by construction.'],
   ['scripts/rules-check/stickers.mjs',
    'Emulator fixture, as cases.mjs: two "demo-" projects (live rules and the rollback variant), which cannot reach a real backend.'],
+  ['scripts/rules-check/sticker-services.mjs',
+   'Emulator fixture, as cases.mjs: a "demo-" project, which cannot reach a real backend.'],
 ]);
 
 /** A line that is only a comment cannot configure anything. */

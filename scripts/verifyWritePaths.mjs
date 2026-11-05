@@ -15,6 +15,9 @@
  *      Apollo id at all).
  *   3. No company creation path queries the bare `apollo_id` field alone.
  *   4. Every sniper_contacts write goes through the guard.
+ *   5. Only src/services/stickers/stickerCore.js writes stickers or sticker
+ *      membership (ADR-007; the scan is scripts/lib/stickerWritePaths.mjs,
+ *      also run in CI by src/test/stickerWritePaths.test.js).
  *
  * KNOWN GAP — server-side writes are NOT covered (Gate 2 Phase 3).
  *
@@ -48,6 +51,7 @@
 import { readdirSync, readFileSync, statSync } from 'fs';
 import { join } from 'path';
 import { parse } from '@babel/parser';
+import { findStickerWriteViolations } from './lib/stickerWritePaths.mjs';
 
 const SRC = 'src';
 
@@ -299,6 +303,11 @@ for (const file of walkFiles(SRC)) {
   }
 }
 
+// 5 — stickers (ADR-007): one writer, here and in netlify/functions.
+const stickerViolations = findStickerWriteViolations(process.cwd());
+summary.stickerViolations = stickerViolations.length;
+violations.push(...stickerViolations);
+
 // ── Report ──────────────────────────────────────────────────────────────────
 
 const bar = '─'.repeat(72);
@@ -308,6 +317,7 @@ console.log(bar);
 console.log(`  contact-creating writes    ${summary.contactWrites}`);
 console.log(`  company-creating writes    ${summary.companyWrites}`);
 console.log(`  sniper_contacts writes     ${summary.sniperWrites}`);
+console.log(`  sticker writes outside the core  ${summary.stickerViolations}`);
 console.log(`  documented exemptions      ${summary.exempted}`);
 console.log(bar);
 

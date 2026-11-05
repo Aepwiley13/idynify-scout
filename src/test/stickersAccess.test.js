@@ -66,3 +66,44 @@ describe('the rules use the same inputs', () => {
     expect(rules.match(/function stickerRulesEnabled\(\) \{\s*return true;\s*\}/g)).toHaveLength(1);
   });
 });
+
+/**
+ * A partial revert of the sticker rules would not fail the emulator suite's
+ * build step, and would quietly re-open writes: the generic owner rules would
+ * cover stickers and membership again. These pin the pieces whose removal
+ * broadens permissions.
+ */
+describe('the pieces whose removal would broaden permissions are present', () => {
+  /** The text of one `match ... {` block, from its header to its matching closing brace. */
+  const block = (header) => {
+    const start = rules.indexOf(header);
+    expect(start).toBeGreaterThan(-1);
+    let depth = 0;
+    for (let i = start + header.length - 1; i < rules.length; i += 1) {
+      if (rules[i] === '{') depth += 1;
+      if (rules[i] === '}' && --depth === 0) return rules.slice(start, i + 1);
+    }
+    throw new Error(`unclosed block: ${header}`);
+  };
+
+  it('every generic grant under users/{uid} excludes the stickers collection and checks membership', () => {
+    const generic = block('match /{coll}/{docId} {');
+    const deep = block('match /{coll}/{docId}/{rest=**} {');
+    expect(generic.match(/coll != 'stickers'/g)).toHaveLength(2); // create, and update/delete
+    expect(generic.match(/contactStickersOk\(coll, userId\)/g)).toHaveLength(2);
+    expect(deep.match(/coll != 'stickers'/g)).toHaveLength(1);
+    expect(deep.match(/contactStickersOk\(coll, userId\)/g)).toHaveLength(1);
+  });
+
+  it('stickers are never deleted, and every write needs the rollout to allow it', () => {
+    const stickers = block('match /stickers/{stickerId} {');
+    expect(stickers).toMatch(/allow delete: if false;/);
+    expect(stickers.match(/stickerWritesAllowed\(\)/g)).toHaveLength(2); // create and update
+    expect(rules).toMatch(/return stickerRulesEnabled\(\) && request\.auth != null && \(/);
+  });
+
+  it('the rollout documents stay server-only', () => {
+    expect(block('match /feature_flags/{flag} {')).toMatch(/allow read, write: if false;/);
+    expect(block('match /sticker_enrollment/{userId} {')).toMatch(/allow read, write: if false;/);
+  });
+});

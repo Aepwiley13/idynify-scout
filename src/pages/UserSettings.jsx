@@ -556,14 +556,18 @@ export default function UserSettings() {
       const snap = await getDoc(doc(db, 'users', user.uid));
       if (snap.exists()) {
         const d = snap.data();
+        const creditsIsNumber = typeof d.credits === 'number';
         setBilling({
-          tier:             d.subscriptionTier  || 'starter',
-          creditsTotal:     d.monthlyCredits    || PLAN_CREDITS[d.subscriptionTier] || 400,
-          creditsUsed:      (d.credits?.used)   ?? (PLAN_CREDITS[d.subscriptionTier] || 400) - (d.credits?.remaining ?? d.credits ?? 0),
-          creditsRemaining: (d.credits?.remaining) ?? (d.credits || 0),
-          billingDate:      d.billingDate        || null,
-          nextBillingDate:  d.nextBillingDate    || null,
-          stripeCustomerId: d.stripeCustomerId   || null,
+          tier:              d.subscriptionTier  || 'starter',
+          creditsTotal:      creditsIsNumber ? null : (d.credits?.total ?? d.monthlyCredits ?? PLAN_CREDITS[d.subscriptionTier] ?? 400),
+          creditsUsed:       creditsIsNumber ? null : (d.credits?.used ?? null),
+          creditsRemaining:  creditsIsNumber ? d.credits : (d.credits?.remaining ?? 0),
+          // currentPeriodStart/End are the real Stripe-sourced dates (billing hardening PR 1).
+          // billingDate/nextBillingDate never had a writer and are gone from here.
+          currentPeriodStart: d.currentPeriodStart || null,
+          currentPeriodEnd:   d.currentPeriodEnd   || null,
+          cancelAtPeriodEnd:  d.cancelAtPeriodEnd === true,
+          stripeCustomerId:  d.stripeCustomerId   || null,
         });
       }
     } catch (err) {
@@ -1080,7 +1084,7 @@ export default function UserSettings() {
                     <div className="us-credit-header">
                       <div>
                         <span className="us-credit-remaining">{(billing?.creditsRemaining ?? 0).toLocaleString()}</span>
-                        <span className="us-credit-of"> / {(billing?.creditsTotal ?? 400).toLocaleString()} credits remaining</span>
+                        <span className="us-credit-of"> / {billing?.creditsTotal != null ? billing.creditsTotal.toLocaleString() : '—'} credits remaining</span>
                       </div>
                       <span className="us-credit-pct">
                         {billing?.creditsTotal ? Math.round(((billing.creditsRemaining ?? 0) / billing.creditsTotal) * 100) : 0}%
@@ -1096,7 +1100,7 @@ export default function UserSettings() {
                     <div className="us-credit-meta">
                       <div className="us-credit-row">
                         <span className="us-credit-meta-label">Used this cycle</span>
-                        <span className="us-credit-meta-value">{(billing?.creditsUsed ?? 0).toLocaleString()} credits</span>
+                        <span className="us-credit-meta-value">{billing?.creditsUsed != null ? `${billing.creditsUsed.toLocaleString()} credits` : '—'}</span>
                       </div>
                       <div className="us-credit-row">
                         <span className="us-credit-meta-label">Enrichments remaining</span>
@@ -1115,7 +1119,7 @@ export default function UserSettings() {
                     <div className="us-card-body">
                       <span className="us-card-label">Current period started</span>
                       <span className="us-card-value us-card-value--muted">
-                        {billing?.billingDate ? new Date(billing.billingDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '—'}
+                        {billing?.currentPeriodStart ? new Date(billing.currentPeriodStart).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '—'}
                       </span>
                     </div>
                   </div>
@@ -1124,9 +1128,12 @@ export default function UserSettings() {
                       <RefreshCw className="w-4 h-4" />
                     </div>
                     <div className="us-card-body">
-                      <span className="us-card-label">Next renewal & credit reset</span>
+                      {/* cancelAtPeriodEnd means this date is when access ENDS, not a renewal —
+                          and no credit-reset job exists anywhere in this codebase, so this never
+                          promises one. */}
+                      <span className="us-card-label">{billing?.cancelAtPeriodEnd ? 'Access ends' : 'Next renewal'}</span>
                       <span className="us-card-value us-card-value--muted">
-                        {billing?.nextBillingDate ? new Date(billing.nextBillingDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '—'}
+                        {billing?.currentPeriodEnd ? new Date(billing.currentPeriodEnd).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '—'}
                       </span>
                     </div>
                   </div>

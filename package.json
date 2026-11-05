@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:billing-emulator": "npx --prefix scripts/rules-check firebase-tools emulators:exec --only firestore --project demo-billing-tests \"npx vitest run --no-file-parallelism src/test/stripeWebhook*.test.js src/test/createCheckoutSession*.test.js src/test/creditTracking*.test.js\"",
     "check:env": "node scripts/checkNoHardcodedProjectId.mjs",
     "check:firebase-key": "node scripts/checkFirebaseKeyProject.mjs"
   },

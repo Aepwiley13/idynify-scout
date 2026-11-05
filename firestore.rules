@@ -42,9 +42,28 @@
 //   subscriptionStatus, selectedTier, status, credits, monthlyCredits,
 //   tierLimits, features, billingCycleDate, stripeCustomerId,
 //   stripeSubscriptionId       billing (stripe-webhook.js; Signup.jsx at create)
+//   currentPeriodStart, currentPeriodEnd, cancelAtPeriodEnd, pauseCollection,
+//   billingDate, nextBillingDate
+//                              billing period/cancellation state (billing
+//                              hardening PR 1 — stripe-webhook.js). billingDate/
+//                              nextBillingDate are legacy field names nothing
+//                              writes anymore; protected anyway, closing a gap
+//                              where they were the two billing fields NOT on
+//                              this list even though the UI reads them.
+//   pendingCheckout            checkout claim/recovery state (billing hardening
+//                              PR 1 — create-checkout-session.js). One field
+//                              holding a nested object; protecting the field
+//                              protects everything nested in it (operationId,
+//                              status, claimedAt — a client that could write
+//                              this could forge a session URL or clear another
+//                              request's in-flight claim).
 // One client write is allowed: Signup.jsx creates the document with six of the
 // billing fields, only on a supported tier and only with the values it writes
-// (see signupTiers and signupBilling).
+// (see signupTiers and signupBilling) — either the legacy numeric `credits`
+// shape or the new object shape, both strictly validated and BOTH still
+// accepted (not just during a transition window: there is no reliable signal
+// from here that every old frontend bundle is gone, so the legacy branch stays
+// until there's actual evidence it's safe to remove).
 // Deleting the user document is not allowed from a client.
 //
 // ─── STICKERS (docs/adr/ADR-007-native-stickers.md) ─────────────────────────
@@ -91,7 +110,9 @@ service cloud.firestore {
               'hasCompletedPayment', 'paymentCompletedAt', 'subscriptionTier',
               'subscriptionStatus', 'selectedTier', 'status', 'credits',
               'monthlyCredits', 'tierLimits', 'features', 'billingCycleDate',
-              'stripeCustomerId', 'stripeSubscriptionId'];
+              'stripeCustomerId', 'stripeSubscriptionId',
+              'currentPeriodStart', 'currentPeriodEnd', 'cancelAtPeriodEnd',
+              'pauseCollection', 'billingDate', 'nextBillingDate', 'pendingCheckout', 'billingLock'];
     }
 
     // The billing fields Signup.jsx writes when it creates the document.
@@ -107,16 +128,42 @@ service cloud.firestore {
       return ['starter', 'pro'];
     }
 
-    // Exactly what Signup.jsx writes: an unpaid account on a supported tier,
-    // with the credits that tier starts with (1250 for pro, 400 for starter).
+    // The two credit allocations a signup is allowed to start with.
+    function signupCreditAmount(tier) {
+      return tier == 'pro' ? 1250 : 400;
+    }
+
+    // Legacy shape: `credits` as a bare number. Unchanged from the original rule.
+    function signupBillingLegacyNumber(data) {
+      return data.credits == signupCreditAmount(data.selectedTier);
+    }
+
+    // New shape: `credits` as an object with known history. Only these four keys,
+    // used must be exactly 0 (a fresh signup has used nothing), remaining must equal
+    // total, total must be the tier's exact allocation, and resetDate must be null
+    // (a pending_payment signup has no billing cycle yet — a client should not be
+    // able to set anything else here).
+    function signupBillingObjectShape(data) {
+      return data.credits.keys().hasOnly(['total', 'used', 'remaining', 'resetDate'])
+        && data.credits.used == 0
+        && data.credits.total == signupCreditAmount(data.selectedTier)
+        && data.credits.remaining == data.credits.total
+        && data.credits.resetDate == null;
+    }
+
+    // Exactly what Signup.jsx writes: an unpaid account on a supported tier, with the
+    // credits that tier starts with — either shape, both strictly validated. Kept
+    // dual-accept indefinitely (not for a fixed window): an already-open browser tab
+    // running the old bundle can still submit the legacy shape after a deploy, and
+    // there's no reliable signal from here that every old tab is gone.
     function signupBilling(data) {
       return data.keys().hasAll(signupBillingFields())
         && data.status == 'pending_payment'
         && data.hasCompletedPayment == false
         && data.selectedTier in signupTiers()
         && data.subscriptionTier == data.selectedTier
-        && data.credits == (data.selectedTier == 'pro' ? 1250 : 400)
-        && data.monthlyCredits == data.credits;
+        && data.monthlyCredits == signupCreditAmount(data.selectedTier)
+        && (signupBillingLegacyNumber(data) || signupBillingObjectShape(data));
     }
 
     // Integration documents only the server may write (see the users block).
@@ -375,6 +422,40 @@ service cloud.firestore {
       allow read, write: if false;
     }
     match /linkedin_member_claims/{memberHash} {
+      allow read, write: if false;
+    }
+
+    // Billing hardening PR 1, all server-only like the blocks above.
+    //   stripeWebhookEvents          dedup ledger — a client that could write it could fake an
+    //                                 event as already applied, or clear one to force a re-apply.
+    //   stripeWebhookPendingEvents   parked subscription events whose owning account wasn't yet
+    //                                 known at delivery time; drained once it is.
+    //   billingAllocations           "has this subscription's initial credit grant already
+    //                                 happened" — a client that could write it could grant
+    //                                 itself credits, or erase the marker to re-trigger a grant.
+    //   billingCheckoutOperations    the durable record created at checkout time (uid, Stripe
+    //                                 customer/session/subscription ids, price) that later
+    //                                 webhook processing checks an incoming event against before
+    //                                 trusting any identity it claims. A client that could write
+    //                                 this could manufacture its own "proof" of a purchase.
+    //   billingAmbiguousAccounts     append-only audit trail for anything the webhook could not
+    //                                 safely auto-resolve.
+    match /stripeWebhookEvents/{eventId} {
+      allow read, write: if false;
+    }
+    match /stripeWebhookPendingEvents/{customerId} {
+      allow read, write: if false;
+    }
+    match /stripeWebhookPendingEvents/{customerId}/events/{eventId} {
+      allow read, write: if false;
+    }
+    match /billingAllocations/{subscriptionId} {
+      allow read, write: if false;
+    }
+    match /billingCheckoutOperations/{operationId} {
+      allow read, write: if false;
+    }
+    match /billingAmbiguousAccounts/{docId} {
       allow read, write: if false;
     }
 

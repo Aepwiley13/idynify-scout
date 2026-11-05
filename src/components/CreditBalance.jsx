@@ -26,8 +26,12 @@ export default function CreditBalance({ showDetails = false, size = 'medium' }) 
       if (userDoc.exists()) {
         const data = userDoc.data();
 
-        // Get current credits
-        setCredits(data.credits || 0);
+        // `credits` can be a bare number (legacy accounts) or an object (post-checkout accounts)
+        // — see src/utils/billingEntitlement.js / creditTracking.js for why both still exist.
+        // Reading `.remaining` off a plain number would be `undefined` and later arithmetic on
+        // it `NaN`; this component used to do exactly that.
+        const remaining = typeof data.credits === 'number' ? data.credits : (data.credits?.remaining ?? 0);
+        setCredits(remaining);
 
         // Determine monthly allotment based on subscription tier
         const tier = data.subscriptionTier || 'starter';
@@ -40,7 +44,7 @@ export default function CreditBalance({ showDetails = false, size = 'medium' }) 
         setResetDate(nextMonth);
 
         // Show upgrade prompt if credits are low
-        if (data.credits < 10) {
+        if (remaining < 10) {
           setShowUpgradePrompt(true);
         }
       }

@@ -1,0 +1,324 @@
+/* Stickers (ADR-007). Colors come from the theme (useT) and stickerPalette.js,
+   inline; this file holds layout only. Breakpoint: the app's one, 768px. */
+
+.stk-section {
+  margin-top: 10px;
+  position: relative;
+}
+
+.stk-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.stk-row > li { display: inline-flex; }
+
+.stk-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px 4px 7px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  max-width: 220px;
+}
+
+.stk-chip--compact { padding: 1px 6px; font-size: 9px; gap: 4px; }
+.stk-chip[data-pending='true'] { opacity: 0.7; }
+
+.stk-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.stk-chip--compact .stk-dot { width: 6px; height: 6px; }
+
+.stk-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stk-remove {
+  background: none;
+  border: none;
+  color: inherit;
+  padding: 1px 0 1px 2px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+}
+.stk-remove:hover, .stk-remove:focus-visible { opacity: 1; }
+.stk-remove:disabled { cursor: default; opacity: 0.3; }
+
+.stk-add-item { position: relative; }
+
+.stk-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+.stk-add-btn:hover { color: #3b82f6 !important; border-color: #3b82f6 !important; }
+
+.stk-add-btn:focus-visible,
+.stk-remove:focus-visible,
+.stk-toast button:focus-visible,
+.stk-sheet-close:focus-visible,
+.stk-picker-input:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.stk-spin { animation: stk-spin 0.9s linear infinite; }
+@keyframes stk-spin { to { transform: rotate(360deg); } }
+
+/* ── Picker ─────────────────────────────────────────────────────────────── */
+.stk-picker { z-index: 60; display: flex; flex-direction: column; gap: 6px; padding: 8px; }
+
+.stk-picker--popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 280px;
+  border-radius: 12px;
+}
+
+.stk-picker-input {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 12px;
+  font-family: inherit;
+  outline: none;
+}
+
+.stk-picker-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.stk-picker-group {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 6px 8px 2px;
+}
+
+.stk-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 7px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.stk-picker-option[data-active='true'] { outline: 1px solid #3b82f655; }
+.stk-picker-option--disabled { cursor: default; }
+.stk-picker-emoji { width: 18px; flex-shrink: 0; text-align: center; }
+.stk-picker-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stk-picker-check { margin-left: auto; }
+.stk-picker-limit, .stk-picker-empty { font-size: 11px; margin: 0; padding: 2px 4px; }
+
+/* Phone: a bottom sheet */
+.stk-sheet-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); z-index: 59; }
+.stk-picker--sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  max-height: 75vh;
+  border-top: 1px solid;
+  border-radius: 16px 16px 0 0;
+  padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px));
+}
+.stk-picker--sheet .stk-picker-list { max-height: none; flex: 1; }
+.stk-sheet-header { display: flex; align-items: center; justify-content: space-between; }
+.stk-sheet-title { font-size: 14px; font-weight: 700; }
+.stk-sheet-close { background: none; border: none; color: inherit; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+
+/* ── Toast ──────────────────────────────────────────────────────────────── */
+.stk-toast-region { position: fixed; right: 20px; bottom: 20px; z-index: 70; pointer-events: none; }
+.stk-toast {
+  pointer-events: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  box-shadow: 0 8px 24px #00000030;
+  max-width: 360px;
+}
+.stk-toast--error { border-left: 3px solid #dc2626 !important; }
+.stk-toast-action { background: none; border: none; color: #3b82f6; font-weight: 700; cursor: pointer; font-family: inherit; font-size: 12px; }
+.stk-toast-close { background: none; border: none; color: inherit; cursor: pointer; opacity: 0.6; display: inline-flex; align-items: center; justify-content: center; }
+
+.stk-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.stk-picker--above { top: auto; bottom: calc(100% + 8px); }
+
+/* ── People: filter, cards, bulk (S6) ───────────────────────────────────── */
+.stk-filter { position: relative; flex-shrink: 0; display: inline-flex; align-items: center; gap: 2px; }
+.stk-filter-btn {
+  display: flex; align-items: center; gap: 5px; padding: 5px 11px; min-height: 44px; border-radius: 20px;
+  font-size: 10px; cursor: pointer; white-space: nowrap; font-family: inherit;
+}
+.stk-dot--outline { background: transparent; border: 1.5px solid currentColor; box-sizing: border-box; }
+.stk-filter-clear {
+  background: none; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  min-width: 28px; min-height: 44px; padding: 0;
+}
+.stk-filter-pop {
+  position: absolute; top: calc(100% + 6px); left: 0; min-width: 190px; max-height: 320px; overflow-y: auto;
+  border-radius: 11px; padding: 5px; z-index: 50; display: flex; flex-direction: column; gap: 1px;
+}
+.stk-filter-title { font-size: 9px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; padding: 4px 9px 6px; }
+.stk-filter-empty { font-size: 11px; padding: 6px 10px; font-style: italic; }
+.stk-filter-item {
+  display: flex; align-items: center; gap: 7px; border: none; border-radius: 7px; padding: 6px 10px;
+  font-size: 12px; cursor: pointer; text-align: left; font-family: inherit;
+}
+.stk-filter-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stk-filter-count { font-size: 10px; }
+.stk-notice { display: flex; align-items: center; gap: 8px; padding: 8px 22px; font-size: 12px; }
+.stk-notice button { background: none; border: none; cursor: pointer; font-family: inherit; font-size: 12px; text-decoration: underline; color: inherit; min-height: 32px; }
+
+.stk-card-row { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.stk-card-more { font-size: 9px; font-weight: 600; }
+
+.stk-bulk { position: relative; }
+.stk-bulk-summary {
+  position: absolute; bottom: calc(100% + 10px); left: 50%; transform: translateX(-50%);
+  width: min(340px, calc(100vw - 32px)); border-radius: 10px; padding: 10px 12px; font-size: 12px;
+  white-space: normal; box-shadow: 0 8px 24px #00000030; display: flex; flex-direction: column; gap: 6px;
+}
+.stk-bulk-summary-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.stk-bulk-summary-actions { display: flex; gap: 12px; }
+.stk-bulk-details { margin: 0; padding-left: 16px; max-height: 160px; overflow-y: auto; font-size: 11px; display: flex; flex-direction: column; gap: 3px; }
+
+/* ── Stickers view (S7) ─────────────────────────────────────────────────── */
+.stk-wall { display: flex; flex-direction: column; gap: 14px; }
+.stk-wall-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.stk-wall-title { font-size: 15px; font-weight: 700; margin: 0; }
+.stk-wall-empty { font-size: 13px; margin: 8px 0; }
+.stk-wall-grid {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px;
+}
+.stk-tile { position: relative; border-radius: 14px; overflow: visible; display: flex; min-height: 110px; }
+.stk-tile-band { position: absolute; left: 0; top: 0; bottom: 0; width: 6px; border-radius: 14px 0 0 14px; }
+.stk-tile-main {
+  flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left;
+  background: none; border: none; cursor: pointer; padding: 14px 40px 14px 18px; font-family: inherit; border-radius: 14px;
+  min-width: 0;
+}
+.stk-tile-top { display: flex; align-items: center; gap: 6px; min-width: 0; max-width: 100%; }
+.stk-tile-emoji { font-size: 18px; line-height: 1; }
+.stk-tile-name { font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.stk-tile-desc { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.stk-tile-count { font-size: 12px; font-weight: 700; margin-top: auto; }
+.stk-tile-menu-btn {
+  position: absolute; top: 6px; right: 6px; width: 32px; height: 32px; border-radius: 8px;
+  background: none; border: none; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+}
+.stk-tile-menu {
+  position: absolute; top: 40px; right: 6px; z-index: 30; min-width: 140px; border-radius: 10px; padding: 4px;
+  display: flex; flex-direction: column; box-shadow: 0 8px 24px #00000030;
+}
+.stk-tile-menu-item { background: none; border: none; text-align: left; padding: 8px 10px; border-radius: 7px; font-size: 13px; cursor: pointer; font-family: inherit; }
+.stk-tile-menu-item:hover, .stk-tile-menu-item:focus-visible { background: rgba(59, 130, 246, 0.1); }
+.stk-wall-archived { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.stk-wall-archived-list { list-style: none; margin: 0; padding: 0; width: 100%; max-width: 480px; }
+.stk-wall-archived-list li { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; }
+.stk-wall-archived-list li .stk-tile-name { flex: 1; font-weight: 500; font-size: 13px; }
+
+.stk-btn {
+  display: inline-flex; align-items: center; gap: 5px; padding: 7px 12px; border-radius: 8px; font-size: 12px; font-weight: 600;
+  background: none; cursor: pointer; font-family: inherit;
+}
+.stk-btn--primary { background: #e8197d; color: #fff; border: none; }
+.stk-btn--danger { background: #dc2626; color: #fff; border: none; }
+.stk-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* ── Dialog ─────────────────────────────────────────────────────────────── */
+.stk-dialog-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); z-index: 80; }
+.stk-dialog {
+  position: fixed; z-index: 81; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: min(420px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto;
+  border-radius: 14px; padding: 18px; box-shadow: 0 20px 48px #00000040; box-sizing: border-box;
+}
+.stk-dialog-title { font-size: 16px; font-weight: 700; margin: 0 0 12px; }
+.stk-dialog-text { font-size: 13px; line-height: 1.5; margin: 0 0 16px; }
+.stk-dialog-form { display: flex; flex-direction: column; gap: 6px; }
+.stk-field-label { font-size: 12px; font-weight: 600; margin-top: 6px; }
+.stk-field { border-radius: 8px; padding: 8px 10px; font-size: 13px; font-family: inherit; outline: none; width: 100%; box-sizing: border-box; resize: vertical; }
+.stk-field--short { width: 96px; }
+.stk-field-note { font-size: 11px; margin: 0; }
+.stk-field-error { font-size: 12px; color: #dc2626; margin: 4px 0 0; }
+.stk-swatches { border: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.stk-swatches legend { padding: 0; margin-bottom: 4px; }
+.stk-swatch { display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: 8px; border: 2px solid transparent; cursor: pointer; }
+.stk-swatch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.stk-swatch:focus-within { outline: 2px solid #3b82f6; outline-offset: 1px; }
+.stk-swatch-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+.stk-swatch-label { font-size: 11px; }
+.stk-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+.stk-tile-main:focus-visible, .stk-tile-menu-btn:focus-visible, .stk-btn:focus-visible, .stk-field:focus-visible { outline: 2px solid #3b82f6; outline-offset: 2px; }
+
+/* Touch: every target at least 44px (the app's convention). */
+@media (max-width: 768px) {
+  .stk-chip { min-height: 44px; padding: 0 4px 0 12px; font-size: 12px; }
+  .stk-chip--compact { min-height: 0; padding: 1px 6px; font-size: 9px; }
+  .stk-remove { min-width: 44px; min-height: 44px; }
+  .stk-add-btn { min-height: 44px; padding: 0 14px; font-size: 12px; }
+  .stk-picker-option { min-height: 44px; font-size: 14px; }
+  .stk-picker-input { min-height: 44px; font-size: 16px; }
+  .stk-sheet-close, .stk-toast-action, .stk-toast-close { min-width: 44px; min-height: 44px; }
+  .stk-toast-region { left: 16px; right: 16px; bottom: 16px; }
+  .stk-toast { max-width: none; }
+  .stk-filter-item { min-height: 44px; font-size: 14px; }
+  .stk-filter-clear { min-width: 44px; }
+  .stk-tile-menu-btn { width: 44px; height: 44px; top: 2px; right: 2px; }
+  .stk-tile-menu-item, .stk-btn { min-height: 44px; }
+  .stk-swatches { grid-template-columns: repeat(2, 1fr); }
+  .stk-swatch { min-height: 44px; }
+  .stk-field { min-height: 44px; font-size: 16px; }
+  .stk-bulk-summary { position: fixed; left: 16px; right: 16px; bottom: 96px; width: auto; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stk-spin { animation: none; }
+}

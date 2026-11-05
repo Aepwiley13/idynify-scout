@@ -10,4 +10,4 @@ import { stickerStore } from './stickerService';
 
 export const { addSticker, removeSticker, addStickerToContacts } = stickerStore;
 
-export { storedStickerIds, STICKER_LIMIT } from './stickers/stickerCore';
+export { storedStickerIds, withMembershipChange, visibleStickers, STICKER_LIMIT } from './stickers/stickerCore';

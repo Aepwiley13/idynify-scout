@@ -9,8 +9,12 @@
  *   'checking'     not known yet: sticker controls stay hidden
  *   'available'    show sticker controls
  *   'unavailable'  keep them hidden
+ *
+ * recheck() asks the server again. A surface calls it after a write the rules
+ * refused as not allowed (DENIAL_REASONS.WRITE_DENIED), so access revoked
+ * mid-session hides every sticker control on the next answer.
  */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { fetchStickersConfig } from './stickersApi.js';
 import { AVAILABILITY, availabilityFromConfig } from './stickersAvailabilityState.js';
@@ -23,9 +27,11 @@ function viewingAsSomeoneElse() {
   }
 }
 
-export function useStickersAvailability() {
+/** { state, recheck }: the answer, and a way to ask again. */
+export function useStickersAvailabilityControl() {
   const [impersonating] = useState(viewingAsSomeoneElse);
   const [state, setState] = useState(impersonating ? AVAILABILITY.UNAVAILABLE : AVAILABILITY.CHECKING);
+  const [round, setRound] = useState(0);
 
   useEffect(() => {
     if (impersonating) return undefined;
@@ -35,9 +41,17 @@ export function useStickersAvailability() {
       .then((answer) => { if (live) setState(availabilityFromConfig(answer)); })
       .catch(() => { if (live) setState(AVAILABILITY.UNAVAILABLE); });
     return () => { live = false; };
+  }, [impersonating, round]);
+
+  const recheck = useCallback(() => {
+    if (!impersonating) setRound((n) => n + 1);
   }, [impersonating]);
 
-  return state;
+  return { state, recheck };
+}
+
+export function useStickersAvailability() {
+  return useStickersAvailabilityControl().state;
 }
 
 export default useStickersAvailability;

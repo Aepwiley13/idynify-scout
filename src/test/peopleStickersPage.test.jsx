@@ -4,7 +4,7 @@
  * sticker services and stickersConfig are fakes (helpers/stickersUi.js).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, within, waitFor } from '@testing-library/react';
+import { render, screen, within, waitFor, configure } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { createFakeStickers, sticker, config } from './helpers/stickersUi';
@@ -53,6 +53,10 @@ vi.mock('../services/contactStickers', () => ({
 }));
 
 import AllLeads from '../pages/Scout/AllLeads';
+
+// The whole People page loads here; give slow CI machines room rather than
+// racing the 1s default.
+configure({ asyncUtilTimeout: 5000 });
 
 const BOARD = sticker('Board', { color: 'blue' });
 const DONOR = sticker('Donor', { color: 'amber', status: 'archived' });

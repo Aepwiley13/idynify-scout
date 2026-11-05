@@ -77,6 +77,10 @@ const ALLOWED = new Map([
    'Emulator fixture, as cases.mjs: two "demo-" projects (live rules and the rollback variant), which cannot reach a real backend.'],
   ['scripts/rules-check/sticker-services.mjs',
    'Emulator fixture, as cases.mjs: a "demo-" project, which cannot reach a real backend.'],
+  ['scripts/rules-check/stickers-flag-parity.mjs',
+   'Emulator fixture, as cases.mjs: a "demo-" project, which cannot reach a real backend.'],
+  ['src/test/stickersStaging.test.js',
+   'Fixture. Inputs to the staging guard, which must accept or refuse them; the ids are the thing under test, never a target.'],
 ]);
 
 /** A line that is only a comment cannot configure anything. */

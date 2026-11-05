@@ -18,6 +18,10 @@ No production project, no credentials, no access to real data.
   archive, add and remove, concurrent adds and removes, an add racing an
   archive, the 50-sticker limit under contention, bulk add, cross-user
   attempts, a direct write that skips the service, and the rollout modes.
+- `stickers-flag-parity.mjs` — the rules, the `stickersConfig` decision
+  (`resolveStickersConfig`) and the app's availability hook
+  (`availabilityFromConfig`) agree for every row of the rollout table, on the
+  same stored documents; viewing as another user is read-only on all three.
 - `write-semantics.mjs` — **what a write does** to the fields it was not told
   about. Guards the rediscovery `updateMask`.
 

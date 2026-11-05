@@ -13,6 +13,7 @@
 import { useEffect, useState } from 'react';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { fetchStickersConfig } from './stickersApi.js';
+import { AVAILABILITY, availabilityFromConfig } from './stickersAvailabilityState.js';
 
 function viewingAsSomeoneElse() {
   try {
@@ -24,18 +25,15 @@ function viewingAsSomeoneElse() {
 
 export function useStickersAvailability() {
   const [impersonating] = useState(viewingAsSomeoneElse);
-  const [state, setState] = useState(impersonating ? 'unavailable' : 'checking');
+  const [state, setState] = useState(impersonating ? AVAILABILITY.UNAVAILABLE : AVAILABILITY.CHECKING);
 
   useEffect(() => {
     if (impersonating) return undefined;
     let live = true;
     Promise.resolve()
       .then(fetchStickersConfig)
-      .then(({ status, body }) => {
-        if (!live) return;
-        setState(status === 200 && body?.enabled === true && body?.readOnly !== true ? 'available' : 'unavailable');
-      })
-      .catch(() => { if (live) setState('unavailable'); });
+      .then((answer) => { if (live) setState(availabilityFromConfig(answer)); })
+      .catch(() => { if (live) setState(AVAILABILITY.UNAVAILABLE); });
     return () => { live = false; };
   }, [impersonating]);
 

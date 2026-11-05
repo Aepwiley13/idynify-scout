@@ -126,6 +126,19 @@ export function storedStickerIds(contact) {
   return Array.isArray(contact?.sticker_ids) ? contact.sticker_ids : [];
 }
 
+/**
+ * The contact as the screen shows it after a confirmed add or remove. Pure:
+ * it updates local state once a transaction has resolved, so the membership
+ * field is spelled only in this module (stickerWritePaths.test.js).
+ */
+export function withMembershipChange(contact, stickerId, op) {
+  const ids = storedStickerIds(contact);
+  let next = ids;
+  if (op === 'add' && !ids.includes(stickerId)) next = [...ids, stickerId];
+  if (op === 'remove') next = ids.filter((id) => id !== stickerId);
+  return { ...contact, sticker_ids: next };
+}
+
 /** Active stickers in display order: by name, case-insensitive, then by ID. */
 export function sortStickers(stickers) {
   return [...stickers].sort((a, b) => stickerNameKey(a.name).localeCompare(stickerNameKey(b.name)) || (a.id < b.id ? -1 : 1));

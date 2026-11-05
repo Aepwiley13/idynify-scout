@@ -129,5 +129,7 @@ describe('People Stickers view (S7)', { timeout: 30000 }, () => {
     expect(screen.getByRole('button', { name: /Cards/ })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByRole('button', { name: /◈ Stickers/ })).toBeNull();
     expect(listed()).toEqual(['Ana Board', 'Ben Gala', 'Cy Nobody']);
+    // QA D-1: the view is gone, the explanation stays.
+    expect(screen.getAllByRole('status').some((el) => el.textContent.includes("Stickers can't be changed right now."))).toBe(true);
   });
 });

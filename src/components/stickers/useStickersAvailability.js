@@ -15,7 +15,7 @@
  * mid-session hides every sticker control on the next answer.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { getEffectiveUser, useImpersonation } from '../../context/ImpersonationContext';
 import { fetchStickersConfig } from './stickersApi.js';
 import { AVAILABILITY, availabilityFromConfig } from './stickersAvailabilityState.js';
 
@@ -27,10 +27,21 @@ function viewingAsSomeoneElse() {
   }
 }
 
-/** { state, recheck }: the answer, and a way to ask again. */
+/**
+ * { state, recheck }: the answer, and a way to ask again.
+ *
+ * "Viewing as someone else" is read from the impersonation context, which
+ * re-renders when a session starts or ends. It is not only the module cache,
+ * which ImpersonationProvider fills in an effect AFTER its children first
+ * render, and which the app fills only when the session request returns
+ * (after a reload, pages mount first). While viewing as, the server is never
+ * asked and the answer is 'unavailable', at once and every render.
+ */
 export function useStickersAvailabilityControl() {
-  const [impersonating] = useState(viewingAsSomeoneElse);
-  const [state, setState] = useState(impersonating ? AVAILABILITY.UNAVAILABLE : AVAILABILITY.CHECKING);
+  const context = useImpersonation();
+  const [cachedAtMount] = useState(viewingAsSomeoneElse);
+  const impersonating = Boolean(context?.isImpersonating) || cachedAtMount;
+  const [answer, setAnswer] = useState(AVAILABILITY.CHECKING);
   const [round, setRound] = useState(0);
 
   useEffect(() => {
@@ -38,8 +49,8 @@ export function useStickersAvailabilityControl() {
     let live = true;
     Promise.resolve()
       .then(fetchStickersConfig)
-      .then((answer) => { if (live) setState(availabilityFromConfig(answer)); })
-      .catch(() => { if (live) setState(AVAILABILITY.UNAVAILABLE); });
+      .then((config) => { if (live) setAnswer(availabilityFromConfig(config)); })
+      .catch(() => { if (live) setAnswer(AVAILABILITY.UNAVAILABLE); });
     return () => { live = false; };
   }, [impersonating, round]);
 
@@ -47,7 +58,7 @@ export function useStickersAvailabilityControl() {
     if (!impersonating) setRound((n) => n + 1);
   }, [impersonating]);
 
-  return { state, recheck };
+  return { state: impersonating ? AVAILABILITY.UNAVAILABLE : answer, recheck };
 }
 
 export function useStickersAvailability() {

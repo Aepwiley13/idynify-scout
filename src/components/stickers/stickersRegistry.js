@@ -17,6 +17,7 @@ export const NO_STICKERS = Object.freeze({
   active: [],
   archived: [],
   byId: new Map(),
+  notify: () => {},
 });
 
 export const StickersContext = createContext(NO_STICKERS);

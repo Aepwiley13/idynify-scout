@@ -13,7 +13,7 @@ vi.mock('firebase/firestore', async (importOriginal) => ({
   doc: (_db, ...path) => ({ path: path.join('/') }),
   updateDoc: async () => {},
 }));
-vi.mock('../context/ImpersonationContext', () => ({ getEffectiveUser: () => ({ uid: 'u1' }) }));
+vi.mock('../context/ImpersonationContext', () => ({ getEffectiveUser: () => ({ uid: 'u1' }), useImpersonation: () => ({ isImpersonating: false }) }));
 vi.mock('../services/peopleService', () => ({ getUniqueTags: async () => [] }));
 vi.mock('../components/scout/CompanyDetailModal', () => ({ default: () => null }));
 vi.mock('../components/stickers/stickersApi.js', () => ({ fetchStickersConfig: (...a) => fake.current.services.fetchStickersConfig(...a) }));

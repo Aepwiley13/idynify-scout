@@ -13,18 +13,25 @@
  * useStickers() (stickersRegistry.js) reads it. Outside any provider it
  * answers 'unavailable': a surface mounted without one shows nothing.
  */
-import { useContext, useEffect, useMemo, useState } from 'react';
+import { useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { subscribeStickers } from '../../services/stickerService';
 import { STICKER_STATUS, sortStickers } from '../../services/stickers/stickerCore';
 import { AVAILABILITY } from './stickersAvailabilityState.js';
 import { useStickersAvailabilityControl } from './useStickersAvailability.js';
 import { REGISTRY_STATUS, StickersContext } from './stickersRegistry.js';
+import StickerToast from './StickerToast';
 
 function StickersRoot({ uid, children }) {
   const { state: availability, recheck } = useStickersAvailabilityControl();
   const listening = availability === AVAILABILITY.AVAILABLE && typeof uid === 'string' && uid.length > 0;
   // The registry belongs to the uid it was loaded for; anything else is still loading.
   const [registry, setRegistry] = useState({ uid: null, status: REGISTRY_STATUS.IDLE, all: [] });
+  // The page's one sticker notice. It lives here, not in a surface, so a
+  // message outlives the surface that raised it: "Stickers can't be changed
+  // right now" stays on screen while the row it came from disappears.
+  const [notice, setNotice] = useState(null);
+  const notify = useCallback((next) => setNotice({ ...next, id: Date.now() + Math.random() }), []);
+  const dismissNotice = useCallback(() => setNotice(null), []);
 
   useEffect(() => {
     if (!listening) return undefined;
@@ -63,10 +70,16 @@ function StickersRoot({ uid, children }) {
       active,
       archived,
       byId: new Map(all.map((s) => [s.id, s])),
+      notify,
     };
-  }, [availability, recheck, listening, uid, registry]);
+  }, [availability, recheck, listening, uid, registry, notify]);
 
-  return <StickersContext.Provider value={value}>{children}</StickersContext.Provider>;
+  return (
+    <StickersContext.Provider value={value}>
+      {children}
+      <StickerToast toast={notice} onDismiss={dismissNotice} />
+    </StickersContext.Provider>
+  );
 }
 
 export function StickersProvider({ uid, children }) {

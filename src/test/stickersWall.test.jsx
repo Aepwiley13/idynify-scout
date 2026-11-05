@@ -17,7 +17,7 @@ vi.mock('../services/stickerService', () => ({
   archiveSticker: (...a) => fake.current.services.archiveSticker(...a),
   restoreSticker: (...a) => fake.current.services.restoreSticker(...a),
 }));
-vi.mock('../context/ImpersonationContext', () => ({ getEffectiveUser: () => ({ uid: 'u1' }) }));
+vi.mock('../context/ImpersonationContext', () => ({ getEffectiveUser: () => ({ uid: 'u1' }), useImpersonation: () => ({ isImpersonating: false }) }));
 
 import { StickersProvider } from '../components/stickers/StickersContext';
 import StickersWall from '../components/stickers/StickersWall';

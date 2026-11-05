@@ -11,7 +11,10 @@ const fake = vi.hoisted(() => ({ current: null }));
 const viewer = vi.hoisted(() => ({ value: { uid: 'u1' } }));
 vi.mock('../components/stickers/stickersApi.js', () => ({ fetchStickersConfig: (...a) => fake.current.services.fetchStickersConfig(...a) }));
 vi.mock('../services/stickerService', () => ({ subscribeStickers: (...a) => fake.current.services.subscribeStickers(...a) }));
-vi.mock('../context/ImpersonationContext', () => ({ getEffectiveUser: () => viewer.value }));
+vi.mock('../context/ImpersonationContext', () => ({
+  getEffectiveUser: () => viewer.value,
+  useImpersonation: () => ({ isImpersonating: Boolean(viewer.value?._isImpersonated) }),
+}));
 
 import { StickersProvider } from '../components/stickers/StickersContext';
 import { useStickers } from '../components/stickers/stickersRegistry';

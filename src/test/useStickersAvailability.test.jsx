@@ -10,7 +10,10 @@ const fetchStickersConfig = vi.hoisted(() => vi.fn());
 const effectiveUser = vi.hoisted(() => ({ value: { uid: 'U' } }));
 
 vi.mock('../components/stickers/stickersApi.js', () => ({ fetchStickersConfig }));
-vi.mock('../context/ImpersonationContext', () => ({ getEffectiveUser: () => effectiveUser.value }));
+vi.mock('../context/ImpersonationContext', () => ({
+  getEffectiveUser: () => effectiveUser.value,
+  useImpersonation: () => ({ isImpersonating: Boolean(effectiveUser.value?.contextImpersonating) }),
+}));
 
 import { useStickersAvailability, useStickersAvailabilityControl } from '../components/stickers/useStickersAvailability.js';
 
@@ -68,5 +71,23 @@ describe('useStickersAvailability', () => {
     act(() => result.current.recheck());
     expect(result.current.state).toBe('unavailable');
     expect(fetchStickersConfig).not.toHaveBeenCalled();
+  });
+
+  it('QA D-2: viewing as someone, known only from the impersonation context, never asks the server', async () => {
+    effectiveUser.value = { uid: 'U', contextImpersonating: true };
+    const { result } = renderHook(() => useStickersAvailabilityControl());
+    expect(result.current.state).toBe('unavailable');
+    await act(async () => {});
+    expect(fetchStickersConfig).not.toHaveBeenCalled();
+  });
+
+  it('QA D-2: a view-as session that starts after mount makes it unavailable at once, with no new request', async () => {
+    fetchStickersConfig.mockResolvedValue({ status: 200, body: { enabled: true, mode: 'beta', readOnly: false } });
+    const { result, rerender } = renderHook(() => useStickersAvailabilityControl());
+    await waitFor(() => expect(result.current.state).toBe('available'));
+    effectiveUser.value = { uid: 'U', contextImpersonating: true };
+    rerender();
+    expect(result.current.state).toBe('unavailable');
+    expect(fetchStickersConfig).toHaveBeenCalledTimes(1);
   });
 });

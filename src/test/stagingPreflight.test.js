@@ -4,7 +4,7 @@
  * secret.
  */
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -46,6 +46,17 @@ describe('checkStagingEnv', () => {
     expect(failing(good(), { productionProjectId: null })).toEqual(['not-production']);
   });
 
+  it('refuses a checkout linked to a Netlify site, whose variables netlify dev would inject', () => {
+    expect(failing(good(), { linkedSite: true })).toEqual(['netlify-unlinked']);
+  });
+
+  it('refuses a checkout with a root .env file Vite would also load', () => {
+    const results = checkStagingEnv(good(), { productionProjectId: PROD, rootEnvFiles: ['.env', '.env.local'] });
+    const r = results.find((x) => x.id === 'no-root-env');
+    expect(r.ok).toBe(false);
+    expect(r.message).toContain('.env, .env.local');
+  });
+
   it('refuses an env file git would commit', () => {
     expect(failing(good(), { fileCommittable: true })).toEqual(['file-not-committable']);
   });
@@ -84,15 +95,27 @@ describe('the tool itself', () => {
     return file;
   };
 
+  // A clean checkout: not linked to Netlify, no root .env (a developer's own clone may have both).
+  const cleanCheckout = () => mkdtempSync(join(tmpdir(), 'checkout-'));
+
   it('passes a good file outside the repo, and prints no secret', () => {
-    const { status, out } = run([`--env=${writeEnv(good())}`], { PRODUCTION_FIREBASE_PROJECT_ID: PROD });
+    const { status, out } = run([`--env=${writeEnv(good())}`, `--checkout=${cleanCheckout()}`], { PRODUCTION_FIREBASE_PROJECT_ID: PROD });
     expect(status).toBe(0);
     expect(out).toContain('Preflight passed.');
     for (const secret of ['SECRETKEYMATERIAL', 'AIzaSECRETWEBKEY']) expect(out).not.toContain(secret);
   });
 
+  it('refuses a checkout linked to Netlify, from the command line', () => {
+    const checkout = cleanCheckout();
+    mkdirSync(join(checkout, '.netlify'));
+    writeFileSync(join(checkout, '.netlify', 'state.json'), '{"siteId":"x"}');
+    const { status, out } = run([`--env=${writeEnv(good())}`, `--checkout=${checkout}`], { PRODUCTION_FIREBASE_PROJECT_ID: PROD });
+    expect(status).toBe(1);
+    expect(out).toContain('netlify-unlinked');
+  });
+
   it('refuses a bad file with exit 1', () => {
-    const { status, out } = run([`--env=${writeEnv({ ...good(), STRIPE_SECRET_KEY: 'sk_live_SECRET' })}`], { PRODUCTION_FIREBASE_PROJECT_ID: PROD });
+    const { status, out } = run([`--env=${writeEnv({ ...good(), STRIPE_SECRET_KEY: 'sk_live_SECRET' })}`, `--checkout=${cleanCheckout()}`], { PRODUCTION_FIREBASE_PROJECT_ID: PROD });
     expect(status).toBe(1);
     expect(out).toContain('Refused:');
     expect(out).not.toContain('sk_live_SECRET');

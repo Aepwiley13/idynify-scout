@@ -9,7 +9,7 @@
  * test even when the caller catches the rejection.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, within, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 const service = vi.hoisted(() => ({ calls: [], impl: async () => ({}) }));
@@ -100,5 +100,25 @@ describe('IdentityCard email edits', () => {
     await user.click(within(entryRow('old@acme.test')).getByTitle('Remove'));
     expect(await screen.findByText('old@acme.test')).not.toBeNull();
     expect(onUpdate).toHaveBeenLastCalledWith(CONTACT);
+  });
+
+  it('keeps what changed on the page while the save was in flight (a sticker added in the row above)', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    let finish;
+    service.impl = () => new Promise((resolve) => { finish = resolve; });
+    const view = render(<IdentityCard contact={CONTACT} onUpdate={onUpdate} />);
+
+    await user.click(within(entryRow('old@acme.test')).getByTitle('Edit'));
+    const input = screen.getByPlaceholderText('Email address');
+    await user.clear(input);
+    await user.type(input, 'new@acme.test{Enter}');
+
+    // While the email save is pending, the page takes a confirmed sticker add.
+    view.rerender(<IdentityCard contact={{ ...CONTACT, sticker_ids: ['S1'] }} onUpdate={onUpdate} />);
+    await act(async () => finish({ ...CONTACT, email: 'new@acme.test', email_normalized: 'new@acme.test', emails: [{ id: '0', value: 'new@acme.test', label: 'work' }], updated_at: 'T2' }));
+
+    const [next] = onUpdate.mock.calls.at(-1);
+    expect(next).toMatchObject({ email: 'new@acme.test', email_normalized: 'new@acme.test', sticker_ids: ['S1'], updated_at: 'T2' });
   });
 });

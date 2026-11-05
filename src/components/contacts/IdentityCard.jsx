@@ -373,6 +373,10 @@ export default function IdentityCard({
   onUpdate,
 }) {
   const T = useT();
+  // The contact as the page holds it now. An email save resolves later, and
+  // whatever landed meanwhile (a sticker added in the row above) must stay.
+  const latestContact = useRef(contact);
+  useEffect(() => { latestContact.current = contact; }, [contact]);
   const [imgBroken, setImgBroken] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(false);
   const photoButtonRef = useRef(null);
@@ -532,11 +536,11 @@ export default function IdentityCard({
       const saved = await saveContactEmailEdit(user.uid, contact.id, edit);
       setEmailsList(readContactEmails(saved));
       // Only the email fields: the page keeps what it computed for display.
-      onUpdate?.({ ...contact, ...pickEmailFields(saved), updated_at: saved.updated_at });
+      onUpdate?.({ ...latestContact.current, ...pickEmailFields(saved), updated_at: saved.updated_at });
     } catch (err) {
       console.error('[IdentityCard] Save emails failed:', err?.code ?? err?.name ?? 'error');
-      setEmailsList(readContactEmails(contact));
-      onUpdate?.(contact);
+      setEmailsList(readContactEmails(latestContact.current));
+      onUpdate?.(latestContact.current);
     }
   }
 

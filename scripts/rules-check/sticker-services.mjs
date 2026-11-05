@@ -13,7 +13,7 @@ import { initializeTestEnvironment } from '@firebase/rules-unit-testing';
 import {
   doc, collection, getDoc, setDoc, updateDoc, runTransaction, serverTimestamp, deleteField, onSnapshot, arrayUnion, arrayRemove, Timestamp,
 } from 'firebase/firestore';
-import { createStickerStore, STICKER_ERRORS } from '../../src/services/stickers/stickerCore.js';
+import { createStickerStore, STICKER_ERRORS, DENIAL_REASONS, MEMBERSHIP_ATTEMPTS } from '../../src/services/stickers/stickerCore.js';
 
 const env = await initializeTestEnvironment({
   projectId: 'demo-sticker-services',
@@ -46,6 +46,10 @@ async function newContact(ids = null, uid = U) {
 }
 const codeOf = async (promise) => {
   try { await promise; return 'ok'; } catch (err) { return err.code ?? err.message; }
+};
+/** code / reason / attempts of a refusal, or 'ok'. */
+const refusalOf = async (promise) => {
+  try { await promise; return 'ok'; } catch (err) { return `${err.code}/${err.reason}/${err.attempts}`; }
 };
 
 const CHECKS = [];
@@ -200,6 +204,70 @@ check('rollout modes: off and un-enrolled beta refuse; enrolled beta and interna
   assert(await codeOf(me.removeSticker(U, c, id)) === 'ok', 'internal, admin');
   await asAdmin((db) => setDoc(doc(db, `users/${U}`), { email: 'u@example.test' }));
   await setMode('on');
+});
+
+check('a cross-user write is refused at the read: final at once, never retried', async () => {
+  const { id } = await me.createSticker(U, { name: 'Private' });
+  const c = await newContact();
+  const got = await refusalOf(storeFor('OTHER').addSticker(U, c, id));
+  assert(got === `${STICKER_ERRORS.PERMISSION_DENIED}/${DENIAL_REASONS.READ_DENIED}/1`, got);
+  assert(!(await read(`users/${U}/contacts/${c}`)).sticker_ids, 'nothing written');
+});
+
+check('feature turned off: an authorization refusal, stopped at the second attempt (not retried as contention)', async () => {
+  const { id } = await me.createSticker(U, { name: 'Shutdown' });
+  const c = await newContact();
+  const k = await newContact([]);
+  await setMode('off');
+  const add = await refusalOf(me.addSticker(U, c, id));
+  const remove = await refusalOf(me.removeSticker(U, k, id));
+  await setMode('on');
+  assert(add === `${STICKER_ERRORS.PERMISSION_DENIED}/${DENIAL_REASONS.WRITE_DENIED}/2`, `add ${add}`);
+  assert(remove === 'ok', `remove of an absent sticker writes nothing: ${remove}`);
+});
+
+check('access revoked between two changes: the second is refused as authorization', async () => {
+  const { id: a } = await me.createSticker(U, { name: 'Before' });
+  const { id: b } = await me.createSticker(U, { name: 'After' });
+  const c = await newContact();
+  assert((await me.addSticker(U, c, a)).status === 'added', 'first add');
+  await asAdmin((db) => setDoc(doc(db, 'feature_flags/stickers'), { mode: 'internal' })); // U is not an admin
+  const got = await refusalOf(me.addSticker(U, c, b));
+  await setMode('on');
+  assert(got === `${STICKER_ERRORS.PERMISSION_DENIED}/${DENIAL_REASONS.WRITE_DENIED}/2`, got);
+  assert(JSON.stringify((await read(`users/${U}/contacts/${c}`)).sticker_ids) === JSON.stringify([a]), 'only the first add');
+});
+
+check('adding an archived sticker is refused by the service from fresh data, not retried', async () => {
+  const { id } = await me.createSticker(U, { name: 'Gone' });
+  await me.archiveSticker(U, id);
+  const got = await refusalOf(me.addSticker(U, await newContact(), id));
+  assert(got === `${STICKER_ERRORS.STICKER_ARCHIVED}/null/null`, got);
+});
+
+check('stress: ten concurrent adds of different stickers to one contact all land', async () => {
+  const ids = [];
+  for (let i = 0; i < 10; i += 1) ids.push((await me.createSticker(U, { name: `Stress ${i}` })).id);
+  const c = await newContact();
+  const outcomes = await Promise.all(ids.map((id) => refusalOf(me.addSticker(U, c, id))));
+  assert(outcomes.every((o) => o === 'ok'), outcomes.join());
+  const stored = await read(`users/${U}/contacts/${c}`);
+  assert(stored.sticker_ids.length === 10 && Object.keys(stored.sticker_assignments).length === 10, 'all ten, with assignments');
+});
+
+check(`stress: concurrent adds racing an archive end consistent (at most ${MEMBERSHIP_ATTEMPTS} attempts each)`, async () => {
+  const { id } = await me.createSticker(U, { name: 'Contended' });
+  const contacts = [];
+  for (let i = 0; i < 8; i += 1) contacts.push(await newContact());
+  const [results] = await Promise.all([
+    Promise.all(contacts.map((c) => refusalOf(me.addSticker(U, c, id)))),
+    me.archiveSticker(U, id),
+  ]);
+  for (const [i, outcome] of results.entries()) {
+    const stored = await read(`users/${U}/contacts/${contacts[i]}`);
+    const added = stored.sticker_ids?.includes(id) ?? false;
+    assert(outcome === 'ok' ? added : (!added && outcome.startsWith(STICKER_ERRORS.STICKER_ARCHIVED)), `contact ${i}: ${outcome}, stored ${added}`);
+  }
 });
 
 let pass = 0;

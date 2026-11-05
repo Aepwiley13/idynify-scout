@@ -27,11 +27,20 @@
  *   - adding a sticker the contact already has, or removing one it does not
  *     have, writes nothing.
  * The rules check the same things again, server-side, against the stored
- * document. Under contention the server can refuse a write the rules judge
- * on newer data (permission-denied, which Firestore does not retry), so a
- * membership change is re-read and re-decided up to MEMBERSHIP_ATTEMPTS
- * times. A real refusal (feature off, someone else's contact) fails every
- * attempt and is reported as permission_denied.
+ * document.
+ *
+ * CONTENTION IS NOT AUTHORIZATION. Under contention the server can refuse a
+ * write that the rules judged on newer data (permission-denied, which
+ * Firestore does not retry), so a refused membership change is re-read and
+ * re-decided. It is never sent in a weaker form. What separates the two:
+ *   - a READ refused is never contention (someone else's contact, signed
+ *     out): final at once, reason read_denied;
+ *   - a write refused again when the re-read found the same membership data
+ *     is an authorization failure (the feature turned off, access revoked):
+ *     final, reason write_denied;
+ *   - a write refused, or aborted, while the data keeps changing is
+ *     contention: re-read up to MEMBERSHIP_ATTEMPTS times, then
+ *     contention_exhausted.
  */
 
 export const STICKER_LIMIT = 50;
@@ -42,6 +51,13 @@ export const STICKER_COLORS = Object.freeze(['teal', 'blue', 'purple', 'coral', 
 export const STICKER_STATUS = Object.freeze({ ACTIVE: 'active', ARCHIVED: 'archived' });
 export const ASSIGNED_BY = Object.freeze(['user', 'csv_import']);
 export const MEMBERSHIP_ATTEMPTS = 4;
+
+/** Why a membership change was refused (StickerError.reason). */
+export const DENIAL_REASONS = Object.freeze({
+  READ_DENIED: 'read_denied',
+  WRITE_DENIED: 'write_denied',
+  CONTENTION_EXHAUSTED: 'contention_exhausted',
+});
 
 const STICKER_ID = /^[A-Za-z0-9]{20}$/;
 const CONTACT_ID = /^[^/]{1,1500}$/;
@@ -63,12 +79,18 @@ export const STICKER_ERRORS = Object.freeze({
   WRITE_FAILED: 'write_failed',
 });
 
-/** A sticker failure with a stable code the UI can map to a message. Never carries contact data. */
+/**
+ * A sticker failure with a stable code the UI can map to a message. Never
+ * carries contact data. A refused membership change also carries `reason`
+ * (DENIAL_REASONS) and `attempts`.
+ */
 export class StickerError extends Error {
-  constructor(code, message = code) {
+  constructor(code, message = code, { reason = null, attempts = null } = {}) {
     super(message);
     this.name = 'StickerError';
     this.code = code;
+    this.reason = reason;
+    this.attempts = attempts;
   }
 }
 
@@ -184,20 +206,52 @@ export function createStickerStore({ db, fs }) {
   const stickerRef = (uid, id) => doc(db, 'users', uid, 'stickers', id);
   const contactRef = (uid, id) => doc(db, 'users', uid, 'contacts', id);
 
-  /** Run a membership transaction, re-reading after a refusal that may only mean "stale". */
-  async function withContentionRetry(run) {
-    let lastError = null;
-    for (let attempt = 0; attempt < MEMBERSHIP_ATTEMPTS; attempt += 1) {
+  /**
+   * Run one membership transaction. `body(tx, seen)` must set
+   * `seen.fingerprint` once its reads are done, to the membership data it
+   * decided on. See the header for how contention and authorization are told
+   * apart.
+   */
+  async function decideMembership(body) {
+    let refusedOn; // the fingerprint the last refused attempt decided on
+    let lastCode = null;
+    for (let attempt = 1; attempt <= MEMBERSHIP_ATTEMPTS; attempt += 1) {
+      const seen = { fingerprint: undefined };
       try {
-        return await run();
+        return await runTransaction(db, (tx) => body(tx, seen));
       } catch (err) {
         if (err instanceof StickerError) throw err; // decided from fresh data: final
-        if (err?.code !== 'permission-denied') throw toStickerError(err);
-        lastError = err;
+        lastCode = err?.code ?? null;
+        if (lastCode === 'permission-denied') {
+          if (seen.fingerprint === undefined) {
+            throw new StickerError(STICKER_ERRORS.PERMISSION_DENIED, 'You can\'t change stickers on this contact.', { reason: DENIAL_REASONS.READ_DENIED, attempts: attempt });
+          }
+          if (seen.fingerprint === refusedOn) {
+            throw new StickerError(STICKER_ERRORS.PERMISSION_DENIED, 'Stickers can\'t be changed right now.', { reason: DENIAL_REASONS.WRITE_DENIED, attempts: attempt });
+          }
+          refusedOn = seen.fingerprint;
+          continue;
+        }
+        if (lastCode === 'aborted' || lastCode === 'failed-precondition') {
+          refusedOn = undefined;
+          continue;
+        }
+        throw toStickerError(err);
       }
     }
-    throw toStickerError(lastError);
+    throw new StickerError(
+      lastCode === 'permission-denied' ? STICKER_ERRORS.PERMISSION_DENIED : STICKER_ERRORS.WRITE_FAILED,
+      'Too many changes at once. Try again.',
+      { reason: DENIAL_REASONS.CONTENTION_EXHAUSTED, attempts: MEMBERSHIP_ATTEMPTS },
+    );
   }
+
+  /** The membership data a decision depends on, as one comparable string. */
+  const fingerprintOf = (contactData, stickerData) => JSON.stringify([
+    storedStickerIds(contactData),
+    Object.keys(contactData?.sticker_assignments ?? {}).sort(),
+    stickerData === undefined ? null : (stickerData?.status ?? '(missing)'),
+  ]);
 
   /** Create a sticker. Its ID is a fresh Firestore auto-ID, never reused. */
   async function createSticker(uid, { name, color = 'gray', emoji = null, description = null } = {}) {
@@ -282,8 +336,9 @@ export function createStickerStore({ db, fs }) {
     requireContactId(contactId);
     requireStickerId(stickerId);
     if (!ASSIGNED_BY.includes(assignedBy)) throw new StickerError(STICKER_ERRORS.INVALID_CHANGE, 'Unknown assignment source.');
-    return withContentionRetry(() => runTransaction(db, async (tx) => {
+    return decideMembership(async (tx, seen) => {
       const [sticker, contact] = await Promise.all([tx.get(stickerRef(uid, stickerId)), tx.get(contactRef(uid, contactId))]);
+      seen.fingerprint = fingerprintOf(contact.exists() ? contact.data() : null, sticker.exists() ? sticker.data() : null);
       if (!sticker.exists()) throw new StickerError(STICKER_ERRORS.STICKER_NOT_FOUND, 'That sticker no longer exists.');
       if (sticker.data().status !== STICKER_STATUS.ACTIVE) throw new StickerError(STICKER_ERRORS.STICKER_ARCHIVED, 'That sticker was archived.');
       if (!contact.exists()) throw new StickerError(STICKER_ERRORS.CONTACT_NOT_FOUND, 'That contact no longer exists.');
@@ -296,7 +351,7 @@ export function createStickerStore({ db, fs }) {
         sticker_change: { op: 'add', sticker_id: stickerId, at: serverTimestamp() },
       });
       return { status: 'added' };
-    }));
+    });
   }
 
   /**
@@ -307,8 +362,9 @@ export function createStickerStore({ db, fs }) {
     requireUid(uid);
     requireContactId(contactId);
     requireStickerId(stickerId);
-    return withContentionRetry(() => runTransaction(db, async (tx) => {
+    return decideMembership(async (tx, seen) => {
       const contact = await tx.get(contactRef(uid, contactId));
+      seen.fingerprint = fingerprintOf(contact.exists() ? contact.data() : null, undefined);
       if (!contact.exists()) throw new StickerError(STICKER_ERRORS.CONTACT_NOT_FOUND, 'That contact no longer exists.');
       const ids = storedStickerIds(contact.data());
       if (!ids.includes(stickerId)) return { status: 'absent' };
@@ -318,7 +374,7 @@ export function createStickerStore({ db, fs }) {
         sticker_change: { op: 'remove', sticker_id: stickerId, at: serverTimestamp() },
       });
       return { status: 'removed' };
-    }));
+    });
   }
 
   /**

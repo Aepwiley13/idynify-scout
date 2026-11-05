@@ -19,6 +19,7 @@ import {
   STICKER_ERRORS,
   STICKER_LIMIT,
   MEMBERSHIP_ATTEMPTS,
+  DENIAL_REASONS,
   cleanStickerName,
   stickerNameKey,
   isStickerId,
@@ -43,7 +44,7 @@ function createMemoryFirestore() {
   const versions = new Map();
   let clock = 1_700_000_000_000;
   let autoId = 0;
-  const hooks = { beforeCommit: null, denyCommits: 0, commitAttempts: 0 };
+  const hooks = { beforeCommit: null, denyCommits: 0, commitAttempts: 0, onDeny: null, denyRead: null, abortCommits: 0, attempted: [] };
   const writes = [];
 
   const resolveValue = (value, now) => {
@@ -106,6 +107,7 @@ function createMemoryFirestore() {
         const tx = {
           get: async (ref) => {
             await Promise.resolve(); // yield, so concurrent transactions interleave
+            if (hooks.denyRead?.(ref.path)) throw Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });
             read.set(ref.path, versions.get(ref.path) ?? 0);
             return snapshot(ref.path);
           },
@@ -121,9 +123,15 @@ function createMemoryFirestore() {
         const stale = [...read].some(([path, version]) => (versions.get(path) ?? 0) !== version);
         if (stale) continue; // Firestore retries a transaction whose reads changed
         hooks.commitAttempts += 1;
+        if (pending.length) hooks.attempted.push(structuredClone(pending.map(([path, patch]) => [path, Object.keys(patch).sort()])));
+        if (pending.length && hooks.abortCommits > 0) {
+          hooks.abortCommits -= 1;
+          throw Object.assign(new Error('Transaction aborted.'), { code: 'aborted' });
+        }
         if (pending.length && hooks.denyCommits > 0) {
-          // The server refusing a write it judged on newer data (or a real refusal).
+          // The server refusing a write: judged on newer data (contention), or a real refusal.
           hooks.denyCommits -= 1;
+          if (hooks.onDeny) await hooks.onDeny();
           throw Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });
         }
         for (const [path, patch] of pending) applyUpdate(path, patch);
@@ -351,26 +359,83 @@ describe('concurrent changes', () => {
   });
 });
 
-describe('a refusal from the server', () => {
-  it('is re-read and retried when it may only mean the write was stale', async () => {
+describe('a refusal from the server: contention or authorization', () => {
+  // Another tab's change, landing exactly when this write is refused.
+  let n = 0;
+  const concurrentAdd = () => {
+    const path = `users/${UID}/contacts/k1`;
+    const current = mem.docs.get(path);
+    const id = sid(700 + ++n);
+    mem.seed(path, { ...current, sticker_ids: [...(current.sticker_ids ?? []), id], sticker_assignments: { ...(current.sticker_assignments ?? {}), [id]: assignment } });
+  };
+  const rejection = async (promise) => {
+    try { await promise; } catch (err) { return err; }
+    throw new Error('expected a rejection');
+  };
+
+  it('contention: refused once while another tab changed the contact, then re-read and added', async () => {
     mem.hooks.denyCommits = 1;
+    mem.hooks.onDeny = concurrentAdd;
     await expect(store.addSticker(UID, 'k1', S1)).resolves.toEqual({ status: 'added' });
     expect(mem.hooks.commitAttempts).toBe(2);
-    expect(contact('k1').sticker_ids).toEqual([S1]);
+    expect(contact('k1').sticker_ids).toEqual([sid(701), S1]);
   });
 
-  it('is reported as permission_denied after a fixed number of attempts when it persists', async () => {
+  it('authorization: refused again on the same data (feature off, access revoked) stops at the second attempt', async () => {
     mem.hooks.denyCommits = 100;
-    await expectCode(store.addSticker(UID, 'k1', S1), STICKER_ERRORS.PERMISSION_DENIED);
-    expect(mem.hooks.commitAttempts).toBe(MEMBERSHIP_ATTEMPTS);
+    const err = await rejection(store.addSticker(UID, 'k1', S1));
+    expect(err).toMatchObject({ code: STICKER_ERRORS.PERMISSION_DENIED, reason: DENIAL_REASONS.WRITE_DENIED, attempts: 2 });
+    expect(mem.hooks.commitAttempts).toBe(2);
     expect(contact('k1')).toEqual({ name: 'Pat' });
   });
 
-  it('applies to removal too', async () => {
+  it('revoked after contention: one contended refusal, then the same data refused again', async () => {
+    mem.hooks.denyCommits = 100;
+    mem.hooks.onDeny = () => { concurrentAdd(); mem.hooks.onDeny = null; };
+    const err = await rejection(store.addSticker(UID, 'k1', S1));
+    expect(err).toMatchObject({ reason: DENIAL_REASONS.WRITE_DENIED, attempts: 3 });
+  });
+
+  it('contention that never settles is reported after a fixed number of attempts', async () => {
+    mem.hooks.denyCommits = 100;
+    mem.hooks.onDeny = concurrentAdd;
+    const err = await rejection(store.addSticker(UID, 'k1', S1));
+    expect(err).toMatchObject({ code: STICKER_ERRORS.PERMISSION_DENIED, reason: DENIAL_REASONS.CONTENTION_EXHAUSTED, attempts: MEMBERSHIP_ATTEMPTS });
+    expect(mem.hooks.commitAttempts).toBe(MEMBERSHIP_ATTEMPTS);
+  });
+
+  it('a refused READ (someone else\'s contact) is final at once, and nothing is written', async () => {
+    mem.hooks.denyRead = (path) => path.includes('/contacts/');
+    const err = await rejection(store.addSticker(UID, 'k1', S1));
+    expect(err).toMatchObject({ code: STICKER_ERRORS.PERMISSION_DENIED, reason: DENIAL_REASONS.READ_DENIED, attempts: 1 });
+    expect(mem.hooks.commitAttempts).toBe(0);
+  });
+
+  it('an aborted commit is contention: retried, then reported if it never settles', async () => {
+    mem.hooks.abortCommits = 2;
+    await expect(store.addSticker(UID, 'k1', S1)).resolves.toEqual({ status: 'added' });
+    mem.seed(`users/${UID}/contacts/k2`, { name: 'Sam' });
+    mem.hooks.abortCommits = 100;
+    const err = await rejection(store.addSticker(UID, 'k2', S1));
+    expect(err).toMatchObject({ code: STICKER_ERRORS.WRITE_FAILED, reason: DENIAL_REASONS.CONTENTION_EXHAUSTED, attempts: MEMBERSHIP_ATTEMPTS });
+  });
+
+  it('removal is classified the same way', async () => {
     mem.seed(`users/${UID}/contacts/k2`, withStickers([S1]));
     mem.hooks.denyCommits = 100;
-    await expectCode(store.removeSticker(UID, 'k2', S1), STICKER_ERRORS.PERMISSION_DENIED);
+    const err = await rejection(store.removeSticker(UID, 'k2', S1));
+    expect(err).toMatchObject({ reason: DENIAL_REASONS.WRITE_DENIED, attempts: 2 });
     expect(contact('k2').sticker_ids).toEqual([S1]);
+  });
+
+  it('a retry never sends a weaker write: every attempt carries the full membership change', async () => {
+    mem.hooks.denyCommits = 100;
+    mem.hooks.onDeny = concurrentAdd;
+    await rejection(store.addSticker(UID, 'k1', S1));
+    expect(mem.hooks.attempted).toHaveLength(MEMBERSHIP_ATTEMPTS);
+    for (const attempt of mem.hooks.attempted) {
+      expect(attempt).toEqual([[`users/${UID}/contacts/k1`, [`sticker_assignments.${S1}`, 'sticker_change', 'sticker_ids']]]);
+    }
   });
 
   it('a failure the service decided from fresh data is not retried', async () => {

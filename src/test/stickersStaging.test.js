@@ -31,7 +31,7 @@ describe('checkStagingTarget', () => {
     ['the production project, by name', { ...ok, productionProjectId: STAGING }, /production project/],
     ['a project not in the allowlist', { ...ok, allowlist: 'other-staging' }, /not listed/],
     ['an allowlisted id that does not look like staging', { projectId: 'acme-prod', credentialsProjectId: 'acme-prod', allowlist: 'acme-prod' }, /does not look like a staging/],
-    ['no service account', { ...ok, credentialsProjectId: null }, /must name a service account/],
+    ['no service account', { ...ok, credentialsProjectId: null }, /service-account key for the staging project is required/],
     ['a service account from another project', { ...ok, credentialsProjectId: 'acme-prod' }, /different project/],
     ['a real project id against the emulator', { projectId: STAGING, emulatorHost: '127.0.0.1:8080' }, /"demo-" project/],
     ['the production project on the emulator', { projectId: 'demo-qa', emulatorHost: '127.0.0.1:8080', productionProjectId: 'demo-qa' }, /production project/],

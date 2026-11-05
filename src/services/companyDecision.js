@@ -378,18 +378,26 @@ export async function triggerPeopleDiscovery({ user, company, icpTitles, activeI
 
   /**
    * Whether this attempt is still the company's current one, checked fresh
-   * against Firestore. A superseded attempt must not write contact data at
-   * all — losing only the right to report its count (what `settle` alone
-   * guarded before) still let a stale response create or merge real
-   * records nobody asked for anymore. Called once, immediately before any
-   * contact write, which closes the window that mattered: a retry is only
-   * ever allowed once the original has gone stale (requirement 2 above), so
-   * the realistic race is the original's slow response finally arriving
-   * after that retry already started — and this check catches it before a
-   * single setDoc or merge runs. It does not re-check between individual
-   * people in the loop that follows; narrowing that further would need a
-   * transactional claim per person, which is more machinery than this
-   * search — at most 3 results — warrants.
+   * against Firestore. Called before EVERY person in the loop below, not
+   * once before it — a retry can supersede this attempt while it is
+   * partway through a multi-person result, and checking only once left
+   * every person after the first exposed to that window for as long as the
+   * whole loop took to run. Checking per-person narrows that window to one
+   * person's write.
+   *
+   * NOT atomic, and not claimed to be: this is a plain read, outside any
+   * transaction, and the write for that person (prepareContactWrite, then
+   * setDoc or applyContactMerge) happens after it returns. A supersession
+   * landing in that specific gap — between this read and that one write
+   * committing — is not caught; whichever person is mid-write at the exact
+   * moment of supersession can still be saved. Closing that fully would mean
+   * running prepareContactWrite's identity resolution and the eventual
+   * write inside one Firestore transaction, but resolveContact reads across
+   * a shared fallback-scan window that every other contact-write path also
+   * calls through plain getDoc/setDoc — making that transactional is a
+   * rewrite of contactWriteGuard's whole identity hierarchy, not a change
+   * scoped to auto-discovery. Accepted as a residual risk for N1: the
+   * exposure is one contact write's round trip, not the whole search.
    */
   const isCurrentAttempt = async () => {
     const snap = await getDoc(companyRef);
@@ -406,18 +414,18 @@ export async function triggerPeopleDiscovery({ user, company, icpTitles, activeI
       await settle({ auto_contact_status: 'failed', auto_contact_count: null, auto_contact_searched_at: new Date().toISOString() });
       return;
     }
-    // A newer attempt may have started while this fetch was in flight. If
-    // so, stop here — before touching a single contact — rather than save
-    // stale suggestions under a search the company no longer considers
-    // current. `settle` below would already no-op in this case; this is
-    // what stops the WRITES, not only the report of them.
-    if (!(await isCurrentAttempt())) return;
-
     // Counts contacts THIS call actually persisted (created or merged), never
     // `result.people.length` — the API's suggestions are not the same fact as
     // what ended up saved and company-linked.
     let savedCount = 0;
     for (const person of (result.people || [])) {
+      // Re-checked before every person — see isCurrentAttempt above. A newer
+      // attempt may have started since the last person was written. If so,
+      // stop here, before touching this or any later contact: `settle`
+      // below would already no-op in that case; this is what stops the
+      // WRITES themselves, not only the report of them.
+      if (!(await isCurrentAttempt())) break;
+
       const contactId = `${company.id}_${person.id}`;
 
       // Identity resolution before every auto-discovered write. This runs in

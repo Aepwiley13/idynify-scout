@@ -76,8 +76,16 @@ vi.mock('../firebase/config', () => ({ db: { __db: true }, auth: { currentUser: 
 // lets a single search exercise both a create and a merge, so the saved count
 // is proven to come from what was actually written, not result.people.length.
 let NEXT_DECISIONS = [];
+// Keyed by apollo_person_id: lets a test pause one specific person's identity
+// resolution mid-loop (to land a superseding retry while it's in flight),
+// without needing a real transaction to make that moment reproducible.
+let PAUSE_HOOKS = {};
 vi.mock('../services/contactWriteGuard', () => ({
-  prepareContactWrite: async () => NEXT_DECISIONS.shift() ?? { action: 'create', fields: {} },
+  prepareContactWrite: async (_uid, candidate) => {
+    const hook = PAUSE_HOOKS[candidate.apollo_person_id];
+    if (hook) await hook.promise;
+    return NEXT_DECISIONS.shift() ?? { action: 'create', fields: {} };
+  },
   applyContactMerge: vi.fn(async () => {}),
 }));
 
@@ -112,6 +120,7 @@ const flushMicrotasks = async () => { for (let i = 0; i < 20; i += 1) await Prom
 beforeEach(() => {
   STORE.clear();
   NEXT_DECISIONS = [];
+  PAUSE_HOOKS = {};
   FAIL_NEXT_UPDATE = null;
   vi.restoreAllMocks();
   applyContactMerge.mockClear();
@@ -405,6 +414,65 @@ describe('triggerPeopleDiscovery: retries and transaction conflicts', () => {
     expect(applyContactMerge).not.toHaveBeenCalled();
     expect(setDoc).not.toHaveBeenCalled();
     expect(read('c1').auto_contact_count).toBe(0); // the second (real) attempt's own genuine zero, untouched
+  });
+
+  it('supersession landing WHILE the original is mid-loop on a 3-person result: the person already writing may still land, but neither later person ever does', async () => {
+    // isCurrentAttempt is re-checked before every person, not once before
+    // the loop (see the comment on it in companyDecision.js) — this proves
+    // that per-person re-check actually stops p2 and p3, and is equally
+    // honest about the one person it can't stop: whichever one is already
+    // past its own check and mid-write at the exact moment the retry lands.
+    seedCompany('c1');
+    let releaseP1;
+    PAUSE_HOOKS.p1 = { promise: new Promise((r) => { releaseP1 = r; }) };
+    globalThis.fetch = vi.fn(async () => ({
+      json: async () => ({
+        success: true,
+        people: [{ id: 'p1', name: 'A' }, { id: 'p2', name: 'B' }, { id: 'p3', name: 'C' }],
+      }),
+    }));
+
+    await triggerPeopleDiscovery({ user: USER, company: read('c1'), icpTitles: ['CEO'], activeICPId: null });
+    // The claim has landed; the background loop has reached p1's check
+    // (still the current attempt — passes), called prepareContactWrite(p1),
+    // and is now paused there, before p1's own write and before ever
+    // reaching p2 or p3.
+    await flushMicrotasks();
+    const firstId = read('c1').auto_contact_search_id;
+
+    // Supersede now, while p1 is paused mid-resolution — the first attempt
+    // has gone stale, and a retry starts and fully completes (zero people)
+    // before p1 is ever released.
+    STORE.set(companyPath('c1'), { ...read('c1'), auto_contact_search_started_at: new Date(Date.now() - AUTO_CONTACT_STALE_MS - 1000).toISOString() });
+    globalThis.fetch = vi.fn(async () => ({ json: async () => ({ success: true, people: [] }) }));
+    await triggerPeopleDiscovery({ user: USER, company: read('c1'), icpTitles: ['CEO'], activeICPId: null });
+    await flushMicrotasks();
+    const secondId = read('c1').auto_contact_search_id;
+    expect(secondId).not.toBe(firstId);
+    expect(read('c1').auto_contact_status).toBe('completed');
+    expect(read('c1').auto_contact_count).toBe(0); // the retry's own genuine zero
+
+    setDoc.mockClear();
+    applyContactMerge.mockClear();
+
+    // Resume the original attempt. p1's check already passed before the
+    // retry landed, so — documented residual risk, not a bug — p1 still
+    // gets written. The loop then reaches p2's check, which runs fresh
+    // AFTER the supersession: it fails, and the loop stops before p2 or p3
+    // ever reach prepareContactWrite.
+    releaseP1();
+    await flushMicrotasks();
+
+    expect(setDoc).toHaveBeenCalledTimes(1);
+    expect(setDoc.mock.calls[0][0].id).toBe('c1_p1');
+    expect(applyContactMerge).not.toHaveBeenCalled(); // p2/p3 never even reached prepareContactWrite
+
+    // The retry's own state stands, untouched by the original's loop
+    // quietly finishing in the background.
+    const finalState = read('c1');
+    expect(finalState.auto_contact_search_id).toBe(secondId);
+    expect(finalState.auto_contact_status).toBe('completed');
+    expect(finalState.auto_contact_count).toBe(0);
   });
 
   it('the company was deleted while a search was in flight: the late answer finds nothing to write to, and does not throw', async () => {

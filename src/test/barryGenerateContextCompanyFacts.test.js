@@ -56,14 +56,14 @@ globalThis.process.env.FIREBASE_API_KEY = 'test';
 
 const CONTACT = { id: 'contact1', name: 'Chris Example', title: 'VP Ops', company_name: 'Blip', company_id: 'comp1' };
 
-async function promptFor(routes) {
+async function promptFor(routes, contactOverride = {}) {
   vi.doMock('../../netlify/functions/firebase-admin.js', () => ({ db: fakeDb(routes), admin: {} }));
   vi.resetModules();
   const { handler } = await import('../../netlify/functions/barryGenerateContext.js');
   CALLS.length = 0;
   const res = await handler({
     httpMethod: 'POST',
-    body: JSON.stringify({ userId: 'u1', authToken: 't', contact: CONTACT }),
+    body: JSON.stringify({ userId: 'u1', authToken: 't', contact: { ...CONTACT, ...contactOverride } }),
   });
   expect(res.statusCode).toBe(200);
   expect(CALLS.length).toBe(1);
@@ -73,10 +73,34 @@ async function promptFor(routes) {
 describe('barryGenerateContext: company facts actually reach the prompt', () => {
   beforeEach(() => { vi.restoreAllMocks?.(); });
 
-  it('no company document at all: every company fact line says Unknown, never a guess', async () => {
-    const prompt = await promptFor({ 'users/u1/companies/comp1': NOT_FOUND });
-    expect(prompt).toMatch(/Founded: Unknown — do not reference company age or founding year/);
-    expect(prompt).toMatch(/Headquarters: Unknown — do not state or guess/);
+  it('no company document at all: falls back to the contact-level fields, never invents a founding year or HQ', async () => {
+    // No verified record exists, so there's nothing to say "Unknown" to in a
+    // dedicated block (that block doesn't even render) — the safe fallback
+    // is the contact's own cached company_name/company_industry, and
+    // nothing anywhere states a founding year or a headquarters, because
+    // neither ever had a contact-level source to fall back to.
+    const prompt = await promptFor(
+      { 'users/u1/companies/comp1': NOT_FOUND },
+      { company_industry: 'Software' },
+    );
+    expect(prompt).toContain('Company: Blip');
+    expect(prompt).toContain('Industry: Software');
+    expect(prompt).not.toMatch(/Founded:/);
+    expect(prompt).not.toMatch(/Headquarters:/);
+  });
+
+  it('company found but industry unverified (missing/conflicting): a stale contact-level industry must not leak in anyway', async () => {
+    // The exact bug: the CONTACT INFORMATION line used to read
+    // contact.company_industry FIRST, so a stale cached value there could
+    // state a fact the dedicated COMPANY CONTEXT block, a few lines below,
+    // correctly calls Unknown — one prompt contradicting itself.
+    const prompt = await promptFor(
+      { 'users/u1/companies/comp1': { exists: true, data: () => ({ name: 'Blip' }) } }, // no industry anywhere
+      { company_industry: 'Retail (stale, cached on the contact long ago)' },
+    );
+    expect(prompt).not.toContain('Retail');
+    expect(prompt).toMatch(/Industry: Not specified/); // this prompt's own phrasing for "no verified value"
+    expect(prompt).toMatch(/Industry: Unknown — do not state or guess/); // the dedicated block's phrasing — consistent, not contradictory
   });
 
   it('a company with real, agreeing facts: the prompt states them, not a placeholder', async () => {
@@ -139,5 +163,32 @@ describe('barryGenerateContext: company facts actually reach the prompt', () => 
     });
     expect(prompt).toContain('ICP_SPECIFIC_TONE');
     expect(prompt).not.toContain('GENERIC_DASHBOARD_TONE');
+  });
+
+  it('a real deciding ICP with NO dashboard document at all: the ICP messaging still reaches the prompt', async () => {
+    // The actual bug: compileReconForPrompt requires at least one of the
+    // dashboard's OWN RECON sections to be completed before it emits
+    // anything — including icpMessaging, which has nothing to do with
+    // whether this user separately finished RECON onboarding. A real
+    // deciding ICP's voice was silently dropped whenever there was no
+    // dashboard document to carry it.
+    const prompt = await promptFor({
+      'users/u1/companies/comp1': { exists: true, data: () => ({ name: 'Blip', swipedForICPId: 'icp_sales' }) },
+      'users/u1/icpProfiles/icp_sales': { exists: true, data: () => ({ messaging: { emailTone: 'ICP_SPECIFIC_TONE' } }) },
+      'dashboards/u1': NOT_FOUND,
+    });
+    expect(prompt).toContain('ICP_SPECIFIC_TONE');
+  });
+
+  it('a real deciding ICP with a dashboard document that has zero completed RECON sections: the ICP messaging still reaches the prompt', async () => {
+    // The same defect, triggered the other way: a dashboard document exists
+    // but compileReconForPrompt's own completedSections.length === 0 guard
+    // still discards icpMessaging before ever looking at it.
+    const prompt = await promptFor({
+      'users/u1/companies/comp1': { exists: true, data: () => ({ name: 'Blip', swipedForICPId: 'icp_sales' }) },
+      'users/u1/icpProfiles/icp_sales': { exists: true, data: () => ({ messaging: { emailTone: 'ICP_SPECIFIC_TONE' } }) },
+      'dashboards/u1': { exists: true, data: () => ({ modules: [{ id: 'recon', sections: [] }] }) },
+    });
+    expect(prompt).toContain('ICP_SPECIFIC_TONE');
   });
 });

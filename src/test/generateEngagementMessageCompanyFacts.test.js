@@ -74,14 +74,14 @@ const CONTACT = {
   company_name: 'Blip', company_id: 'comp1',
 };
 
-async function promptFor(routes) {
+async function promptFor(routes, contactOverride = {}) {
   vi.doMock('firebase-admin/firestore', () => ({ getFirestore: () => fakeDb(routes), FieldValue: {} }));
   vi.resetModules();
   const { handler } = await import('../../netlify/functions/generate-engagement-message.js');
   CALLS.length = 0;
   const res = await handler({
     httpMethod: 'POST',
-    body: JSON.stringify({ userId: 'u1', authToken: 't', userIntent: 'say hello', contact: CONTACT }),
+    body: JSON.stringify({ userId: 'u1', authToken: 't', userIntent: 'say hello', contact: { ...CONTACT, ...contactOverride } }),
   });
   expect(res.statusCode).toBe(200);
   expect(CALLS.length).toBe(1);
@@ -89,10 +89,39 @@ async function promptFor(routes) {
 }
 
 describe('generate-engagement-message: company facts and the deciding ICP actually reach the prompt', () => {
-  it('no company document at all: every company fact line says Unknown, never a guess', async () => {
-    const prompt = await promptFor({ 'users/u1/companies/comp1': NOT_FOUND });
-    expect(prompt).toMatch(/Founded: Unknown — do not reference company age or founding year/);
-    expect(prompt).toMatch(/Headquarters: Unknown — do not state or guess/);
+  it('no company document at all: falls back to the contact-level fields, never invents a founding year or HQ', async () => {
+    // No verified record exists, so there's nothing to say "Unknown" to in a
+    // dedicated block (that block doesn't even render) — the safe fallback
+    // is the contact's own cached company_name/company_industry, and
+    // nothing anywhere states a founding year or a headquarters, because
+    // neither ever had a contact-level source to fall back to.
+    const prompt = await promptFor(
+      { 'users/u1/companies/comp1': NOT_FOUND },
+      { company_industry: 'Software' },
+    );
+    expect(prompt).toContain('Company: Blip'); // the contact's own cached name
+    expect(prompt).toContain('Industry: Software');
+    expect(prompt).not.toMatch(/Founded:/);
+    expect(prompt).not.toMatch(/Headquarters:/);
+  });
+
+  it('company found but industry unverified (missing/conflicting): a stale contact-level industry must not leak in anyway', async () => {
+    // The exact bug: CONTACT INFORMATION used to read contact.company_industry
+    // FIRST, so a stale cached value there could state a fact the dedicated
+    // COMPANY CONTEXT block, two paragraphs below, correctly calls Unknown —
+    // one prompt contradicting itself.
+    const prompt = await promptFor(
+      {
+        'users/u1/companies/comp1': {
+          exists: true,
+          data: () => ({ name: 'Blip' }), // no industry anywhere — genuinely unverified
+        },
+      },
+      { company_industry: 'Retail (stale, cached on the contact long ago)' },
+    );
+    expect(prompt).not.toContain('Retail');
+    expect(prompt).toMatch(/Industry: Not specified/); // CONTACT INFORMATION's own phrasing for "no verified value"
+    expect(prompt).toMatch(/Industry: Unknown — do not state or guess/); // the dedicated block's phrasing — consistent, not contradictory
   });
 
   it('a company with real, agreeing facts: the prompt states them, not a placeholder', async () => {
@@ -152,5 +181,17 @@ describe('generate-engagement-message: company facts and the deciding ICP actual
     });
     expect(prompt).toContain('ICP_SPECIFIC_TONE');
     expect(prompt).not.toContain('GENERIC_DASHBOARD_TONE');
+  });
+
+  it('a real deciding ICP with NO dashboard document at all: the ICP messaging still reaches the prompt', async () => {
+    // Unlike barryGenerateContext.js, this file already set reconLoaded=true
+    // independently whenever icpMessaging is truthy — confirming that fix
+    // isn't needed here too, not just assuming it from reading the code.
+    const prompt = await promptFor({
+      'users/u1/companies/comp1': { exists: true, data: () => ({ name: 'Blip', swipedForICPId: 'icp_sales' }) },
+      'users/u1/icpProfiles/icp_sales': { exists: true, data: () => ({ messaging: { emailTone: 'ICP_SPECIFIC_TONE' } }) },
+      'dashboards/u1': NOT_FOUND,
+    });
+    expect(prompt).toContain('ICP_SPECIFIC_TONE');
   });
 });

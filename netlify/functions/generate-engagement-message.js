@@ -10,7 +10,7 @@ import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
 import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
 import { OUTBOUND_COPY_RULES } from './utils/outboundCopyRules.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
-import { loadCompanyFactsForBarry, formatCompanyFactsBlock } from './utils/barryCompanyFacts.js';
+import { loadCompanyFactsForBarry, formatCompanyFactsBlock, resolveDisplayCompanyFields } from './utils/barryCompanyFacts.js';
 
 /**
  * GENERATE ENGAGEMENT MESSAGE - Barry AI Intelligence Engine
@@ -148,10 +148,12 @@ export const handler = async (event) => {
     // this prompt before; nothing here ever read the company collection.
     let verifiedCompanyFacts = {};
     let icpId = null;
+    let companyFound = false;
     try {
       const companyLookup = await loadCompanyFactsForBarry(db, userId, fullContact.company_id);
       verifiedCompanyFacts = companyLookup.facts;
       icpId = companyLookup.icpId;
+      companyFound = companyLookup.companyFound;
     } catch (companyError) {
       console.warn('⚠️ Could not load company facts (non-fatal):', companyError.message);
     }
@@ -316,16 +318,30 @@ export const handler = async (event) => {
     const lastName = fullContact.lastName || '';
     const fullName = `${firstName} ${lastName}`.trim();
     const title = fullContact.title || fullContact.current_position_title || '';
-    const company = fullContact.company_name || fullContact.current_company_name || verifiedCompanyFacts.name || '';
-    const industry = fullContact.company_industry || fullContact.industry || verifiedCompanyFacts.industry || '';
+    // Company/industry come from resolveDisplayCompanyFields, never a plain
+    // `||` fallback chain: once a real company record is found, ITS facts
+    // are authoritative for every field it covers — present or "Unknown" —
+    // and must not be quietly overridden by a stale or conflicting cached
+    // field on the contact doc. The contact-level fields are consulted
+    // ONLY when no company record exists at all.
+    const displayCompany = resolveDisplayCompanyFields(verifiedCompanyFacts, companyFound, {
+      name: fullContact.company_name || fullContact.current_company_name,
+      industry: fullContact.company_industry || fullContact.industry,
+    });
+    const company = displayCompany.name || '';
+    const industry = displayCompany.industry || '';
     const seniority = fullContact.seniority || '';
 
-    // Company facts block: rendered whenever this contact has a company_id
-    // to look up. A field the company document doesn't have is stated as
-    // unknown, never left out — see loadCompanyFactsForBarry for the
-    // same-source-disagrees rule and formatCompanyFactsBlock for why an
-    // absent fact still gets an explicit line.
-    const companyFactsBlock = fullContact.company_id ? formatCompanyFactsBlock(verifiedCompanyFacts) : null;
+    // Company facts block: rendered only when a real company record was
+    // found — not merely when a company_id was given (a dangling id with no
+    // document behind it falls back to the plain contact-level fields
+    // above instead; a block full of "Unknown" lines on top of that
+    // fallback would contradict it). Once a record IS found, a field it
+    // doesn't verify is stated as unknown here, never left out — see
+    // loadCompanyFactsForBarry for the same-source-disagrees rule and
+    // formatCompanyFactsBlock for why an absent fact still gets an
+    // explicit line.
+    const companyFactsBlock = companyFound ? formatCompanyFactsBlock(verifiedCompanyFacts) : null;
 
     // Build RECON context string
     let reconContext = '';

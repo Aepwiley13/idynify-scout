@@ -2,9 +2,24 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
-import { loadCompanyFactsForBarry, formatCompanyFactsBlock } from './utils/barryCompanyFacts.js';
+import { loadCompanyFactsForBarry, formatCompanyFactsBlock, resolveDisplayCompanyFields } from './utils/barryCompanyFacts.js';
 import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
 import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
+
+/**
+ * A minimal RECON-shaped messaging block built from JUST the deciding ICP's
+ * own messaging — for when compileReconForPrompt has nothing to wrap it in
+ * (see the call site: no dashboard document, or one with zero completed
+ * RECON sections). Deliberately not added to reconCompiler.js itself: that
+ * module is shared by other Barry endpoints this fix has no reason to touch.
+ */
+function formatIcpMessagingOnly(icpMessaging) {
+  const entries = Object.entries(icpMessaging || {}).filter(([, v]) => typeof v === 'string' && v.trim());
+  if (!entries.length) return '';
+  const formatKey = (key) => key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase());
+  const lines = entries.map(([key, value]) => `- ${formatKey(key)}: ${value}`);
+  return `\nMESSAGING & VALUE PROPOSITION (the deciding ICP's own voice):\n${lines.join('\n')}\n`;
+}
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -65,13 +80,13 @@ export const handler = async (event) => {
     // Reads the actual company document this contact belongs to — never the
     // client-supplied payload the frontend used to pass (always null in
     // practice, which is why this panel used to have nothing to ground on).
-    let companyFacts = { facts: {}, icpId: null };
+    let companyFacts = { facts: {}, icpId: null, companyFound: false };
     try {
       companyFacts = await loadCompanyFactsForBarry(db, userId, contact?.company_id);
     } catch (companyError) {
       console.warn('⚠️ Could not load company facts (non-fatal):', companyError.message);
     }
-    const { facts: verifiedCompanyFacts, icpId } = companyFacts;
+    const { facts: verifiedCompanyFacts, icpId, companyFound } = companyFacts;
 
     // ─── Fetch RECON training data + the deciding ICP's messaging ───
     let reconContext = '';
@@ -85,9 +100,18 @@ export const handler = async (event) => {
       const icpMessaging = icpDoc?.exists ? (icpDoc.data()?.messaging || null) : null;
       if (dashboardDoc.exists) {
         reconContext = compileReconForPrompt(dashboardDoc.data(), icpMessaging);
-        if (reconContext) {
-          console.log('🧠 RECON training data loaded and compiled');
-        }
+      }
+      // compileReconForPrompt requires at least one of the dashboard's OWN
+      // RECON sections to be completed before it emits anything at all —
+      // including icpMessaging, which has nothing to do with whether the
+      // user separately finished RECON onboarding. Without this, a real
+      // deciding ICP's voice was silently dropped whenever there was no
+      // dashboard document (or one with nothing completed yet) to carry it.
+      if (!reconContext && icpMessaging) {
+        reconContext = formatIcpMessagingOnly(icpMessaging);
+      }
+      if (reconContext) {
+        console.log('🧠 RECON training data loaded and compiled');
       }
     } catch (reconError) {
       // Non-fatal — Barry works without RECON, just less personalized
@@ -100,11 +124,22 @@ export const handler = async (event) => {
     });
 
     // Prepare contact data for Barry
+    //
+    // Company/industry come from resolveDisplayCompanyFields, never a plain
+    // `contact.company_name || verifiedCompanyFacts.industry` fallback chain:
+    // once a real company record is found, ITS facts are authoritative for
+    // every field it covers — present or "Unknown" — and must not be
+    // quietly overridden by a stale or conflicting cached field on the
+    // contact doc. The contact-level fields are consulted ONLY when no
+    // company record exists at all (see the function's own doc comment).
+    const displayCompany = resolveDisplayCompanyFields(verifiedCompanyFacts, companyFound, {
+      name: contact.company_name, industry: contact.company_industry,
+    });
     const contactSummary = {
       name: contact.name || 'Unknown',
       title: contact.title || 'Not specified',
-      company: contact.company_name || 'Unknown company',
-      industry: contact.company_industry || verifiedCompanyFacts.industry || 'Not specified',
+      company: displayCompany.name || 'Unknown company',
+      industry: displayCompany.industry || 'Not specified',
       seniority: contact.seniority || 'Not specified',
       department: contact.department || (contact.departments && contact.departments[0]) || 'Not specified',
       location: [contact.city, contact.state, contact.country].filter(Boolean).join(', ') || 'Not specified',
@@ -124,12 +159,16 @@ export const handler = async (event) => {
       engagement_intent: contact.engagementIntent || null
     };
 
-    // Company context block: rendered whenever this contact has a company_id
-    // to look up, whatever the lookup finds — a field the company document
-    // doesn't have is stated as unknown in the prompt, never left out (an
-    // omitted field invites a guess; an explicit "Unknown" instruction
-    // constrains one). See loadCompanyFactsForBarry for the conflict rule.
-    const companyFactsBlock = contact?.company_id ? formatCompanyFactsBlock(verifiedCompanyFacts) : null;
+    // Company context block: rendered only when a real company record was
+    // found — not merely when a company_id was given (a dangling id with no
+    // document behind it has nothing to verify, and falls back to the plain
+    // contact-level fields above instead, via resolveDisplayCompanyFields;
+    // showing a block full of "Unknown" lines on top of that fallback would
+    // contradict it). Once a record IS found, a field it doesn't verify is
+    // stated as unknown here, never left out — an omitted field invites a
+    // guess, an explicit "Unknown" instruction constrains one. See
+    // loadCompanyFactsForBarry for the conflict rule.
+    const companyFactsBlock = companyFound ? formatCompanyFactsBlock(verifiedCompanyFacts) : null;
 
     // Build the prompt for Barry — now with RECON context
     const prompt = `You are Barry, a contextual intelligence guide helping a user prepare for a first conversation with another person.

@@ -48,13 +48,22 @@ const EMPTY_FACTS = Object.freeze({
  * same rule barryGenerateSequenceStep.js already applies for the same
  * reason: a guessed ICP association is worse than none.
  *
- * @returns {Promise<{facts: object, icpId: string|null}>}
+ * `companyFound` says whether an actual company document was read — true
+ * only when one exists at `companyId`. Callers need this, not just `facts`,
+ * to get the fallback rule right: once a real company record is found,
+ * ITS facts are authoritative for every field it covers, present or
+ * "Unknown" — a field it doesn't verify must not quietly fall back to a
+ * less reliable source (a contact doc's own cached, possibly stale
+ * `company_name`/`company_industry`). That fallback is only safe when
+ * there is no verified record at all to defer to.
+ *
+ * @returns {Promise<{facts: object, icpId: string|null, companyFound: boolean}>}
  */
 export async function loadCompanyFactsForBarry(db, userId, companyId) {
-  if (!userId || !companyId) return { facts: EMPTY_FACTS, icpId: null };
+  if (!userId || !companyId) return { facts: EMPTY_FACTS, icpId: null, companyFound: false };
 
   const companyDoc = await db.collection('users').doc(userId).collection('companies').doc(companyId).get();
-  if (!companyDoc.exists) return { facts: EMPTY_FACTS, icpId: null };
+  if (!companyDoc.exists) return { facts: EMPTY_FACTS, icpId: null, companyFound: false };
 
   const company = companyDoc.data() || {};
   const snapshot = company.apolloEnrichment?.snapshot || {};
@@ -68,7 +77,25 @@ export async function loadCompanyFactsForBarry(db, userId, companyId) {
     description: realString(snapshot.description),
   };
 
-  return { facts, icpId: company.swipedForICPId || null };
+  return { facts, icpId: company.swipedForICPId || null, companyFound: true };
+}
+
+/**
+ * The company name/industry a prompt should actually state, applying the
+ * fallback rule above: a verified record (even with some fields unverified
+ * within it) always wins over the contact doc's cached copy; the cached
+ * copy is consulted ONLY when no company record was found at all. Without
+ * this, a stale or conflicting contact-level field can restate exactly the
+ * fact the company-facts block just, deliberately, called "Unknown."
+ */
+export function resolveDisplayCompanyFields(facts, companyFound, contactLevel = {}) {
+  if (companyFound) {
+    return { name: facts.name, industry: facts.industry };
+  }
+  return {
+    name: realString(contactLevel.name),
+    industry: realString(contactLevel.industry),
+  };
 }
 
 /**

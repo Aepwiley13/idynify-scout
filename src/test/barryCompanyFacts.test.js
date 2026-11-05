@@ -11,7 +11,7 @@
  * since that's the text the model actually sees.
  */
 import { describe, it, expect } from 'vitest';
-import { loadCompanyFactsForBarry, formatCompanyFactsBlock } from '../../netlify/functions/utils/barryCompanyFacts.js';
+import { loadCompanyFactsForBarry, formatCompanyFactsBlock, resolveDisplayCompanyFields } from '../../netlify/functions/utils/barryCompanyFacts.js';
 
 const UID = 'u1';
 
@@ -44,22 +44,24 @@ function fakeDb(companies = {}) {
 }
 
 describe('loadCompanyFactsForBarry', () => {
-  it('no companyId at all: every fact null, no Firestore read attempted', async () => {
+  it('no companyId at all: every fact null, companyFound false, no Firestore read attempted', async () => {
     const db = fakeDb({ c1: { name: 'Should never be read' } });
-    const { facts, icpId } = await loadCompanyFactsForBarry(db, UID, null);
+    const { facts, icpId, companyFound } = await loadCompanyFactsForBarry(db, UID, null);
     expect(facts).toEqual({ name: null, industry: null, hq_location: null, founded_year: null, description: null });
     expect(icpId).toBeNull();
+    expect(companyFound).toBe(false);
   });
 
-  it('companyId given but no such document: every fact null, not a throw', async () => {
+  it('companyId given but no such document: every fact null, companyFound false, not a throw', async () => {
     const db = fakeDb({});
-    const { facts, icpId } = await loadCompanyFactsForBarry(db, UID, 'ghost');
+    const { facts, icpId, companyFound } = await loadCompanyFactsForBarry(db, UID, 'ghost');
     expect(facts.name).toBeNull();
     expect(facts.founded_year).toBeNull();
     expect(icpId).toBeNull();
+    expect(companyFound).toBe(false);
   });
 
-  it('a real company with clean, agreeing facts: every field verified', async () => {
+  it('a real company with clean, agreeing facts: every field verified, companyFound true', async () => {
     const db = fakeDb({
       c1: {
         name: 'Blip',
@@ -70,11 +72,12 @@ describe('loadCompanyFactsForBarry', () => {
         apolloEnrichment: { snapshot: { industry: 'Software', location: { full: 'Utah, US' }, founded_year: 2015, description: 'A scheduling tool.' } },
       },
     });
-    const { facts, icpId } = await loadCompanyFactsForBarry(db, UID, 'c1');
+    const { facts, icpId, companyFound } = await loadCompanyFactsForBarry(db, UID, 'c1');
     expect(facts).toEqual({
       name: 'Blip', industry: 'Software', hq_location: 'Utah, US', founded_year: 2015, description: 'A scheduling tool.',
     });
     expect(icpId).toBe('icp_sales');
+    expect(companyFound).toBe(true);
   });
 
   it('two sources disagree on founding year and HQ: both omitted, neither guessed', async () => {
@@ -142,5 +145,49 @@ describe('formatCompanyFactsBlock: the exact text the model sees', () => {
     expect(block).toContain('Headquarters: Utah, US');
     expect(block).toMatch(/Industry: Unknown/);
     expect(block).toMatch(/Founded: Unknown — do not reference company age or founding year/);
+  });
+});
+
+describe('resolveDisplayCompanyFields: a verified record always wins over a stale contact-level field', () => {
+  it('company found, industry unverified (missing or conflicting): stays null — never falls back to the contact doc', () => {
+    // This is the exact bug: a prompt's general "who is this" line restating
+    // a value the dedicated company-facts block just called "Unknown".
+    const out = resolveDisplayCompanyFields(
+      { name: 'Blip', industry: null, hq_location: 'Utah, US', founded_year: null, description: null },
+      true,
+      { name: 'Blip (stale contact copy)', industry: 'Retail (wrong, cached on the contact long ago)' },
+    );
+    expect(out.name).toBe('Blip');
+    expect(out.industry).toBeNull(); // NOT 'Retail (wrong...)' — the contact-level value never gets a vote
+  });
+
+  it('company found, every field verified: verified facts used outright, contact-level ignored even though present', () => {
+    const out = resolveDisplayCompanyFields(
+      { name: 'Blip', industry: 'Software', hq_location: 'Utah, US', founded_year: 2015, description: null },
+      true,
+      { name: 'Something Else Entirely', industry: 'Something Else' },
+    );
+    expect(out.name).toBe('Blip');
+    expect(out.industry).toBe('Software');
+  });
+
+  it('no company record found at all: falls back to the contact-level fields — the one case that fallback is safe for', () => {
+    const out = resolveDisplayCompanyFields(
+      { name: null, industry: null, hq_location: null, founded_year: null, description: null },
+      false,
+      { name: 'Blip', industry: 'Software' },
+    );
+    expect(out.name).toBe('Blip');
+    expect(out.industry).toBe('Software');
+  });
+
+  it('no company record found, and the contact-level fields are placeholder junk: still treated as absent', () => {
+    const out = resolveDisplayCompanyFields(
+      { name: null, industry: null, hq_location: null, founded_year: null, description: null },
+      false,
+      { name: 'Unknown', industry: 'n/a' },
+    );
+    expect(out.name).toBeNull();
+    expect(out.industry).toBeNull();
   });
 });

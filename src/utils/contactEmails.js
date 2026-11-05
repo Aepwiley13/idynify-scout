@@ -98,6 +98,16 @@ export function buildEmailWrite(list) {
   return { emails, email: primary, email_normalized: primary ? normalizeEmail(primary) : null };
 }
 
+/**
+ * The email fields of a saved contact, to merge into the contact a page
+ * holds. A page keeps fields it computed itself (ContactProfile fills a
+ * display-only message count), so a save hands back these three, not the
+ * whole stored document.
+ */
+export function pickEmailFields(saved = {}) {
+  return { emails: saved.emails ?? [], email: saved.email ?? null, email_normalized: saved.email_normalized ?? null };
+}
+
 /** Whether the contact already has an address anywhere a reader would look. */
 export function hasAnyEmail(contact = {}) {
   return Boolean(text(contact.email) || text(contact.work_email)
@@ -139,4 +149,4 @@ export function emailIdentityDrift(contact = {}) {
   return codes;
 }
 
-export default { readContactEmails, applyEmailEdit, buildEmailWrite, hasAnyEmail, emailIdentityDrift, EMAIL_DRIFT, EMAIL_LABELS };
+export default { readContactEmails, applyEmailEdit, buildEmailWrite, pickEmailFields, hasAnyEmail, emailIdentityDrift, EMAIL_DRIFT, EMAIL_LABELS };

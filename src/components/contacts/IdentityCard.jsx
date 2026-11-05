@@ -41,7 +41,7 @@ import { getUniqueTags } from '../../services/peopleService';
 import './IdentityCard.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { saveContactEmailEdit } from '../../services/contactEmailService';
-import { readContactEmails, applyEmailEdit } from '../../utils/contactEmails';
+import { readContactEmails, applyEmailEdit, pickEmailFields } from '../../utils/contactEmails';
 import ContactPhones from './ContactPhones';
 import ContactIdentityViewer from './ContactIdentityViewer';
 import { hasRealContactPhoto, resolveContactPhotoSources, contactDisplayName } from '../../utils/contactPhoto';
@@ -530,7 +530,8 @@ export default function IdentityCard({
     try {
       const saved = await saveContactEmailEdit(user.uid, contact.id, edit);
       setEmailsList(readContactEmails(saved));
-      onUpdate?.(saved);
+      // Only the email fields: the page keeps what it computed for display.
+      onUpdate?.({ ...contact, ...pickEmailFields(saved), updated_at: saved.updated_at });
     } catch (err) {
       console.error('[IdentityCard] Save emails failed:', err?.code ?? err?.name ?? 'error');
       setEmailsList(readContactEmails(contact));

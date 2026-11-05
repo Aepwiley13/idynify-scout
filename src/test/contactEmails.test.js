@@ -12,6 +12,7 @@ import {
   readContactEmails,
   applyEmailEdit,
   buildEmailWrite,
+  pickEmailFields,
   hasAnyEmail,
   emailIdentityDrift,
   EMAIL_DRIFT,
@@ -93,6 +94,14 @@ describe('buildEmailWrite', () => {
 
   it('a secondary address never becomes the identity key', () => {
     expect(buildEmailWrite([entry('1', 'primary@x.test'), entry('2', 'Second@x.test')]).email_normalized).toBe('primary@x.test');
+  });
+});
+
+describe('pickEmailFields', () => {
+  it('returns the three email fields of a saved contact, and nothing else', () => {
+    const saved = { id: 'c1', name: 'Jane', engagement_summary: { total_messages_sent: 0 }, ...buildEmailWrite([entry('1', 'Jane@Acme.test')]) };
+    expect(pickEmailFields(saved)).toEqual({ emails: [entry('1', 'Jane@Acme.test')], email: 'Jane@Acme.test', email_normalized: 'jane@acme.test' });
+    expect(pickEmailFields({})).toEqual({ emails: [], email: null, email_normalized: null });
   });
 });
 

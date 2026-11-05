@@ -47,7 +47,26 @@ describe('IdentityCard email edits', () => {
 
     expect(service.calls).toEqual([['u1', 'c1', { type: 'upsert', entry: { id: '0', value: 'Jane@Acme.test', label: 'work' } }]]);
     expect(await screen.findByText('Jane@Acme.test')).not.toBeNull();
-    expect(onUpdate).toHaveBeenCalledWith(saved);
+    expect(onUpdate).toHaveBeenCalledWith({ ...CONTACT, email: saved.email, email_normalized: saved.email_normalized, emails: saved.emails, updated_at: undefined });
+  });
+
+  it('keeps fields the page computed for display (ContactProfile’s message count) after a save', async () => {
+    const user = userEvent.setup();
+    const onUpdate = vi.fn();
+    const onPage = { ...CONTACT, engagement_summary: { total_messages_sent: 7 } };
+    // As stored: no message count (the page derived it from the timeline).
+    service.impl = async () => ({ ...CONTACT, email: 'new@acme.test', email_normalized: 'new@acme.test', emails: [{ id: '0', value: 'new@acme.test', label: 'work' }], updated_at: 'T1' });
+    render(<IdentityCard contact={onPage} onUpdate={onUpdate} />);
+
+    await user.click(within(entryRow('old@acme.test')).getByTitle('Edit'));
+    const input = screen.getByPlaceholderText('Email address');
+    await user.clear(input);
+    await user.type(input, 'new@acme.test{Enter}');
+
+    expect(await screen.findByText('new@acme.test')).not.toBeNull();
+    const [next] = onUpdate.mock.calls.at(-1);
+    expect(next.engagement_summary).toEqual({ total_messages_sent: 7 });
+    expect(next).toMatchObject({ email: 'new@acme.test', email_normalized: 'new@acme.test', updated_at: 'T1' });
   });
 
   it('clearing an address removes that entry', async () => {

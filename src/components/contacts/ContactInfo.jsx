@@ -6,6 +6,7 @@ import { db } from '../../firebase/config';
 import { useSubscription } from '../../hooks/useSubscription';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 import { saveContactEmailEdit } from '../../services/contactEmailService';
+import { pickEmailFields } from '../../utils/contactEmails';
 import './ContactInfo.css';
 
 const LABEL_PILL_COLORS = {
@@ -146,7 +147,7 @@ export default function ContactInfo({ contact, mode = 'compact', onUpdate }) {
         type: 'upsert', entry: { id: `added-${Date.now()}`, value, label },
       });
       setAddingEmail(false);
-      if (onUpdate) onUpdate(saved);
+      if (onUpdate) onUpdate({ ...contact, ...pickEmailFields(saved), updated_at: saved.updated_at });
     } catch (err) {
       console.error('Failed to add email:', err?.code ?? err?.name ?? 'error');
     }

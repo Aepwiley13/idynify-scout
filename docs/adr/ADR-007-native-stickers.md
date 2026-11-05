@@ -1,13 +1,13 @@
 # ADR-007 — Native stickers
 
-**Status:** Proposed · 2026-11-04 · awaiting product-owner acceptance
+**Status:** Accepted · 2026-11-05 · product owner (GO with controlled merge and deployment gates)
 **Plan:** `docs/contact-hub/NATIVE_STICKERS_PLAN.md`
 **Implemented by:**
 - S2 rules (Aepwiley13/idynify-scout#762)
 - S3 rollout flag (#764)
 - S4 services (#763)
 
-All are drafts.
+Merged one at a time on approval. Deploying the rules to production and enabling the flag each need separate authorization.
 
 ---
 

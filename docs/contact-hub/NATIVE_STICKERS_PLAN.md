@@ -226,4 +226,4 @@ ADR-007 (`docs/adr/ADR-007-native-stickers.md`) records the decisions. This sect
 - **B-R1** changes profile email saves for every user as soon as it merges. It is not behind the flag.
 - **The flag document** is never created by a merge.
 
-**Stopped here** for review. The native UI (S5–S7) is specified in `STICKERS_UI_SPEC.md` and not started.
+**2026-11-05: GO.** Foundation PRs merge one at a time, each after its CI passes. The UI spec is approved, with all five decisions as proposed; S5–S7 are built in separate draft PRs behind the flag. **Not authorized:** deploying the rules to production, enabling the flag, or any production backfill.

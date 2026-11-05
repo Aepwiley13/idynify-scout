@@ -1,6 +1,6 @@
 # Stickers UI (S5–S7): implementation spec and acceptance tests
 
-**Status:** Final for approval. **Not started.** No UI code is written until this spec is approved.
+**Status:** Approved 2026-11-05 by the product owner, with the five decisions in §6 as proposed. Implemented in separate draft PRs (S5, S6, S7) behind the sticker availability flag.
 **Builds on:**
 - ADR-007, §1 of `NATIVE_STICKERS_PLAN.md`
 - S2 rules (#762), S3 flag (#764), S4 services (#763)
@@ -230,9 +230,9 @@
 
 ---
 
-## 6. Decisions for approval (defaults shown)
+## 6. Decisions (all approved as proposed, 2026-11-05)
 
-| # | Question | Default in this spec |
+| # | Question | Decision |
 |---|---|---|
 | Q1 | While an admin views as a user, show that user's stickers read-only? | **No.** Hidden, as the S3 hook does today. A read-only display can follow later. |
 | Q2 | People filter: one sticker, or "any of several"? | **One**, like Tag |

@@ -24,7 +24,10 @@ vi.mock('../services/contactStickers', () => ({
   addSticker: (...a) => fake.current.services.addSticker(...a),
   removeSticker: (...a) => fake.current.services.removeSticker(...a),
 }));
-vi.mock('../context/ImpersonationContext', () => ({ getEffectiveUser: () => viewer.value }));
+vi.mock('../context/ImpersonationContext', () => ({
+  getEffectiveUser: () => viewer.value,
+  useImpersonation: () => ({ isImpersonating: Boolean(viewer.value?._isImpersonated) }),
+}));
 
 import { StickersProvider } from '../components/stickers/StickersContext';
 import ContactStickersRow from '../components/stickers/ContactStickersRow';
@@ -283,5 +286,15 @@ describe('S5 Stickers row', () => {
     await user.click(screen.getByRole('option', { name: 'Donor' }));
     await act(async () => { resolvers.forEach((r) => r({ status: 'added' })); });
     await waitFor(() => expect(chipNames()).toEqual(['Board', 'Donor']));
+  });
+
+  it('QA D-1: when access is revoked, the row disappears but the explanation stays on screen', async () => {
+    fake.current.state.impl.add = async () => { throw stickerError('permission_denied', 'write_denied'); };
+    const { user, container } = await renderRow(contactWith([]));
+    fake.current.state.config = config({ enabled: false, mode: 'off', readOnly: false });
+    await user.click(screen.getByRole('button', { name: 'Add sticker' }));
+    await user.click(screen.getByRole('option', { name: 'Board' }));
+    await waitFor(() => expect(container.querySelector('[data-testid="contact-stickers"]')).toBeNull());
+    expect(screen.getByRole('status')).toHaveTextContent("Stickers can't be changed right now.");
   });
 });

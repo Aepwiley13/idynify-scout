@@ -7,7 +7,7 @@
  * collapsed section with Restore: memberships were never removed, so a
  * restore brings every one back. Writes go through stickerService only.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { MoreHorizontal, Plus } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
@@ -17,7 +17,6 @@ import { countStickers } from './peopleStickers';
 import { hexOf } from './stickerPalette';
 import { describeStickerError, logStickerFailure } from './stickerMessages';
 import StickerDialog, { ModalDialog } from './StickerDialog';
-import StickerToast from './StickerToast';
 import './stickers.css';
 
 const people = (n) => `${n} ${n === 1 ? 'person' : 'people'}`;
@@ -51,21 +50,20 @@ function TileMenu({ sticker, onEdit, onArchive, onClose, buttonRef }) {
 }
 
 export default function StickersWall({ contacts, onOpenSticker }) {
-  const { ready, uid, active, archived, all, recheck } = useStickers();
+  const { ready, uid, active, archived, all, recheck, notify } = useStickers();
   const T = useT();
   const counts = useMemo(() => countStickers(contacts, active), [contacts, active]);
   const [dialog, setDialog] = useState(null);
   const [menuFor, setMenuFor] = useState(null);
   const [archivedOpen, setArchivedOpen] = useState(false);
-  const [toast, setToast] = useState(null);
   const [busyId, setBusyId] = useState(null);
   const openerRef = useRef(null);
   const menuButtons = useRef(new Map());
-  const dismiss = useCallback(() => setToast(null), []);
 
   if (!ready) return null;
 
-  const say = (next) => setToast({ ...next, id: Date.now() + Math.random() });
+  // Page-level notice (StickersProvider): it stays if the view falls back to Cards.
+  const say = notify;
   const closeDialog = () => { setDialog(null); openerRef.current?.focus(); };
 
   function failed(action, error, retry = null) {
@@ -226,7 +224,6 @@ export default function StickersWall({ contacts, onOpenSticker }) {
         </ModalDialog>
       ) : null}
 
-      <StickerToast toast={toast} onDismiss={dismiss} />
     </div>
   );
 }

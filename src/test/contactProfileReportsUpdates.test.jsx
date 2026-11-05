@@ -36,6 +36,7 @@ vi.mock('../firebase/config', () => ({ db: {}, auth: { currentUser: { uid: 'u1' 
 vi.mock('../context/ImpersonationContext', () => ({
   getEffectiveUser: () => ({ uid: 'u1', getIdToken: async () => 't' }),
   useActiveUserId: () => 'u1',
+  useImpersonation: () => ({ isImpersonating: false }),
 }));
 vi.mock('../components/stickers/stickersApi.js', () => ({ fetchStickersConfig: async () => ({ status: 200, body: { enabled: false, mode: 'off', readOnly: false } }) }));
 vi.mock('../services/referralIntelligenceService', () => ({ getContactReferralAnalytics: async () => null }));

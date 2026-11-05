@@ -25,15 +25,31 @@ const store = vi.hoisted(() => ({ docs: new Map() }));
 vi.mock('firebase/firestore', async (importOriginal) => {
   const real = await importOriginal();
   const doc = (_db, ...segments) => ({ path: segments.join('/') });
-  const getDoc = async (ref) => {
+  const snapOf = (ref) => {
     const data = store.docs.get(ref.path);
     return { exists: () => data !== undefined, data: () => data };
   };
+  const getDoc = async (ref) => snapOf(ref);
   const updateDoc = async (ref, data) => {
     const current = store.docs.get(ref.path) ?? {};
     store.docs.set(ref.path, { ...current, ...data });
   };
-  return { ...real, doc, getDoc, updateDoc };
+  // A straightforward fake: reads and writes hit the live store directly,
+  // same shape companyDecision.js's own tests use. Good enough to prove
+  // updateContactStatus reads fresh inside the transaction rather than
+  // trusting a passed-in currentStatus — not a claim this fake models
+  // Firestore's actual conflict/retry behavior under real contention.
+  const runTransaction = async (_db, fn) => {
+    const tx = {
+      get: async (ref) => snapOf(ref),
+      update: (ref, data) => {
+        const current = store.docs.get(ref.path) ?? {};
+        store.docs.set(ref.path, { ...current, ...data });
+      },
+    };
+    return fn(tx);
+  };
+  return { ...real, doc, getDoc, updateDoc, runTransaction };
 });
 vi.mock('../firebase/config', () => ({ db: {} }));
 
@@ -187,5 +203,46 @@ describe('Idempotency guard', () => {
   it('engagementGuardKey distinguishes by trigger, not just by contact', () => {
     expect(engagementGuardKey('u1', 'c1', 'message_sent')).not.toBe(engagementGuardKey('u1', 'c1', 'manual_interaction_logged'));
     expect(engagementGuardKey('u1', 'c1', 'message_sent')).toBe(engagementGuardKey('u1', 'c1', 'message_sent'));
+  });
+});
+
+describe('Transactional durability: correct even when currentStatus is stale, or the in-memory guard cannot see the other caller at all', () => {
+  it('a stale passed currentStatus is simply not consulted — the fresh document state decides', async () => {
+    // Simulates another tab or device having already advanced the contact
+    // to Awaiting Reply; THIS caller's own belief is still (correctly, from
+    // its own point of view a moment ago) 'New'.
+    put('c1', { contact_status: 'Awaiting Reply' });
+    const result = await updateContactStatus({
+      userId: UID, contactId: 'c1', trigger: STATUS_TRIGGERS.MANUAL_INTERACTION_LOGGED,
+      currentStatus: 'New', // stale — the real document already disagrees
+    });
+    expect(result).toBeNull(); // correctly a no-op: Engaged doesn't advance past Awaiting Reply
+    expect(get('c1').contact_status).toBe('Awaiting Reply'); // never regressed by the stale input
+  });
+
+  it('a stale passed `contact` object is likewise not consulted for record_status promotion — the fresh read is', async () => {
+    put('c1', { contact_status: 'New', status: 'suggested', record_status: 'suggested' });
+    const staleContact = { contact_status: 'New', status: 'active', record_status: 'active' }; // stale: doc actually says suggested
+    await updateContactStatus({
+      userId: UID, contactId: 'c1', trigger: STATUS_TRIGGERS.MANUAL_INTERACTION_LOGGED,
+      currentStatus: 'New', contact: staleContact,
+    });
+    // Promotion still correctly fires off the FRESH read's own 'suggested',
+    // not the stale object's 'active' (which would have skipped it).
+    expect(get('c1').record_status).toBe('active');
+  });
+
+  it('two separate runtimes racing the same trigger (simulated by resetting the in-memory guard in between — its own protection cannot see this): still exactly one write, because the transaction reads fresh at commit time', async () => {
+    put('c1', { contact_status: 'New' });
+    const first = await updateContactStatus({ userId: UID, contactId: 'c1', trigger: STATUS_TRIGGERS.MANUAL_INTERACTION_LOGGED, currentStatus: 'New' });
+    expect(first).toBe('Engaged');
+
+    // A second "tab": its own in-memory guard has never seen this key, so
+    // the local guard alone does nothing here — only the transaction's
+    // fresh read (now seeing 'Engaged') stops the duplicate.
+    resetEngagementGuards();
+    const second = await updateContactStatus({ userId: UID, contactId: 'c1', trigger: STATUS_TRIGGERS.MANUAL_INTERACTION_LOGGED, currentStatus: 'New' });
+    expect(second).toBeNull();
+    expect(loggedEvents.filter((e) => e.type === 'contact_status_changed')).toHaveLength(1);
   });
 });

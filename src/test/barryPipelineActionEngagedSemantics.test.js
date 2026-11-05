@@ -86,7 +86,7 @@ beforeEach(() => {
 });
 
 describe('engage_contact: creating a mission is planning outreach, not a confirmed interaction', () => {
-  it('moves the contact into Hunter and creates a mission, but never writes contact_status', async () => {
+  it('moves the contact into Hunter and creates a mission, but never writes contact_status, engaged_at, or last_interaction_at', async () => {
     TABLE = [{ id: 'c1', name: 'Dana Whitfield', stage: 'scout', status: 'active' }];
     const r = await act('c1', 'engage_contact');
     expect(r.status).toBe(200);
@@ -97,6 +97,13 @@ describe('engage_contact: creating a mission is planning outreach, not a confirm
     expect(write.contact_status).toBeUndefined();
     expect(write.contact_status_updated_at).toBeUndefined();
     expect(r.body.updated_fields.contact_status).toBeUndefined();
+
+    // engaged_at/last_interaction_at are read elsewhere (BlitzMode,
+    // HunterContactCard, barryHunterProcessEngage, barryHunterCardRead) as
+    // "a real interaction happened" — a mission whose own first step is
+    // still unsent is not that, so neither field is stamped here either.
+    expect(write.engaged_at).toBeUndefined();
+    expect(write.last_interaction_at).toBeUndefined();
 
     // A mission really was created.
     expect(WRITES.some((w) => w.id === 'new')).toBe(true);
@@ -114,6 +121,28 @@ describe('engage_contact: creating a mission is planning outreach, not a confirm
     await act('c1', 'engage_contact');
     const write = writeFor('c1');
     expect(write.contact_status).toBeUndefined(); // never touched, in either direction
+  });
+});
+
+describe('complete_step and log_outcome: the OTHER two last_interaction_at writers, both tied to a real outcome — unaffected, regression-tested', () => {
+  it('complete_step still stamps last_interaction_at — a mission step actually being completed IS a real event, unlike engage_contact merely creating one', async () => {
+    // The fake's TABLE backs every collection name identically (a pre-existing
+    // limitation of this harness, not introduced here), so a "mission" row
+    // can be seeded into the same array under its own id.
+    TABLE = [
+      { id: 'c1', name: 'Dana Whitfield', stage: 'hunter', active_mission_id: 'm1' },
+      { id: 'm1', steps: [{ step_number: 1, label: 'Send intro', status: 'current' }] },
+    ];
+    const r = await act('c1', 'complete_step', { missionId: 'm1', outcome: 'sent' });
+    expect(r.status).toBe(200);
+    expect(writeFor('c1').last_interaction_at).toBeDefined();
+  });
+
+  it('log_outcome still stamps last_interaction_at — an explicitly logged outcome IS a real event', async () => {
+    TABLE = [{ id: 'c1', name: 'Dana Whitfield', stage: 'hunter' }];
+    const r = await act('c1', 'log_outcome', { outcome: 'replied_positive', notes: 'wants a demo' });
+    expect(r.status).toBe(200);
+    expect(writeFor('c1').last_interaction_at).toBeDefined();
   });
 });
 

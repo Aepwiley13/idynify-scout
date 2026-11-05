@@ -160,16 +160,24 @@ async function engageContact(userId, contactId) {
 
   // Creating a mission is planning outreach, not a confirmed interaction —
   // contact_status is deliberately not touched here any more (the mission's
-  // own first step is still unsent). record_status promotion below is a
-  // separate dimension, left as-is: being given a mission still means this
-  // record is no longer just a discovery suggestion, regardless of whether
-  // contact_status moved.
+  // own first step is still unsent). `engaged_at`/`last_interaction_at` are
+  // the same mistake under different names: both are read elsewhere as "a
+  // real interaction happened" — BlitzMode/HunterContactCard display
+  // last_interaction_at to the user as "last contact," BlitzMode sorts
+  // follow-up priority by it, and barryHunterProcessEngage/barryHunterCardRead
+  // feed it straight into Barry's own prompt as a fact. completeMissionStep
+  // and logOutcome (elsewhere in this file) correctly set it on an actual
+  // outcome; gmail-poll-replies.js sets it on a real inbound reply. A mission
+  // that's merely been created, with its own first step still unsent, is
+  // none of those — so neither field is stamped here any more.
+  // record_status promotion below is a separate dimension, left as-is:
+  // being given a mission still means this record is no longer just a
+  // discovery suggestion, regardless of whether contact_status or the
+  // interaction-timestamp fields moved.
   const contactUpdate = {
     hunter_status: 'active_mission',
     active_mission_id: missionRef.id,
     stage: 'hunter',
-    engaged_at: now,
-    last_interaction_at: FieldValue.serverTimestamp(),
     updated_at: now
   };
 

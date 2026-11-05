@@ -51,7 +51,7 @@
  *   Sequence completed     → Mission Complete
  */
 
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, runTransaction } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { logTimelineEvent, ACTORS } from './timelineLogger';
 import {
@@ -290,18 +290,45 @@ export function engagementGuardKey(userId, contactId, trigger) {
  *
  * Non-blocking — catches errors silently.
  *
+ * DURABILITY, not just the in-memory guard: the decision (what the current
+ * status actually is, and what the trigger should do to it) and the write
+ * both happen inside ONE Firestore transaction that reads the document
+ * fresh at commit time. `currentStatus`/`contact`, below, are accepted for
+ * backward compatibility with every existing caller's signature but are no
+ * longer consulted for the decision — the transaction's own read is always
+ * authoritative, so a stale closure, a second browser tab, or a second
+ * device cannot make this function act on data it already knows is old.
+ * `withEngagementGuard` (this module) still exists alongside the
+ * transaction: it is a same-runtime fast-skip for the common case
+ * (remounting the same component before its last call resolved), cheaper
+ * than a Firestore round trip; the transaction is what makes the OUTCOME
+ * correct even when the guard can't see the other caller at all — a
+ * second tab has no way to know about this tab's in-memory Set, but both
+ * tabs' transactions still serialize correctly against the same document.
+ *
+ * What this does NOT claim: it is not "global idempotency" in the sense of
+ * deduplicating two genuinely separate real-world events that each
+ * legitimately request the same transition (e.g. two actual replies). That
+ * is not a race to resolve — it is two real events, and the existing
+ * priority check already decides each on its own merits, same as before.
+ * What the transaction specifically closes is the stale-read class of bug:
+ * two concurrent callers racing on the SAME transition, where without a
+ * fresh read the second one could overwrite based on data it already knew
+ * was superseded. On a genuine conflict, Firestore retries the losing
+ * transaction against the document the winner just committed; this
+ * function's own priority check then correctly reads that as
+ * already-satisfied and writes nothing — not two statuses, not two
+ * timeline events.
+ *
  * @param {Object} params
  * @param {string} params.userId       - Authenticated user ID
  * @param {string} params.contactId    - Contact document ID
  * @param {string} params.trigger      - One of STATUS_TRIGGERS
- * @param {string} [params.currentStatus] - Current contact_status (optional, avoids re-read)
- * @param {Object} [params.contact]       - The contact doc, if the caller already
- *   has it. Only consulted when the transition is into an engaged status, and
- *   only to decide whether the record needs promoting out of 'suggested'. When
- *   omitted the document is re-read, so callers that lack it stay correct.
+ * @param {string} [params.currentStatus] - Accepted, not consulted — see above
+ * @param {Object} [params.contact]       - Accepted, not consulted — see above
  * @returns {Promise<string|null>} New status if updated, null if skipped or failed
  */
-export async function updateContactStatus({ userId, contactId, trigger, currentStatus, contact = null }) {
+export async function updateContactStatus({ userId, contactId, trigger }) {
   if (!userId || !contactId || !trigger) {
     console.error('[StateMachine] Missing required fields:', { userId, contactId, trigger });
     return null;
@@ -309,41 +336,45 @@ export async function updateContactStatus({ userId, contactId, trigger, currentS
 
   return withEngagementGuard(engagementGuardKey(userId, contactId, trigger), async () => {
     try {
-      const resolvedCurrentStatus = currentStatus || CONTACT_STATUSES.NEW;
-      const newStatus = resolveTransition(resolvedCurrentStatus, trigger);
-
-      if (!newStatus) {
-        // Transition skipped — no update needed
-        return null;
-      }
-
-      // Write to Firestore
       const contactRef = doc(db, 'users', userId, 'contacts', contactId);
-      const patch = {
-        contact_status: newStatus,
-        contact_status_updated_at: new Date().toISOString()
-      };
+      let resolvedCurrentStatus;
+      let newStatus;
 
-      // A contact the user has actually engaged is no longer a discovery
-      // suggestion, and must not be left as one. Auto-discovery writes
-      // `status: 'suggested'` and nothing used to clear it, so an emailed
-      // contact could keep that marker forever — at which point Saved Companies
-      // dropped it for being suggested and People dropped it for being engaged,
-      // and it appeared in neither surface while cadences kept running against
-      // it. Promoting in the SAME write means the two dimensions can never
-      // disagree about a contact this path has touched.
-      if (isEngagedRecord({ contact_status: newStatus })) {
-        let subject = contact;
-        if (!subject) {
-          const snap = await getDoc(contactRef);
-          subject = snap.exists() ? snap.data() : null;
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(contactRef);
+        const freshContact = snap.exists() ? snap.data() : null;
+        resolvedCurrentStatus = freshContact?.contact_status || CONTACT_STATUSES.NEW;
+        newStatus = resolveTransition(resolvedCurrentStatus, trigger);
+
+        if (!newStatus) return; // Transition skipped — no write, this transaction does nothing
+
+        const patch = {
+          contact_status: newStatus,
+          contact_status_updated_at: new Date().toISOString()
+        };
+
+        // A contact the user has actually engaged is no longer a discovery
+        // suggestion, and must not be left as one. Auto-discovery writes
+        // `status: 'suggested'` and nothing used to clear it, so an emailed
+        // contact could keep that marker forever — at which point Saved
+        // Companies dropped it for being suggested and People dropped it
+        // for being engaged, and it appeared in neither surface while
+        // cadences kept running against it. Promoting in the SAME write
+        // means the two dimensions can never disagree about a contact this
+        // path has touched. Reads the SAME fresh snapshot this transaction
+        // already has — never a second, separately-timed read.
+        if (isEngagedRecord({ contact_status: newStatus })) {
+          Object.assign(patch, engagementPromotionFields(freshContact, { reason: trigger }));
         }
-        Object.assign(patch, engagementPromotionFields(subject, { reason: trigger }));
-      }
 
-      await updateDoc(contactRef, patch);
+        tx.update(contactRef, patch);
+      });
 
-      // Log timeline event
+      if (!newStatus) return null;
+
+      // Log timeline event — fail-soft, after the authoritative write has
+      // committed. A failure here never undoes or retries the status
+      // change; it is activity history, not the system of record.
       logTimelineEvent({
         userId,
         contactId,

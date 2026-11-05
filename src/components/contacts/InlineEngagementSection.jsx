@@ -18,7 +18,8 @@ import {
   SEND_RESULT
 } from '../../utils/sendActionResolver';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
-import { updateContactStatus, STATUS_TRIGGERS, getContactStatus } from '../../utils/contactStateMachine';
+import { logEngageSessionStarted } from '../../utils/engagementHistoryLogger';
+import { withEngagementGuard, engagementGuardKey } from '../../utils/contactStateMachine';
 import LearningToast from '../LearningToast';
 import './InlineEngagementSection.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
@@ -333,15 +334,16 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
       setEngagementIntent(intentId || 'prospect');
       setIntentSubmitted(true);
       generateMessageOptions(intentText, intentId || 'prospect');
-      // Update contact status
+      // Opening the composer is preparation, not a confirmed interaction —
+      // logged as its own event, never as a contact_status change. See
+      // contactStateMachine.js's header for why ENGAGE_CLICKED isn't a
+      // status trigger at all any more.
       const user = getEffectiveUser();
       if (user && contact?.id) {
-        updateContactStatus({
-          userId: user.uid,
-          contactId: contact.id,
-          trigger: STATUS_TRIGGERS.ENGAGE_CLICKED,
-          currentStatus: getContactStatus(contact)
-        });
+        withEngagementGuard(
+          engagementGuardKey(user.uid, contact.id, 'engage_session_started'),
+          () => logEngageSessionStarted(user.uid, contact.id, { goal: intentText, channel: null }),
+        );
         updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
           hunter_status: 'engaged_pending',
           hunter_engaged_at: new Date().toISOString(),
@@ -430,13 +432,12 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
 
     const user = getEffectiveUser();
     if (user && contact?.id) {
-      // State Machine: contact_status → Engaged
-      updateContactStatus({
-        userId: user.uid,
-        contactId: contact.id,
-        trigger: STATUS_TRIGGERS.ENGAGE_CLICKED,
-        currentStatus: getContactStatus(contact)
-      });
+      // Opening the composer is preparation, not a confirmed interaction —
+      // logged as its own event, never as a contact_status change.
+      withEngagementGuard(
+        engagementGuardKey(user.uid, contact.id, 'engage_session_started'),
+        () => logEngageSessionStarted(user.uid, contact.id, { goal: null, channel: null }),
+      );
 
       // Immediately move to Hunter so the contact is visible there while composing.
       // Barry will later promote to 'active_mission' when the mission is created.

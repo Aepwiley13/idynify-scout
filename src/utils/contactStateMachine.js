@@ -11,7 +11,8 @@
  *
  * ── Lead Statuses (person_type === 'lead') ──────────────
  *   New             — Contact just created, never engaged
- *   Engaged         — User opened the Engage module on this profile
+ *   Engaged         — A confirmed outbound/inbound interaction happened, or
+ *                     one was explicitly logged after the fact
  *   Awaiting Reply  — Message sent, waiting for response
  *   In Conversation — Contact replied positively, dialogue active
  *   Dormant         — No activity for an extended period (auto or manual)
@@ -28,15 +29,21 @@
  *   Mission Complete — Mission workflow completed (legacy)
  *
  * Transition triggers:
- *   Contact created        → New
- *   Engage clicked         → Engaged
- *   Message sent           → Awaiting Reply
- *   Positive reply         → In Conversation
- *   Person type → customer → Active Customer
- *   Person type → partner  → Partner
- *   Person type → network  → Network
+ *   Contact created          → New
+ *   Message sent             → Awaiting Reply
+ *   Positive reply           → In Conversation
+ *   Manual interaction logged → Engaged
+ *   Person type → customer   → Active Customer
+ *   Person type → partner    → Partner
+ *   Person type → network    → Network
  *   Person type → past_customer → Past Customer
- *   Manual complete action → Dormant (or user-set)
+ *   Manual complete action   → Dormant (or user-set)
+ *
+ * NOT a trigger here, deliberately: opening an engagement composer,
+ * generating or saving a draft, creating a Barry mission, planning
+ * outreach, or moving a workflow stage. None of those is a confirmed
+ * interaction — see engagementHistoryLogger.js's logEngageSessionStarted
+ * for how that activity is still recorded, just not as a status change.
  *
  * Deprecated triggers (maintained for existing data):
  *   Campaign assigned      → In Campaign
@@ -44,7 +51,7 @@
  *   Sequence completed     → Mission Complete
  */
 
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { doc, runTransaction } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { logTimelineEvent, ACTORS } from './timelineLogger';
 import {
@@ -81,11 +88,15 @@ const VALID_STATUSES = Object.values(CONTACT_STATUSES);
 
 export const STATUS_TRIGGERS = {
   CONTACT_CREATED: 'contact_created',
-  ENGAGE_CLICKED: 'engage_clicked',
   MESSAGE_SENT: 'message_sent',
   POSITIVE_REPLY: 'positive_reply',
   NEGATIVE_REPLY: 'negative_reply',
   NO_REPLY_EXTENDED: 'no_reply_extended',
+  // A real interaction, confirmed after the fact rather than observed live —
+  // a call, a meeting, anything that happened outside the app. Reuses the
+  // existing "Brief Barry" manual-logging flow (PersistentEngageBar.jsx);
+  // see its header for why that flow and not a new one.
+  MANUAL_INTERACTION_LOGGED: 'manual_interaction_logged',
   PERSON_TYPE_CUSTOMER: 'person_type_customer',
   PERSON_TYPE_PARTNER: 'person_type_partner',
   PERSON_TYPE_NETWORK: 'person_type_network',
@@ -103,12 +114,17 @@ export const STATUS_TRIGGERS = {
 const TRANSITION_MAP = {
   // Active lead lifecycle
   [STATUS_TRIGGERS.CONTACT_CREATED]: CONTACT_STATUSES.NEW,
-  [STATUS_TRIGGERS.ENGAGE_CLICKED]: CONTACT_STATUSES.ENGAGED,
   [STATUS_TRIGGERS.MESSAGE_SENT]: CONTACT_STATUSES.AWAITING_REPLY,
   [STATUS_TRIGGERS.POSITIVE_REPLY]: CONTACT_STATUSES.IN_CONVERSATION,
   [STATUS_TRIGGERS.NEGATIVE_REPLY]: CONTACT_STATUSES.DORMANT,
   [STATUS_TRIGGERS.NO_REPLY_EXTENDED]: CONTACT_STATUSES.DORMANT,
   [STATUS_TRIGGERS.MANUAL_DORMANT]: CONTACT_STATUSES.DORMANT,
+  // Deliberately NOT in alwaysApplyTriggers below: a manual log of one past
+  // interaction can advance a contact that's never had one, but must not be
+  // able to regress one already at Awaiting Reply/In Conversation the way
+  // MESSAGE_SENT legitimately can (a real new send resets the waiting
+  // clock; a backfilled note about an old interaction should not).
+  [STATUS_TRIGGERS.MANUAL_INTERACTION_LOGGED]: CONTACT_STATUSES.ENGAGED,
 
   // Person type → relationship status transitions
   [STATUS_TRIGGERS.PERSON_TYPE_CUSTOMER]: CONTACT_STATUSES.ACTIVE_CUSTOMER,
@@ -221,84 +237,164 @@ export function getContactStatus(contact) {
   return contact?.contact_status || CONTACT_STATUSES.NEW;
 }
 
+// ── Idempotency guard ───────────────────────────────────────────────────────
+//
+// Same shape as companyDecision.js's `inFlight` Set, for the same class of
+// problem: an engagement surface can remount (close/reopen the composer, a
+// stray re-render) before an earlier write for the SAME contact and trigger
+// has resolved, and each independent call then has no way to know the other
+// one is already in flight. Scoped to `userId/contactId/trigger` rather than
+// just the subject — two DIFFERENT triggers for the same contact (a reply
+// landing while a manual log is being saved, say) are two real events and
+// must both proceed; only a trigger racing itself is a duplicate.
+//
+// Shared by updateContactStatus below AND the composer-open call sites that
+// log `engage_session_started` directly (never through this function, since
+// that's no longer a status-producing trigger) — both need the same
+// protection against the same remount race.
+
+const inFlightEngagementKeys = new Set();
+
+/** Test seam: forget every in-flight claim. */
+export function resetEngagementGuards() {
+  inFlightEngagementKeys.clear();
+}
+
+/**
+ * Runs `fn` only if no call with this exact `key` is already in flight.
+ * A duplicate call while one is pending resolves to `null` immediately,
+ * without waiting for the first — it's not queued, it's dropped, which is
+ * correct here: the first call already represents this trigger having
+ * happened once, and there's nothing for a second, overlapping call to add.
+ */
+export async function withEngagementGuard(key, fn) {
+  if (inFlightEngagementKeys.has(key)) return null;
+  inFlightEngagementKeys.add(key);
+  try {
+    return await fn();
+  } finally {
+    inFlightEngagementKeys.delete(key);
+  }
+}
+
+/** The guard key `updateContactStatus` uses — exported so callers that need
+ * to guard a related, non-status write (logging `engage_session_started`)
+ * with the same key shape can stay consistent with it. */
+export function engagementGuardKey(userId, contactId, trigger) {
+  return `${userId}/${contactId}/${trigger}`;
+}
+
 /**
  * Update a contact's status based on a trigger.
  * Writes to Firestore and logs a timeline event.
  *
  * Non-blocking — catches errors silently.
  *
+ * DURABILITY, not just the in-memory guard: the decision (what the current
+ * status actually is, and what the trigger should do to it) and the write
+ * both happen inside ONE Firestore transaction that reads the document
+ * fresh at commit time. `currentStatus`/`contact`, below, are accepted for
+ * backward compatibility with every existing caller's signature but are no
+ * longer consulted for the decision — the transaction's own read is always
+ * authoritative, so a stale closure, a second browser tab, or a second
+ * device cannot make this function act on data it already knows is old.
+ * `withEngagementGuard` (this module) still exists alongside the
+ * transaction: it is a same-runtime fast-skip for the common case
+ * (remounting the same component before its last call resolved), cheaper
+ * than a Firestore round trip; the transaction is what makes the OUTCOME
+ * correct even when the guard can't see the other caller at all — a
+ * second tab has no way to know about this tab's in-memory Set, but both
+ * tabs' transactions still serialize correctly against the same document.
+ *
+ * What this does NOT claim: it is not "global idempotency" in the sense of
+ * deduplicating two genuinely separate real-world events that each
+ * legitimately request the same transition (e.g. two actual replies). That
+ * is not a race to resolve — it is two real events, and the existing
+ * priority check already decides each on its own merits, same as before.
+ * What the transaction specifically closes is the stale-read class of bug:
+ * two concurrent callers racing on the SAME transition, where without a
+ * fresh read the second one could overwrite based on data it already knew
+ * was superseded. On a genuine conflict, Firestore retries the losing
+ * transaction against the document the winner just committed; this
+ * function's own priority check then correctly reads that as
+ * already-satisfied and writes nothing — not two statuses, not two
+ * timeline events.
+ *
  * @param {Object} params
  * @param {string} params.userId       - Authenticated user ID
  * @param {string} params.contactId    - Contact document ID
  * @param {string} params.trigger      - One of STATUS_TRIGGERS
- * @param {string} [params.currentStatus] - Current contact_status (optional, avoids re-read)
- * @param {Object} [params.contact]       - The contact doc, if the caller already
- *   has it. Only consulted when the transition is into an engaged status, and
- *   only to decide whether the record needs promoting out of 'suggested'. When
- *   omitted the document is re-read, so callers that lack it stay correct.
+ * @param {string} [params.currentStatus] - Accepted, not consulted — see above
+ * @param {Object} [params.contact]       - Accepted, not consulted — see above
  * @returns {Promise<string|null>} New status if updated, null if skipped or failed
  */
-export async function updateContactStatus({ userId, contactId, trigger, currentStatus, contact = null }) {
-  try {
-    if (!userId || !contactId || !trigger) {
-      console.error('[StateMachine] Missing required fields:', { userId, contactId, trigger });
-      return null;
-    }
-
-    const resolvedCurrentStatus = currentStatus || CONTACT_STATUSES.NEW;
-    const newStatus = resolveTransition(resolvedCurrentStatus, trigger);
-
-    if (!newStatus) {
-      // Transition skipped — no update needed
-      return null;
-    }
-
-    // Write to Firestore
-    const contactRef = doc(db, 'users', userId, 'contacts', contactId);
-    const patch = {
-      contact_status: newStatus,
-      contact_status_updated_at: new Date().toISOString()
-    };
-
-    // A contact the user has actually engaged is no longer a discovery
-    // suggestion, and must not be left as one. Auto-discovery writes
-    // `status: 'suggested'` and nothing used to clear it, so an emailed
-    // contact could keep that marker forever — at which point Saved Companies
-    // dropped it for being suggested and People dropped it for being engaged,
-    // and it appeared in neither surface while cadences kept running against
-    // it. Promoting in the SAME write means the two dimensions can never
-    // disagree about a contact this path has touched.
-    if (isEngagedRecord({ contact_status: newStatus })) {
-      let subject = contact;
-      if (!subject) {
-        const snap = await getDoc(contactRef);
-        subject = snap.exists() ? snap.data() : null;
-      }
-      Object.assign(patch, engagementPromotionFields(subject, { reason: trigger }));
-    }
-
-    await updateDoc(contactRef, patch);
-
-    // Log timeline event
-    logTimelineEvent({
-      userId,
-      contactId,
-      type: 'contact_status_changed',
-      actor: ACTORS.SYSTEM,
-      preview: `${resolvedCurrentStatus} → ${newStatus}`,
-      metadata: {
-        statusFrom: resolvedCurrentStatus,
-        statusTo: newStatus,
-        trigger
-      }
-    });
-
-    return newStatus;
-  } catch (error) {
-    console.error('[StateMachine] Failed to update contact status:', error);
-    // Non-blocking — never throw
+export async function updateContactStatus({ userId, contactId, trigger }) {
+  if (!userId || !contactId || !trigger) {
+    console.error('[StateMachine] Missing required fields:', { userId, contactId, trigger });
     return null;
   }
+
+  return withEngagementGuard(engagementGuardKey(userId, contactId, trigger), async () => {
+    try {
+      const contactRef = doc(db, 'users', userId, 'contacts', contactId);
+      let resolvedCurrentStatus;
+      let newStatus;
+
+      await runTransaction(db, async (tx) => {
+        const snap = await tx.get(contactRef);
+        const freshContact = snap.exists() ? snap.data() : null;
+        resolvedCurrentStatus = freshContact?.contact_status || CONTACT_STATUSES.NEW;
+        newStatus = resolveTransition(resolvedCurrentStatus, trigger);
+
+        if (!newStatus) return; // Transition skipped — no write, this transaction does nothing
+
+        const patch = {
+          contact_status: newStatus,
+          contact_status_updated_at: new Date().toISOString()
+        };
+
+        // A contact the user has actually engaged is no longer a discovery
+        // suggestion, and must not be left as one. Auto-discovery writes
+        // `status: 'suggested'` and nothing used to clear it, so an emailed
+        // contact could keep that marker forever — at which point Saved
+        // Companies dropped it for being suggested and People dropped it
+        // for being engaged, and it appeared in neither surface while
+        // cadences kept running against it. Promoting in the SAME write
+        // means the two dimensions can never disagree about a contact this
+        // path has touched. Reads the SAME fresh snapshot this transaction
+        // already has — never a second, separately-timed read.
+        if (isEngagedRecord({ contact_status: newStatus })) {
+          Object.assign(patch, engagementPromotionFields(freshContact, { reason: trigger }));
+        }
+
+        tx.update(contactRef, patch);
+      });
+
+      if (!newStatus) return null;
+
+      // Log timeline event — fail-soft, after the authoritative write has
+      // committed. A failure here never undoes or retries the status
+      // change; it is activity history, not the system of record.
+      logTimelineEvent({
+        userId,
+        contactId,
+        type: 'contact_status_changed',
+        actor: ACTORS.SYSTEM,
+        preview: `${resolvedCurrentStatus} → ${newStatus}`,
+        metadata: {
+          statusFrom: resolvedCurrentStatus,
+          statusTo: newStatus,
+          trigger
+        }
+      });
+
+      return newStatus;
+    } catch (error) {
+      console.error('[StateMachine] Failed to update contact status:', error);
+      // Non-blocking — never throw
+      return null;
+    }
+  });
 }
 
 export { VALID_STATUSES };

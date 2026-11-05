@@ -103,9 +103,17 @@ const DEFAULT_OUTCOME_GOALS = {
 };
 
 // ── Stage → contact_status coercion ──────────────────────────────────────────
+//
+// `hunter` forces no status: being moved into Hunter (via engage_contact
+// below, or a move_stage/Gate-2 action) is workflow intent — planning
+// outreach, not a confirmed interaction. The other three stages represent
+// something that actually happened to get there (a reply, a close, a
+// cooldown) and keep forcing their status; only Engaged was the one being
+// claimed on intent alone. barryLink.js's STAGE_STATUS_MAP is a separate,
+// deliberate mirror of this one — keep both in sync if this changes again.
 
 const STAGE_STATUS_MAP = {
-  hunter:   'Engaged',
+  hunter:   null, // no forced status change — see note above
   sniper:   'In Conversation',
   basecamp: 'Active Customer',
   fallback: 'Dormant',
@@ -150,14 +158,26 @@ async function engageContact(userId, contactId) {
 
   const missionRef = await userRef.collection('missions').add(mission);
 
+  // Creating a mission is planning outreach, not a confirmed interaction —
+  // contact_status is deliberately not touched here any more (the mission's
+  // own first step is still unsent). `engaged_at`/`last_interaction_at` are
+  // the same mistake under different names: both are read elsewhere as "a
+  // real interaction happened" — BlitzMode/HunterContactCard display
+  // last_interaction_at to the user as "last contact," BlitzMode sorts
+  // follow-up priority by it, and barryHunterProcessEngage/barryHunterCardRead
+  // feed it straight into Barry's own prompt as a fact. completeMissionStep
+  // and logOutcome (elsewhere in this file) correctly set it on an actual
+  // outcome; gmail-poll-replies.js sets it on a real inbound reply. A mission
+  // that's merely been created, with its own first step still unsent, is
+  // none of those — so neither field is stamped here any more.
+  // record_status promotion below is a separate dimension, left as-is:
+  // being given a mission still means this record is no longer just a
+  // discovery suggestion, regardless of whether contact_status or the
+  // interaction-timestamp fields moved.
   const contactUpdate = {
     hunter_status: 'active_mission',
     active_mission_id: missionRef.id,
     stage: 'hunter',
-    contact_status: 'Engaged',
-    contact_status_updated_at: FieldValue.serverTimestamp(),
-    engaged_at: now,
-    last_interaction_at: FieldValue.serverTimestamp(),
     updated_at: now
   };
 
@@ -175,8 +195,7 @@ async function engageContact(userId, contactId) {
     updated_fields: {
       hunter_status: 'active_mission',
       active_mission_id: missionRef.id,
-      stage: 'hunter',
-      contact_status: 'Engaged'
+      stage: 'hunter'
     },
     context: { from_stage: fromStage, outcome_goal: outcomeGoal }
   };

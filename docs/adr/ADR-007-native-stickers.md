@@ -63,7 +63,8 @@ Stickers are a user's own named, colored relationship categories ("Board member"
 
 ## Verified by
 
-- `scripts/rules-check/stickers.mjs`: 115 emulator cases against the live rules and the rollback variant.
+- `scripts/rules-check/stickers.mjs`: 141 cases, each run against the live rules and the lockdown variant (282 checks). The runner fails if lockdown is ever looser than live.
+- `scripts/rules-check/stickers-flag-parity.mjs`: the rules, `stickersConfig` and the app's availability hook agree for every rollout row; viewing as another user is read-only on all three.
 - `scripts/rules-check/sticker-services.mjs`: the real `stickerCore` against the real rules, concurrency included.
 - `src/test/stickersAccess.test.js`, `src/test/stickersConfig.test.js`: the parity table on both sides.
 - `src/test/stickerCore.test.js`, `src/test/stickerWritePaths.test.js`, `src/test/useStickersAvailability.test.jsx`.

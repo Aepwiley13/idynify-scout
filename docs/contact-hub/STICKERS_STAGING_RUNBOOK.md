@@ -36,7 +36,7 @@
    - every integration key (I5) is empty
    - git would not commit the file
 1. **Front end.** In DevTools → Network, filter `firestore.googleapis.com`. Every request path contains `projects/<staging-id>/`.
-2. **Back end.** `FIREBASE_PROJECT_ID` in the environment serving the functions is `<staging-id>`. Load the env file into the shell (`set -a; . <file>; set +a`), then start `npx netlify dev --offline` from the same shell. `--offline` keeps the CLI from fetching any Netlify site's variables.
+2. **Back end.** `FIREBASE_PROJECT_ID` in the environment serving the functions is `<staging-id>`. Start the app with `node scripts/staging/stagingDev.mjs --env=<file>`: it re-runs the preflight, then starts `netlify dev --offline` with the env file and the staging credential only (setup guide A5). `--offline` keeps the CLI from fetching any Netlify site's variables.
 3. **Signed in as a test account** (§3.2), never a real one.
 
 **If any check shows `idynify-scout-dev` or anything not ending in your staging id: stop, sign out, and report it. Do not continue.**
@@ -86,7 +86,7 @@ Record each uid; the tool takes uids.
 **Rules.** Deploy `main`'s rules to **staging only**, with `scripts/staging/stagingRulesDeploy.mjs`. It takes the project from the env file the app runs with, so the browser, the functions, sign-in and the rules all use the same project. It refuses unless:
 - the env file passes every preflight check
 - `--project` repeats that file's project
-- the deploy credential (`GOOGLE_APPLICATION_CREDENTIALS`) belongs to it
+- the deploy credential (`GOOGLE_APPLICATION_CREDENTIALS` or `STAGING_SERVICE_ACCOUNT_KEY`, never both) belongs to it
 - it is listed in `STICKERS_STAGING_PROJECTS`
 - it is not `PRODUCTION_FIREBASE_PROJECT_ID`
 
@@ -109,13 +109,13 @@ Read the target and command it prints, then add `--apply`.
 **Rollout mode and beta list.** Use `scripts/staging/stickersStaging.mjs`, which writes only `feature_flags/stickers` and `sticker_enrollment/{uid}`. It refuses any target it cannot prove is non-production:
 - `--project` must be listed in `STICKERS_STAGING_PROJECTS`
 - the id must contain `staging` or `stg`
-- it must equal the `project_id` of the service account in `GOOGLE_APPLICATION_CREDENTIALS`
+- it must equal the `project_id` of the service account (`GOOGLE_APPLICATION_CREDENTIALS` or `STAGING_SERVICE_ACCOUNT_KEY`)
 - it must differ from `PRODUCTION_FIREBASE_PROJECT_ID`
 
 It is a dry run unless `--apply` is passed.
 
 ```bash
-export GOOGLE_APPLICATION_CREDENTIALS=/path/outside/repo/staging-service-account.json
+export GOOGLE_APPLICATION_CREDENTIALS=/path/outside/repo/staging-service-account.json   # or STAGING_SERVICE_ACCOUNT_KEY (setup guide A5)
 ```
 ```bash
 export STICKERS_STAGING_PROJECTS=<staging-id>

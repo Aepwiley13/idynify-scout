@@ -19,7 +19,7 @@ import {
   parseServiceAccountKey, readStagingCredential, withCredential, checkCredential, temporaryKeyFile, redactKeys,
   CredentialRefusal, KEY_VARIABLE, FILE_VARIABLE,
 } from '../../scripts/staging/stagingCredentials.mjs';
-import { planDevRun } from '../../scripts/staging/stagingDev.mjs';
+import { planDevRun, devArgs, hasEdgeFunctions } from '../../scripts/staging/stagingDev.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(here, '../..');
@@ -171,6 +171,27 @@ describe('planDevRun (the app launcher)', () => {
   });
 });
 
+describe('the launcher’s edge-function switch', () => {
+  it('runs netlify dev offline, and skips the edge runtime only when asked', () => {
+    expect(devArgs()).toEqual(['netlify', 'dev', '--offline']);
+    expect(devArgs({ noEdgeFunctions: true })).toEqual(['netlify', 'dev', '--offline', '--internal-disable-edge-functions']);
+  });
+
+  it('refuses to skip edge functions a project declares', () => {
+    const credential = { source: KEY_VARIABLE, ...parseServiceAccountKey(raw()) };
+    const plan = planDevRun({ fileEnv: webEnv(), credential, noEdgeFunctions: true, edgeFunctionsDeclared: true });
+    expect(plan.ok).toBe(false);
+    expect(plan.problems.join(' ')).toContain('edge-functions');
+  });
+
+  it('this project declares none (so the switch changes nothing it serves)', () => {
+    expect(hasEdgeFunctions(REPO)).toBe(false);
+    const dir = mkdtempSync(join(tmpdir(), 'edge-'));
+    writeFileSync(join(dir, 'netlify.toml'), '[[edge_functions]]\n  path = "/x"\n  function = "x"\n');
+    expect(hasEdgeFunctions(dir)).toBe(true);
+  });
+});
+
 describe('the tools, with the key in STAGING_SERVICE_ACCOUNT_KEY', () => {
   const run = (name, args, env = {}) => {
     try {
@@ -235,5 +256,6 @@ describe('the tools, with the key in STAGING_SERVICE_ACCOUNT_KEY', () => {
     expect(source).toContain('delete childEnv[KEY_VARIABLE]');
     expect(source.indexOf('temporaryKeyFile(credential)')).toBeLessThan(source.indexOf('spawnSync(command[0]'));
     expect(source).toMatch(/finally \{\s*key\?\.remove\(\);/);
+    expect(source).toMatch(/for \(const signal of signals\) process\.once\(signal, onSignal\)/);
   });
 });

@@ -137,12 +137,17 @@ function main() {
   const key = credential.source === KEY_VARIABLE ? temporaryKeyFile(credential) : null;
   const childEnv = { ...process.env, [FILE_VARIABLE]: key ? key.path : process.env[FILE_VARIABLE] };
   delete childEnv[KEY_VARIABLE];
+  // Ctrl-C, SIGTERM or SIGHUP still remove the temporary key (only SIGKILL cannot).
+  const onSignal = () => { key?.remove(); process.exit(130); };
+  const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'];
+  for (const signal of signals) process.once(signal, onSignal);
   try {
     const run = spawnSync(command[0], command.slice(1), { cwd: repoRoot(), stdio: 'inherit', env: childEnv });
     if (validate && run.status === 0) console.log('\nValidated against the staging project: nothing was deployed. Add --apply to deploy.');
     return run.status ?? 1;
   } finally {
     key?.remove();
+    for (const signal of signals) process.removeListener(signal, onSignal);
   }
 }
 

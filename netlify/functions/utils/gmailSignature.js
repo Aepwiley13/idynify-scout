@@ -104,3 +104,32 @@ export function appendSignatureHtml(htmlBody, signatureHtml) {
   if (!signatureHtml) return htmlBody;
   return `${htmlBody}<br><div class="gmail_signature_container"><div dir="ltr" class="gmail_signature">${signatureHtml}</div></div>`;
 }
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * The deterministic sign-off used when the user has no signature configured
+ * in their Gmail account — the common case, since nothing in the app prompts
+ * them to set one. Not a model-written name: Barry's own draft-generation
+ * prompt deliberately omits the sender's name (see outboundCopyRules.js) and
+ * ends every message with "Best," and nothing after it, so without this the
+ * email goes out signed by no one. `name` is the caller's own resolved
+ * display name (e.g. from userIdentity.js's displayNameFor) — this function
+ * only renders it, it does not resolve identity itself.
+ *
+ * @param {string} name  Already-resolved display name; empty/falsy means
+ *   there is nothing to sign with, so the result is '' (no fallback forced).
+ * @returns {string} HTML signature block, or '' when there's no name to use.
+ */
+export function buildFallbackSignatureHtml(name) {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return '';
+  return `Best,<br>${escapeHtml(trimmed)}`;
+}

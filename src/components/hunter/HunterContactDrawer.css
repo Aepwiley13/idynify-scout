@@ -913,6 +913,18 @@
   margin: 0;
 }
 
+.view-recipient-email {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0.25rem 0 0 0;
+  word-break: break-all;
+}
+
+.recipient-email-warning {
+  color: #ef4444;
+  font-weight: 600;
+}
+
 /* Mission Select Items */
 .mission-select-item {
   background: var(--bg-secondary);

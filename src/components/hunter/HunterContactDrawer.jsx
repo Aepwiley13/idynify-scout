@@ -902,6 +902,10 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   if (!isOpen) return null;
 
   const hasEmail = contact.email && contact.email.trim() !== '';
+  // Same format check gmail-send-quick.js applies server-side to `toEmail` —
+  // gates the Send button here too, so a malformed address (the kind that
+  // produced the DNS NXDOMAIN bounce) is caught before the send round-trip.
+  const hasValidEmailFormat = hasEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email.trim());
   const hasPhone = contact.phone && contact.phone.trim() !== '';
   const characterCount = message.length;
   const smsCount = characterCount <= 160 ? 1 : Math.ceil(characterCount / 153);
@@ -1469,6 +1473,17 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                 {isNativeHandoff() ? 'Opening' : 'Sending'} via {selectedWeapon} to {contact.firstName} {contact.lastName}
               </p>
 
+              {/* Full recipient address for email — the actual send-confirmation
+                  screen, previously showed only the contact's name here. */}
+              {selectedWeapon === 'email' && (
+                <p className="view-recipient-email">
+                  To: {hasEmail ? contact.email : 'No email on file'}
+                  {hasEmail && !hasValidEmailFormat && (
+                    <span className="recipient-email-warning"> — this address doesn't look valid</span>
+                  )}
+                </p>
+              )}
+
               {/* Show native handoff notice */}
               {isNativeHandoff() && (
                 <div className="handoff-notice">
@@ -1520,7 +1535,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
               <button
                 className="btn-primary-hunter btn-send"
                 onClick={handleSendMessage}
-                disabled={!message || loading}
+                disabled={!message || loading || (selectedWeapon === 'email' && !isNativeHandoff() && !hasValidEmailFormat)}
               >
                 {loading ? (
                   <>

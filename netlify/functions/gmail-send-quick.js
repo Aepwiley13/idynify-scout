@@ -12,10 +12,14 @@ import { randomUUID } from 'node:crypto';
 import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { getGmailSignatureHtml, appendSignatureHtml } from './utils/gmailSignature.js';
+import { getGmailSignatureHtml, appendSignatureHtml, buildFallbackSignatureHtml } from './utils/gmailSignature.js';
 import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 import { encodeHeaderValue, formatAddress } from './utils/emailHeaders.js';
+import { displayNameFor } from '../../src/utils/userIdentity.js';
+
+/** The exact format check already applied to the CC address (below) — now applied to the primary recipient too. */
+const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Re-exported: existing tests and callers import these from here.
 export { encodeHeaderValue, formatAddress };
@@ -221,11 +225,24 @@ export const handler = async (event) => {
       };
     }
 
+    // The primary recipient used to be checked for presence only — weaker
+    // than the CC field three lines below it, which already format-checks.
+    // This is the address that actually bounced in the incident this check
+    // exists for; same rule, same regex, applied to both.
+    const toEmailTrimmed = typeof toEmail === 'string' ? toEmail.trim() : '';
+    if (!EMAIL_FORMAT.test(toEmailTrimmed)) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'toEmail must be a valid email address' })
+      };
+    }
+
     // Merge the Phase 1.5 single `cc` string into the CC list (deduplicated)
     const ccList = Array.isArray(ccEmails) ? [...ccEmails] : [];
     if (cc !== undefined && cc !== null && cc !== '') {
       const ccTrimmed = typeof cc === 'string' ? cc.trim() : '';
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(ccTrimmed)) {
+      if (!EMAIL_FORMAT.test(ccTrimmed)) {
         return {
           statusCode: 400,
           headers,
@@ -377,7 +394,26 @@ export const handler = async (event) => {
 
     // Fetch Gmail signature as HTML (non-blocking — falls back to no signature)
     const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
-    const signatureHtml = await getGmailSignatureHtml(gmail);
+    let signatureHtml = await getGmailSignatureHtml(gmail);
+
+    // The user's own Gmail signature, when they've configured one, always
+    // wins — appendSignatureHtml below only ever applies ONE signature, so
+    // there is no scenario where both this fallback and a real Gmail
+    // signature land in the same email. This exists because nothing in the
+    // app prompts the user to set a Gmail signature, so the common case is
+    // an empty one — and Barry's own draft-generation prompt deliberately
+    // never writes a sender name (outboundCopyRules.js), so without this an
+    // email like the one in the incident goes out ending in "Best," and no
+    // name at all. One extra read, only on the empty-signature path.
+    if (!signatureHtml) {
+      try {
+        const userDoc = await db.collection('users').doc(userId).get();
+        const fallbackName = userDoc.exists ? displayNameFor(userDoc.data()) : '';
+        signatureHtml = buildFallbackSignatureHtml(fallbackName);
+      } catch (profileError) {
+        console.warn('⚠️ Could not load user profile for sender-name fallback (non-blocking):', profileError.message);
+      }
+    }
 
     // Open tracking (Phase 2): embed a pixel only for cadence sends — those
     // carrying both contactId and cadenceId. Requires the deploy's public base

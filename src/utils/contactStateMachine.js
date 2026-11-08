@@ -344,9 +344,23 @@ export async function updateContactStatus({ userId, contactId, trigger }) {
         const snap = await tx.get(contactRef);
         const freshContact = snap.exists() ? snap.data() : null;
         resolvedCurrentStatus = freshContact?.contact_status || CONTACT_STATUSES.NEW;
-        newStatus = resolveTransition(resolvedCurrentStatus, trigger);
+        const resolved = resolveTransition(resolvedCurrentStatus, trigger);
 
-        if (!newStatus) return; // Transition skipped — no write, this transaction does nothing
+        // A trigger that resolves back to the status the contact is
+        // ALREADY at is not a real change. MESSAGE_SENT (and the other
+        // alwaysApplyTriggers) are deliberately unconditional about
+        // WHETHER to apply regardless of priority — that's a different
+        // question from whether applying actually changes anything. A
+        // second real send to a contact already at Awaiting Reply is
+        // still a genuine send — sendActionResolver.js logs that
+        // separately and unconditionally as its own `message_sent`
+        // timeline event, untouched by this guard — but it is not a
+        // second status TRANSITION, and must not produce a second one
+        // here: a no-op write plus a `contact_status_changed` entry
+        // reading "Awaiting Reply → Awaiting Reply" that looks like
+        // something happened when nothing did.
+        if (!resolved || resolved === resolvedCurrentStatus) return; // No write, this transaction does nothing
+        newStatus = resolved;
 
         const patch = {
           contact_status: newStatus,

@@ -132,6 +132,12 @@
 [functions."gmail-sync-worker"]
   timeout = 300
 
+# Scheduled every 10 minutes, same shape as gmail-sync-worker above but a
+# separate pipeline (reply detection, not identity-resolution ingestion —
+# see its own file header). Also walks up to 50 connected accounts.
+[functions."gmail-reply-sync-worker"]
+  timeout = 300
+
 [functions."adminGetUsers"]
   timeout = 26
 

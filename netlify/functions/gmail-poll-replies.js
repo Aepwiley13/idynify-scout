@@ -13,13 +13,19 @@
  *
  * Called on-demand by the Hunter People "Sync Replies" button.
  * Safety cap: max 50 contacts checked per call to stay within rate limits.
+ *
+ * The per-contact logic (thread check, reply classification, status write,
+ * timeline event) lives in ./utils/replyPolling.js, shared with the
+ * scheduled worker (gmail-reply-sync-worker.js) so "Sync Replies" and the
+ * automatic schedule run the exact same implementation. This file keeps
+ * only its own HTTP contract — auth, OAuth setup, response shape — unchanged.
  */
 
 import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { writeTimelineEvent, ACTORS } from './utils/timelineWrite.js';
+import { getFirestore } from 'firebase-admin/firestore';
 import { requireProjectId } from './utils/firebaseEnv.js';
+import { pollRepliesForUser } from './utils/replyPolling.js';
 
 if (getApps().length === 0) {
   const privateKey = process.env.FIREBASE_PRIVATE_KEY
@@ -42,8 +48,6 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Headers': 'Content-Type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
-
-const MAX_CONTACTS = 50;
 
 export const handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers: CORS_HEADERS, body: '' };
@@ -131,146 +135,25 @@ export const handler = async (event) => {
       console.warn('getProfile failed (non-blocking):', scopeErr.message);
     }
 
-    // ── Load contacts awaiting a reply that have a tracked threadId ───────────
-    const contactsSnap = await db
-      .collection('users').doc(userId)
-      .collection('contacts')
-      .where('hunter_status', 'in', ['active_mission', 'awaiting_reply'])
-      .get();
+    // ── Check tracked threads for replies — shared with the scheduled worker ──
+    const { transitioned, checkedCount, needsReconnect } = await pollRepliesForUser(db, gmail, userId, myEmail);
 
-    const candidates = contactsSnap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .filter(c => !!c.gmail_thread_id)
-      .slice(0, MAX_CONTACTS);
-
-    console.log(`📬 Checking ${candidates.length} tracked threads for ${userId}`);
-
-    if (candidates.length === 0) {
+    if (checkedCount === 0) {
       return { statusCode: 200, headers: CORS_HEADERS, body: JSON.stringify({ transitioned: [], checkedCount: 0 }) };
     }
-
-    // ── Check each thread for replies ─────────────────────────────────────────
-    const transitioned = [];
-    let needsReconnect = false;
-    const receivedAt = new Date().toISOString();
-
-    await Promise.all(candidates.map(async (contact) => {
-      try {
-        const threadRes = await gmail.users.threads.get({
-          userId: 'me',
-          id: contact.gmail_thread_id,
-          format: 'metadata',
-          metadataHeaders: ['From', 'Subject'],
-        });
-
-        const messages = threadRes.data.messages || [];
-        if (messages.length < 2) return; // Only our outbound message — no reply yet
-
-        // Find messages NOT from us (replies from the contact)
-        const replies = messages.filter(msg => {
-          const fromHeader = msg.payload?.headers?.find(h => h.name === 'From')?.value || '';
-          return myEmail ? !fromHeader.toLowerCase().includes(myEmail) : true;
-        });
-
-        if (replies.length === 0) return; // All messages are from us — no reply
-
-        const latestReply = replies[replies.length - 1];
-        const fromHeader = latestReply.payload?.headers?.find(h => h.name === 'From')?.value || '';
-        const subjectHeader = latestReply.payload?.headers?.find(h => h.name === 'Subject')?.value || '';
-        const gmailReplyId = latestReply.id;
-
-        console.log(`✉️  Reply detected for contact ${contact.id} from ${fromHeader}`);
-
-        // Write transition to Firestore (contact document)
-        const contactRef = db
-          .collection('users').doc(userId)
-          .collection('contacts').doc(contact.id);
-
-        await contactRef.update({
-          hunter_status: 'in_conversation',
-          contact_status: 'In Conversation',
-          contact_status_updated_at: receivedAt,
-          last_reply_at: receivedAt,
-          last_reply_from: fromHeader,
-          last_interaction_at: receivedAt,
-          updated_at: receivedAt,
-        });
-
-        // ── Task 2.1: Also update mission document if contact is in a mission ──
-        // Re-read the contact to get the latest active_mission_id
-        const freshContactSnap = await contactRef.get();
-        const freshContact = freshContactSnap.data() || {};
-        const activeMissionId = freshContact.active_mission_id || contact.active_mission_id;
-
-        if (activeMissionId) {
-          try {
-            const missionRef = db
-              .collection('users').doc(userId)
-              .collection('missions').doc(activeMissionId);
-            const missionSnap = await missionRef.get();
-
-            if (missionSnap.exists) {
-              const missionData = missionSnap.data();
-              const updatedContacts = (missionData.contacts || []).map(c =>
-                c.contactId === contact.id
-                  ? { ...c, replyStatus: 'replied', repliedAt: receivedAt, repliedFrom: fromHeader }
-                  : c
-              );
-              await missionRef.update({ contacts: updatedContacts, updatedAt: receivedAt });
-              console.log(`✅ Mission ${activeMissionId} updated — contact ${contact.id} marked replied`);
-            }
-          } catch (missionErr) {
-            // Non-fatal — contact is still updated; log and continue
-            console.warn(`[PollReplies] Mission update skipped for ${contact.id}:`, missionErr.message);
-          }
-        }
-
-        // Log timeline event
-        // G1-04: 'message_received' was in neither client allowlist; it now
-        // validates against the shared contract like every other event.
-        await writeTimelineEvent(db, {
-          userId,
-          contactId: contact.id,
-          type: 'message_received',
-          actor: ACTORS.CONTACT,
-          preview: subjectHeader || 'Reply received',
-          metadata: {
-            gmailMessageId: gmailReplyId,
-            gmailThreadId: contact.gmail_thread_id,
-            fromAddress: fromHeader,
-            autoDetected: true,
-            receivedAt: typeof receivedAt === 'string' ? receivedAt : null,
-          },
-        });
-
-        transitioned.push({
-          contactId: contact.id,
-          name: contact.name || 'Contact',
-          threadId: contact.gmail_thread_id,
-          fromEmail: fromHeader,
-        });
-
-      } catch (err) {
-        if (err.status === 403 || err.code === 403) {
-          needsReconnect = true;
-        } else {
-          console.warn(`[PollReplies] Skipping contact ${contact.id}:`, err.message);
-        }
-      }
-    }));
 
     if (needsReconnect && transitioned.length === 0) {
       return { statusCode: 200, headers: CORS_HEADERS, body: JSON.stringify({ transitioned: [], code: 'NEEDS_RECONNECT' }) };
     }
 
-    console.log(`✅ Poll complete — ${transitioned.length} transitions, ${candidates.length} checked`);
+    console.log(`✅ Poll complete — ${transitioned.length} transitions, ${checkedCount} checked`);
 
     return {
       statusCode: 200,
       headers: CORS_HEADERS,
       body: JSON.stringify({
         transitioned,
-        checkedCount: candidates.length,
+        checkedCount,
       }),
     };
 

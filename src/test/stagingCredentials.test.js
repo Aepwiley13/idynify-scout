@@ -7,7 +7,7 @@
  * the shell that is Firebase, a credential or an integration.
  */
 import { describe, it, expect } from 'vitest';
-import { mkdtempSync, writeFileSync, statSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, statSync, readFileSync, existsSync, readdirSync, realpathSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -19,7 +19,7 @@ import {
   parseServiceAccountKey, parseCredentialFile, readStagingCredential, withCredential, checkCredential, temporaryKeyFile, redactKeys,
   CredentialRefusal, KEY_VARIABLE, FILE_VARIABLE, ADC_MODE,
 } from '../../scripts/staging/stagingCredentials.mjs';
-import { planDevRun, devArgs, hasEdgeFunctions } from '../../scripts/staging/stagingDev.mjs';
+import { planDevRun, devArgs, hasEdgeFunctions, stickerFunctionsFolder, STICKER_QA_FUNCTIONS } from '../../scripts/staging/stagingDev.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(here, '../..');
@@ -192,6 +192,30 @@ describe('the launcher’s edge-function switch', () => {
   });
 });
 
+describe('serving only the sticker QA functions', () => {
+  it('links exactly those functions from a private temporary folder, and removes it', () => {
+    const folder = stickerFunctionsFolder(REPO);
+    expect(relative(REPO, folder.path).startsWith('..')).toBe(true);
+    expect(statSync(folder.path).mode & 0o777).toBe(0o700);
+    expect(readdirSync(folder.path).sort()).toEqual(STICKER_QA_FUNCTIONS.map((n) => `${n}.js`).sort());
+    for (const name of STICKER_QA_FUNCTIONS) {
+      expect(realpathSync(join(folder.path, `${name}.js`))).toBe(realpathSync(join(REPO, 'netlify/functions', `${name}.js`)));
+    }
+    folder.remove();
+    expect(existsSync(folder.path)).toBe(false);
+    expect(devArgs({ functionsDir: '/x' })).toEqual(['netlify', 'dev', '--offline', '--functions', '/x']);
+  });
+
+  it('every one of them can run on short-lived credentials (shared init, or the same opt-in)', () => {
+    for (const name of STICKER_QA_FUNCTIONS) {
+      const source = readFileSync(join(REPO, 'netlify/functions', `${name}.js`), 'utf8');
+      const sharedInit = source.includes("from './firebase-admin.js'");
+      const optIn = source.includes('wantsApplicationDefaultCredentials(process.env)');
+      expect(sharedInit || optIn, name).toBe(true);
+    }
+  });
+});
+
 describe('the tools, with the key in STAGING_SERVICE_ACCOUNT_KEY', () => {
   const run = (name, args, env = {}) => {
     try {
@@ -286,7 +310,7 @@ const credFile = (text) => {
 
 describe('short-lived credential files (no key)', () => {
   it('reads impersonated and workload-identity credentials by the service account they impersonate', () => {
-    for (const text of [impersonated(), federated()]) {
+    for (const text of [impersonated(), impersonated({ quota_project_id: P }), federated()]) {
       expect(parseCredentialFile(text)).toMatchObject({ kind: 'short-lived', projectId: P, clientEmail: SA, privateKey: null });
     }
     expect(parseCredentialFile(raw())).toMatchObject({ kind: 'key', projectId: P });
@@ -298,6 +322,7 @@ describe('short-lived credential files (no key)', () => {
     ['a delegation chain', impersonated({ delegates: ['other@acme-prod.iam.gserviceaccount.com'] })],
     ['no source credentials', impersonated({ source_credentials: undefined })],
     ['an unknown type', JSON.stringify({ type: 'gdch_service_account' })],
+    ['a quota project other than staging', impersonated({ quota_project_id: PROD })],
   ])('refuses %s, without quoting the file', (_, text) => {
     const err = refusal(() => parseCredentialFile(text));
     expect(err).toBeInstanceOf(CredentialRefusal);
@@ -363,10 +388,31 @@ describe('the tools, with short-lived credentials in GOOGLE_APPLICATION_CREDENTI
     expect(out).toContain('Refused: nothing was deployed.');
   });
 
+  it('the rollout tool refuses a real project unless the production project is named', () => {
+    const { status, out } = run('stickersStaging.mjs', [`--project=${P}`, '--mode=beta'], { [FILE_VARIABLE]: credFile(impersonated()), STICKERS_STAGING_PROJECTS: P });
+    expect(status).toBe(1);
+    expect(out).toContain('PRODUCTION_FIREBASE_PROJECT_ID');
+  });
+
   it('the rollout tool accepts them for the staging project only', () => {
     const ok = run('stickersStaging.mjs', [`--project=${P}`, '--mode=beta'], { [FILE_VARIABLE]: credFile(impersonated()), STICKERS_STAGING_PROJECTS: P, PRODUCTION_FIREBASE_PROJECT_ID: PROD });
     expect(ok.status).toBe(0);
     expect(ok.out).toContain('Dry run: nothing was written.');
+  });
+
+  it('no implicit fallback: a personal default credential where gcloud keeps it is never used', () => {
+    const home = mkdtempSync(join(tmpdir(), 'home-'));
+    const gcloud = join(home, '.config', 'gcloud');
+    mkdirSync(gcloud, { recursive: true });
+    writeFileSync(join(gcloud, 'application_default_credentials.json'), JSON.stringify({ type: 'authorized_user', refresh_token: 'MARK-REFRESH' }));
+    const base = { HOME: home, CLOUDSDK_CONFIG: gcloud, STICKERS_STAGING_PROJECTS: P, PRODUCTION_FIREBASE_PROJECT_ID: PROD };
+    const deploy = run('stagingRulesDeploy.mjs', [`--env=${envFile()}`, `--project=${P}`], base);
+    expect(deploy.status).toBe(1);
+    expect(deploy.out).toContain('Refused: nothing was deployed.');
+    const rollout = run('stickersStaging.mjs', [`--project=${P}`, '--mode=beta'], base);
+    expect(rollout.status).toBe(1);
+    expect(`${deploy.out}${rollout.out}`).not.toMatch(/MARK-/);
+    expect(planDevRun({ fileEnv: webEnv(), credential: readStagingCredential(base) }).ok).toBe(false);
   });
 
   it('firebase-tools runs with an empty config, so a `firebase login` account or FIREBASE_TOKEN cannot take over', () => {

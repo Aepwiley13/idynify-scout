@@ -13,7 +13,7 @@
  *   - against a real project: --project must be listed in
  *     STICKERS_STAGING_PROJECTS, must look like a staging project ("staging"
  *     or "stg" in its id), must be the project the service account belongs
- *     to, and must not be PRODUCTION_FIREBASE_PROJECT_ID when that is set.
+ *     to, and must not be PRODUCTION_FIREBASE_PROJECT_ID, which must be set.
  *     The service account is STAGING_SERVICE_ACCOUNT_KEY (the key itself) or
  *     GOOGLE_APPLICATION_CREDENTIALS (a key file), never both
  *     (stagingCredentials.mjs); its key is never printed.
@@ -78,6 +78,7 @@ export function checkStagingTarget({ projectId, credentialsProjectId = null, emu
     if (!projectId.startsWith('demo-')) throw new StagingRefusal('Against the emulator, use a "demo-" project.');
     return { target: 'emulator' };
   }
+  if (!productionProjectId) throw new StagingRefusal('Set PRODUCTION_FIREBASE_PROJECT_ID so the production project can be ruled out.');
   const allowed = allowlist.split(',').map((p) => p.trim()).filter(Boolean);
   if (!allowed.includes(projectId)) throw new StagingRefusal('The project is not listed in STICKERS_STAGING_PROJECTS.');
   if (!/(staging|stg)/.test(projectId)) throw new StagingRefusal('The project id does not look like a staging project.');

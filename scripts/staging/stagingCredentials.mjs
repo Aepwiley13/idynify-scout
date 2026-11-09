@@ -114,6 +114,11 @@ export function parseCredentialFile(text, label = FILE_VARIABLE) {
   if (type === 'impersonated_service_account' && !json.source_credentials) {
     throw new CredentialRefusal(`${label} has no source credentials.`);
   }
+  // gcloud records the active project as the quota project: requests would
+  // name it (x-goog-user-project). It must be the staging project too.
+  if (json.quota_project_id && json.quota_project_id !== account[1]) {
+    throw new CredentialRefusal(`${label} bills another project (quota_project_id). Recreate it with the staging project set (setup guide A5).`);
+  }
   return { kind: 'short-lived', projectId: account[1], clientEmail, privateKey: null, json: null };
 }
 

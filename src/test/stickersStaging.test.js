@@ -14,9 +14,10 @@ import { parseArgs, checkStagingTarget, planWrites, StagingRefusal } from '../..
 const here = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = resolve(here, '../../scripts/staging/stickersStaging.mjs');
 const STAGING = 'acme-staging';
+const PRODUCTION = 'acme-live';
 
 describe('checkStagingTarget', () => {
-  const ok = { projectId: STAGING, credentialsProjectId: STAGING, allowlist: STAGING };
+  const ok = { projectId: STAGING, credentialsProjectId: STAGING, allowlist: STAGING, productionProjectId: PRODUCTION };
 
   it('accepts an allowlisted staging project that the service account belongs to', () => {
     expect(checkStagingTarget(ok)).toEqual({ target: 'staging' });
@@ -30,7 +31,8 @@ describe('checkStagingTarget', () => {
     ['no project', { ...ok, projectId: null }, /--project is required/],
     ['the production project, by name', { ...ok, productionProjectId: STAGING }, /production project/],
     ['a project not in the allowlist', { ...ok, allowlist: 'other-staging' }, /not listed/],
-    ['an allowlisted id that does not look like staging', { projectId: 'acme-prod', credentialsProjectId: 'acme-prod', allowlist: 'acme-prod' }, /does not look like a staging/],
+    ['a real project when the production project is not named', { ...ok, productionProjectId: null }, /PRODUCTION_FIREBASE_PROJECT_ID/],
+    ['an allowlisted id that does not look like staging', { projectId: 'acme-prod', credentialsProjectId: 'acme-prod', allowlist: 'acme-prod', productionProjectId: PRODUCTION }, /does not look like a staging/],
     ['no service account', { ...ok, credentialsProjectId: null }, /service-account key for the staging project is required/],
     ['a service account from another project', { ...ok, credentialsProjectId: 'acme-prod' }, /different project/],
     ['a real project id against the emulator', { projectId: STAGING, emulatorHost: '127.0.0.1:8080' }, /"demo-" project/],

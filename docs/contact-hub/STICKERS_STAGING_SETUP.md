@@ -17,8 +17,10 @@ The detailed operator steps are in `STICKERS_STAGING_RUNBOOK.md`. This page is t
    - Enable **Email/Password**.
    - Under Settings → Authorized domains, keep `localhost`.
 4. **Web app.** Project settings → General → Your apps → Add app → Web. Copy the six config values (apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId).
-5. **Service account (least privilege, staging only).** Don't use the default `firebase-adminsdk` account, whose access is much broader. In the Google Cloud console, with **the staging project selected**:
-   1. IAM & Admin → Service accounts → Create: `stickers-staging-qa`.
+5. **Credentials: short-lived, on a trusted local machine. No key.** QA runs from your own machine. A Claude Code cloud environment is **not** used for credentials: anyone using the environment can see its variables, and it has no workload identity for Google to trust.
+
+   In the Google Cloud console, with **the staging project selected**:
+   1. IAM & Admin → Service accounts: `stickers-staging-qa`. Create it only if it doesn't exist yet. Don't use the default `firebase-adminsdk` account, whose access is much broader.
    2. Grant it these roles **on the staging project only**, and nothing on any other project:
 
       | Role | Why |
@@ -29,38 +31,59 @@ The detailed operator steps are in `STICKERS_STAGING_RUNBOOK.md`. This page is t
       | Service Usage Consumer (`roles/serviceusage.serviceUsageConsumer`) | firebase-tools checks the Firestore API is enabled |
 
       Nothing else:
-      - **Not** Owner, Editor, Firebase Admin, Firebase Viewer, any token-creator role, or anything on another project.
-      - **QA accounts need no Auth admin role.** They are created like any sign-up, with the web API key.
+      - **Not** Owner, Editor, Firebase Admin, Firebase Viewer, or anything on another project.
+      - **This account cannot create users** (Firebase Authentication Viewer only reads). You create the four QA accounts yourself in the Firebase console (step F1).
       - **Index permissions:** firebase-tools pre-checks index-admin permissions for any Firestore deploy, but that check is advisory (it only logs at debug level), and `--only firestore:rules` never touches indexes.
       - **No database creation:** this account cannot create a database, which firebase-tools would otherwise try if the database were missing.
       - If `--validate` in step D reports a missing permission, add that one only.
-   3. Keys → Add key → Create new key → JSON. Keep the file **outside any repository**. Never commit it, email it, or paste it into chat.
-   4. **Delete the key when QA is finished** (Keys → delete).
+   3. **Let only yourself impersonate it.** Grant **Service Account Token Creator** to your designated Google identity, **on this service account only** (account → Permissions → Grant access), never at the project level. Check that no project-level binding exists.
+   4. **Enable the IAM Service Account Credentials API** on the staging project (APIs & Services → Library). Impersonation goes through it.
+   5. **Create short-lived credentials** on your machine, in a gcloud folder of their own so your usual gcloud setup is untouched. The Mac walkthrough is `STICKERS_STAGING_MAC_SETUP.md`.
+      ```bash
+      export CLOUDSDK_CONFIG=$HOME/idynify-staging/gcloud
+      ```
+      Sign that folder in as your designated identity, and set the staging project, **before** creating the credentials. gcloud records the active project as the credentials' quota project, and the tools refuse any other project there:
+      ```bash
+      gcloud auth login
+      ```
+      ```bash
+      gcloud config set project <staging-id>
+      ```
+      Check impersonation works, without printing a token:
+      ```bash
+      gcloud firestore databases describe --database="(default)" --impersonate-service-account=stickers-staging-qa@<staging-id>.iam.gserviceaccount.com --format="value(name)"
+      ```
+      Then create the credentials:
+      ```bash
+      gcloud auth application-default login --impersonate-service-account=stickers-staging-qa@<staging-id>.iam.gserviceaccount.com
+      ```
+      ```bash
+      export GOOGLE_APPLICATION_CREDENTIALS=$HOME/idynify-staging/gcloud/application_default_credentials.json
+      ```
+      - **No key is created.** Every tool, and the functions under `netlify dev`, act as the staging account with tokens that expire within an hour and refresh automatically.
+      - The file holds your own sign-in, used only to mint those tokens. gcloud writes it readable by you alone. Treat it like any gcloud login on your machine.
+      - The tools accept only a file that impersonates a service account of the staging project, with no other quota project. They refuse your plain login (`authorized_user`), which reaches production too, and they never print the file's contents.
+      - **No implicit fallback:** no tool ever uses a default credential, such as gcloud's usual `~/.config/gcloud` login. With no credential named explicitly, every tool refuses.
+      - Workload identity configurations (`external_account` with service-account impersonation) are accepted on the same terms, for example from CI.
 
-   **Where the key goes:**
-   - *Your own machine:* `export GOOGLE_APPLICATION_CREDENTIALS=<path to the key file>`.
-   - *A Claude Code cloud session:* its only in-process secret store is an environment variable. In the session's environment settings, add `STAGING_SERVICE_ACCOUNT_KEY` set to the key file's contents as base64, which fits on one line:
-     - macOS: `base64 -i key.json | pbcopy`
-     - Linux: `base64 -w0 key.json`
-     - Windows PowerShell: `[Convert]::ToBase64String([IO.File]::ReadAllBytes("key.json")) | Set-Clipboard`
-
-     It loads when the session next starts. Remove the variable when QA is finished.
-
-   **What protects the key in each place:**
-   - *Laptop:* the file's permissions (`chmod 600`), outside any repository.
-   - *Cloud session:* the environment is personal, so only your own sessions on it receive the variable. It is **not** a secret manager. The value is stored in the environment's settings like any other variable, and every process in every session that uses that environment can read it.
-     - So use a **separate personal environment** just for staging QA, with only this variable. Your everyday sessions and any scheduled routines on other environments never receive it.
-     - Network secrets (the proxy-injected kind) cannot hold a signing key, and would put a service-account token on the browser's Firestore requests, bypassing the rules under test.
-   - *What a leak could reach:* the staging project only, with synthetic data.
+   **Keeping production out of reach:**
+   - The account has roles on the staging project only.
+   - Every tool refuses any project but the one the credential, the env file and `STICKERS_STAGING_PROJECTS` all name, and refuses `PRODUCTION_FIREBASE_PROJECT_ID`.
+   - The rules deploy runs firebase-tools with an empty config folder. Otherwise an account you signed in with `firebase login` (or `FIREBASE_TOKEN`) would take priority over these credentials, so the deploy would run as you rather than as the staging account.
+   - The functions use these credentials only because the launcher sets `FIREBASE_ADMIN_CREDENTIALS=application-default` (`netlify/functions/utils/adminCredential.js`). Nothing deployed sets it.
 
    **Revoking after QA, without touching anything else in staging:**
-   1. Delete the key: Service accounts → `stickers-staging-qa` → Keys → delete. It stops working at once.
-   2. Delete the variable (or the whole QA environment).
-   3. Optionally delete the service account.
+   ```bash
+   CLOUDSDK_CONFIG=$HOME/idynify-staging/gcloud gcloud auth application-default revoke
+   ```
+   Then:
+   1. Delete `$HOME/idynify-staging/gcloud`.
+   2. Remove your Token Creator grant on the account.
+   3. Optionally delete the account.
 
-   Nothing in the staging project depends on it: no deployed functions or hosting use it. The deployed rules, the data and the test accounts stay, and the default `firebase-adminsdk` account is untouched.
+   Nothing in the staging project depends on the account: no deployed functions or hosting use it. The deployed rules, the data and the test accounts stay, and the default `firebase-adminsdk` account is untouched.
 
-   Set one or the other, never both: the tools refuse both. They check the key belongs to the staging project, never print it, and never write it into the env file. The rules deploy hands it to firebase-tools as a private temporary file, deleted as soon as firebase-tools exits (`scripts/staging/stagingCredentials.mjs`).
+   **If impersonation is not possible:** a key file for the same account still works on your machine. Download it (Keys → JSON), `chmod 600` it outside any repository, point `GOOGLE_APPLICATION_CREDENTIALS` at it, and delete the key when QA is finished. Never put it in a cloud environment variable, chat or email.
 6. **Access.** Only you and the QA tester need access. Don't add production collaborators.
 
 ## B. A clean checkout
@@ -76,7 +99,7 @@ The detailed operator steps are in `STICKERS_STAGING_RUNBOOK.md`. This page is t
 2. Fill in:
    - the six `VITE_FIREBASE_*` values from A4
    - `FIREBASE_PROJECT_ID`: the same project id
-   - **no key:** the functions' account comes from the A5 credential. (Putting `FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY` in the file still works if no A5 credential is set, but keeps a key in a file.)
+   - **no key or account:** the functions' credentials come from A5.
 3. Leave every other variable out.
 4. Check it, with the A5 credential set:
    ```bash
@@ -85,7 +108,7 @@ The detailed operator steps are in `STICKERS_STAGING_RUNBOOK.md`. This page is t
    It must end with **Preflight passed.**
 
 ## D. Rules on staging (with your approval for this staging deploy)
-With the A5 credential set (`GOOGLE_APPLICATION_CREDENTIALS` or `STAGING_SERVICE_ACCOUNT_KEY`):
+With the A5 credentials set (`GOOGLE_APPLICATION_CREDENTIALS`):
 ```bash
 export STICKERS_STAGING_PROJECTS=<staging-id>
 ```
@@ -105,14 +128,18 @@ PRODUCTION_FIREBASE_PROJECT_ID=idynify-scout-dev node scripts/staging/stagingDev
 ```
 It re-runs the preflight, refuses on any failure, and starts `netlify dev --offline`. The app gets only the env file, the staging account (in memory), and from your shell nothing that is Firebase, a credential or an integration.
 
-In a cloud session, behind an HTTPS proxy:
-- add `--rest`, because the proxy does not carry gRPC;
-- add `--no-edge-functions`, because the CLI downloads an edge runtime on the first request even though this project has no edge functions. The launcher refuses that flag if the project ever declares one.
+With short-lived credentials (A5), the launcher runs the functions on them, with no key.
+
+For sticker QA, add `--only-sticker-functions`. It serves just the functions sticker QA calls (`stickersConfig`, and "view as": `adminGetUsers`, `adminStartImpersonation`, `adminGetImpersonationSession`, `adminEndImpersonation`). Otherwise the CLI bundles all of them at start, which can exhaust memory on a small machine.
+
+Behind an HTTPS proxy:
+- add `--rest` if the proxy does not carry gRPC;
+- add `--no-edge-functions` if it blocks the edge runtime the CLI downloads on the first request. This project has no edge functions, and the launcher refuses that flag if the project ever declares one.
 - Open http://localhost:8888.
 - In DevTools → Network, every `firestore.googleapis.com` request must name `projects/<staging-id>`. If anything names `idynify-scout-dev`, stop.
 
 ## F. Test accounts and synthetic contacts
-1. Create four accounts in the staging console (Authentication → Users → Add user): QA-Admin, QA-Beta, QA-User, QA-Other.
+1. Create four accounts in the staging Firebase console (Authentication → Users → Add user): QA-Admin, QA-Beta, QA-User, QA-Other. The service account cannot create users, so this step is manual. Keep the passwords only in a local file readable by you alone (`~/idynify-staging/qa-accounts.env`, `chmod 600`), never in chat or the repository.
    - Use addresses you control, for example with plus-addressing.
    - Sign in once as each. If the app asks for onboarding, take the free option; no billing is connected on staging.
 2. In the staging Firestore console, open `users/<QA-Admin uid>` and add `role: "admin"`. This is staging only.

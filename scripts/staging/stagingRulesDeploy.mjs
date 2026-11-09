@@ -35,15 +35,16 @@
  *   node scripts/staging/stagingRulesDeploy.mjs --env=/path/outside/repo/.env.staging --project=<staging-id> --apply
  *   (lockdown drill only) … --allow-modified-rules --apply
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, rmSync, chmodSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { spawnSync, execFileSync } from 'node:child_process';
-import { resolve } from 'node:path';
+import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import process from 'node:process';
 import { checkStagingEnv, parseEnvFile, committable, repoRoot } from './stagingPreflight.mjs';
 import { checkStagingTarget, StagingRefusal } from './stickersStaging.mjs';
 import {
-  readStagingCredential, withCredential, checkCredential, temporaryKeyFile, CredentialRefusal, KEY_VARIABLE, FILE_VARIABLE,
+  readStagingCredential, withCredential, checkCredential, temporaryKeyFile, describe, CredentialRefusal, KEY_VARIABLE, FILE_VARIABLE,
 } from './stagingCredentials.mjs';
 
 /** The deploy to run, or why not. Pure. */
@@ -126,19 +127,26 @@ function main() {
   }
   console.log(`Target: ${value('project')} (browser, functions, auth domain and rules all agree)`);
   console.log(`Rules:  firestore.rules at ${provenance.commit ?? 'an unknown commit'}${provenance.modified ? ' WITH LOCAL CHANGES (lockdown drill)' : ''}`);
-  console.log(`Credential: ${credential.source} (service account of ${credential.projectId})`);
+  console.log(`Credential: ${describe(credential)}, a service account of ${credential.projectId}`);
   const command = validate ? [...plan.command, '--dry-run'] : plan.command;
   console.log(`Command: ${command.join(' ')}`);
   if (!apply && !validate) {
     console.log('\nDry run: nothing was contacted or deployed. Next: --validate (checks against the staging project, deploys nothing), then --apply.');
     return 0;
   }
-  // The child gets a key FILE, never the inline key variable.
+  // The child gets a credential FILE, never the inline key variable.
   const key = credential.source === KEY_VARIABLE ? temporaryKeyFile(credential) : null;
-  const childEnv = { ...process.env, [FILE_VARIABLE]: key ? key.path : process.env[FILE_VARIABLE] };
+  // An empty firebase-tools config: firebase-tools prefers an account signed in
+  // with `firebase login` (or FIREBASE_TOKEN) over GOOGLE_APPLICATION_CREDENTIALS,
+  // which on a laptop would deploy as the owner instead of the staging account.
+  const firebaseConfig = mkdtempSync(join(tmpdir(), 'staging-firebase-config-'));
+  chmodSync(firebaseConfig, 0o700);
+  const childEnv = { ...process.env, [FILE_VARIABLE]: key ? key.path : credential.path, XDG_CONFIG_HOME: firebaseConfig };
   delete childEnv[KEY_VARIABLE];
-  // Ctrl-C, SIGTERM or SIGHUP still remove the temporary key (only SIGKILL cannot).
-  const onSignal = () => { key?.remove(); process.exit(130); };
+  delete childEnv.FIREBASE_TOKEN;
+  const cleanUp = () => { key?.remove(); rmSync(firebaseConfig, { recursive: true, force: true }); };
+  // Ctrl-C, SIGTERM or SIGHUP still clean up (only SIGKILL cannot).
+  const onSignal = () => { cleanUp(); process.exit(130); };
   const signals = ['SIGINT', 'SIGTERM', 'SIGHUP'];
   for (const signal of signals) process.once(signal, onSignal);
   try {
@@ -146,7 +154,7 @@ function main() {
     if (validate && run.status === 0) console.log('\nValidated against the staging project: nothing was deployed. Add --apply to deploy.');
     return run.status ?? 1;
   } finally {
-    key?.remove();
+    cleanUp();
     for (const signal of signals) process.removeListener(signal, onSignal);
   }
 }

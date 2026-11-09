@@ -18,13 +18,20 @@
  *   PRODUCTION_FIREBASE_PROJECT_ID=<production id> node scripts/staging/stagingDev.mjs --env=/path/outside/repo/.env.staging
  *   (optional) --rest   Firestore Admin over REST instead of gRPC, for HTTPS
  *                       proxies that do not carry gRPC (FIRESTORE_PREFER_REST)
+ *   (optional) --only-sticker-functions
+ *                       serve only the functions sticker QA uses (STICKER_QA_FUNCTIONS),
+ *                       from a private temporary folder of links removed on exit.
+ *                       The CLI otherwise bundles all of them at start, which
+ *                       can exhaust memory on a small machine; other functions
+ *                       then answer 404, which sticker QA never needs.
  *   (optional) --no-edge-functions
  *                       skip the CLI's edge-function runtime, which it downloads
  *                       (Deno) on the first request even when a project has no
  *                       edge functions. Refused when the project declares any,
  *                       so real edge functions are never skipped silently.
  */
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, mkdtempSync, chmodSync, symlinkSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { spawn } from 'node:child_process';
 import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -49,9 +56,35 @@ export function hasEdgeFunctions(root) {
   }
 }
 
-/** The CLI arguments: `netlify dev --offline`, plus the edge switch when asked for. */
-export function devArgs({ noEdgeFunctions = false } = {}) {
-  return ['netlify', 'dev', '--offline', ...(noEdgeFunctions ? ['--internal-disable-edge-functions'] : [])];
+/** The functions sticker QA calls: availability, and "view as" in the admin tools. */
+export const STICKER_QA_FUNCTIONS = Object.freeze([
+  'stickersConfig', 'adminGetUsers', 'adminStartImpersonation', 'adminGetImpersonationSession', 'adminEndImpersonation',
+]);
+
+/** A private temporary folder (0700) of links to those functions. Call remove() on exit. */
+export function stickerFunctionsFolder(root, { dir = tmpdir() } = {}) {
+  const folder = mkdtempSync(join(dir, 'staging-functions-'));
+  chmodSync(folder, 0o700);
+  try {
+    for (const name of STICKER_QA_FUNCTIONS) {
+      const source = join(root, 'netlify', 'functions', `${name}.js`);
+      if (!existsSync(source)) throw new Error(`netlify/functions/${name}.js is missing.`);
+      symlinkSync(source, join(folder, `${name}.js`));
+    }
+  } catch (err) {
+    rmSync(folder, { recursive: true, force: true });
+    throw err;
+  }
+  return { path: folder, remove: () => rmSync(folder, { recursive: true, force: true }) };
+}
+
+/** The CLI arguments: `netlify dev --offline`, plus the switches asked for. */
+export function devArgs({ noEdgeFunctions = false, functionsDir = null } = {}) {
+  return [
+    'netlify', 'dev', '--offline',
+    ...(noEdgeFunctions ? ['--internal-disable-edge-functions'] : []),
+    ...(functionsDir ? ['--functions', functionsDir] : []),
+  ];
 }
 
 /**
@@ -108,9 +141,12 @@ function main() {
     console.error('\nRefused: the app was not started.');
     return 1;
   }
-  console.log(`Preflight passed. Starting the app against ${fileEnv.VITE_FIREBASE_PROJECT_ID} (browser, functions and sign-in), credential from ${credential.source}.`);
-  const child = spawn('npx', devArgs({ noEdgeFunctions }), { cwd: repoRoot(), stdio: 'inherit', env: plan.childEnv });
-  child.on('exit', (code) => { process.exitCode = code ?? 1; });
+  const functions = argv.includes('--only-sticker-functions') ? stickerFunctionsFolder(repoRoot()) : null;
+  console.log(`Preflight passed. Starting the app against ${fileEnv.VITE_FIREBASE_PROJECT_ID} (browser, functions and sign-in), credential from ${credential.source}${functions ? `, serving only: ${STICKER_QA_FUNCTIONS.join(', ')}` : ''}.`);
+  const child = spawn('npx', devArgs({ noEdgeFunctions, functionsDir: functions?.path }), { cwd: repoRoot(), stdio: 'inherit', env: plan.childEnv });
+  const stop = () => { functions?.remove(); };
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(signal, () => { child.kill(signal); stop(); process.exit(130); });
+  child.on('exit', (code) => { stop(); process.exitCode = code ?? 1; });
   return undefined;
 }
 

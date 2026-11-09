@@ -16,8 +16,8 @@ import { generateKeyPairSync } from 'node:crypto';
 import { Buffer } from 'node:buffer';
 import process from 'node:process';
 import {
-  parseServiceAccountKey, readStagingCredential, withCredential, checkCredential, temporaryKeyFile, redactKeys,
-  CredentialRefusal, KEY_VARIABLE, FILE_VARIABLE,
+  parseServiceAccountKey, parseCredentialFile, readStagingCredential, withCredential, checkCredential, temporaryKeyFile, redactKeys,
+  CredentialRefusal, KEY_VARIABLE, FILE_VARIABLE, ADC_MODE,
 } from '../../scripts/staging/stagingCredentials.mjs';
 import { planDevRun, devArgs, hasEdgeFunctions } from '../../scripts/staging/stagingDev.mjs';
 
@@ -226,7 +226,7 @@ describe('the tools, with the key in STAGING_SERVICE_ACCOUNT_KEY', () => {
   it('the rules deploy dry run names the credential source, contacts nothing, and prints no key', () => {
     const { status, out } = run('stagingRulesDeploy.mjs', [`--env=${envFile()}`, `--project=${P}`], { [KEY_VARIABLE]: raw(), STICKERS_STAGING_PROJECTS: P, PRODUCTION_FIREBASE_PROJECT_ID: PROD });
     expect(status).toBe(0);
-    expect(out).toContain(`Credential: ${KEY_VARIABLE} (service account of ${P})`);
+    expect(out).toContain(`Credential: service-account key (${KEY_VARIABLE}), a service account of ${P}`);
     expect(out).toContain('Dry run: nothing was contacted or deployed.');
     expect(out).not.toContain(KEY_LINE);
   });
@@ -255,7 +255,124 @@ describe('the tools, with the key in STAGING_SERVICE_ACCOUNT_KEY', () => {
     const source = readFileSync(script('stagingRulesDeploy.mjs'), 'utf8');
     expect(source).toContain('delete childEnv[KEY_VARIABLE]');
     expect(source.indexOf('temporaryKeyFile(credential)')).toBeLessThan(source.indexOf('spawnSync(command[0]'));
-    expect(source).toMatch(/finally \{\s*key\?\.remove\(\);/);
+    expect(source).toMatch(/finally \{\s*cleanUp\(\);/);
+    expect(source).toContain('const cleanUp = () => { key?.remove(); rmSync(firebaseConfig, { recursive: true, force: true }); };');
     expect(source).toMatch(/for \(const signal of signals\) process\.once\(signal, onSignal\)/);
+  });
+});
+
+// gcloud's short-lived credentials: `gcloud auth application-default login
+// --impersonate-service-account=<staging account>` writes this shape. The
+// source is the person's own login; only the staging account's tokens are used.
+const SA = `stickers-staging-qa@${P}.iam.gserviceaccount.com`;
+const impersonated = (over = {}) => JSON.stringify({
+  type: 'impersonated_service_account',
+  service_account_impersonation_url: `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${SA}:generateAccessToken`,
+  delegates: [],
+  source_credentials: { type: 'authorized_user', client_id: 'c', client_secret: 'MARK-SOURCE-SECRET', refresh_token: 'MARK-REFRESH' },
+  ...over,
+});
+const federated = () => JSON.stringify({
+  type: 'external_account', audience: '//iam.googleapis.com/projects/1/locations/global/workloadIdentityPools/p/providers/q',
+  subject_token_type: 'urn:ietf:params:oauth:token-type:jwt', token_url: 'https://sts.googleapis.com/v1/token',
+  service_account_impersonation_url: `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${SA}:generateAccessToken`,
+  credential_source: { file: '/run/token' },
+});
+const credFile = (text) => {
+  const file = join(mkdtempSync(join(tmpdir(), 'adc-')), 'application_default_credentials.json');
+  writeFileSync(file, text, { mode: 0o600 });
+  return file;
+};
+
+describe('short-lived credential files (no key)', () => {
+  it('reads impersonated and workload-identity credentials by the service account they impersonate', () => {
+    for (const text of [impersonated(), federated()]) {
+      expect(parseCredentialFile(text)).toMatchObject({ kind: 'short-lived', projectId: P, clientEmail: SA, privateKey: null });
+    }
+    expect(parseCredentialFile(raw())).toMatchObject({ kind: 'key', projectId: P });
+  });
+
+  it.each([
+    ['a personal login, which reaches production too', JSON.stringify({ type: 'authorized_user', refresh_token: 'MARK-REFRESH' })],
+    ['impersonation of nothing checkable', impersonated({ service_account_impersonation_url: 'https://example.test/x' })],
+    ['a delegation chain', impersonated({ delegates: ['other@acme-prod.iam.gserviceaccount.com'] })],
+    ['no source credentials', impersonated({ source_credentials: undefined })],
+    ['an unknown type', JSON.stringify({ type: 'gdch_service_account' })],
+  ])('refuses %s, without quoting the file', (_, text) => {
+    const err = refusal(() => parseCredentialFile(text));
+    expect(err).toBeInstanceOf(CredentialRefusal);
+    expect(err.message).not.toMatch(/MARK-/);
+  });
+
+  it('runs the functions on Application Default Credentials from that file, never a key', () => {
+    const file = credFile(impersonated());
+    const credential = readStagingCredential({ [FILE_VARIABLE]: file });
+    expect(credential).toMatchObject({ source: FILE_VARIABLE, path: file, kind: 'short-lived' });
+    const merged = withCredential(webEnv(), credential);
+    expect(merged).toMatchObject({ FIREBASE_PROJECT_ID: P, FIREBASE_CLIENT_EMAIL: SA, FIREBASE_ADMIN_CREDENTIALS: ADC_MODE, [FILE_VARIABLE]: file });
+    expect(merged.FIREBASE_PRIVATE_KEY).toBeUndefined();
+    const { childEnv } = planDevRun({ fileEnv: webEnv(), credential, shellEnv: { PATH: '/bin', [FILE_VARIABLE]: '/home/me/.config/gcloud/application_default_credentials.json', FIREBASE_TOKEN: 't' } });
+    expect(childEnv[FILE_VARIABLE]).toBe(file);
+    expect(childEnv.FIREBASE_ADMIN_CREDENTIALS).toBe(ADC_MODE);
+    expect(childEnv).not.toHaveProperty('FIREBASE_PRIVATE_KEY');
+    expect(childEnv).not.toHaveProperty('FIREBASE_TOKEN');
+  });
+});
+
+describe('the tools, with short-lived credentials in GOOGLE_APPLICATION_CREDENTIALS', () => {
+  const run = (name, args, env = {}) => {
+    try {
+      return { status: 0, out: execFileSync(process.execPath, [script(name), ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: { PATH: process.env.PATH, ...env } }) };
+    } catch (err) {
+      return { status: err.status, out: `${err.stdout ?? ''}${err.stderr ?? ''}` };
+    }
+  };
+  const envFile = () => {
+    const file = join(mkdtempSync(join(tmpdir(), 'adc-env-')), '.env.staging');
+    writeFileSync(file, Object.entries(webEnv()).map(([k, v]) => `${k}="${v}"`).join('\n'));
+    return file;
+  };
+  const cleanCheckout = () => mkdtempSync(join(tmpdir(), 'checkout-'));
+
+  it('the preflight passes with no private key anywhere, and prints no secret', () => {
+    const { status, out } = run('stagingPreflight.mjs', [`--env=${envFile()}`, `--checkout=${cleanCheckout()}`], { PRODUCTION_FIREBASE_PROJECT_ID: PROD, [FILE_VARIABLE]: credFile(impersonated()) });
+    expect(status).toBe(0);
+    expect(out).toContain('✓ private-key            Short-lived credentials: no private key is used.');
+    expect(out).toContain('✓ credential-project');
+    expect(out).not.toMatch(/MARK-/);
+  });
+
+  it('the preflight refuses a personal login', () => {
+    const { status, out } = run('stagingPreflight.mjs', [`--env=${envFile()}`, `--checkout=${cleanCheckout()}`], { PRODUCTION_FIREBASE_PROJECT_ID: PROD, [FILE_VARIABLE]: credFile(JSON.stringify({ type: 'authorized_user', refresh_token: 'MARK-REFRESH' })) });
+    expect(status).toBe(1);
+    expect(out).toContain('personal Google login');
+    expect(out).not.toMatch(/MARK-/);
+  });
+
+  it('the rules deploy dry run names the short-lived credential and its project', () => {
+    const { status, out } = run('stagingRulesDeploy.mjs', [`--env=${envFile()}`, `--project=${P}`], { [FILE_VARIABLE]: credFile(impersonated()), STICKERS_STAGING_PROJECTS: P, PRODUCTION_FIREBASE_PROJECT_ID: PROD });
+    expect(status).toBe(0);
+    expect(out).toContain(`Credential: short-lived credential (${FILE_VARIABLE}), a service account of ${P}`);
+    expect(out).not.toMatch(/MARK-/);
+  });
+
+  it('the rules deploy refuses short-lived credentials for another project', () => {
+    const other = impersonated({ service_account_impersonation_url: 'https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/qa@acme-prod.iam.gserviceaccount.com:generateAccessToken' });
+    const { status, out } = run('stagingRulesDeploy.mjs', [`--env=${envFile()}`, `--project=${P}`], { [FILE_VARIABLE]: credFile(other), STICKERS_STAGING_PROJECTS: P, PRODUCTION_FIREBASE_PROJECT_ID: PROD });
+    expect(status).toBe(1);
+    expect(out).toContain('Refused: nothing was deployed.');
+  });
+
+  it('the rollout tool accepts them for the staging project only', () => {
+    const ok = run('stickersStaging.mjs', [`--project=${P}`, '--mode=beta'], { [FILE_VARIABLE]: credFile(impersonated()), STICKERS_STAGING_PROJECTS: P, PRODUCTION_FIREBASE_PROJECT_ID: PROD });
+    expect(ok.status).toBe(0);
+    expect(ok.out).toContain('Dry run: nothing was written.');
+  });
+
+  it('firebase-tools runs with an empty config, so a `firebase login` account or FIREBASE_TOKEN cannot take over', () => {
+    const source = readFileSync(script('stagingRulesDeploy.mjs'), 'utf8');
+    expect(source).toContain("mkdtempSync(join(tmpdir(), 'staging-firebase-config-'))");
+    expect(source).toContain('XDG_CONFIG_HOME: firebaseConfig');
+    expect(source).toContain('delete childEnv.FIREBASE_TOKEN;');
   });
 });

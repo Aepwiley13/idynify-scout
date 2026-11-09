@@ -4,12 +4,24 @@
  * env file (docs/contact-hub/STICKERS_STAGING_SETUP.md, "Credential").
  *
  * Exactly one source may be set:
- *   STAGING_SERVICE_ACCOUNT_KEY      the JSON key itself, raw (one line) or
- *                                    base64 of the file. For a cloud session,
- *                                    whose only in-process secret store is an
- *                                    environment variable.
- *   GOOGLE_APPLICATION_CREDENTIALS   a path to the JSON key file, on a local
- *                                    machine.
+ *   GOOGLE_APPLICATION_CREDENTIALS   a path to a credential file on a trusted
+ *                                    local machine. Preferred: gcloud's
+ *                                    short-lived credentials impersonating a
+ *                                    staging service account
+ *                                    ("impersonated_service_account", no key
+ *                                    exists), or a workload-identity
+ *                                    configuration that impersonates one
+ *                                    ("external_account"). Also accepted: a
+ *                                    service-account key file.
+ *   STAGING_SERVICE_ACCOUNT_KEY      a service-account key itself. Not for
+ *                                    cloud environments, whose variables are
+ *                                    visible to everyone using the environment.
+ * A personal login ("authorized_user") is refused: it reaches every project
+ * the person can, production included.
+ *
+ * kind: 'key' (a private key, in memory) or 'short-lived' (Application
+ * Default Credentials from the file; the functions run with
+ * FIREBASE_ADMIN_CREDENTIALS=application-default).
  * Both set is refused: a machine-wide GOOGLE_APPLICATION_CREDENTIALS may name
  * another project's key, and guessing which one was meant is how a staging
  * tool ends up holding a production credential.
@@ -25,6 +37,10 @@ import { Buffer } from 'node:buffer';
 
 export const KEY_VARIABLE = 'STAGING_SERVICE_ACCOUNT_KEY';
 export const FILE_VARIABLE = 'GOOGLE_APPLICATION_CREDENTIALS';
+/** Mirrors netlify/functions/utils/adminCredential.js ADC_MODE. */
+export const ADC_MODE = 'application-default';
+const IMPERSONATION_URL = /^https:\/\/iamcredentials\.googleapis\.com\/v1\/projects\/-\/serviceAccounts\/([^/:?#]+):generateAccessToken$/;
+const SERVICE_ACCOUNT_EMAIL = /^[a-z0-9-]+@([a-z0-9-]+)\.iam\.gserviceaccount\.com$/;
 
 export class CredentialRefusal extends Error {
   constructor(message) {
@@ -61,7 +77,44 @@ export function parseServiceAccountKey(text, label = KEY_VARIABLE) {
   if (!json.client_email.endsWith(`@${json.project_id}.iam.gserviceaccount.com`)) {
     throw new CredentialRefusal(`${label}: client_email is not a service account of the key's own project.`);
   }
-  return { projectId: json.project_id, clientEmail: json.client_email, privateKey: json.private_key, json };
+  return { kind: 'key', projectId: json.project_id, clientEmail: json.client_email, privateKey: json.private_key, json };
+}
+
+/**
+ * A credential FILE: a service-account key, or short-lived credentials that
+ * impersonate a service account (gcloud's "impersonated_service_account", or
+ * a workload-identity "external_account" with service-account impersonation).
+ * The service account named decides the project. Throws CredentialRefusal.
+ */
+export function parseCredentialFile(text, label = FILE_VARIABLE) {
+  let json;
+  try {
+    json = JSON.parse(String(text ?? ''));
+  } catch {
+    throw new CredentialRefusal(`${label} is not valid JSON.`);
+  }
+  const type = json && typeof json === 'object' ? json.type : undefined;
+  if (type === 'service_account') return parseServiceAccountKey(String(text), label);
+  if (type === 'authorized_user') {
+    throw new CredentialRefusal(`${label} is a personal Google login, which reaches every project you can, production included. Create short-lived credentials that impersonate the staging service account instead (setup guide A5).`);
+  }
+  if (type !== 'impersonated_service_account' && type !== 'external_account') {
+    throw new CredentialRefusal(`${label} is not a credential type these tools accept (service_account, impersonated_service_account or external_account).`);
+  }
+  const match = IMPERSONATION_URL.exec(json.service_account_impersonation_url ?? '');
+  if (!match) {
+    throw new CredentialRefusal(`${label} does not impersonate a service account, so its project cannot be checked.`);
+  }
+  if (Array.isArray(json.delegates) && json.delegates.length) {
+    throw new CredentialRefusal(`${label} uses a delegation chain; impersonate the staging service account directly.`);
+  }
+  const clientEmail = decodeURIComponent(match[1]);
+  const account = SERVICE_ACCOUNT_EMAIL.exec(clientEmail);
+  if (!account) throw new CredentialRefusal(`${label} impersonates something that is not a project service account.`);
+  if (type === 'impersonated_service_account' && !json.source_credentials) {
+    throw new CredentialRefusal(`${label} has no source credentials.`);
+  }
+  return { kind: 'short-lived', projectId: account[1], clientEmail, privateKey: null, json: null };
 }
 
 /**
@@ -81,7 +134,7 @@ export function readStagingCredential(env = {}, { readFile = readFileSync } = {}
     } catch (err) {
       throw new CredentialRefusal(`${FILE_VARIABLE} could not be read (${err?.code ?? 'error'}).`);
     }
-    return { source: FILE_VARIABLE, ...parseServiceAccountKey(text, FILE_VARIABLE) };
+    return { source: FILE_VARIABLE, path: env[FILE_VARIABLE], ...parseCredentialFile(text, FILE_VARIABLE) };
   }
   return null;
 }
@@ -92,12 +145,26 @@ export function readStagingCredential(env = {}, { readFile = readFileSync } = {}
  */
 export function withCredential(env, credential) {
   if (!credential) return { ...env };
+  if (credential.kind === 'short-lived') {
+    return {
+      ...env,
+      FIREBASE_PROJECT_ID: env.FIREBASE_PROJECT_ID || credential.projectId,
+      FIREBASE_CLIENT_EMAIL: credential.clientEmail,
+      FIREBASE_ADMIN_CREDENTIALS: ADC_MODE,
+      [FILE_VARIABLE]: credential.path,
+    };
+  }
   return {
     ...env,
     FIREBASE_PROJECT_ID: env.FIREBASE_PROJECT_ID || credential.projectId,
     FIREBASE_CLIENT_EMAIL: credential.clientEmail,
     FIREBASE_PRIVATE_KEY: credential.privateKey,
   };
+}
+
+/** "service-account key (VAR)" or "short-lived credential (VAR)", for messages. */
+export function describe(credential) {
+  return `${credential.kind === 'short-lived' ? 'short-lived credential' : 'service-account key'} (${credential.source})`;
 }
 
 /**
@@ -113,8 +180,8 @@ export function checkCredential(fileEnv, credential) {
     id: 'credential-project',
     ok: sameProject,
     message: sameProject
-      ? `The service-account key (${credential.source}) belongs to ${project}.`
-      : `The service-account key (${credential.source}) belongs to a different project than the env file.`,
+      ? `The ${describe(credential)} belongs to ${project}.`
+      : `The ${describe(credential)} belongs to a different project than the env file.`,
   });
   const fileAccount = typeof fileEnv.FIREBASE_CLIENT_EMAIL === 'string' ? fileEnv.FIREBASE_CLIENT_EMAIL.trim() : '';
   if (fileAccount) {

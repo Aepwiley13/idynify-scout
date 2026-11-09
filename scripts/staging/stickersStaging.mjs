@@ -115,9 +115,12 @@ async function main() {
       console.log('\nDry run: nothing was written. Add --apply to write.');
       return 0;
     }
-    const { initializeApp, cert } = await import('firebase-admin/app');
+    const { initializeApp, cert, applicationDefault } = await import('firebase-admin/app');
     const { getFirestore } = await import('firebase-admin/firestore');
-    initializeApp(credential ? { credential: cert(credential.json), projectId: args.project } : { projectId: args.project });
+    let options = { projectId: args.project };
+    if (credential?.kind === 'key') options = { credential: cert(credential.json), projectId: args.project };
+    else if (credential) options = { credential: applicationDefault(), projectId: args.project }; // short-lived, from GOOGLE_APPLICATION_CREDENTIALS
+    initializeApp(options);
     const db = getFirestore();
     // REST, not gRPC: works behind HTTPS proxies that do not carry gRPC. Same writes.
     if (!emulator) db.settings({ preferRest: true });

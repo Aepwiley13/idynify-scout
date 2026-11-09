@@ -5,24 +5,17 @@
  * Initializes once and exports for reuse across functions.
  */
 
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { initializeApp, getApps, cert, applicationDefault } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { requireProjectId } from './utils/firebaseEnv.js';
+import { adminAppOptions } from './utils/adminCredential.js';
 
-// Initialize Firebase Admin (only once)
+// Initialize Firebase Admin (only once). The service account from
+// FIREBASE_CLIENT_EMAIL / FIREBASE_PRIVATE_KEY, unless local staging QA opts
+// into short-lived credentials (utils/adminCredential.js).
 if (getApps().length === 0) {
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY
-    ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-    : undefined;
-
-  initializeApp({
-    credential: cert({
-      projectId: requireProjectId(),
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: privateKey
-    })
-  });
+  initializeApp(adminAppOptions(process.env, { cert, applicationDefault, projectId: requireProjectId() }));
 }
 
 // Create auth instance

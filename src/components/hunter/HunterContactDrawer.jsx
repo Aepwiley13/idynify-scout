@@ -902,6 +902,13 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   if (!isOpen) return null;
 
   const hasEmail = contact.email && contact.email.trim() !== '';
+  // Syntax check only (same regex gmail-send-quick.js applies server-side to
+  // `toEmail`) — confirms the address is well-formed, nothing more. It does
+  // NOT verify the domain exists or that Gmail can deliver to it: the DNS
+  // NXDOMAIN bounce this exists for was a syntactically valid address, so
+  // this check would not have caught that incident — only Gmail's own bounce
+  // does. This only rejects strings that could never be a real address.
+  const hasValidEmailFormat = hasEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email.trim());
   const hasPhone = contact.phone && contact.phone.trim() !== '';
   const characterCount = message.length;
   const smsCount = characterCount <= 160 ? 1 : Math.ceil(characterCount / 153);
@@ -1469,6 +1476,17 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
                 {isNativeHandoff() ? 'Opening' : 'Sending'} via {selectedWeapon} to {contact.firstName} {contact.lastName}
               </p>
 
+              {/* Full recipient address for email — the actual send-confirmation
+                  screen, previously showed only the contact's name here. */}
+              {selectedWeapon === 'email' && (
+                <p className="view-recipient-email">
+                  To: {hasEmail ? contact.email : 'No email on file'}
+                  {hasEmail && !hasValidEmailFormat && (
+                    <span className="recipient-email-warning"> — this address doesn't look valid</span>
+                  )}
+                </p>
+              )}
+
               {/* Show native handoff notice */}
               {isNativeHandoff() && (
                 <div className="handoff-notice">
@@ -1520,7 +1538,7 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
               <button
                 className="btn-primary-hunter btn-send"
                 onClick={handleSendMessage}
-                disabled={!message || loading}
+                disabled={!message || loading || (selectedWeapon === 'email' && !isNativeHandoff() && !hasValidEmailFormat)}
               >
                 {loading ? (
                   <>

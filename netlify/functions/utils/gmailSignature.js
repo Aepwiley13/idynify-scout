@@ -104,3 +104,90 @@ export function appendSignatureHtml(htmlBody, signatureHtml) {
   if (!signatureHtml) return htmlBody;
   return `${htmlBody}<br><div class="gmail_signature_container"><div dir="ltr" class="gmail_signature">${signatureHtml}</div></div>`;
 }
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * The deterministic sign-off used when the user has no signature configured
+ * in their Gmail account — the common case, since nothing in the app prompts
+ * them to set one. Not a model-written name: Barry's own draft-generation
+ * prompt deliberately omits the sender's name (see outboundCopyRules.js) and
+ * ends every message with "Best," and nothing after it, so without this the
+ * email goes out signed by no one. `name` is the caller's own resolved
+ * display name (e.g. from userIdentity.js's displayNameFor) — this function
+ * only renders it, it does not resolve identity itself.
+ *
+ * @param {string} name  Already-resolved display name; empty/falsy means
+ *   there is nothing to sign with, so the result is '' (no fallback forced).
+ * @returns {string} HTML signature block, or '' when there's no name to use.
+ */
+export function buildFallbackSignatureHtml(name) {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return '';
+  return `Best,<br>${escapeHtml(trimmed)}`;
+}
+
+/**
+ * A bare valediction on its own line at the very end of the body, with no
+ * name after it — Barry's draft prompt always produces exactly this (see
+ * outboundCopyRules.js: "end emails with 'Best,' and no name"). Requires the
+ * word to start right after a line break (or the string start) and run to
+ * the end, so it only matches a line that IS the sign-off, not a sentence
+ * that happens to end in one of these words ("let me know, thanks" does not
+ * match; a line reading only "Thanks" or "Thanks," does).
+ */
+const BARE_VALEDICTION = /(^|\n)[ \t]*(Best regards|Best|Thanks|Thank you|Regards|Sincerely|Warmly|Cheers)[ \t]*,?[ \t]*$/i;
+
+/**
+ * Decide how to complete a message's sign-off when the user has no Gmail
+ * signature configured, without ever producing a duplicate closing.
+ *
+ * The original fallback always appended a brand-new "Best,<br>{name}" block
+ * after the body, via appendSignatureHtml. That collides with two real
+ * cases: Barry's draft already ends every message with a bare "Best," (no
+ * name) — appending another "Best,<br>Name" after it reads as
+ * "Best,\n\nBest,\nName"; and a user who already typed their own closing
+ * ("...\n\nBest,\nAaron Wiley", the exact workaround from the smoke test)
+ * would get that same name appended a second time.
+ *
+ * This instead: (1) if the body already appears to end with the resolved
+ * name, adds nothing — it's already signed; (2) if the body ends with a
+ * bare valediction and no name, completes THAT line in place (same
+ * paragraph, not a new signature block); (3) otherwise, with no existing
+ * sign-off at all, adds a wholly separate "Best,<br>{name}" block exactly as
+ * before.
+ *
+ * @param {string} bodyText  The plain-text message body, before HTML conversion.
+ * @param {string} name      Already-resolved display name; empty/falsy means
+ *   there is nothing to sign with — the body is returned unchanged.
+ * @returns {{ bodyText: string, signatureHtml: string }}
+ */
+export function resolveFallbackSignOff(bodyText, name) {
+  const trimmedName = (name || '').trim();
+  if (!trimmedName || typeof bodyText !== 'string') {
+    return { bodyText: bodyText ?? '', signatureHtml: '' };
+  }
+
+  // Already signed with (something that looks like) this name — the last
+  // couple of non-empty lines are enough to catch "Best,\nAaron Wiley" or a
+  // name on its own line with no valediction at all.
+  const tailLines = bodyText.split('\n').map(l => l.trim()).filter(Boolean).slice(-2);
+  if (tailLines.join(' ').toLowerCase().includes(trimmedName.toLowerCase())) {
+    return { bodyText, signatureHtml: '' };
+  }
+
+  if (BARE_VALEDICTION.test(bodyText)) {
+    // Complete the existing sign-off in place — same line, not a second one.
+    return { bodyText: `${bodyText}\n${trimmedName}`, signatureHtml: '' };
+  }
+
+  // No sign-off of any kind in the body — add a wholly separate block.
+  return { bodyText, signatureHtml: buildFallbackSignatureHtml(trimmedName) };
+}

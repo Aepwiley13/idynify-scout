@@ -12,13 +12,22 @@ import { randomUUID } from 'node:crypto';
 import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
-import { getGmailSignatureHtml, appendSignatureHtml, buildFallbackSignatureHtml } from './utils/gmailSignature.js';
+import { getGmailSignatureHtml, appendSignatureHtml, resolveFallbackSignOff } from './utils/gmailSignature.js';
 import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 import { encodeHeaderValue, formatAddress } from './utils/emailHeaders.js';
 import { displayNameFor } from '../../src/utils/userIdentity.js';
 
-/** The exact format check already applied to the CC address (below) — now applied to the primary recipient too. */
+/**
+ * Syntax check only — `local@domain.tld` shape. This does NOT verify the
+ * domain resolves, has an MX record, or that Gmail can actually deliver to
+ * it; it only rejects strings that could never be a real address before
+ * spending a send round-trip on one. A domain that doesn't exist (the DNS
+ * NXDOMAIN bounce this exists for) is syntactically valid and passes this
+ * check — that failure is caught later, by Gmail itself, as a bounce.
+ * The exact check already applied to the CC address (below) — now applied
+ * to the primary recipient too.
+ */
 const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Re-exported: existing tests and callers import these from here.
@@ -405,11 +414,20 @@ export const handler = async (event) => {
     // never writes a sender name (outboundCopyRules.js), so without this an
     // email like the one in the incident goes out ending in "Best," and no
     // name at all. One extra read, only on the empty-signature path.
+    //
+    // resolveFallbackSignOff decides WHERE the name goes (or whether it's
+    // needed at all): Barry's draft already ends every message with a bare
+    // "Best," (no name) — naively appending a second "Best,<br>Name" block
+    // after that reads as a duplicated closing, and the same would happen if
+    // the user had already typed their own sign-off. See its own docstring.
+    let bodyText = body;
     if (!signatureHtml) {
       try {
         const userDoc = await db.collection('users').doc(userId).get();
         const fallbackName = userDoc.exists ? displayNameFor(userDoc.data()) : '';
-        signatureHtml = buildFallbackSignatureHtml(fallbackName);
+        const resolved = resolveFallbackSignOff(bodyText, fallbackName);
+        bodyText = resolved.bodyText;
+        signatureHtml = resolved.signatureHtml;
       } catch (profileError) {
         console.warn('⚠️ Could not load user profile for sender-name fallback (non-blocking):', profileError.message);
       }
@@ -442,7 +460,7 @@ export const handler = async (event) => {
       toEmail,
       recipientName,
       subject,
-      bodyText: body,
+      bodyText,
       ccHeader,
       attachment: attachmentPart,
       trackingPixel,

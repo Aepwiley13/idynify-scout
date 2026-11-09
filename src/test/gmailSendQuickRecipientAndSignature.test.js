@@ -181,4 +181,36 @@ describe('sender-name fallback signature', () => {
     const raw = decodeRaw();
     expect(raw).not.toContain('gmail_signature_container');
   });
+
+  it('a Barry-generated draft ending in a bare "Best," gets completed in place — never "Best, Best, Aaron Wiley"', async () => {
+    gmailSigMock.signature = '';
+    const res = await handler(makeEvent({ body: 'Saw your Series B — worth a chat?\n\nBest,' }));
+    expect(res.statusCode).toBe(200);
+    const raw = decodeRaw();
+    expect(raw).not.toContain('gmail_signature_container'); // completed in the body, not a separate block
+    expect((raw.match(/Best,/g) || []).length).toBe(1);
+    expect(raw).toMatch(/Best,<br>Aaron Wiley/);
+  });
+
+  it('a user-edited sign-off that already has the name is left exactly as written — no second name appended', async () => {
+    gmailSigMock.signature = '';
+    const res = await handler(makeEvent({ body: 'Following up on our call.\n\nBest,\nAaron Wiley' }));
+    expect(res.statusCode).toBe(200);
+    const raw = decodeRaw();
+    expect(raw).not.toContain('gmail_signature_container');
+    expect((raw.match(/Best,/g) || []).length).toBe(1);
+    expect((raw.match(/Aaron Wiley/g) || []).length).toBe(1);
+  });
+
+  it('a configured Gmail signature still wins even when the body ends in Barry\'s bare "Best," — the body is left untouched', async () => {
+    gmailSigMock.signature = '<div>Aaron W. — Acme Inc.</div>';
+    const res = await handler(makeEvent({ body: 'Saw your Series B — worth a chat?\n\nBest,' }));
+    expect(res.statusCode).toBe(200);
+    const raw = decodeRaw();
+    expect(raw).toContain('Acme Inc.');
+    expect(raw.split('gmail_signature_container').length - 1).toBe(1);
+    // The body's own bare "Best," is untouched — only the no-signature path completes it
+    expect((raw.match(/Best,/g) || []).length).toBe(1);
+    expect(raw).not.toContain('Best,<br>Aaron Wiley');
+  });
 });

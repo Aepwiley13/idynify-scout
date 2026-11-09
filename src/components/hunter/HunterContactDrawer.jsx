@@ -902,9 +902,12 @@ export default function HunterContactDrawer({ contact, isOpen, onClose, onContac
   if (!isOpen) return null;
 
   const hasEmail = contact.email && contact.email.trim() !== '';
-  // Same format check gmail-send-quick.js applies server-side to `toEmail` —
-  // gates the Send button here too, so a malformed address (the kind that
-  // produced the DNS NXDOMAIN bounce) is caught before the send round-trip.
+  // Syntax check only (same regex gmail-send-quick.js applies server-side to
+  // `toEmail`) — confirms the address is well-formed, nothing more. It does
+  // NOT verify the domain exists or that Gmail can deliver to it: the DNS
+  // NXDOMAIN bounce this exists for was a syntactically valid address, so
+  // this check would not have caught that incident — only Gmail's own bounce
+  // does. This only rejects strings that could never be a real address.
   const hasValidEmailFormat = hasEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email.trim());
   const hasPhone = contact.phone && contact.phone.trim() !== '';
   const characterCount = message.length;

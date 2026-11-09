@@ -64,7 +64,7 @@ beforeEach(() => {
 });
 
 describe('Repeat MESSAGE_SENT to an already-Awaiting-Reply contact', () => {
-  it('writes nothing and logs no contact_status_changed event — the exact "Awaiting Reply -> Awaiting Reply" symptom', async () => {
+  it('writes no contact_status_changed event and leaves contact_status unchanged — the exact "Awaiting Reply -> Awaiting Reply" symptom', async () => {
     put('c1', { contact_status: CONTACT_STATUSES.AWAITING_REPLY });
     const result = await updateContactStatus({
       userId: UID, contactId: 'c1', trigger: STATUS_TRIGGERS.MESSAGE_SENT,
@@ -72,6 +72,19 @@ describe('Repeat MESSAGE_SENT to an already-Awaiting-Reply contact', () => {
     expect(result).toBeNull();
     expect(get('c1').contact_status).toBe(CONTACT_STATUSES.AWAITING_REPLY);
     expect(loggedEvents.filter((e) => e.type === 'contact_status_changed')).toHaveLength(0);
+  });
+
+  it('still refreshes contact_status_updated_at on the no-op path — it is a genuine resend, and recommendationEngine.js\'s Stalled Engagement Alerts orders Awaiting Reply contacts by this field to decide who is overdue for a follow-up', async () => {
+    const stale = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(); // 10 days ago
+    put('c1', { contact_status: CONTACT_STATUSES.AWAITING_REPLY, contact_status_updated_at: stale });
+    const before = Date.now();
+    const result = await updateContactStatus({
+      userId: UID, contactId: 'c1', trigger: STATUS_TRIGGERS.MESSAGE_SENT,
+    });
+    expect(result).toBeNull(); // still no status TRANSITION — this assertion is unaffected
+    const updatedAt = new Date(get('c1').contact_status_updated_at).getTime();
+    expect(updatedAt).toBeGreaterThanOrEqual(before);
+    expect(get('c1').contact_status_updated_at).not.toBe(stale);
   });
 
   it('a real first send from New still advances to Awaiting Reply and logs exactly one event — the guard only blocks the same-to-same case', async () => {

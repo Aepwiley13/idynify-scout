@@ -916,6 +916,10 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
   }
 
   const hasEmail = !!(contact.email && contact.email.trim());
+  // Format only — confirms the address is well-formed, not that the domain
+  // exists or that Gmail can actually deliver to it. Same check
+  // gmail-send-quick.js applies server-side to `toEmail`.
+  const hasValidEmailFormat = hasEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contact.email.trim());
   const hasPhone = !!(contact.phone && contact.phone.trim());
   const firstName = contact.firstName || contact.name?.split(' ')[0] || 'this person';
   const characterCount = message.length;
@@ -1552,6 +1556,17 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
                 </span>
               </div>
 
+              {/* Full recipient address for email — this is the actual
+                  send-confirmation screen; previously only showed firstName. */}
+              {selectedWeapon === 'email' && (
+                <p className="ies-review-recipient">
+                  To: {hasEmail ? contact.email : 'No email on file'}
+                  {hasEmail && !hasValidEmailFormat && (
+                    <span className="ies-recipient-warning"> — this address doesn't look valid</span>
+                  )}
+                </p>
+              )}
+
               {isNativeHandoff() && (
                 <div className="ies-handoff-notice">
                   <ExternalLink className="w-4 h-4" />
@@ -1669,7 +1684,7 @@ const InlineEngagementSection = forwardRef(function InlineEngagementSection(
                 <button
                   className="ies-send-btn"
                   onClick={handleSendMessage}
-                  disabled={!message || loading}
+                  disabled={!message || loading || (selectedWeapon === 'email' && !isNativeHandoff() && !hasValidEmailFormat)}
                 >
                   {loading ? (
                     <>

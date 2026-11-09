@@ -7,6 +7,7 @@ process.env.STRIPE_SECRET_KEY ||= 'sk_test_fake';
 process.env.STRIPE_WEBHOOK_SECRET ||= 'whsec_fake';
 process.env.STRIPE_PRICE_STARTER ||= 'price_starter';
 process.env.STRIPE_PRICE_PRO ||= 'price_pro';
+process.env.STRIPE_PRICE_SCOUT_STARTER_FREE ||= 'price_scout_starter_free';
 process.env.BILLING_LEDGER_EPOCH_UNIX ||= '1000000000';
 
 // Triggers firebase-admin.js's initializeApp() as a side effect before getFirestore() is ever

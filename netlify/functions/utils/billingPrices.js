@@ -1,15 +1,43 @@
 /**
- * The only two Stripe Prices this server recognizes as Idynify products. Used to gate every
- * billing write (checkout, allocation, replacement authorization) against "is this actually one
- * of our products" rather than trusting amount_total or metadata.tier alone.
+ * Every Stripe Price this server recognizes as belonging to an Idynify product — used to gate
+ * identity/reconciliation: is this subscription even one of ours, so its lifecycle events
+ * (status sync, cancellation, period dates) should be reconciled at all, rather than flagged
+ * unknown_price. This is deliberately NOT the same question as "does this price grant paid
+ * credits" — see creditGrantingPriceIds() below. STRIPE_PRICE_SCOUT_STARTER_FREE is a live $0/mo
+ * price (an existing subscriber was found on it, outside the original two-price allowlist): it
+ * belongs here so that subscriber's events reconcile normally, but it must never appear in
+ * creditGrantingPriceIds() — a $0 price, however it's named, is not a paid product.
  */
 export function knownPriceIds() {
+  return new Set([
+    process.env.STRIPE_PRICE_STARTER,
+    process.env.STRIPE_PRICE_PRO,
+    process.env.STRIPE_PRICE_SCOUT_STARTER_FREE,
+  ].filter(Boolean));
+}
+
+/**
+ * The Stripe Prices that grant paid credits on allocation. Strictly narrower than
+ * knownPriceIds(): a price can be a recognized Idynify product (reconciled normally) without
+ * ever being credit-granting. Never infer this from a price's product name — "Scout Starter"
+ * reads like the paid Starter tier, but this specific price is $0/month and must never trigger
+ * an allocation, regardless of what it's called in Stripe.
+ */
+export function creditGrantingPriceIds() {
   return new Set([process.env.STRIPE_PRICE_STARTER, process.env.STRIPE_PRICE_PRO].filter(Boolean));
 }
 
 export function isKnownIdynifyPrice(subscriptionOrPriceId) {
   const ids = knownPriceIds();
   if (ids.size === 0) return false; // not configured — never silently treat anything as known
+  if (typeof subscriptionOrPriceId === 'string') return ids.has(subscriptionOrPriceId);
+  const priceId = priceIdOfSubscription(subscriptionOrPriceId);
+  return priceId != null && ids.has(priceId);
+}
+
+export function isCreditGrantingPrice(subscriptionOrPriceId) {
+  const ids = creditGrantingPriceIds();
+  if (ids.size === 0) return false;
   if (typeof subscriptionOrPriceId === 'string') return ids.has(subscriptionOrPriceId);
   const priceId = priceIdOfSubscription(subscriptionOrPriceId);
   return priceId != null && ids.has(priceId);

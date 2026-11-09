@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import Stripe from 'stripe';
 import { db } from './firebase-admin.js';
-import { isKnownIdynifyPrice, priceIdOfSession, priceIdOfSubscription, knownPriceIds } from './utils/billingPrices.js';
+import { isKnownIdynifyPrice, isCreditGrantingPrice, priceIdOfSession, priceIdOfSubscription, knownPriceIds } from './utils/billingPrices.js';
 import { describeSubscription, isBlockingStatus } from '../../src/utils/billingEntitlement.js';
 
 // IMPORTANT Firestore constraint that shapes every transaction in this file: the Admin SDK
@@ -235,14 +235,22 @@ function decideReconciliation({ userData, subscription, replacementStatus, resol
  * different-but-dead on-file subscription purely because it wasn't "blocking" — without the
  * verified-newer-plus-provenance bar reconciliation requires for the exact same subscription,
  * which could reject it in the same transaction. Both now stand or fall together.
+ *
+ * `flag` distinguishes two different kinds of "no grant": every case here is a genuine anomaly
+ * worth a human looking at (an unrecognized price, a customer mismatch, a failed retry, an
+ * unauthorized replacement) EXCEPT one — a price that IS a recognized Idynify product
+ * (isKnownIdynifyPrice) but is NOT credit-granting (isCreditGrantingPrice), e.g. the $0/month
+ * Scout Starter price. That is expected, understood behavior, not an anomaly: no credits, no
+ * ambiguous-account flag, nothing for anyone to review.
  */
 function decideAllocationEligibility({ userData, customerId, priceId, replacementStatus }) {
-  if (!isKnownIdynifyPrice(priceId)) return { ok: false, reason: 'unknown_price' };
+  if (!isKnownIdynifyPrice(priceId)) return { ok: false, flag: true, reason: 'unknown_price' };
+  if (!isCreditGrantingPrice(priceId)) return { ok: false, flag: false, reason: 'not_credit_granting_price' };
   if (userData?.stripeCustomerId && userData.stripeCustomerId !== customerId) {
-    return { ok: false, reason: 'customer_mismatch' };
+    return { ok: false, flag: true, reason: 'customer_mismatch' };
   }
-  if (replacementStatus.kind === 'retry_error') return { ok: false, reason: 'onfile_retrieve_failed' };
-  if (replacementStatus.kind === 'unauthorized') return { ok: false, reason: 'replacement_not_authorized' };
+  if (replacementStatus.kind === 'retry_error') return { ok: false, flag: true, reason: 'onfile_retrieve_failed' };
+  if (replacementStatus.kind === 'unauthorized') return { ok: false, flag: true, reason: 'replacement_not_authorized' };
   return { ok: true };
 }
 
@@ -407,7 +415,11 @@ async function handleCheckoutCompleted(stripe, stripeEvent) {
         } else {
           const eligible = decideAllocationEligibility({ userData, customerId: session.customer, priceId, replacementStatus });
           if (!eligible.ok) {
-            ambiguous.push({ uid: resolvedUid, reason: eligible.reason, details: { sessionId: session.id, subscriptionId } });
+            // A known-but-non-credit-granting price (e.g. the $0/month Scout Starter price) is
+            // expected, understood behavior — no grant, and nothing for a human to review.
+            if (eligible.flag) {
+              ambiguous.push({ uid: resolvedUid, reason: eligible.reason, details: { sessionId: session.id, subscriptionId } });
+            }
           } else if (session.payment_status !== 'paid') {
             ambiguous.push({ uid: resolvedUid, reason: 'not_paid', details: { sessionId: session.id, subscriptionId } });
           } else {

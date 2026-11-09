@@ -11,9 +11,20 @@
  * Doc shape: {
  *   contactId, contact, channel, subject, body,
  *   userIntent, engagementIntent, strategy,
- *   scheduledFor (ISO), status ('pending'|'sent'|'notified'|'cancelled'),
+ *   scheduledFor (ISO), status ('pending'|'sent'|'notified'|'skipped'|'failed'|'cancelled'),
  *   createdAt
  * }
+ *
+ * Before any email send (here, and in the per-recipient loop inside a
+ * scheduled wave) the contact's CURRENT state is re-read and checked —
+ * see isSendSuppressed/checkSendSuppressed below. `contact`/`contactId`
+ * above is only the snapshot captured when the engagement was queued; it
+ * is never trusted for the suppression decision. A suppressed engagement
+ * is marked status:'skipped' with a skippedReason, never deleted or
+ * rewritten — it stays as a permanent, inspectable record of why it
+ * didn't send. A suppression CHECK that itself fails (e.g. a transient
+ * Firestore error) leaves the doc 'pending' for the next run rather than
+ * guessing either way.
  */
 
 import { schedule } from '@netlify/functions';
@@ -45,6 +56,39 @@ if (getApps().length === 0) {
 }
 
 const db = getFirestore();
+
+/**
+ * Pure decision: should a queued automated send be suppressed for this
+ * contact, given its CURRENT data (not the snapshot captured when the
+ * engagement or wave was queued)? Returns null when the send should
+ * proceed, else { reason } for the caller to record.
+ *
+ * - contact_replied: hunter_status is already 'in_conversation' — the
+ *   contact answered (detected by gmail-poll-replies.js / the automatic
+ *   reply-sync worker) since this send was queued. Covers opt-outs too,
+ *   to the extent one arrives as a reply — no sentiment or free-text
+ *   detection exists anywhere in this codebase, and none is added here.
+ * - contact_bounced: email_delivery_status is read defensively for
+ *   forward compatibility with the planned bounce-detection work (PR 2).
+ *   That field does not exist yet, so this arm is a no-op today and
+ *   starts working the moment PR 2 ships, with no second change needed
+ *   to this file.
+ */
+export function isSendSuppressed(contact) {
+  if (!contact) return { reason: 'contact_deleted' };
+  if (contact.hunter_status === 'in_conversation') return { reason: 'contact_replied' };
+  if (contact.email_delivery_status?.state === 'bounced') return { reason: 'contact_bounced' };
+  return null;
+}
+
+/** isSendSuppressed, with its own fresh read — for callers (sendScheduledEmail)
+ * that only hold the snapshot from when the engagement was queued. */
+async function checkSendSuppressed(userId, contactId) {
+  if (!contactId) return null;
+  const snap = await db.collection('users').doc(userId).collection('contacts').doc(contactId).get();
+  if (!snap.exists) return { reason: 'contact_deleted' };
+  return isSendSuppressed(snap.data());
+}
 
 export const processScheduledEngagements = async () => {
   const startTime = Date.now();
@@ -78,16 +122,17 @@ export const processScheduledEngagements = async () => {
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     console.log(
       `✅ process-scheduled-engagements complete: ${results.sent} sent, ` +
-      `${results.notified} notified, ${results.wavesSent} wave emails, ${results.failed} failed in ${duration}s`
+      `${results.notified} notified, ${results.wavesSent} wave emails, ${results.skipped} skipped, ${results.failed} failed in ${duration}s`
     );
 
     // 207 on partial failure, matching daily-leads-refresh: a 200 must mean
     // every scheduled engagement and wave was handled. An honest zero — nothing
-    // was due this quarter-hour — still returns 200.
+    // was due this quarter-hour — still returns 200. Skipped is not a failure:
+    // it means the suppression check worked as intended.
     const allOk = results.failed === 0;
     console.log(allOk ? 'engagements.scheduled.ok' : 'engagements.scheduled.partial_failure', {
       sent: results.sent, notified: results.notified,
-      wavesSent: results.wavesSent, usersFailed: results.failed,
+      wavesSent: results.wavesSent, skipped: results.skipped, usersFailed: results.failed,
       durationMs: Date.now() - startTime,
     });
 
@@ -96,7 +141,7 @@ export const processScheduledEngagements = async () => {
         db, job: 'process-scheduled-engagements', severity: 'partial_failure',
         summary: `${results.failed} scheduled engagement(s) or wave(s) failed to send.`,
         detail: { sent: results.sent, notified: results.notified,
-                  wavesSent: results.wavesSent, failed: results.failed,
+                  wavesSent: results.wavesSent, skipped: results.skipped, failed: results.failed,
                   firstError: results.firstError || 'n/a' },
       });
     }
@@ -226,6 +271,31 @@ async function sendScheduledEmail(userId, docRef, eng, results) {
     .replace(/=+$/, '');
 
   const existingThreadId = contact.gmail_thread_id || null;
+
+  // Fresh, send-time check: the reply or bounce may have landed any time
+  // between this engagement being queued and this run — re-reading right
+  // before the Gmail call closes that window as tightly as this job can.
+  let suppression;
+  try {
+    suppression = await checkSendSuppressed(userId, contactId);
+  } catch (checkErr) {
+    // Could not verify current state — fail closed (do not send), but
+    // leave status 'pending' rather than 'skipped' or 'failed', so the
+    // next scheduled run retries rather than losing a possibly-still-valid
+    // reminder outright.
+    console.warn(`⚠️ Suppression check failed for contact ${contactId}, leaving pending for retry:`, checkErr.message);
+    return;
+  }
+  if (suppression) {
+    await docRef.update({
+      status: 'skipped',
+      skippedReason: suppression.reason,
+      skippedAt: FieldValue.serverTimestamp(),
+    });
+    results.skipped++;
+    console.log(`⏭️  Scheduled email to contact ${contactId} skipped (${suppression.reason})`);
+    return;
+  }
 
   const gmailResult = await gmail.users.messages.send({
     userId: 'me',
@@ -435,6 +505,7 @@ async function sendScheduledWave(userId, waveRef, wave, results) {
 
   // Load recipient contacts from Firestore
   let sentCount = 0;
+  let skippedCount = 0;
   const waveSubject = subject || WAVE_SUBJECTS[type] || wave.name || 'Checking in';
 
   for (const contactId of recipientIds) {
@@ -445,6 +516,17 @@ async function sendScheduledWave(userId, waveRef, wave, results) {
       if (!contactDoc.exists) continue;
       const contact = contactDoc.data();
       if (!contact.email) continue;
+
+      // Same fresh, send-time suppression check as the single-engagement
+      // path — this contact read is already as fresh as it gets (fetched
+      // right in this loop, not a queued-time snapshot), so no second
+      // read is needed here.
+      const suppression = isSendSuppressed(contact);
+      if (suppression) {
+        skippedCount++;
+        console.log(`⏭️  Wave email to contact ${contactId} skipped (${suppression.reason})`);
+        continue;
+      }
 
       // Personalize message
       const firstName = contact.first_name || contact.name?.split(' ')[0] || 'there';
@@ -545,11 +627,13 @@ async function sendScheduledWave(userId, waveRef, wave, results) {
   await waveRef.update({
     status: 'processed',
     'stats.sent': sentCount,
+    'stats.skipped': skippedCount,
     sentAt: FieldValue.serverTimestamp(),
     processedAt: FieldValue.serverTimestamp(),
   });
 
-  console.log(`✅ Scheduled wave processed: ${sentCount}/${recipientIds.length} sent`);
+  results.skipped += skippedCount;
+  console.log(`✅ Scheduled wave processed: ${sentCount}/${recipientIds.length} sent, ${skippedCount} skipped`);
 }
 
 const WAVE_SUBJECTS = {

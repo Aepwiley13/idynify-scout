@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
+import { generateKeyPairSync } from 'node:crypto';
 import process from 'node:process';
 import { planRulesDeploy } from '../../scripts/staging/stagingRulesDeploy.mjs';
 
@@ -74,9 +75,13 @@ describe('the tool itself', () => {
   const files = () => {
     const dir = mkdtempSync(join(tmpdir(), 'rules-deploy-'));
     const envFile = join(dir, '.env.staging');
-    writeFileSync(envFile, Object.entries(env()).map(([k, v]) => `${k}="${v}"`).join('\n'));
+    // The key comes from the credential, so the env file holds none (one credential, kept out of files).
+    const { FIREBASE_PRIVATE_KEY: _key, FIREBASE_CLIENT_EMAIL: _account, ...fileEnv } = env();
+    writeFileSync(envFile, Object.entries(fileEnv).map(([k, v]) => `${k}="${v}"`).join('\n'));
     const cred = join(dir, 'sa.json');
-    writeFileSync(cred, JSON.stringify({ project_id: P }));
+    // A real-format service-account key: the tool now reads and checks the whole key.
+    const { privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048, privateKeyEncoding: { type: 'pkcs8', format: 'pem' }, publicKeyEncoding: { type: 'spki', format: 'pem' } });
+    writeFileSync(cred, JSON.stringify({ type: 'service_account', project_id: P, client_email: `qa@${P}.iam.gserviceaccount.com`, private_key: privateKey }));
     return { envFile, cred };
   };
 
@@ -85,7 +90,7 @@ describe('the tool itself', () => {
     const { status, out } = run([`--env=${envFile}`, `--project=${P}`], { GOOGLE_APPLICATION_CREDENTIALS: cred, STICKERS_STAGING_PROJECTS: P, PRODUCTION_FIREBASE_PROJECT_ID: PROD });
     expect(status).toBe(0);
     expect(out).toContain(`--only firestore:rules --project ${P}`);
-    expect(out).toContain('Dry run: nothing was deployed.');
+    expect(out).toContain('Dry run: nothing was contacted or deployed.');
     expect(out).toMatch(/Rules: {2}firestore\.rules at [0-9a-f]{7}/);
   });
 
@@ -96,10 +101,11 @@ describe('the tool itself', () => {
     expect(out).toContain('Refused: nothing was deployed.');
   });
 
-  it('only ever runs the deploy behind --apply', () => {
+  it('only ever runs firebase-tools behind --validate (its own --dry-run) or --apply', () => {
     const source = readFileSync(SCRIPT, 'utf8');
     expect(source.match(/spawnSync\(/g)).toHaveLength(1); // one call, and only one
-    expect(source.indexOf("if (!apply)")).toBeLessThan(source.indexOf('spawnSync(plan.command'));
+    expect(source.indexOf('if (!apply && !validate)')).toBeLessThan(source.indexOf('spawnSync(command[0]'));
+    expect(source).toContain("const command = validate ? [...plan.command, '--dry-run'] : plan.command;");
     expect(source).toContain("'firestore:rules'");
     expect(source).not.toMatch(/--only[^\n]*(functions|hosting|indexes)/);
   });

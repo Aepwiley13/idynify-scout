@@ -12,9 +12,11 @@
  *     "demo-" project, which cannot reach a real backend;
  *   - against a real project: --project must be listed in
  *     STICKERS_STAGING_PROJECTS, must look like a staging project ("staging"
- *     or "stg" in its id), must be the project the service account in
- *     GOOGLE_APPLICATION_CREDENTIALS belongs to, and must not be
- *     PRODUCTION_FIREBASE_PROJECT_ID when that is set.
+ *     or "stg" in its id), must be the project the service account belongs
+ *     to, and must not be PRODUCTION_FIREBASE_PROJECT_ID when that is set.
+ *     The service account is STAGING_SERVICE_ACCOUNT_KEY (the key itself) or
+ *     GOOGLE_APPLICATION_CREDENTIALS (a key file), never both
+ *     (stagingCredentials.mjs); its key is never printed.
  * No project id is written into this file: the operator names the target, and
  * the guard checks it.
  *
@@ -28,10 +30,10 @@
  * Flags: --project=<id> (required) · --mode=off|internal|beta|on · --enroll=<uid> (repeatable)
  *        --unenroll=<uid> (repeatable) · --apply
  */
-import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import process from 'node:process';
 import { STICKER_MODES, STICKER_ENROLLED_STAGE, STICKER_FLAG_PATH, STICKER_ENROLLMENT_COLLECTION } from '../../src/constants/stickersAccess.js';
+import { readStagingCredential, CredentialRefusal, redactKeys } from './stagingCredentials.mjs';
 
 const UID = /^[A-Za-z0-9_-]{1,128}$/;
 const MODES = Object.values(STICKER_MODES);
@@ -79,7 +81,7 @@ export function checkStagingTarget({ projectId, credentialsProjectId = null, emu
   const allowed = allowlist.split(',').map((p) => p.trim()).filter(Boolean);
   if (!allowed.includes(projectId)) throw new StagingRefusal('The project is not listed in STICKERS_STAGING_PROJECTS.');
   if (!/(staging|stg)/.test(projectId)) throw new StagingRefusal('The project id does not look like a staging project.');
-  if (!credentialsProjectId) throw new StagingRefusal('GOOGLE_APPLICATION_CREDENTIALS must name a service account for the staging project.');
+  if (!credentialsProjectId) throw new StagingRefusal('A service-account key for the staging project is required (STAGING_SERVICE_ACCOUNT_KEY or GOOGLE_APPLICATION_CREDENTIALS).');
   if (credentialsProjectId !== projectId) throw new StagingRefusal('The service account belongs to a different project.');
   return { target: 'staging' };
 }
@@ -97,13 +99,11 @@ async function main() {
   let args;
   try {
     args = parseArgs(process.argv.slice(2));
-    let credentialsProjectId = null;
-    if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-      credentialsProjectId = JSON.parse(readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8')).project_id ?? null;
-    }
+    const emulator = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
+    const credential = emulator ? null : readStagingCredential(process.env);
     const { target } = checkStagingTarget({
       projectId: args.project,
-      credentialsProjectId,
+      credentialsProjectId: credential?.projectId ?? null,
       emulatorHost: process.env.FIRESTORE_EMULATOR_HOST ?? null,
       allowlist: process.env.STICKERS_STAGING_PROJECTS ?? '',
       productionProjectId: process.env.PRODUCTION_FIREBASE_PROJECT_ID ?? null,
@@ -117,10 +117,10 @@ async function main() {
     }
     const { initializeApp, cert } = await import('firebase-admin/app');
     const { getFirestore } = await import('firebase-admin/firestore');
-    initializeApp(process.env.GOOGLE_APPLICATION_CREDENTIALS && !process.env.FIRESTORE_EMULATOR_HOST
-      ? { credential: cert(JSON.parse(readFileSync(process.env.GOOGLE_APPLICATION_CREDENTIALS, 'utf8'))), projectId: args.project }
-      : { projectId: args.project });
+    initializeApp(credential ? { credential: cert(credential.json), projectId: args.project } : { projectId: args.project });
     const db = getFirestore();
+    // REST, not gRPC: works behind HTTPS proxies that do not carry gRPC. Same writes.
+    if (!emulator) db.settings({ preferRest: true });
     for (const [path, data] of writes) {
       if (data === null) await db.doc(path).delete();
       else await db.doc(path).set(data);
@@ -128,7 +128,8 @@ async function main() {
     console.log(`\nWrote ${writes.length} document(s).`);
     return 0;
   } catch (err) {
-    console.error(err instanceof StagingRefusal ? `Refused: ${err.message}` : `Failed: ${err?.message ?? err}`);
+    const refused = err instanceof StagingRefusal || err instanceof CredentialRefusal;
+    console.error(refused ? `Refused: ${err.message}` : `Failed: ${redactKeys(err?.message ?? err)}`);
     return 1;
   }
 }

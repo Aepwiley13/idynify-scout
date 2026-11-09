@@ -1135,6 +1135,18 @@
   color: var(--text-secondary);
 }
 
+.ies-review-recipient {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  margin: 0.2rem 0 0.875rem 0;
+  word-break: break-all;
+}
+
+.ies-recipient-warning {
+  color: #ef4444;
+  font-weight: 600;
+}
+
 .ies-handoff-notice {
   display: flex;
   align-items: flex-start;
@@ -1940,6 +1952,10 @@ body.theme-dark .ies-review-title {
 
 body.theme-dark .ies-review-via {
   color: var(--text-secondary);
+}
+
+body.theme-dark .ies-recipient-warning {
+  color: #f87171;
 }
 
 body.theme-dark .ies-handoff-notice span {

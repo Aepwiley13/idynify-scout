@@ -52,6 +52,11 @@ const ALLOWLIST = [
   'src/hooks/usePendingReplies.js',
   'netlify/functions/barryOrientationBrief.js',
   'netlify/functions/gmail-poll-replies.js',
+  // The same already-accepted legacy write as gmail-poll-replies.js above —
+  // moved here, not introduced here, when its per-contact logic was
+  // extracted into this shared module (see eslint.config.js's own ignores
+  // list, which has the identical entry for the identical reason).
+  'netlify/functions/utils/replyPolling.js',
   'netlify/functions/utils/barryInboxAnalyzer.js',
   'netlify/functions/utils/barryStrategyRecommender.js',
   'netlify/functions/utils/barryContextAssembler.js',

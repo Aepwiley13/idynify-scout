@@ -179,6 +179,25 @@ async function checkSendSuppressed(userId, contactId) {
  * first-touch wave recipient) has nothing to check live, so this is a
  * no-op for most wave sends and only costs an extra API call for contacts
  * with an established thread.
+ *
+ * CONSERVATIVE SUPPRESSION POLICY (deliberate, not a gap): this check does
+ * NOT distinguish a genuine reply from an automated notification (bounce,
+ * out-of-office, mailing-list) or an unrelated third party replying on the
+ * same thread — it suppresses the send on ANY message in the thread not
+ * from `myEmail`, full stop. That is intentional. The two possible wrong
+ * outcomes here are not symmetric: suppressing a send that would actually
+ * have been fine just delays or skips an automated follow-up — cheap,
+ * recoverable, and already visible as a 'contact_replied_live' skip the
+ * next run or a human can revisit. Sending an automated follow-up into a
+ * thread the recipient already responded to — even with a bounce, an
+ * out-of-office, or someone else entirely — is the outcome this safeguard
+ * exists to prevent, and is not something a missed send can later undo.
+ * So this function always resolves any ambiguity toward suppression, not
+ * toward sending. It does not reuse replyPolling.js's classifyReply
+ * (automated/unverified/genuine) specifically because that finer-grained
+ * distinction is for deciding whether to CREDIT a reply to the contact —
+ * a decision this function never makes; it only ever decides whether to
+ * hold back a send, where being over-cautious is the safe direction.
  */
 async function hasLiveUnprocessedReply(gmail, contact, myEmail) {
   if (!contact?.gmail_thread_id) return false;

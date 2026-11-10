@@ -262,6 +262,30 @@ describe('sendScheduledEmail: fresh suppression check before the Gmail send', ()
     await processScheduledEngagements();
     expect(h.sentRaws).toHaveLength(1);
   });
+
+  it('the live check is deliberately conservative: an automated-looking sender (mailer-daemon) in the thread still suppresses the send', async () => {
+    // hasLiveUnprocessedReply does not classify the message — it suppresses
+    // on ANY non-self sender, bounce or out-of-office included. That is the
+    // documented policy: a missed send is cheap and recoverable, a send into
+    // a thread the recipient (or a bounce) already answered is not.
+    setupPending({ gmail_thread_id: 't1' });
+    h.liveThreadReplyFrom.t1 = 'mailer-daemon@googlemail.com';
+
+    await processScheduledEngagements();
+
+    expect(h.sentRaws).toHaveLength(0);
+    expect(h.docs[engagementPath('e1')].skippedReason).toBe('contact_replied_live');
+  });
+
+  it('the live check is deliberately conservative: an unrelated third party replying on the thread still suppresses the send', async () => {
+    setupPending({ gmail_thread_id: 't1', email: 'jane@acme.com' });
+    h.liveThreadReplyFrom.t1 = 'bob@acme.com'; // a colleague, not the tracked contact
+
+    await processScheduledEngagements();
+
+    expect(h.sentRaws).toHaveLength(0);
+    expect(h.docs[engagementPath('e1')].skippedReason).toBe('contact_replied_live');
+  });
 });
 
 describe('sendScheduledWave: same suppression check in the per-recipient loop', () => {

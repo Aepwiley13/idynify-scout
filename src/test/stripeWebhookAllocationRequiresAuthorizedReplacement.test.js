@@ -85,7 +85,12 @@ describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
     expect(allocation.exists).toBe(false); // no marker written for an unauthorized purchase
 
     const ambiguous = await db.collection('billingAmbiguousAccounts').get();
-    expect(ambiguous.docs.some((d) => d.data().reason === 'replacement_not_authorized')).toBe(true);
+    const flagged = ambiguous.docs.find((d) => d.data().reason === 'replacement_not_authorized');
+    expect(flagged).toBeTruthy();
+    // status: 'pending' is what makes this collection an actual reviewable queue — without it,
+    // there'd be no way to tell "still needs a human" from "already handled" other than tracking
+    // it externally. Only scripts/manualCreditRecovery.mjs ever moves a record to 'resolved'.
+    expect(flagged.data().status).toBe('pending');
   });
 
   it('a fully authorized replacement (verified newer, provenance matches) DOES grant — allocation and reconciliation agree', async () => {

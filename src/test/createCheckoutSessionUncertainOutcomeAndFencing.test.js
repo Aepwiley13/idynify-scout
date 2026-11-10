@@ -92,8 +92,15 @@ describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
     expect(result2.statusCode).toBe(409);
     expect(JSON.parse(result2.body).error).toBe('checkout_needs_manual_reconciliation');
 
-    const opsSnap = await db.collection('billingCheckoutOperations').get();
-    expect(opsSnap.docs).toHaveLength(0); // no fresh operation was ever minted
+    // Scoped to this uid, not the whole collection — this emulator instance is shared across
+    // every file in one `test:billing-emulator` run, and several other files seed
+    // billingCheckoutOperations docs in their own beforeEach without an afterAll cleanup (their
+    // own tests don't need one), so asserting the WHOLE collection is empty is fragile against
+    // whatever unrelated file happens to run adjacent to this one on a given pass. No operation
+    // record was ever created for THIS user in this test — op_stuck_1 only ever existed as a
+    // pendingCheckout pointer on the user doc, never an actual billingCheckoutOperations doc.
+    const opsSnap = await db.collection('billingCheckoutOperations').where('uid', '==', 'uid_uncertain_1').get();
+    expect(opsSnap.docs).toHaveLength(0); // no fresh operation was ever minted for this user
 
     const doc = await userRef.get();
     expect(doc.data().pendingCheckout.operationId).toBe('op_stuck_1'); // untouched

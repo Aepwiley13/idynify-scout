@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { db } from './firebase-admin.js';
 import { isKnownIdynifyPrice, isCreditGrantingPrice, priceIdOfSession, priceIdOfSubscription, knownPriceIds } from './utils/billingPrices.js';
 import { describeSubscription, isBlockingStatus } from '../../src/utils/billingEntitlement.js';
+import { tierForPrice, creditGrantFields } from './utils/creditGrantFields.js';
 
 // IMPORTANT Firestore constraint that shapes every transaction in this file: the Admin SDK
 // requires every tx.get() to happen before any tx.set()/tx.update() in the same transaction —
@@ -11,16 +12,7 @@ import { describeSubscription, isBlockingStatus } from '../../src/utils/billingE
 // is structured as: (1) read everything via tx.get, (2) compute a decision with pure functions
 // that touch neither Firestore nor Stripe, (3) apply every tx.set/tx.update at the end.
 
-const TIER_CREDITS = {
-  starter: { credits: 400, companies: 40, contacts: 120, support: '48-hour email' },
-  pro: { credits: 1250, companies: 125, contacts: 375, support: '24-hour email' },
-};
-
 const DEAD_SUBSCRIPTION_STATUSES = new Set(['canceled', 'incomplete_expired']);
-
-function tierForPrice(priceId) {
-  return priceId === process.env.STRIPE_PRICE_PRO ? 'pro' : 'starter';
-}
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error('Stripe is not configured');
@@ -137,8 +129,17 @@ function mergeWritesByRef(writes) {
   return [...byPath.values()];
 }
 
+/**
+ * `status: 'pending'` makes this collection an actual reviewable queue, not just an append-only
+ * log — scripts/manualCreditRecovery.mjs is the only thing that ever moves a record to
+ * 'resolved' (atomically, as part of applying the fix), so `status == 'pending'` always answers
+ * "what still needs a human to look at it" without anyone tracking that externally.
+ */
 function ambiguousWriteFor({ uid, reason, details }) {
-  return { ref: db.collection('billingAmbiguousAccounts').doc(), data: { uid, reason, details, flaggedAt: new Date().toISOString() } };
+  return {
+    ref: db.collection('billingAmbiguousAccounts').doc(),
+    data: { uid, reason, details, status: 'pending', flaggedAt: new Date().toISOString() },
+  };
 }
 
 // ── Pure decision: operation-record validate-then-extend (no I/O) ─────────────────────────────
@@ -252,27 +253,6 @@ function decideAllocationEligibility({ userData, customerId, priceId, replacemen
   if (replacementStatus.kind === 'retry_error') return { ok: false, flag: true, reason: 'onfile_retrieve_failed' };
   if (replacementStatus.kind === 'unauthorized') return { ok: false, flag: true, reason: 'replacement_not_authorized' };
   return { ok: true };
-}
-
-function creditGrantFields(priceId) {
-  const tier = tierForPrice(priceId);
-  const config = TIER_CREDITS[tier] ?? TIER_CREDITS.starter;
-  const nextReset = new Date();
-  nextReset.setMonth(nextReset.getMonth() + 1);
-  return {
-    tier,
-    fields: {
-      hasCompletedPayment: true,
-      paymentCompletedAt: new Date().toISOString(),
-      subscriptionTier: tier,
-      credits: { total: config.credits, used: 0, remaining: config.credits, resetDate: nextReset.toISOString() },
-      tierLimits: {
-        creditsPerMonth: config.credits, companiesPerMonth: config.companies,
-        contactsPerMonth: config.contacts, teamSeats: 1, support: config.support,
-      },
-      features: { mobilePhone: tier === 'pro' },
-    },
-  };
 }
 
 // ── 6c: checkout.session.completed ────────────────────────────────────────────────────────────

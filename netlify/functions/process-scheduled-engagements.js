@@ -17,14 +17,24 @@
  *
  * Before any email send (here, and in the per-recipient loop inside a
  * scheduled wave) the contact's CURRENT state is re-read and checked —
- * see isSendSuppressed/checkSendSuppressed below. `contact`/`contactId`
+ * see isSendSuppressed/checkSendSuppressed below, which reuse the
+ * canonical src/utils/relationshipRead.js accessors (isInConversation,
+ * hasReplied) rather than hunter_status alone, plus an explicit
+ * relationship-status/Mission-Complete exclusion set. `contact`/`contactId`
  * above is only the snapshot captured when the engagement was queued; it
- * is never trusted for the suppression decision. A suppressed engagement
- * is marked status:'skipped' with a skippedReason, never deleted or
- * rewritten — it stays as a permanent, inspectable record of why it
- * didn't send. A suppression CHECK that itself fails (e.g. a transient
- * Firestore error) leaves the doc 'pending' for the next run rather than
- * guessing either way.
+ * is never trusted for the suppression decision. A missing contactId is
+ * its own suppression reason (no_contact_reference), not a silent bypass.
+ * A suppressed engagement is marked status:'skipped' with a skippedReason,
+ * never deleted or rewritten — it stays as a permanent, inspectable
+ * record of why it didn't send. A suppression CHECK that itself fails
+ * (e.g. a transient Firestore error) leaves the doc 'pending' for the
+ * next run rather than guessing either way.
+ *
+ * A second, independent safeguard (hasLiveUnprocessedReply) checks the
+ * live Gmail thread immediately before the send itself, closing the
+ * residual race between the Firestore read above and the Gmail API call
+ * down to roughly one API round-trip — see its own docstring for why that
+ * residual window cannot be closed further.
  */
 
 import { schedule } from '@netlify/functions';
@@ -39,6 +49,8 @@ import { writeTimelineEvent, ACTORS } from './utils/timelineWrite.js';
 import { alertOps } from './utils/alertOps.js';
 import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 import { buildPlainTextEmail } from './utils/emailHeaders.js';
+import { isInConversation, hasReplied } from '../../src/utils/relationshipRead.js';
+import { CONTACT_STATUSES } from '../../src/utils/contactStateMachine.js';
 
 // Initialize Firebase Admin (singleton guard)
 if (getApps().length === 0) {
@@ -58,36 +70,138 @@ if (getApps().length === 0) {
 const db = getFirestore();
 
 /**
+ * contact_status values a queued automated send must never fire into —
+ * relationship statuses (set by an explicit person-type reclassification,
+ * a dimension this scheduler's own workflow fields know nothing about) or
+ * a terminal lead status. Mirrors the identical set in replyPolling.js
+ * (PR A) — kept duplicated rather than cross-imported, since these are two
+ * independent PRs/branches; the two sets must be kept in sync by hand if
+ * CONTACT_STATUSES ever grows a new relationship/terminal value.
+ */
+const STATUS_BLOCKS_AUTOMATED_SEND = new Set([
+  CONTACT_STATUSES.ACTIVE_CUSTOMER,
+  CONTACT_STATUSES.PAST_CUSTOMER,
+  CONTACT_STATUSES.PARTNER,
+  CONTACT_STATUSES.NETWORK,
+  CONTACT_STATUSES.MISSION_COMPLETE,
+]);
+
+/**
  * Pure decision: should a queued automated send be suppressed for this
  * contact, given its CURRENT data (not the snapshot captured when the
  * engagement or wave was queued)? Returns null when the send should
  * proceed, else { reason } for the caller to record.
  *
- * - contact_replied: hunter_status is already 'in_conversation' — the
- *   contact answered (detected by gmail-poll-replies.js / the automatic
- *   reply-sync worker) since this send was queued. Covers opt-outs too,
- *   to the extent one arrives as a reply — no sentiment or free-text
- *   detection exists anywhere in this codebase, and none is added here.
+ * Audited every existing authoritative signal before adding this, rather
+ * than inventing a new one:
+ * - isInConversation (src/utils/relationshipRead.js) — THE canonical
+ *   guardrail answer to "did they reply," already checking
+ *   contact.relationship.state (canonical, live-mode only),
+ *   contact_status, AND hunter_status in one place. Reusing it here (not
+ *   hunter_status alone, as the previous version of this guard did) is
+ *   what makes this the smallest CONSISTENT predicate — the same question
+ *   answered the same way everywhere else in the codebase that asks it.
+ * - hasReplied (same file) — true once contact.relationship.reply_count
+ *   (canonical) or the legacy replies_received mirror is > 0. A contact
+ *   can have answered before and since cycled out of the in_conversation
+ *   workflow state for an unrelated reason; a stale queued "just checking
+ *   in" send to a known responder is still inappropriate.
+ * - STATUS_BLOCKS_AUTOMATED_SEND — a relationship status or Mission
+ *   Complete. Checked independently of the above two: a contact who
+ *   became a customer through a path that never touched hunter_status
+ *   should not receive a cold-outreach-shaped automated follow-up either.
  * - contact_bounced: email_delivery_status is read defensively for
  *   forward compatibility with the planned bounce-detection work (PR 2).
  *   That field does not exist yet, so this arm is a no-op today and
  *   starts working the moment PR 2 ships, with no second change needed
  *   to this file.
+ *
+ * Opt-outs: no opt-out/do-not-contact/unsubscribe field exists anywhere in
+ * this codebase today (confirmed by search, not assumed) — there is
+ * nothing for this predicate to check. Covered only to the extent an
+ * opt-out arrives as a reply, via isInConversation/hasReplied above. No
+ * sentiment or free-text detection is added here.
  */
 export function isSendSuppressed(contact) {
   if (!contact) return { reason: 'contact_deleted' };
-  if (contact.hunter_status === 'in_conversation') return { reason: 'contact_replied' };
+  if (isInConversation(contact)) return { reason: 'contact_replied' };
+  if (hasReplied(contact)) return { reason: 'contact_replied' };
+  if (STATUS_BLOCKS_AUTOMATED_SEND.has(contact.contact_status)) return { reason: 'relationship_status_advanced' };
   if (contact.email_delivery_status?.state === 'bounced') return { reason: 'contact_bounced' };
   return null;
 }
 
-/** isSendSuppressed, with its own fresh read — for callers (sendScheduledEmail)
- * that only hold the snapshot from when the engagement was queued. */
+/**
+ * Fresh contact read, for callers (sendScheduledEmail) that only hold the
+ * snapshot captured when the engagement was queued. Returns
+ * { suppression, contact } — `contact` is the fresh doc data (or null),
+ * reused by the caller for the live Gmail check too, so that check reads
+ * the CURRENT gmail_thread_id rather than the queued-time snapshot's,
+ * which may be stale or absent.
+ *
+ * A missing contactId is NOT treated as "nothing to check" — that used to
+ * return null (proceed), which silently bypassed recipient verification
+ * entirely for any engagement that somehow lacked a contact reference.
+ * There is no way to verify current state for an address with no
+ * canonical contact doc behind it, so this fails closed: suppressed, with
+ * its own distinct reason, same as every other suppression case — logged
+ * and preserved, never silently sent.
+ */
 async function checkSendSuppressed(userId, contactId) {
-  if (!contactId) return null;
+  if (!contactId) return { suppression: { reason: 'no_contact_reference' }, contact: null };
   const snap = await db.collection('users').doc(userId).collection('contacts').doc(contactId).get();
-  if (!snap.exists) return { reason: 'contact_deleted' };
-  return isSendSuppressed(snap.data());
+  if (!snap.exists) return { suppression: { reason: 'contact_deleted' }, contact: null };
+  const contact = snap.data();
+  return { suppression: isSendSuppressed(contact), contact };
+}
+
+/**
+ * Residual race, documented rather than hidden: checkSendSuppressed reads
+ * Firestore as the LAST step before the Gmail API call, which closes the
+ * original gap (a reply landing any time between queuing and this run) to
+ * the width of one function call — but a reply could still land in the
+ * literal window between that Firestore read and the Gmail send
+ * completing. Firestore and the Gmail API cannot be made atomic with each
+ * other; no amount of additional Firestore-side checking removes this
+ * specific window.
+ *
+ * The smallest practical safeguard available, consistent with what this
+ * scheduler already has a Gmail client open for: a LIVE check of the
+ * tracked Gmail thread itself, immediately before sending, reusing the
+ * exact "message not from me" logic replyPolling.js (PR A) already
+ * established — not a new detector. This catches a reply that has already
+ * arrived in Gmail but has not yet been written to Firestore by either
+ * the manual "Sync Replies" button or the scheduled reply-sync worker,
+ * shrinking the residual window to genuinely concurrent arrival (on the
+ * order of the single Gmail API round-trip this function makes), which is
+ * accepted as a remaining, bounded limitation rather than engineered away
+ * further. A contact with no gmail_thread_id yet (the common case for a
+ * first-touch wave recipient) has nothing to check live, so this is a
+ * no-op for most wave sends and only costs an extra API call for contacts
+ * with an established thread.
+ */
+async function hasLiveUnprocessedReply(gmail, contact, myEmail) {
+  if (!contact?.gmail_thread_id) return false;
+  try {
+    const threadRes = await gmail.users.threads.get({
+      userId: 'me',
+      id: contact.gmail_thread_id,
+      format: 'metadata',
+      metadataHeaders: ['From'],
+    });
+    const messages = threadRes.data.messages || [];
+    const emailLower = (myEmail || '').toLowerCase();
+    return messages.some((m) => {
+      const from = (m.payload?.headers?.find((h) => h.name === 'From')?.value || '').toLowerCase();
+      return emailLower ? !from.includes(emailLower) : false;
+    });
+  } catch (err) {
+    // Non-fatal — this is a best-effort extra safeguard on top of the
+    // authoritative Firestore check, not a replacement for it. A failure
+    // here must not block an otherwise-eligible send.
+    console.warn('⚠️ Live Gmail thread check failed (non-blocking):', err.message);
+    return false;
+  }
 }
 
 export const processScheduledEngagements = async () => {
@@ -275,9 +389,13 @@ async function sendScheduledEmail(userId, docRef, eng, results) {
   // Fresh, send-time check: the reply or bounce may have landed any time
   // between this engagement being queued and this run — re-reading right
   // before the Gmail call closes that window as tightly as this job can.
-  let suppression;
+  // The fresh contact (not the queued-time snapshot) is reused below for
+  // the live Gmail check too, so that check reads the CURRENT
+  // gmail_thread_id rather than one that may be stale or was never on the
+  // original snapshot at all.
+  let suppression, freshContact;
   try {
-    suppression = await checkSendSuppressed(userId, contactId);
+    ({ suppression, contact: freshContact } = await checkSendSuppressed(userId, contactId));
   } catch (checkErr) {
     // Could not verify current state — fail closed (do not send), but
     // leave status 'pending' rather than 'skipped' or 'failed', so the
@@ -294,6 +412,19 @@ async function sendScheduledEmail(userId, docRef, eng, results) {
     });
     results.skipped++;
     console.log(`⏭️  Scheduled email to contact ${contactId} skipped (${suppression.reason})`);
+    return;
+  }
+
+  // Smallest practical safeguard on the residual Firestore/Gmail race —
+  // see hasLiveUnprocessedReply's own docstring.
+  if (await hasLiveUnprocessedReply(gmail, freshContact, gmailData.email)) {
+    await docRef.update({
+      status: 'skipped',
+      skippedReason: 'contact_replied_live',
+      skippedAt: FieldValue.serverTimestamp(),
+    });
+    results.skipped++;
+    console.log(`⏭️  Scheduled email to contact ${contactId} skipped (contact_replied_live)`);
     return;
   }
 
@@ -510,6 +641,11 @@ async function sendScheduledWave(userId, waveRef, wave, results) {
 
   for (const contactId of recipientIds) {
     try {
+      // A malformed recipientIds entry has no contact to verify against —
+      // same "fail closed, don't guess" rule as a missing engagement
+      // contactId, just with no persisted item here to mark skipped.
+      if (!contactId) continue;
+
       const contactDoc = await db.collection('users').doc(userId)
         .collection('contacts').doc(contactId).get();
 
@@ -548,6 +684,15 @@ async function sendScheduledWave(userId, waveRef, wave, results) {
         .replace(/=+$/, '');
 
       const existingThreadId = contact.gmail_thread_id || null;
+
+      // Same smallest-practical-safeguard live check as the single-engagement
+      // path — see hasLiveUnprocessedReply's docstring. A no-op for most wave
+      // recipients, who have no gmail_thread_id yet (first-touch outreach).
+      if (await hasLiveUnprocessedReply(gmail, contact, gmailData.email)) {
+        skippedCount++;
+        console.log(`⏭️  Wave email to contact ${contactId} skipped (contact_replied_live)`);
+        continue;
+      }
 
       const gmailResult = await gmail.users.messages.send({
         userId: 'me',

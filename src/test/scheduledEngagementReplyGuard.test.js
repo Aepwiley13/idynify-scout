@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 
 vi.mock('firebase-admin/app', () => ({ initializeApp: vi.fn(), getApps: () => [{}], cert: vi.fn() }));
 
-const h = vi.hoisted(() => ({ docs: {}, sentRaws: [], throwOnGet: new Set() }));
+const h = vi.hoisted(() => ({ docs: {}, sentRaws: [], throwOnGet: new Set(), liveThreadReplyFrom: {} }));
 
 vi.mock('firebase-admin/firestore', () => {
   function docRef(path) {
@@ -82,6 +82,14 @@ vi.mock('googleapis', () => ({
             return { data: { id: `msg_${h.sentRaws.length}`, threadId: `thread_${h.sentRaws.length}` } };
           }),
         },
+        threads: {
+          get: vi.fn(async ({ id }) => {
+            const replyFrom = h.liveThreadReplyFrom[id];
+            const messages = [{ payload: { headers: [{ name: 'From', value: 'me@idynify.com' }] } }];
+            if (replyFrom) messages.push({ payload: { headers: [{ name: 'From', value: replyFrom }] } });
+            return { data: { messages } };
+          }),
+        },
       },
     }),
   },
@@ -113,6 +121,7 @@ beforeEach(() => {
   for (const key of Object.keys(h.docs)) delete h.docs[key];
   h.sentRaws.length = 0;
   h.throwOnGet.clear();
+  h.liveThreadReplyFrom = {};
   process.env.FIREBASE_PROJECT_ID = 'test-project';
   process.env.FIREBASE_CLIENT_EMAIL = 'test@test.iam.gserviceaccount.com';
   process.env.GOOGLE_CLIENT_ID = 'id';
@@ -121,6 +130,7 @@ beforeEach(() => {
   h.docs[`users/${USER_ID}`] = {};
   h.docs[`users/${USER_ID}/integrations/gmail`] = {
     status: 'connected', accessToken: 'tok', refreshToken: 'rtok', expiresAt: Date.now() + 60 * 60 * 1000,
+    email: 'me@idynify.com',
   };
 });
 
@@ -147,6 +157,22 @@ describe('isSendSuppressed', () => {
   it('does not suppress on an unrelated email_delivery_status value', () => {
     expect(isSendSuppressed({ hunter_status: 'awaiting_reply', email_delivery_status: { state: 'delivered' } })).toBeNull();
   });
+
+  it('suppresses via contact_status === "In Conversation" even when hunter_status disagrees and still says awaiting_reply — isInConversation checks both', () => {
+    expect(isSendSuppressed({ hunter_status: 'awaiting_reply', contact_status: 'In Conversation' })).toEqual({ reason: 'contact_replied' });
+  });
+
+  it('suppresses a known responder (hasReplied) even when hunter_status/contact_status show no current conversation — a stale queued send to someone who has answered before is still inappropriate', () => {
+    expect(isSendSuppressed({ hunter_status: 'awaiting_reply', contact_status: 'Dormant', engagement_summary: { replies_received: 1 } })).toEqual({ reason: 'contact_replied' });
+    expect(isSendSuppressed({ hunter_status: 'awaiting_reply', relationship: { reply_count: 2 } })).toEqual({ reason: 'contact_replied' });
+  });
+
+  it.each(['Active Customer', 'Past Customer', 'Partner', 'Network', 'Mission Complete'])(
+    'suppresses (relationship_status_advanced) once contact_status is %s, even though hunter_status still says awaiting_reply',
+    (status) => {
+      expect(isSendSuppressed({ hunter_status: 'awaiting_reply', contact_status: status })).toEqual({ reason: 'relationship_status_advanced' });
+    }
+  );
 });
 
 describe('sendScheduledEmail: fresh suppression check before the Gmail send', () => {
@@ -205,6 +231,37 @@ describe('sendScheduledEmail: fresh suppression check before the Gmail send', ()
     expect(() => isSendSuppressed({})).not.toThrow();
     expect(() => isSendSuppressed({ email_delivery_status: null })).not.toThrow();
   });
+
+  it('a missing contactId suppresses the send (no_contact_reference) rather than silently bypassing recipient verification', async () => {
+    h.docs[engagementPath('e1')] = {
+      status: 'pending', scheduledFor: new Date(Date.now() - 1000).toISOString(),
+      channel: 'email', contactId: null, contact: { email: 'jane@acme.com', firstName: 'Jane' },
+      subject: 'Following up', body: 'Just checking in.',
+    };
+    await processScheduledEngagements();
+    expect(h.sentRaws).toHaveLength(0);
+    const eng = h.docs[engagementPath('e1')];
+    expect(eng.status).toBe('skipped');
+    expect(eng.skippedReason).toBe('no_contact_reference');
+  });
+
+  it('a live Gmail reply not yet reflected in Firestore is caught by the send-time thread check, even when the Firestore check alone would have allowed it', async () => {
+    setupPending({ gmail_thread_id: 't1' }); // still 'awaiting_reply' in Firestore — the race
+    h.liveThreadReplyFrom.t1 = 'jane@acme.com';
+
+    await processScheduledEngagements();
+
+    expect(h.sentRaws).toHaveLength(0);
+    const eng = h.docs[engagementPath('e1')];
+    expect(eng.status).toBe('skipped');
+    expect(eng.skippedReason).toBe('contact_replied_live');
+  });
+
+  it('a contact with no gmail_thread_id yet never triggers the live check (no-op) and sends normally', async () => {
+    setupPending(); // no gmail_thread_id
+    await processScheduledEngagements();
+    expect(h.sentRaws).toHaveLength(1);
+  });
 });
 
 describe('sendScheduledWave: same suppression check in the per-recipient loop', () => {
@@ -224,5 +281,34 @@ describe('sendScheduledWave: same suppression check in the per-recipient loop', 
     expect(wave.stats.sent).toBe(1);
     expect(wave.stats.skipped).toBe(1);
     expect(wave.status).toBe('processed');
+  });
+
+  it('a malformed recipientIds entry (null/empty) is skipped without crashing the rest of the wave', async () => {
+    h.docs[contactPath('eligible')] = { hunter_status: 'awaiting_reply', email: 'eligible@acme.com' };
+    h.docs[wavePath('w1')] = {
+      status: 'scheduled', scheduledFor: new Date(Date.now() - 1000).toISOString(),
+      channel: 'via Email', message: 'Hi {{first_name}}, checking in.',
+      recipientIds: [null, 'eligible', ''],
+    };
+
+    await processScheduledEngagements();
+
+    expect(h.sentRaws).toHaveLength(1);
+    expect(h.docs[wavePath('w1')].status).toBe('processed');
+  });
+
+  it('a live Gmail reply not yet in Firestore is caught in the wave loop too, same as the single-engagement path', async () => {
+    h.docs[contactPath('c1')] = { hunter_status: 'awaiting_reply', email: 'jane@acme.com', gmail_thread_id: 't1' };
+    h.liveThreadReplyFrom.t1 = 'jane@acme.com';
+    h.docs[wavePath('w1')] = {
+      status: 'scheduled', scheduledFor: new Date(Date.now() - 1000).toISOString(),
+      channel: 'via Email', message: 'Hi {{first_name}}, checking in.',
+      recipientIds: ['c1'],
+    };
+
+    await processScheduledEngagements();
+
+    expect(h.sentRaws).toHaveLength(0);
+    expect(h.docs[wavePath('w1')].stats.skipped).toBe(1);
   });
 });

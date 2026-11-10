@@ -6,6 +6,31 @@
  * SEPARATE tool from the webhook, never invoked automatically, and requires a human to supply
  * purchase-specific evidence on every run — it will not run without it.
  *
+ * ── Round-10 review finding: evidence is an approval record, not a substitute for validation ──
+ *
+ * The CLI's required --evidence-stripe-session-id/--evidence-note arguments used to be the
+ * ENTIRE gate: whatever an operator typed was trusted at face value and just stored alongside the
+ * grant. That's backwards. An operator's claim that "this is believed to be a genuine purchase"
+ * is a record of WHO approved the recovery and WHY — it has never, by itself, proven the claim is
+ * true. verifyPurchaseAgainstStripe() below independently re-derives the facts from Stripe itself
+ * before any write happens:
+ *   - priceId must be a recognized, CREDIT-GRANTING Idynify price — rejects both a totally
+ *     unknown price and a known-but-free one (e.g. the $0/month Scout Starter price).
+ *   - the subscription's actual Stripe customer must match the account's recorded
+ *     stripeCustomerId (when one is already on file) — rejects a mismatched account.
+ *   - the subscription's actual purchased price must match the claimed --price-id — rejects a
+ *     mismatched purchase record (the operator claiming a different price than what was bought).
+ *   - the subscription must not be canceled/incomplete_expired — never restores access for a
+ *     subscription that is not currently in force.
+ *   - the account must not already have a DIFFERENT subscription on file — granting for this one
+ *     would overwrite that unrelated subscription's balance and usage, not just add to it.
+ *   - the evidence pointer itself must independently resolve to a real Stripe object that
+ *     actually supports this grant (a checkout session for this exact subscription, paid; or the
+ *     subscription id itself) — an operator typing ANY string into --evidence-stripe-session-id
+ *     is never sufficient on its own.
+ * Any failure throws EvidenceValidationError and nothing is written — not even the ambiguous-
+ * account record is touched.
+ *
  * TRANSACTIONAL + IDEMPOTENT, not just "checked before running":
  *   - The existence check for billingAllocations/{subscriptionId} and every write happen inside
  *     ONE Firestore transaction. Running this script twice for the same subscriptionId — by
@@ -17,6 +42,10 @@
  *   - If an ambiguousAccountDocId is given, that record is read inside the SAME transaction and
  *     marked 'resolved' in the SAME commit as the grant — so the credit write and the
  *     review-queue update can never land independently of each other.
+ *   - The "different subscription already on file" check runs BOTH before the transaction (fast
+ *     failure against the Stripe-verified facts) AND again inside it against a fresh read — the
+ *     Firestore-only re-check closes the race where a concurrent webhook grant binds a different
+ *     subscription to this account in between the two.
  *
  * Reuses creditGrantFields() from netlify/functions/utils/creditGrantFields.js — the exact same
  * function the automated webhook path uses — so a manual grant is byte-for-byte what an
@@ -25,10 +54,13 @@
  * This writes to Firestore. It needs a WRITE-capable service account key, not the read-only one
  * used for verification/reconciliation elsewhere in this project — do not point
  * FIREBASE_SERVICE_ACCOUNT_PATH at the read-only key; every write will fail with
- * PERMISSION_DENIED, which is a safe failure, not a usage error to work around.
+ * PERMISSION_DENIED, which is a safe failure, not a usage error to work around. It also needs a
+ * real STRIPE_SECRET_KEY to independently verify the purchase — this tool cannot run on claimed
+ * evidence alone.
  *
  * USAGE
  *   FIREBASE_SERVICE_ACCOUNT_PATH=/path/to/write-capable-key.json \
+ *   STRIPE_SECRET_KEY=sk_live_... \
  *     node scripts/manualCreditRecovery.mjs \
  *       --uid <firebase-uid> \
  *       --subscription-id <sub_...> \
@@ -40,17 +72,20 @@
  *       [--dry-run]
  *
  * Exit codes: 0 applied (or dry-run would apply); 2 already granted (idempotent no-op, not an
- * error); 1 did not run at all (missing evidence, bad arguments, or a Firestore/auth error).
+ * error); 1 did not run at all (missing evidence, bad arguments, failed Stripe validation, or a
+ * Firestore/auth error).
  */
 
 import process from 'node:process';
 import { readFileSync } from 'node:fs';
 import { creditGrantFields } from '../netlify/functions/utils/creditGrantFields.js';
+import { isKnownIdynifyPrice, isCreditGrantingPrice } from '../netlify/functions/utils/billingPrices.js';
 
 export class UsageError extends Error {}
 export class AlreadyGrantedError extends Error {}
+export class EvidenceValidationError extends Error {}
 
-export const USAGE = `Usage: FIREBASE_SERVICE_ACCOUNT_PATH=<write-capable key> node scripts/manualCreditRecovery.mjs \\
+export const USAGE = `Usage: FIREBASE_SERVICE_ACCOUNT_PATH=<write-capable key> STRIPE_SECRET_KEY=<key> node scripts/manualCreditRecovery.mjs \\
   --uid <firebase-uid> --subscription-id <sub_...> --price-id <price_...> \\
   --evidence-stripe-session-id <cs_...|sub_...> --evidence-note "<why this is genuine>" \\
   [--ambiguous-account-doc-id <id>] [--operator "<name>"] [--dry-run]
@@ -75,12 +110,92 @@ export function parseArgs(argv) {
 }
 
 /**
- * The transactional core. `db` is injected (never imported at module scope) so this is testable
- * against the Firestore emulator without needing real credentials, and so the CLI entrypoint
- * below is the only place that ever touches a real service-account connection.
+ * Independently re-derives the purchase facts from Stripe — never trusts the CLI arguments at
+ * face value. Runs BEFORE any Firestore transaction starts (mirrors stripe-webhook.js's own
+ * "Stripe reads needed to decide, Firestore reads/writes in the transaction" split), so a bad
+ * argument fails fast without ever touching Firestore. See file header for what each check is
+ * for. Returns the verified subscription on success.
  */
-export async function applyManualRecovery(db, args) {
+export async function verifyPurchaseAgainstStripe({ stripe, userData, uid, subscriptionId, priceId, evidenceStripeSessionId }) {
+  if (!isKnownIdynifyPrice(priceId)) {
+    throw new EvidenceValidationError(`priceId ${priceId} is not a recognized Idynify price — refusing to grant an unknown price`);
+  }
+  if (!isCreditGrantingPrice(priceId)) {
+    throw new EvidenceValidationError(`priceId ${priceId} is a known Idynify price but does not grant credits (e.g. a free price) — refusing`);
+  }
+
+  let subscription;
+  try {
+    subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  } catch (err) {
+    throw new EvidenceValidationError(`could not retrieve subscription ${subscriptionId} from Stripe: ${err.message}`);
+  }
+
+  if (userData.stripeCustomerId && subscription.customer !== userData.stripeCustomerId) {
+    throw new EvidenceValidationError(
+      `subscription ${subscriptionId} belongs to Stripe customer ${subscription.customer}, but users/${uid} is recorded under ${userData.stripeCustomerId} — refusing (mismatched account)`
+    );
+  }
+
+  const actualPriceIds = (subscription.items?.data ?? []).map((item) => item.price?.id);
+  if (!actualPriceIds.includes(priceId)) {
+    throw new EvidenceValidationError(
+      `subscription ${subscriptionId} does not actually carry price ${priceId} (has: ${actualPriceIds.join(', ') || 'none'}) — refusing (mismatched purchase record)`
+    );
+  }
+
+  if (subscription.status === 'canceled' || subscription.status === 'incomplete_expired') {
+    throw new EvidenceValidationError(`subscription ${subscriptionId} is ${subscription.status} — refusing to restore access for a canceled subscription`);
+  }
+
+  if (userData.stripeSubscriptionId && userData.stripeSubscriptionId !== subscriptionId) {
+    throw new EvidenceValidationError(
+      `users/${uid} already has a different subscription (${userData.stripeSubscriptionId}) on file — granting credits for ${subscriptionId} would overwrite that unrelated balance and usage. Resolve the correct target manually.`
+    );
+  }
+
+  // The evidence pointer itself must independently check out — never trusted just because an
+  // operator supplied one. --evidence-stripe-session-id is documented as <cs_...|sub_...>.
+  if (evidenceStripeSessionId.startsWith('cs_')) {
+    let session;
+    try {
+      session = await stripe.checkout.sessions.retrieve(evidenceStripeSessionId);
+    } catch (err) {
+      throw new EvidenceValidationError(`could not retrieve checkout session ${evidenceStripeSessionId} from Stripe: ${err.message}`);
+    }
+    if (session.subscription !== subscriptionId) {
+      throw new EvidenceValidationError(
+        `evidence checkout session ${evidenceStripeSessionId} points at subscription ${session.subscription ?? 'none'}, not ${subscriptionId} — the evidence does not actually support this grant`
+      );
+    }
+    if (session.payment_status !== 'paid') {
+      throw new EvidenceValidationError(`evidence checkout session ${evidenceStripeSessionId} has payment_status "${session.payment_status}", not "paid"`);
+    }
+  } else if (evidenceStripeSessionId !== subscriptionId) {
+    throw new EvidenceValidationError(
+      `--evidence-stripe-session-id ${evidenceStripeSessionId} is neither a checkout session for ${subscriptionId} nor the subscription id itself — the evidence does not point at this purchase`
+    );
+  }
+
+  return subscription;
+}
+
+/**
+ * The transactional core. `db` and `stripe` are injected (never imported at module scope) so this
+ * is testable against the Firestore emulator and a fake Stripe client without needing real
+ * credentials, and so the CLI entrypoint below is the only place that ever touches a real
+ * service-account connection or a real Stripe key.
+ */
+export async function applyManualRecovery(db, stripe, args) {
   const { uid, subscriptionId, priceId, evidenceStripeSessionId, evidenceNote, ambiguousAccountDocId, operator, dryRun } = args;
+
+  const preUserSnap = await db.collection('users').doc(uid).get();
+  if (!preUserSnap.exists) throw new UsageError(`users/${uid} does not exist`);
+
+  // Independent Stripe verification happens BEFORE the transaction — see
+  // verifyPurchaseAgainstStripe for what it checks and why. A failure here never touches
+  // Firestore at all, not even to read further.
+  await verifyPurchaseAgainstStripe({ stripe, userData: preUserSnap.data(), uid, subscriptionId, priceId, evidenceStripeSessionId });
 
   return db.runTransaction(async (tx) => {
     // ── READ PHASE ──────────────────────────────────────────────────────────────────────────
@@ -95,6 +210,18 @@ export async function applyManualRecovery(db, args) {
     const userRef = db.collection('users').doc(uid);
     const userSnap = await tx.get(userRef);
     if (!userSnap.exists) throw new UsageError(`users/${uid} does not exist`);
+
+    // Re-check against a FRESH read, inside the transaction — closes the gap between the
+    // Stripe pre-check above and this commit (e.g. a concurrent webhook grant binding a
+    // different subscription to this account in between). No new Stripe call is needed: the
+    // Stripe-side facts (customer, price, status) don't change within this window; only
+    // Firestore's own state can race here.
+    const userData = userSnap.data();
+    if (userData.stripeSubscriptionId && userData.stripeSubscriptionId !== subscriptionId) {
+      throw new EvidenceValidationError(
+        `users/${uid} now has a different subscription (${userData.stripeSubscriptionId}) on file — aborting to avoid overwriting its balance and usage`
+      );
+    }
 
     let ambiguousRef = null;
     let ambiguousSnap = null;
@@ -144,6 +271,11 @@ async function main() {
     console.error('FIREBASE_SERVICE_ACCOUNT_PATH is required: a WRITE-capable service-account key.');
     process.exit(1);
   }
+  const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+  if (!stripeSecretKey) {
+    console.error('STRIPE_SECRET_KEY is required: this tool independently verifies the purchase against Stripe, it does not run on claimed evidence alone.');
+    process.exit(1);
+  }
   let key;
   try {
     key = JSON.parse(readFileSync(keyPath, 'utf8'));
@@ -154,11 +286,13 @@ async function main() {
 
   const { initializeApp, cert } = await import('firebase-admin/app');
   const { getFirestore } = await import('firebase-admin/firestore');
+  const { default: Stripe } = await import('stripe');
   initializeApp({ credential: cert(key) });
   const db = getFirestore();
+  const stripe = new Stripe(stripeSecretKey);
 
   try {
-    const result = await applyManualRecovery(db, args);
+    const result = await applyManualRecovery(db, stripe, args);
     if (result.dryRun) {
       console.log('DRY RUN — nothing written. Would write:');
       console.log(JSON.stringify(result.wouldWrite, null, 2));
@@ -171,7 +305,7 @@ async function main() {
       console.log(err.message);
       process.exit(2); // idempotent no-op, not a failure
     }
-    if (err instanceof UsageError) { console.error(err.message); process.exit(1); }
+    if (err instanceof UsageError || err instanceof EvidenceValidationError) { console.error(err.message); process.exit(1); }
     console.error('Recovery transaction failed:', err);
     process.exit(1);
   }

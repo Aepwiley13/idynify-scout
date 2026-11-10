@@ -14,10 +14,22 @@ describe('creditGrantFields — shared between the automated webhook path and ma
     process.env.STRIPE_PRICE_PRO = 'price_pro_unit';
   });
 
-  it('tierForPrice maps the pro price to pro and everything else to starter', () => {
+  it('tierForPrice maps the two configured prices and refuses to default anything else', () => {
     expect(tierForPrice('price_pro_unit')).toBe('pro');
     expect(tierForPrice('price_starter_unit')).toBe('starter');
-    expect(tierForPrice('price_unrelated')).toBe('starter');
+  });
+
+  it('tierForPrice throws for a genuinely unrecognized price — never silently defaults to starter', () => {
+    expect(() => tierForPrice('price_unrelated')).toThrow(/not a recognized credit-granting price/);
+  });
+
+  it('tierForPrice throws for a known-but-free price (e.g. the $0/month Scout Starter price) — being recognized elsewhere is not enough', () => {
+    process.env.STRIPE_PRICE_SCOUT_STARTER_FREE = 'price_scout_starter_free_unit';
+    expect(() => tierForPrice('price_scout_starter_free_unit')).toThrow(/not a recognized credit-granting price/);
+  });
+
+  it('creditGrantFields throws for an unrecognized price rather than silently granting starter credits', () => {
+    expect(() => creditGrantFields('price_unrelated')).toThrow(/not a recognized credit-granting price/);
   });
 
   it('grants starter credits for the starter price', () => {

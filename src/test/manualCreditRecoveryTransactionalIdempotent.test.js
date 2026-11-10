@@ -22,6 +22,19 @@ import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 
 const FIRESTORE_EMULATOR_AVAILABLE = Boolean(process.env.FIRESTORE_EMULATOR_HOST);
 
+/**
+ * A minimal, literal fake — no vi.mock needed since applyManualRecovery takes `stripe` as a
+ * plain injected parameter, same as `db`. Each test builds one consistent with its own scenario
+ * (matching customer, price, status, and evidence), since verifyPurchaseAgainstStripe now
+ * independently checks all of that before any write happens.
+ */
+function fakeStripe({ subscriptions = {}, sessions = {} } = {}) {
+  return {
+    subscriptions: { retrieve: async (id) => { if (!subscriptions[id]) throw new Error(`no such subscription: ${id}`); return subscriptions[id]; } },
+    checkout: { sessions: { retrieve: async (id) => { if (!sessions[id]) throw new Error(`no such checkout session: ${id}`); return sessions[id]; } } },
+  };
+}
+
 describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
   'manualCreditRecovery: transactional, idempotent, evidence-required (run via: npm run test:billing-emulator)',
   () => {
@@ -43,7 +56,12 @@ describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
       details: { sessionId: 'cs_recover_1', subscriptionId: 'sub_recover_1' },
     });
 
-    const result = await applyManualRecovery(db, {
+    const stripe = fakeStripe({
+      subscriptions: { sub_recover_1: { customer: 'cus_recover_1', status: 'active', items: { data: [{ price: { id: 'price_starter' } }] } } },
+      sessions: { cs_recover_1: { subscription: 'sub_recover_1', payment_status: 'paid' } },
+    });
+
+    const result = await applyManualRecovery(db, stripe, {
       uid: 'uid_recover_1', subscriptionId: 'sub_recover_1', priceId: 'price_starter',
       evidenceStripeSessionId: 'cs_recover_1', evidenceNote: 'Confirmed paid invoice in Stripe, paymentCompletedAt correlates, no prior billingAllocations marker.',
       ambiguousAccountDocId: ambigRef.id, operator: 'aaron',
@@ -67,15 +85,19 @@ describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
 
   it('is idempotent: a second run for the same subscriptionId is a clean no-op, not a double grant', async () => {
     await db.collection('users').doc('uid_recover_2').set({ email: 'recover2@example.test' });
+    const stripe = fakeStripe({
+      subscriptions: { sub_recover_2: { customer: 'cus_recover_2', status: 'active', items: { data: [{ price: { id: 'price_starter' } }] } } },
+      sessions: { cs_recover_2: { subscription: 'sub_recover_2', payment_status: 'paid' } },
+    });
     const args = {
       uid: 'uid_recover_2', subscriptionId: 'sub_recover_2', priceId: 'price_starter',
       evidenceStripeSessionId: 'cs_recover_2', evidenceNote: 'Verified against Stripe invoice.',
     };
 
-    const first = await applyManualRecovery(db, args);
+    const first = await applyManualRecovery(db, stripe, args);
     expect(first.applied).toBe(true);
 
-    await expect(applyManualRecovery(db, args)).rejects.toThrow(AlreadyGrantedError);
+    await expect(applyManualRecovery(db, stripe, args)).rejects.toThrow(AlreadyGrantedError);
 
     // Exactly one grant landed, not two.
     const userDoc = await db.collection('users').doc('uid_recover_2').get();
@@ -84,14 +106,18 @@ describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
 
   it('is safe even if two recovery attempts race concurrently for the same subscriptionId', async () => {
     await db.collection('users').doc('uid_recover_3').set({ email: 'recover3@example.test' });
+    const stripe = fakeStripe({
+      subscriptions: { sub_recover_3: { customer: 'cus_recover_3', status: 'active', items: { data: [{ price: { id: 'price_pro' } }] } } },
+      sessions: { cs_recover_3: { subscription: 'sub_recover_3', payment_status: 'paid' } },
+    });
     const args = {
       uid: 'uid_recover_3', subscriptionId: 'sub_recover_3', priceId: 'price_pro',
       evidenceStripeSessionId: 'cs_recover_3', evidenceNote: 'Verified against Stripe invoice.',
     };
 
     const results = await Promise.allSettled([
-      applyManualRecovery(db, args),
-      applyManualRecovery(db, args),
+      applyManualRecovery(db, stripe, args),
+      applyManualRecovery(db, stripe, args),
     ]);
 
     const fulfilled = results.filter((r) => r.status === 'fulfilled');
@@ -118,7 +144,11 @@ describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
 
   it('a --dry-run reports what it would write without writing anything', async () => {
     await db.collection('users').doc('uid_recover_4').set({ email: 'recover4@example.test' });
-    const result = await applyManualRecovery(db, {
+    const stripe = fakeStripe({
+      subscriptions: { sub_recover_4: { customer: 'cus_recover_4', status: 'active', items: { data: [{ price: { id: 'price_starter' } }] } } },
+      sessions: { cs_recover_4: { subscription: 'sub_recover_4', payment_status: 'paid' } },
+    });
+    const result = await applyManualRecovery(db, stripe, {
       uid: 'uid_recover_4', subscriptionId: 'sub_recover_4', priceId: 'price_starter',
       evidenceStripeSessionId: 'cs_recover_4', evidenceNote: 'test', dryRun: true,
     });

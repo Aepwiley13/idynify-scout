@@ -10,13 +10,22 @@ export const TIER_CREDITS = {
   pro: { credits: 1250, companies: 125, contacts: 375, support: '24-hour email' },
 };
 
+/**
+ * Round-10 review finding: this used to default ANY priceId that wasn't literally
+ * STRIPE_PRICE_PRO to 'starter' — including a totally unknown price, or the $0/month Scout
+ * Starter free price. Both callers already gate with isCreditGrantingPrice() before reaching
+ * here, but this is the shared, load-bearing function itself, so it fails closed on its own
+ * rather than trusting every future caller to remember to gate first.
+ */
 export function tierForPrice(priceId) {
-  return priceId === process.env.STRIPE_PRICE_PRO ? 'pro' : 'starter';
+  if (priceId === process.env.STRIPE_PRICE_PRO) return 'pro';
+  if (priceId === process.env.STRIPE_PRICE_STARTER) return 'starter';
+  throw new Error(`tierForPrice: ${priceId} is not a recognized credit-granting price (expected STRIPE_PRICE_STARTER or STRIPE_PRICE_PRO) — refusing to default to a tier`);
 }
 
 export function creditGrantFields(priceId) {
   const tier = tierForPrice(priceId);
-  const config = TIER_CREDITS[tier] ?? TIER_CREDITS.starter;
+  const config = TIER_CREDITS[tier];
   const nextReset = new Date();
   nextReset.setMonth(nextReset.getMonth() + 1);
   return {

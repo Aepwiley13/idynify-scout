@@ -10,26 +10,28 @@ import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { requireProjectId } from './utils/firebaseEnv.js';
 
+// Test runs against the Firestore emulator (billing hardening PR 1's integration suite,
+// `firebase emulators:exec` sets this). The emulator doesn't check credentials — only a
+// project id is needed, never real service-account values. A separate, earlier guard
+// (not nested inside the block below) so that block stays byte-for-byte the original
+// deployed path — asserted directly by src/test/adminCredential.test.js.
+if (getApps().length === 0 && process.env.FIRESTORE_EMULATOR_HOST) {
+  initializeApp({ projectId: requireProjectId() });
+}
+
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {
-  if (process.env.FIRESTORE_EMULATOR_HOST) {
-    // Test runs against the Firestore emulator (billing hardening PR 1's integration suite,
-    // `firebase emulators:exec` sets this). The emulator doesn't check credentials — only a
-    // project id is needed, never real service-account values.
-    initializeApp({ projectId: requireProjectId() });
-  } else {
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY
-      ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-      : undefined;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY
+    ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
+    : undefined;
 
-    initializeApp({
-      credential: cert({
-        projectId: requireProjectId(),
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey: privateKey
-      })
-    });
-  }
+  initializeApp({
+    credential: cert({
+      projectId: requireProjectId(),
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: privateKey
+    })
+  });
 }
 
 // Create auth instance

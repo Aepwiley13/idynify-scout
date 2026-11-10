@@ -146,7 +146,7 @@ beforeEach(() => {
 describe('genuine reply advances Awaiting Reply -> In Conversation', () => {
   it('writes hunter_status, contact_status, the marker, and exactly one message_received timeline event', async () => {
     const db = makeFakeDb({
-      [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1', name: 'Jane' },
+      [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1', name: 'Jane', email: 'jane@acme.com' },
     });
     const gmail = makeGmail();
     const reply = message('m1', [header('From', 'jane@acme.com'), header('Subject', 'Re: Checking in')]);
@@ -172,7 +172,7 @@ describe('genuine reply advances Awaiting Reply -> In Conversation', () => {
 
   it('a Dormant contact can still be advanced by a genuine new reply — it legitimately resets the clock, same as a real resend', async () => {
     const db = makeFakeDb({
-      [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Dormant', gmail_thread_id: 't1' },
+      [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Dormant', gmail_thread_id: 't1', email: 'jane@acme.com' },
     });
     const gmail = makeGmail();
     thread(gmail, 't1', [OUTBOUND, message('m1', [header('From', 'jane@acme.com'), header('Subject', 'Re: Checking in')])]);
@@ -217,7 +217,7 @@ describe('automated mail is never treated as a reply', () => {
 
   it('a human reply asking to stop emailing is still a genuine reply — opt-out/sentiment detection is an explicit non-goal', async () => {
     const db = makeFakeDb({
-      [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1' },
+      [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1', email: 'jane@acme.com' },
     });
     const gmail = makeGmail();
     // Ordinary headers — nothing automated about this message's envelope,
@@ -297,7 +297,7 @@ describe('durable, message-level idempotency', () => {
     // transaction re-reads the marker fresh, so whichever commits first
     // wins and the second is a no-op by construction — not by luck.
     const db = makeFakeDb({
-      [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1' },
+      [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1', email: 'jane@acme.com' },
     });
     const gmail = makeGmail();
     thread(gmail, 't1', [OUTBOUND, message('m1', [header('From', 'jane@acme.com'), header('Subject', 'Re: Checking in')])]);
@@ -409,7 +409,7 @@ describe('needsReconnect propagation (unchanged behavior)', () => {
   it('a 403 from a thread check is reported as needsReconnect without throwing the whole run', async () => {
     const db = makeFakeDb({
       [contactPath('c1')]: { id: 'c1', hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1' },
-      [contactPath('c2')]: { id: 'c2', hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't2' },
+      [contactPath('c2')]: { id: 'c2', hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't2', email: 'bob@acme.com' },
     });
     const gmail = {
       users: {
@@ -435,7 +435,7 @@ describe('a second genuine reply is still processed once the contact is already 
     const db = makeFakeDb({
       [contactPath()]: {
         id: CONTACT_ID, hunter_status: 'in_conversation', contact_status: 'In Conversation',
-        gmail_thread_id: 't1', gmail_last_processed_reply_id: 'm1',
+        gmail_thread_id: 't1', gmail_last_processed_reply_id: 'm1', email: 'jane@acme.com',
       },
     });
     const gmail = makeGmail();
@@ -517,16 +517,27 @@ describe('sender identity verification', () => {
     expect(entries[0].metadata.fromAddress).toContain('bob@acme.com');
   });
 
-  it('a contact with no known email identity at all falls back to treating any non-self sender as genuine — no identity data to be strict against', async () => {
+  it('a contact with no known email identity at all does NOT get a non-self sender auto-attributed as a verified reply', async () => {
     const db = makeFakeDb({
       [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1' },
     });
     const gmail = makeGmail();
     thread(gmail, 't1', [OUTBOUND, message('m1', [header('From', 'someone@acme.com'), header('Subject', 'Re: Checking in')])]);
 
-    await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
+    const result = await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
 
-    expect(db._docs[contactPath()].contact_status).toBe('In Conversation');
+    // No identity on file to verify against — this must be 'unverified', not
+    // 'genuine'. It must not count as a confirmed reply or move the stage.
+    expect(result.transitioned).toHaveLength(0);
+    const contact = db._docs[contactPath()];
+    expect(contact.contact_status).toBe('Awaiting Reply'); // unchanged
+    expect(contact.hunter_status).toBe('awaiting_reply'); // unchanged
+
+    // Still recorded, just flagged — nothing silently dropped.
+    const entries = timelineEntries(db);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].metadata.senderVerified).toBe(false);
+    expect(entries[0].metadata.fromAddress).toContain('someone@acme.com');
   });
 });
 

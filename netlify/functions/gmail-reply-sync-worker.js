@@ -29,6 +29,34 @@
  * Users are processed serially, same reasoning as gmail-sync-worker.js:
  * one slow or failing mailbox must not exhaust the run's time budget or
  * block any other user's threads from being checked.
+ *
+ * ROLLOUT CONTROL
+ * ----------------
+ * This worker is gated by GMAIL_REPLY_SYNC_ENABLED, which defaults OFF —
+ * unset, or set to anything other than the literal string 'true' — in
+ * every environment, production and Netlify deploy previews included.
+ * While off, runReplySync returns immediately, BEFORE findConnectedGmailUsers
+ * is called: no mailbox enumeration, no OAuth client, no Gmail API call.
+ * This flag is independent of GMAIL_IDENTITY_MODE and does not touch it.
+ *
+ * The manual "Sync Replies" button (gmail-poll-replies.js) is a separate
+ * HTTP function and is NOT gated by this flag — it keeps working exactly
+ * as it does today regardless of this worker's rollout state.
+ *
+ * Rollout procedure:
+ *   1. Internal test — set GMAIL_REPLY_SYNC_ENABLED=true AND
+ *      GMAIL_REPLY_SYNC_USER_ALLOWLIST=<comma-separated userIds> in the
+ *      target environment (e.g. just Aaron's own userId). Only those
+ *      users are ever passed to syncUserReplies; everyone else is skipped
+ *      exactly as if the worker were off for them.
+ *   2. Verify — watch the gmail.reply_sync.ok / gmail.reply_sync.partial_failure
+ *      logs and alertOps output for those users over a few 10-minute runs.
+ *   3. Broaden — once satisfied, remove GMAIL_REPLY_SYNC_USER_ALLOWLIST
+ *      (leave GMAIL_REPLY_SYNC_ENABLED=true). With no allowlist set, every
+ *      connected account is checked — the same accounts the manual button
+ *      already reaches, just on a schedule.
+ *   To pause entirely at any point, set GMAIL_REPLY_SYNC_ENABLED back to
+ *   unset/false — no code change, no redeploy required.
  */
 
 import { schedule } from '@netlify/functions';
@@ -44,6 +72,28 @@ import { requireProjectId } from './utils/firebaseEnv.js';
 
 /** This worker's own fairness-rotation field — see findConnectedGmailUsers's docstring. */
 const REPLY_SYNC_ROTATION_FIELD = 'lastReplySyncAt';
+
+/**
+ * Master rollout switch — see this file's ROLLOUT CONTROL docstring above.
+ * Defaults OFF: only the exact string 'true' turns the worker on, so an
+ * unset var (every environment until explicitly configured, deploy
+ * previews included) is off by construction, not by convention.
+ */
+export function isReplySyncEnabled(env = process.env) {
+  return env.GMAIL_REPLY_SYNC_ENABLED === 'true';
+}
+
+/**
+ * Optional internal-test allowlist. Returns null (no restriction — every
+ * connected user is in scope) when unset or empty; otherwise a Set of
+ * userIds, trimmed, for syncUserReplies to be limited to.
+ */
+export function getReplySyncAllowlist(env = process.env) {
+  const raw = env.GMAIL_REPLY_SYNC_USER_ALLOWLIST;
+  if (!raw) return null;
+  const ids = raw.split(',').map((s) => s.trim()).filter(Boolean);
+  return ids.length > 0 ? new Set(ids) : null;
+}
 
 if (getApps().length === 0) {
   const privateKey = process.env.FIREBASE_PRIVATE_KEY
@@ -126,14 +176,37 @@ export async function syncUserReplies(db, user) {
 /**
  * Run one full reply-check pass across every connected Gmail account.
  *
+ * Gated by GMAIL_REPLY_SYNC_ENABLED (see this file's ROLLOUT CONTROL
+ * docstring). When disabled, this returns immediately — before
+ * findConnectedGmailUsers, before any OAuth client, before any Gmail call.
+ *
  * @param {import('firebase-admin/firestore').Firestore} db
- * @param {{ now?: number, budgetMs?: number }} [options]
+ * @param {{ now?: number, budgetMs?: number, enabled?: boolean, allowlist?: Set<string>|null }} [options]
+ *   `enabled`/`allowlist` default to reading GMAIL_REPLY_SYNC_ENABLED /
+ *   GMAIL_REPLY_SYNC_USER_ALLOWLIST from the environment; tests override
+ *   them directly rather than mutating process.env.
  */
 export async function runReplySync(db, options = {}) {
   const startedAt = options.now ?? Date.now();
   const budgetMs = options.budgetMs ?? RUN_BUDGET_MS;
+  const enabled = options.enabled ?? isReplySyncEnabled();
 
-  const users = await findConnectedGmailUsers(db, undefined, REPLY_SYNC_ROTATION_FIELD);
+  if (!enabled) {
+    log('disabled via GMAIL_REPLY_SYNC_ENABLED — skipping run (no account enumeration, no OAuth, no Gmail calls)');
+    return {
+      usersConsidered: 0, usersSynced: 0, usersDeferred: 0,
+      totals: { checked: 0, transitioned: 0, failed: 0 },
+      results: [], durationMs: Date.now() - startedAt, disabled: true,
+    };
+  }
+
+  const allowlist = options.allowlist ?? getReplySyncAllowlist();
+
+  let users = await findConnectedGmailUsers(db, undefined, REPLY_SYNC_ROTATION_FIELD);
+  if (allowlist) {
+    users = users.filter((u) => allowlist.has(u.userId));
+    log(`rollout allowlist active — restricting this run to ${users.length} user(s)`);
+  }
   log(`starting run — ${users.length} connected account(s)`);
 
   const results = [];

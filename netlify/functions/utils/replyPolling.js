@@ -115,18 +115,20 @@ function knownContactIdentities(contact) {
  *
  * When the contact has no known email identity on file at all (should not
  * happen in practice — gmail_thread_id implies we sent them mail — but
- * nothing here assumes it can't), this returns true rather than dropping
- * the message outright: there is no identity data to be strict against,
- * and silently losing activity is worse than the narrow case this exists
- * to catch. "Handling legitimate aliases safely" means a known alias
- * (contact.email/primaryEmail/secondaryEmails) always verifies; an address
- * that matches NONE of them does not get silently dropped either — see
- * classifyReply, which still records it, just without driving a
- * relationship-stage transition.
+ * nothing here assumes it can't), this returns false: there is nothing on
+ * file to verify against, so a non-self sender is treated the same as any
+ * other unmatched address, not specially trusted for lack of a record to
+ * check it against. The message is not dropped either way — see
+ * classifyReply, whose 'unverified' outcome still records it (timelined,
+ * senderVerified:false) without crediting it as the contact's own reply or
+ * driving a relationship-stage transition. "Handling legitimate aliases
+ * safely" means a known alias (contact.email/primaryEmail/secondaryEmails)
+ * always verifies; a contact with none of those on file simply has nothing
+ * that can.
  */
 function isVerifiedContactSender(message, contact) {
   const identities = knownContactIdentities(contact);
-  if (identities.size === 0) return true;
+  if (identities.size === 0) return false;
   return identities.has(extractEmailAddress(headerValue(message, 'From')));
 }
 

@@ -45,7 +45,9 @@ vi.mock('../../netlify/functions/utils/alertOps.js', () => ({
   alertOps: vi.fn(async (args) => { h.alertCalls.push(args); }),
 }));
 
-const { runReplySync, syncUserReplies, replySyncHandler } = await import('../../netlify/functions/gmail-reply-sync-worker.js');
+const {
+  runReplySync, syncUserReplies, replySyncHandler, isReplySyncEnabled, getReplySyncAllowlist,
+} = await import('../../netlify/functions/gmail-reply-sync-worker.js');
 const { findConnectedGmailUsers } = await import('../../netlify/functions/gmail-sync-worker.js');
 const { getOAuthClient } = await import('../../netlify/functions/utils/gmailMessageService.js');
 const { pollRepliesForUser } = await import('../../netlify/functions/utils/replyPolling.js');
@@ -73,6 +75,11 @@ beforeEach(() => {
   findConnectedGmailUsers.mockClear();
   getOAuthClient.mockClear();
   pollRepliesForUser.mockClear();
+  // Rollout flag must default off regardless of what the host shell's env
+  // happens to carry — every test that needs the worker actually running
+  // opts in explicitly via { enabled: true } or by setting these itself.
+  delete process.env.GMAIL_REPLY_SYNC_ENABLED;
+  delete process.env.GMAIL_REPLY_SYNC_USER_ALLOWLIST;
 });
 
 describe('syncUserReplies', () => {
@@ -110,7 +117,7 @@ describe('runReplySync', () => {
     h.pollResultByUser.u1 = { transitioned: [{ contactId: 'c1' }], checkedCount: 2, needsReconnect: false };
     h.pollResultByUser.u2 = { transitioned: [], checkedCount: 3, needsReconnect: false };
 
-    const summary = await runReplySync(makeFakeDb());
+    const summary = await runReplySync(makeFakeDb(), { enabled: true });
 
     expect(summary.usersConsidered).toBe(2);
     expect(summary.usersSynced).toBe(2);
@@ -122,7 +129,7 @@ describe('runReplySync', () => {
     h.pollResultByUser.u1 = { throw: 'u1 blew up' };
     h.pollResultByUser.u2 = { transitioned: [], checkedCount: 1, needsReconnect: false };
 
-    const summary = await runReplySync(makeFakeDb());
+    const summary = await runReplySync(makeFakeDb(), { enabled: true });
 
     expect(summary.usersSynced).toBe(2);
     expect(summary.totals.failed).toBe(1);
@@ -133,7 +140,7 @@ describe('runReplySync', () => {
     h.users = [{ userId: 'u1' }, { userId: 'u2' }, { userId: 'u3' }];
     h.pollResultByUser.u1 = { transitioned: [], checkedCount: 1, needsReconnect: false };
 
-    const summary = await runReplySync(makeFakeDb(), { now: Date.now() - 1_000_000, budgetMs: 0 });
+    const summary = await runReplySync(makeFakeDb(), { enabled: true, now: Date.now() - 1_000_000, budgetMs: 0 });
 
     expect(summary.usersSynced).toBe(0);
     expect(summary.usersDeferred).toBe(3);
@@ -141,12 +148,90 @@ describe('runReplySync', () => {
 
   it('calls findConnectedGmailUsers with its own rotation field, not the default', async () => {
     h.users = [];
-    await runReplySync(makeFakeDb());
+    await runReplySync(makeFakeDb(), { enabled: true });
     expect(findConnectedGmailUsers).toHaveBeenCalledWith(expect.anything(), undefined, 'lastReplySyncAt');
   });
 });
 
-describe('replySyncHandler', () => {
+describe('rollout gating (GMAIL_REPLY_SYNC_ENABLED / allowlist)', () => {
+  it('isReplySyncEnabled is false for unset, empty, or any value other than the exact string "true"', () => {
+    expect(isReplySyncEnabled({})).toBe(false);
+    expect(isReplySyncEnabled({ GMAIL_REPLY_SYNC_ENABLED: '' })).toBe(false);
+    expect(isReplySyncEnabled({ GMAIL_REPLY_SYNC_ENABLED: 'TRUE' })).toBe(false);
+    expect(isReplySyncEnabled({ GMAIL_REPLY_SYNC_ENABLED: '1' })).toBe(false);
+    expect(isReplySyncEnabled({ GMAIL_REPLY_SYNC_ENABLED: 'true' })).toBe(true);
+  });
+
+  it('getReplySyncAllowlist returns null when unset, a trimmed Set when populated', () => {
+    expect(getReplySyncAllowlist({})).toBeNull();
+    expect(getReplySyncAllowlist({ GMAIL_REPLY_SYNC_USER_ALLOWLIST: '' })).toBeNull();
+    const allowlist = getReplySyncAllowlist({ GMAIL_REPLY_SYNC_USER_ALLOWLIST: ' u1, u2 ,u3' });
+    expect(allowlist).toEqual(new Set(['u1', 'u2', 'u3']));
+  });
+
+  it('disabled by default: no account enumeration, no OAuth, no Gmail calls — the run is a true no-op', async () => {
+    h.users = [{ userId: 'u1' }]; // would be processed if the gate were open
+    h.pollResultByUser.u1 = { transitioned: [{ contactId: 'c1' }], checkedCount: 1, needsReconnect: false };
+
+    const summary = await runReplySync(makeFakeDb()); // no options — reads env, which beforeEach cleared
+
+    expect(summary.disabled).toBe(true);
+    expect(summary.usersConsidered).toBe(0);
+    expect(summary.usersSynced).toBe(0);
+    expect(summary.totals).toEqual({ checked: 0, transitioned: 0, failed: 0 });
+    // The actual guarantee Aaron asked for: these never even get called.
+    expect(findConnectedGmailUsers).not.toHaveBeenCalled();
+    expect(getOAuthClient).not.toHaveBeenCalled();
+    expect(pollRepliesForUser).not.toHaveBeenCalled();
+  });
+
+  it('an allowlist restricts the run to only the listed userIds, independent of how many are connected', async () => {
+    h.users = [{ userId: 'u1' }, { userId: 'u2' }, { userId: 'u3' }];
+    h.pollResultByUser.u2 = { transitioned: [], checkedCount: 1, needsReconnect: false };
+
+    const summary = await runReplySync(makeFakeDb(), { enabled: true, allowlist: new Set(['u2']) });
+
+    expect(summary.usersConsidered).toBe(1);
+    expect(summary.usersSynced).toBe(1);
+    expect(summary.results[0].userId).toBe('u2');
+    expect(getOAuthClient).toHaveBeenCalledTimes(1);
+    expect(getOAuthClient).toHaveBeenCalledWith('u2', expect.anything());
+  });
+
+  it('replySyncHandler itself stays off by default (the real entry point, not just the inner function)', async () => {
+    h.users = [{ userId: 'u1' }];
+    h.pollResultByUser.u1 = { transitioned: [{ contactId: 'c1' }], checkedCount: 1, needsReconnect: false };
+
+    const res = await replySyncHandler(); // no env var set — beforeEach cleared it
+
+    expect(res.statusCode).toBe(200); // disabled is a clean no-op, not a failure
+    const body = JSON.parse(res.body);
+    expect(body.usersConsidered).toBe(0);
+    expect(findConnectedGmailUsers).not.toHaveBeenCalled();
+    expect(h.alertCalls).toHaveLength(0); // a disabled run never alerts ops
+  });
+
+  it('replySyncHandler processes accounts once GMAIL_REPLY_SYNC_ENABLED=true is set in the environment', async () => {
+    h.users = [{ userId: 'u1' }];
+    h.pollResultByUser.u1 = { transitioned: [], checkedCount: 1, needsReconnect: false };
+    process.env.GMAIL_REPLY_SYNC_ENABLED = 'true';
+
+    const res = await replySyncHandler();
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.usersConsidered).toBe(1);
+    expect(findConnectedGmailUsers).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('replySyncHandler (with the rollout flag enabled — processing behavior, not gating)', () => {
+  beforeEach(() => {
+    // These tests are about what happens once the worker IS running, same
+    // as before the rollout flag existed — gating itself is covered above.
+    process.env.GMAIL_REPLY_SYNC_ENABLED = 'true';
+  });
+
   it('returns 200 when every account succeeds', async () => {
     h.users = [{ userId: 'u1' }];
     h.pollResultByUser.u1 = { transitioned: [], checkedCount: 0, needsReconnect: false };

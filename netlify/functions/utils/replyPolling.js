@@ -68,6 +68,17 @@ function headerValue(message, name) {
   return message.payload?.headers?.find(h => h.name === name)?.value || '';
 }
 
+/** Lowercased, trimmed — the normal form every identity comparison here uses. */
+function normalizeEmail(addr) {
+  return (addr || '').toLowerCase().trim();
+}
+
+/** "Jane Doe <jane@acme.com>" -> "jane@acme.com"; a bare address is returned as-is. */
+function extractEmailAddress(fromHeaderValue) {
+  const match = (fromHeaderValue || '').match(/<([^>]+)>/);
+  return normalizeEmail(match ? match[1] : fromHeaderValue);
+}
+
 /**
  * True when a message is NOT from the connected account — a candidate reply.
  * @param {object} message — a Gmail API message resource (metadata format)
@@ -79,21 +90,79 @@ function isFromContact(message, myEmail) {
 }
 
 /**
- * True when classifyMessage calls this message AUTOMATED — a bounce,
- * out-of-office, mailing-list send, or similar machine-generated mail that
- * must never be treated as the contact answering. Reuses the existing,
- * tested classifier; invents nothing new.
- *
- * REPLY vs NEW_INBOUND vs UNKNOWN (classifyMessage's other three outcomes)
- * are irrelevant here and deliberately not consulted — this message is
- * already on a thread Idynify started and is tracking by gmail_thread_id,
- * so "not automated" is sufficient to call it a genuine reply.
+ * Every address this contact is known to send from: the primary email field
+ * plus whatever alias fields the rest of the codebase already recognizes
+ * for the same contact (isKnownContact in gmailMessageService.js checks the
+ * same three fields when resolving a NEW inbound sender) — reused here, not
+ * invented, for consistency with how identity is checked everywhere else.
  */
-function isAutomatedMessage(message, myEmail) {
+function knownContactIdentities(contact) {
+  const identities = new Set();
+  if (contact.email) identities.add(normalizeEmail(contact.email));
+  if (contact.primaryEmail) identities.add(normalizeEmail(contact.primaryEmail));
+  if (Array.isArray(contact.secondaryEmails)) {
+    for (const addr of contact.secondaryEmails) identities.add(normalizeEmail(addr));
+  }
+  return identities;
+}
+
+/**
+ * Is this message actually FROM the tracked contact, not merely "not from
+ * me"? A tracked thread can carry a reply from someone else entirely — a
+ * colleague replying instead of the original contact, a reply-all picking
+ * up a third party — and treating that as the contact's own answer would
+ * attribute it to the wrong person.
+ *
+ * When the contact has no known email identity on file at all (should not
+ * happen in practice — gmail_thread_id implies we sent them mail — but
+ * nothing here assumes it can't), this returns true rather than dropping
+ * the message outright: there is no identity data to be strict against,
+ * and silently losing activity is worse than the narrow case this exists
+ * to catch. "Handling legitimate aliases safely" means a known alias
+ * (contact.email/primaryEmail/secondaryEmails) always verifies; an address
+ * that matches NONE of them does not get silently dropped either — see
+ * classifyReply, which still records it, just without driving a
+ * relationship-stage transition.
+ */
+function isVerifiedContactSender(message, contact) {
+  const identities = knownContactIdentities(contact);
+  if (identities.size === 0) return true;
+  return identities.has(extractEmailAddress(headerValue(message, 'From')));
+}
+
+/**
+ * Classify one reply-candidate message into exactly one of three
+ * outcomes, each with its own, deliberately different treatment below:
+ *
+ * - 'automated': classifyMessage (gmailMessageService.js's existing,
+ *   tested classifier — bounce, out-of-office, mailing-list, calendar
+ *   notification) says so. Never the contact answering. No timeline
+ *   event, no status change — the marker still advances past it so it is
+ *   never re-classified on a later run.
+ * - 'unverified': not automated, but the From address matches none of the
+ *   contact's known identities (email/primaryEmail/secondaryEmails) — an
+ *   unexpected third party in a thread Idynify is tracking for a specific
+ *   person. Still timelined, for visibility — nothing about this message
+ *   is dropped — but it must never drive a relationship-stage transition,
+ *   since it cannot be attributed to the tracked contact with confidence.
+ * - 'genuine': a verified, non-automated reply from the contact. The only
+ *   outcome eligible to advance hunter_status/contact_status.
+ *
+ * classifyMessage's REPLY vs NEW_INBOUND vs UNKNOWN outcomes are
+ * irrelevant here and deliberately not consulted — this message is
+ * already on a thread Idynify started and is tracking by
+ * gmail_thread_id, so only automated-vs-not and sender identity matter.
+ */
+function classifyReply(message, contact, myEmail) {
   const headers = message.payload?.headers || [];
   const from = headerValue(message, 'From');
-  const category = classifyMessage(headers, '', from, myEmail, {});
-  return category === MESSAGE_CATEGORIES.AUTOMATED;
+  if (classifyMessage(headers, '', from, myEmail, {}) === MESSAGE_CATEGORIES.AUTOMATED) {
+    return 'automated';
+  }
+  if (!isVerifiedContactSender(message, contact)) {
+    return 'unverified';
+  }
+  return 'genuine';
 }
 
 /**
@@ -118,6 +187,25 @@ function isAutomatedMessage(message, myEmail) {
  * half would fail, neither lands, so a partial failure can never leave the
  * two inconsistent with each other.
  *
+ * CANDIDATE SCOPE: includes 'in_conversation', not just 'active_mission'/
+ * 'awaiting_reply'. Excluding it once a contact had its first genuine
+ * reply would mean a SECOND reply on the same thread is never checked
+ * again — the contact is permanently out of the candidate pool the
+ * moment it most needs continued tracking. (hunter_status values outside
+ * this set — 'archived', 'none', etc. — are still excluded; a contact
+ * moved there has left the lifecycle this worker tracks.)
+ *
+ * FAIRNESS: a user with more than MAX_CONTACTS tracked threads would
+ * otherwise have the SAME arbitrary first 50 (Firestore's default
+ * ordering) checked every single run, starving every thread past #50
+ * forever. Candidates are sorted by `last_reply_check_at` ascending
+ * (never-checked first) before slicing, the same least-recently-checked
+ * rotation findConnectedGmailUsers already uses for account enumeration —
+ * so coverage rotates across runs instead of permanently favoring one
+ * subset. last_reply_check_at is stamped on every candidate actually
+ * examined, including ones with nothing new to report, by
+ * pollRepliesForContact below.
+ *
  * @param {import('firebase-admin/firestore').Firestore} db
  * @param {object} gmail — authenticated gmail_v1 client
  * @param {string} userId
@@ -128,12 +216,17 @@ export async function pollRepliesForUser(db, gmail, userId, myEmail) {
   const contactsSnap = await db
     .collection('users').doc(userId)
     .collection('contacts')
-    .where('hunter_status', 'in', ['active_mission', 'awaiting_reply'])
+    .where('hunter_status', 'in', ['active_mission', 'awaiting_reply', 'in_conversation'])
     .get();
 
   const candidates = contactsSnap.docs
     .map(d => ({ id: d.id, ...d.data() }))
     .filter(c => !!c.gmail_thread_id)
+    .sort((a, b) => {
+      const aAt = a.last_reply_check_at || '';
+      const bAt = b.last_reply_check_at || '';
+      return aAt < bAt ? -1 : aAt > bAt ? 1 : 0;
+    })
     .slice(0, MAX_CONTACTS);
 
   if (candidates.length === 0) {
@@ -162,8 +255,27 @@ export async function pollRepliesForUser(db, gmail, userId, myEmail) {
 /**
  * Check and process one contact's thread. Returns a transition summary if
  * at least one genuine reply advanced the contact, else null.
+ *
+ * last_reply_check_at is stamped unconditionally before returning, on
+ * every path including "nothing new" — it is the fairness-rotation field
+ * pollRepliesForUser sorts candidates by, not a reply-specific marker, so
+ * it must advance on every examination, not just a productive one.
+ * Best-effort: a failure to stamp it is logged, never thrown — it would
+ * otherwise turn a cheap bookkeeping write into a reason to report this
+ * contact as failed.
  */
 async function pollRepliesForContact(db, gmail, userId, contact, myEmail) {
+  try {
+    return await checkContactThread(db, gmail, userId, contact, myEmail);
+  } finally {
+    const contactRef = db.collection('users').doc(userId).collection('contacts').doc(contact.id);
+    await contactRef.update({ last_reply_check_at: new Date().toISOString() }).catch((err) => {
+      console.warn(`[replyPolling] Could not stamp last_reply_check_at for ${contact.id} (non-blocking):`, err.message);
+    });
+  }
+}
+
+async function checkContactThread(db, gmail, userId, contact, myEmail) {
   const threadRes = await gmail.users.threads.get({
     userId: 'me',
     id: contact.gmail_thread_id,
@@ -178,8 +290,29 @@ async function pollRepliesForContact(db, gmail, userId, contact, myEmail) {
   if (contactReplies.length === 0) return null;
 
   const lastProcessedId = contact.gmail_last_processed_reply_id || null;
-  const lastIdx = lastProcessedId ? contactReplies.findIndex(m => m.id === lastProcessedId) : -1;
-  const newReplies = contactReplies.slice(lastIdx + 1);
+  let startIdx;
+  if (!lastProcessedId) {
+    startIdx = 0; // never checked before — process the whole history once
+  } else {
+    const lastIdx = contactReplies.findIndex(m => m.id === lastProcessedId);
+    if (lastIdx === -1) {
+      // The marker is SET but not found in the current reply list — stale
+      // or ambiguous (the list's shape can change between runs, e.g. a
+      // message that used to count is now excluded as an unverified
+      // sender). Reprocessing from position 0 here would silently replay
+      // already-handled history as new timeline events. Fail closed:
+      // nothing from this thread this run; the next run tries again with
+      // whatever the marker and the thread look like then.
+      console.warn(
+        `[replyPolling] gmail_last_processed_reply_id ${lastProcessedId} not found in thread ` +
+        `${contact.gmail_thread_id} for contact ${contact.id} — skipping this run rather than risk replaying history`
+      );
+      return null;
+    }
+    startIdx = lastIdx + 1;
+  }
+
+  const newReplies = contactReplies.slice(startIdx);
   if (newReplies.length === 0) return null; // Nothing past the marker
 
   const contactRef = db.collection('users').doc(userId).collection('contacts').doc(contact.id);
@@ -187,7 +320,7 @@ async function pollRepliesForContact(db, gmail, userId, contact, myEmail) {
 
   for (const message of newReplies) {
     const genuine = await applyOneReply(
-      db, contactRef, contactReplies, message, myEmail, userId, contact.id, contact.gmail_thread_id
+      db, contactRef, contactReplies, message, contact, myEmail, userId, contact.id, contact.gmail_thread_id
     );
     if (genuine) lastGenuine = genuine;
   }
@@ -211,14 +344,15 @@ async function pollRepliesForContact(db, gmail, userId, contact, myEmail) {
 
 /**
  * Apply a single reply-candidate message, atomically, idempotently.
- * Returns { fromHeader } when it was a genuine (non-automated) reply that
- * this call actually applied, else null (already processed by a
- * concurrent run, or automated).
+ * Returns { fromHeader } when it was a GENUINE, verified reply that this
+ * call actually applied (the only outcome that counts toward the
+ * contact's transition/mission-update), else null — already processed by
+ * a concurrent run, automated, or from an unverified sender.
  */
-async function applyOneReply(db, contactRef, contactReplies, message, myEmail, userId, contactId, gmailThreadId) {
+async function applyOneReply(db, contactRef, contactReplies, message, contact, myEmail, userId, contactId, gmailThreadId) {
   const fromHeader = headerValue(message, 'From');
   const subjectHeader = headerValue(message, 'Subject');
-  const automated = isAutomatedMessage(message, myEmail);
+  const category = classifyReply(message, contact, myEmail); // 'automated' | 'unverified' | 'genuine'
   const receivedAt = new Date().toISOString();
   const thisIdx = contactReplies.findIndex(m => m.id === message.id);
 
@@ -248,7 +382,12 @@ async function applyOneReply(db, contactRef, contactReplies, message, myEmail, u
       updated_at: receivedAt,
     };
 
-    if (!automated) {
+    // Only a GENUINE, verified reply may advance the relationship —
+    // never an automated message, and never an unverified sender (item 2:
+    // "a non-self sender in a tracked thread is not automatically the
+    // intended contact"). An unverified sender still gets its activity
+    // recorded below, just not attributed as the contact's own answer.
+    if (category === 'genuine') {
       patch.last_reply_at = receivedAt;
       patch.last_reply_from = fromHeader;
       patch.last_interaction_at = receivedAt;
@@ -262,7 +401,12 @@ async function applyOneReply(db, contactRef, contactReplies, message, myEmail, u
 
     tx.update(contactRef, patch);
 
-    if (!automated) {
+    // Timelined for both 'genuine' and 'unverified' — only 'automated' is
+    // silent. An unverified sender's message is real activity on this
+    // thread; it just cannot be credited to the tracked contact with
+    // confidence, which senderVerified:false makes explicit for anyone
+    // reading the history back.
+    if (category !== 'automated') {
       // Written directly via tx.set, not through timelineWrite.js's
       // writeTimelineEvent — that helper only exposes a non-transactional
       // .add(), which would reopen exactly the inconsistency this function
@@ -287,6 +431,7 @@ async function applyOneReply(db, contactRef, contactReplies, message, myEmail, u
           gmailThreadId,
           fromAddress: fromHeader,
           autoDetected: true,
+          senderVerified: category === 'genuine',
           receivedAt,
         },
       });
@@ -295,7 +440,7 @@ async function applyOneReply(db, contactRef, contactReplies, message, myEmail, u
     return true;
   });
 
-  return applied && !automated ? { fromHeader } : null;
+  return applied && category === 'genuine' ? { fromHeader } : null;
 }
 
 async function updateMissionOnReply(db, userId, contact, lastGenuine) {

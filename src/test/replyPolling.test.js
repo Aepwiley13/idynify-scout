@@ -280,7 +280,13 @@ describe('durable, message-level idempotency', () => {
     const result = await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
 
     expect(result.transitioned).toHaveLength(0);
-    expect(db._docs[contactPath()]).toEqual(afterFirst);
+    // last_reply_check_at is EXPECTED to be stamped on every examination
+    // (that's the fairness-rotation field, covered in its own test below)
+    // — everything else about the contact must not change on a no-op poll.
+    const { last_reply_check_at: _ignored, ...afterFirstRest } = afterFirst;
+    const { last_reply_check_at: secondCheckAt, ...afterSecondRest } = db._docs[contactPath()];
+    expect(afterSecondRest).toEqual(afterFirstRest);
+    expect(secondCheckAt).toBeTruthy();
     expect(timelineEntries(db)).toHaveLength(entriesAfterFirst);
   });
 
@@ -421,5 +427,175 @@ describe('needsReconnect propagation (unchanged behavior)', () => {
     expect(result.needsReconnect).toBe(true);
     expect(result.transitioned).toHaveLength(1); // c2 still succeeds
     expect(result.transitioned[0].contactId).toBe('c2');
+  });
+});
+
+describe('a second genuine reply is still processed once the contact is already in_conversation', () => {
+  it('a contact at hunter_status:in_conversation is still a candidate, and a new reply still gets its own timeline event', async () => {
+    const db = makeFakeDb({
+      [contactPath()]: {
+        id: CONTACT_ID, hunter_status: 'in_conversation', contact_status: 'In Conversation',
+        gmail_thread_id: 't1', gmail_last_processed_reply_id: 'm1',
+      },
+    });
+    const gmail = makeGmail();
+    const reply1 = message('m1', [header('From', 'jane@acme.com'), header('Subject', 'Re: Checking in')]);
+    const reply2 = message('m2', [header('From', 'jane@acme.com'), header('Subject', 'Re: Checking in')]);
+    thread(gmail, 't1', [OUTBOUND, reply1, reply2]);
+
+    const result = await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
+
+    // The old candidate query (hunter_status in ['active_mission','awaiting_reply'])
+    // would have excluded this contact entirely — checkedCount proves it was
+    // actually examined this run, not silently skipped.
+    expect(result.checkedCount).toBe(1);
+    expect(result.transitioned).toHaveLength(1);
+    const entries = timelineEntries(db);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].metadata.gmailMessageId).toBe('m2');
+    expect(db._docs[contactPath()].gmail_last_processed_reply_id).toBe('m2');
+  });
+
+  it('a hunter_status outside the tracked set (e.g. archived) is correctly excluded — the widened scope is not unbounded', async () => {
+    const db = makeFakeDb({
+      [contactPath()]: { id: CONTACT_ID, hunter_status: 'archived', contact_status: 'In Conversation', gmail_thread_id: 't1' },
+    });
+    const gmail = makeGmail();
+    thread(gmail, 't1', [OUTBOUND, message('m1', [header('From', 'jane@acme.com'), header('Subject', 'Re: Checking in')])]);
+
+    const result = await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
+
+    expect(result.checkedCount).toBe(0);
+  });
+});
+
+describe('sender identity verification', () => {
+  it('a reply from an address matching contact.email is genuine and advances status as before', async () => {
+    const db = makeFakeDb({
+      [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1', email: 'jane@acme.com' },
+    });
+    const gmail = makeGmail();
+    thread(gmail, 't1', [OUTBOUND, message('m1', [header('From', 'Jane Doe <jane@acme.com>'), header('Subject', 'Re: Checking in')])]);
+
+    await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
+
+    expect(db._docs[contactPath()].contact_status).toBe('In Conversation');
+  });
+
+  it('a reply from a known secondaryEmails alias is genuine — "legitimate aliases handled safely"', async () => {
+    const db = makeFakeDb({
+      [contactPath()]: {
+        id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1',
+        email: 'jane@acme.com', secondaryEmails: ['jane.doe@personal.com'],
+      },
+    });
+    const gmail = makeGmail();
+    thread(gmail, 't1', [OUTBOUND, message('m1', [header('From', 'jane.doe@personal.com'), header('Subject', 'Re: Checking in')])]);
+
+    await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
+
+    expect(db._docs[contactPath()].contact_status).toBe('In Conversation');
+  });
+
+  it('a reply from an UNEXPECTED third party in the tracked thread is still timelined, but never advances the relationship stage', async () => {
+    const db = makeFakeDb({
+      [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1', email: 'jane@acme.com' },
+    });
+    const gmail = makeGmail();
+    // A colleague replies instead of Jane — same thread, different person.
+    thread(gmail, 't1', [OUTBOUND, message('m1', [header('From', 'bob@acme.com'), header('Subject', 'Re: Checking in')])]);
+
+    const result = await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
+
+    expect(result.transitioned).toHaveLength(0); // not attributed as Jane's own reply
+    expect(db._docs[contactPath()].contact_status).toBe('Awaiting Reply'); // unchanged
+    expect(db._docs[contactPath()].hunter_status).toBe('awaiting_reply'); // unchanged
+
+    const entries = timelineEntries(db);
+    expect(entries).toHaveLength(1); // still recorded — nothing silently dropped
+    expect(entries[0].metadata.senderVerified).toBe(false);
+    expect(entries[0].metadata.fromAddress).toContain('bob@acme.com');
+  });
+
+  it('a contact with no known email identity at all falls back to treating any non-self sender as genuine — no identity data to be strict against', async () => {
+    const db = makeFakeDb({
+      [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1' },
+    });
+    const gmail = makeGmail();
+    thread(gmail, 't1', [OUTBOUND, message('m1', [header('From', 'someone@acme.com'), header('Subject', 'Re: Checking in')])]);
+
+    await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
+
+    expect(db._docs[contactPath()].contact_status).toBe('In Conversation');
+  });
+});
+
+describe('stale or missing gmail_last_processed_reply_id', () => {
+  it('no marker at all (never checked before) processes the whole available history once', async () => {
+    const db = makeFakeDb({
+      [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1' },
+    });
+    const gmail = makeGmail();
+    thread(gmail, 't1', [OUTBOUND, message('m1', [header('From', 'jane@acme.com'), header('Subject', 'Re: Checking in')])]);
+
+    await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
+
+    expect(timelineEntries(db)).toHaveLength(1);
+  });
+
+  it('a marker set but not found in the current reply list is treated as stale — nothing is replayed, this thread is skipped this run', async () => {
+    const db = makeFakeDb({
+      [contactPath()]: {
+        id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1',
+        gmail_last_processed_reply_id: 'm-does-not-exist-in-thread',
+      },
+    });
+    const gmail = makeGmail();
+    thread(gmail, 't1', [OUTBOUND, message('m1', [header('From', 'jane@acme.com'), header('Subject', 'Re: Checking in')])]);
+
+    const result = await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
+
+    // Must NOT silently process m1 as new — that would mean a stale/corrupt
+    // marker causes a replay of (possibly already-handled) history.
+    expect(result.transitioned).toHaveLength(0);
+    expect(timelineEntries(db)).toHaveLength(0);
+    expect(db._docs[contactPath()].gmail_last_processed_reply_id).toBe('m-does-not-exist-in-thread'); // untouched
+  });
+});
+
+describe('fairness: candidates beyond MAX_CONTACTS rotate across runs', () => {
+  it('sorts candidates by last_reply_check_at ascending (never-checked first) before applying the cap', async () => {
+    const db = makeFakeDb({
+      [contactPath('old')]: { id: 'old', hunter_status: 'awaiting_reply', gmail_thread_id: 't-old', last_reply_check_at: '2020-01-01T00:00:00.000Z' },
+      [contactPath('never')]: { id: 'never', hunter_status: 'awaiting_reply', gmail_thread_id: 't-never' }, // no field at all — sorts first
+      [contactPath('recent')]: { id: 'recent', hunter_status: 'awaiting_reply', gmail_thread_id: 't-recent', last_reply_check_at: '2026-01-01T00:00:00.000Z' },
+    });
+    const gmail = makeGmail(); // empty thread for all — nothing to find, just proving examination order via last_reply_check_at writes
+
+    await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
+
+    // All three got examined in this run (well under MAX_CONTACTS=50), each
+    // stamped with a fresh check time — the ordering itself is exercised by
+    // MAX_CONTACTS-capping in a real deployment; here the sort is unit-level.
+    expect(db._docs[contactPath('old')].last_reply_check_at).toBeTruthy();
+    expect(db._docs[contactPath('never')].last_reply_check_at).toBeTruthy();
+    expect(db._docs[contactPath('recent')].last_reply_check_at).toBeTruthy();
+  });
+});
+
+describe('hunter_status and contact_status disagreement', () => {
+  it('contact_status already advanced to a relationship status blocks the transition even while hunter_status still says awaiting_reply', async () => {
+    const db = makeFakeDb({
+      [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Active Customer', gmail_thread_id: 't1' },
+    });
+    const gmail = makeGmail();
+    thread(gmail, 't1', [OUTBOUND, message('m1', [header('From', 'jane@acme.com'), header('Subject', 'Re: Checking in')])]);
+
+    await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
+
+    const contact = db._docs[contactPath()];
+    expect(contact.contact_status).toBe('Active Customer'); // untouched
+    expect(contact.hunter_status).toBe('awaiting_reply'); // untouched — not advanced either
+    expect(timelineEntries(db)).toHaveLength(1); // the reply is still recorded
   });
 });

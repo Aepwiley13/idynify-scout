@@ -16,9 +16,15 @@
  * will; see replySyncWorkerBoundary.test.js, which asserts this by reading
  * the source.
  *
- * Account enumeration and OAuth handling are reused unchanged from
- * gmail-sync-worker.js (findConnectedGmailUsers, getOAuthClient) — this
- * file adds no new credential handling or account-discovery logic.
+ * Account enumeration is reused from gmail-sync-worker.js
+ * (findConnectedGmailUsers) and OAuth handling from gmailMessageService.js
+ * (getOAuthClient) — this file adds no new credential handling or
+ * account-discovery logic. findConnectedGmailUsers is called with its own
+ * independent sortField ('lastReplySyncAt', stamped by this worker after
+ * every user it checks) rather than the default 'lastSuccessfulSyncAt' —
+ * sharing that field would make this worker's own fairness rotation an
+ * accident of how often the UNRELATED identity-sync worker happens to run,
+ * rather than a property of this worker's own progress.
  *
  * Users are processed serially, same reasoning as gmail-sync-worker.js:
  * one slow or failing mailbox must not exhaust the run's time budget or
@@ -30,10 +36,14 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { google } from 'googleapis';
 
-import { findConnectedGmailUsers, getOAuthClient } from './utils/gmailMessageService.js';
+import { findConnectedGmailUsers } from './gmail-sync-worker.js';
+import { getOAuthClient } from './utils/gmailMessageService.js';
 import { pollRepliesForUser } from './utils/replyPolling.js';
 import { alertOps } from './utils/alertOps.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
+
+/** This worker's own fairness-rotation field — see findConnectedGmailUsers's docstring. */
+const REPLY_SYNC_ROTATION_FIELD = 'lastReplySyncAt';
 
 if (getApps().length === 0) {
   const privateKey = process.env.FIREBASE_PRIVATE_KEY
@@ -103,6 +113,13 @@ export async function syncUserReplies(db, user) {
     warn(`Sync failed for ${userId}:`, err.message);
     summary.error = err.message;
     return summary;
+  } finally {
+    // Stamps this worker's OWN fairness-rotation field, regardless of
+    // outcome — a user who errored or had nothing new was still examined,
+    // and must not be checked again before everyone else gets a turn.
+    await db.collection('users').doc(userId).collection('integrations').doc('gmail')
+      .update({ [REPLY_SYNC_ROTATION_FIELD]: new Date().toISOString() })
+      .catch((err) => warn(`Could not stamp ${REPLY_SYNC_ROTATION_FIELD} for ${userId} (non-blocking):`, err.message));
   }
 }
 
@@ -116,7 +133,7 @@ export async function runReplySync(db, options = {}) {
   const startedAt = options.now ?? Date.now();
   const budgetMs = options.budgetMs ?? RUN_BUDGET_MS;
 
-  const users = await findConnectedGmailUsers(db);
+  const users = await findConnectedGmailUsers(db, undefined, REPLY_SYNC_ROTATION_FIELD);
   log(`starting run — ${users.length} connected account(s)`);
 
   const results = [];

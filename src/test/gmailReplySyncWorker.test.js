@@ -7,7 +7,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('firebase-admin/app', () => ({ initializeApp: vi.fn(), getApps: () => [{}], cert: vi.fn() }));
-vi.mock('firebase-admin/firestore', () => ({ getFirestore: () => ({}) }));
+// getFirestore() backs replySyncHandler's own internal call — makeFakeDb is a
+// hoisted function declaration (defined further down this file), so it's
+// already available by the time this factory actually runs.
+vi.mock('firebase-admin/firestore', () => ({ getFirestore: () => makeFakeDb() }));
 vi.mock('googleapis', () => ({ google: { gmail: () => ({ users: { getProfile: async () => ({ data: { emailAddress: 'u@x.com' } }) } }) } }));
 
 const h = vi.hoisted(() => ({
@@ -15,10 +18,14 @@ const h = vi.hoisted(() => ({
   oauthByUser: {},
   pollResultByUser: {},
   alertCalls: [],
+  docs: {},
+}));
+
+vi.mock('../../netlify/functions/gmail-sync-worker.js', () => ({
+  findConnectedGmailUsers: vi.fn(async () => h.users),
 }));
 
 vi.mock('../../netlify/functions/utils/gmailMessageService.js', () => ({
-  findConnectedGmailUsers: vi.fn(async () => h.users),
   getOAuthClient: vi.fn(async (userId) =>
     Object.prototype.hasOwnProperty.call(h.oauthByUser, userId)
       ? h.oauthByUser[userId]
@@ -39,14 +46,30 @@ vi.mock('../../netlify/functions/utils/alertOps.js', () => ({
 }));
 
 const { runReplySync, syncUserReplies, replySyncHandler } = await import('../../netlify/functions/gmail-reply-sync-worker.js');
-const { findConnectedGmailUsers, getOAuthClient } = await import('../../netlify/functions/utils/gmailMessageService.js');
+const { findConnectedGmailUsers } = await import('../../netlify/functions/gmail-sync-worker.js');
+const { getOAuthClient } = await import('../../netlify/functions/utils/gmailMessageService.js');
 const { pollRepliesForUser } = await import('../../netlify/functions/utils/replyPolling.js');
+
+/** Minimal fake supporting the lastReplySyncAt stamp syncUserReplies writes in its finally block. */
+function makeFakeDb() {
+  function docRef(path) {
+    return {
+      update: async (patch) => { h.docs[path] = { ...(h.docs[path] || {}), ...patch }; },
+      collection: (sub) => collRef(`${path}/${sub}`),
+    };
+  }
+  function collRef(path) {
+    return { doc: (id) => docRef(`${path}/${id}`) };
+  }
+  return { collection: (name) => collRef(name) };
+}
 
 beforeEach(() => {
   h.users = [];
   h.oauthByUser = {};
   h.pollResultByUser = {};
   h.alertCalls.length = 0;
+  h.docs = {};
   findConnectedGmailUsers.mockClear();
   getOAuthClient.mockClear();
   pollRepliesForUser.mockClear();
@@ -55,13 +78,13 @@ beforeEach(() => {
 describe('syncUserReplies', () => {
   it('reuses getOAuthClient and returns oauth_unavailable without throwing when it returns null', async () => {
     h.oauthByUser.u1 = null;
-    const summary = await syncUserReplies({}, { userId: 'u1' });
+    const summary = await syncUserReplies(makeFakeDb(), { userId: 'u1' });
     expect(summary.error).toBe('oauth_unavailable');
   });
 
   it('aggregates checkedCount/transitionedCount from pollRepliesForUser', async () => {
     h.pollResultByUser.u1 = { transitioned: [{ contactId: 'c1' }], checkedCount: 5, needsReconnect: false };
-    const summary = await syncUserReplies({}, { userId: 'u1' });
+    const summary = await syncUserReplies(makeFakeDb(), { userId: 'u1' });
     expect(summary.checkedCount).toBe(5);
     expect(summary.transitionedCount).toBe(1);
     expect(summary.error).toBeNull();
@@ -69,8 +92,15 @@ describe('syncUserReplies', () => {
 
   it('never throws — a crash inside pollRepliesForUser is captured as summary.error', async () => {
     h.pollResultByUser.u1 = { throw: 'boom' };
-    const summary = await syncUserReplies({}, { userId: 'u1' });
+    const summary = await syncUserReplies(makeFakeDb(), { userId: 'u1' });
     expect(summary.error).toBe('boom');
+  });
+
+  it('stamps lastReplySyncAt on the integration doc regardless of outcome — its own fairness-rotation field, independent of the identity-sync worker\'s', async () => {
+    h.pollResultByUser.u1 = { throw: 'boom' }; // even on failure
+    const db = makeFakeDb();
+    await syncUserReplies(db, { userId: 'u1' });
+    expect(h.docs['users/u1/integrations/gmail'].lastReplySyncAt).toBeDefined();
   });
 });
 
@@ -80,7 +110,7 @@ describe('runReplySync', () => {
     h.pollResultByUser.u1 = { transitioned: [{ contactId: 'c1' }], checkedCount: 2, needsReconnect: false };
     h.pollResultByUser.u2 = { transitioned: [], checkedCount: 3, needsReconnect: false };
 
-    const summary = await runReplySync({});
+    const summary = await runReplySync(makeFakeDb());
 
     expect(summary.usersConsidered).toBe(2);
     expect(summary.usersSynced).toBe(2);
@@ -92,7 +122,7 @@ describe('runReplySync', () => {
     h.pollResultByUser.u1 = { throw: 'u1 blew up' };
     h.pollResultByUser.u2 = { transitioned: [], checkedCount: 1, needsReconnect: false };
 
-    const summary = await runReplySync({});
+    const summary = await runReplySync(makeFakeDb());
 
     expect(summary.usersSynced).toBe(2);
     expect(summary.totals.failed).toBe(1);
@@ -103,10 +133,16 @@ describe('runReplySync', () => {
     h.users = [{ userId: 'u1' }, { userId: 'u2' }, { userId: 'u3' }];
     h.pollResultByUser.u1 = { transitioned: [], checkedCount: 1, needsReconnect: false };
 
-    const summary = await runReplySync({}, { now: Date.now() - 1_000_000, budgetMs: 0 });
+    const summary = await runReplySync(makeFakeDb(), { now: Date.now() - 1_000_000, budgetMs: 0 });
 
     expect(summary.usersSynced).toBe(0);
     expect(summary.usersDeferred).toBe(3);
+  });
+
+  it('calls findConnectedGmailUsers with its own rotation field, not the default', async () => {
+    h.users = [];
+    await runReplySync(makeFakeDb());
+    expect(findConnectedGmailUsers).toHaveBeenCalledWith(expect.anything(), undefined, 'lastReplySyncAt');
   });
 });
 

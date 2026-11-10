@@ -44,9 +44,16 @@ describe('Reply-sync pipeline never references the gated identity-resolution pat
     }
   });
 
-  it('gmail-reply-sync-worker.js reuses gmail-sync-worker.js\'s account enumeration and OAuth handling rather than reimplementing it', () => {
+  it('gmail-reply-sync-worker.js reuses gmail-sync-worker.js\'s findConnectedGmailUsers and gmailMessageService.js\'s getOAuthClient, rather than reimplementing either', () => {
     const file = src('netlify/functions/gmail-reply-sync-worker.js');
-    expect(file).toContain("import { findConnectedGmailUsers, getOAuthClient } from './utils/gmailMessageService.js'");
+    expect(file).toContain("import { findConnectedGmailUsers } from './gmail-sync-worker.js'");
+    expect(file).toContain("import { getOAuthClient } from './utils/gmailMessageService.js'");
+  });
+
+  it('calls findConnectedGmailUsers with its own independent rotation field, not the identity-sync worker\'s lastSuccessfulSyncAt', () => {
+    const file = src('netlify/functions/gmail-reply-sync-worker.js');
+    expect(file).toMatch(/findConnectedGmailUsers\(db,\s*undefined,\s*REPLY_SYNC_ROTATION_FIELD\)/);
+    expect(file).not.toMatch(/findConnectedGmailUsers\(db\)/); // the bare call would silently fall back to the default field
   });
 
   it('gmail-reply-sync-worker.js is schedule()-wrapped, the same form gmail-sync-worker.js uses', () => {

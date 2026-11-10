@@ -141,11 +141,20 @@ function nextSyncAtIso() {
  * Least-recently-synced accounts go first so a large tenant list still gets
  * fair coverage across runs. Accounts that have never synced sort first.
  *
+ * `sortField` names WHICH timestamp on the integration doc defines "least
+ * recently [done]" — defaults to this worker's own `lastSuccessfulSyncAt`.
+ * A different caller with its own, independent rotation to maintain (the
+ * reply-sync worker, stamping `lastReplySyncAt`) passes its own field name
+ * rather than sharing this one — sharing would make reply-sync's fairness
+ * an accident of how often THIS worker happens to run, not a property of
+ * its own progress.
+ *
  * @param {import('firebase-admin/firestore').Firestore} db
  * @param {number} [limit]
+ * @param {string} [sortField]
  * @returns {Promise<Array<{ userId: string, docRef: object, data: object }>>}
  */
-export async function findConnectedGmailUsers(db, limit = MAX_USERS_PER_RUN) {
+export async function findConnectedGmailUsers(db, limit = MAX_USERS_PER_RUN, sortField = 'lastSuccessfulSyncAt') {
   let snap;
   try {
     snap = await db
@@ -173,8 +182,8 @@ export async function findConnectedGmailUsers(db, limit = MAX_USERS_PER_RUN) {
   }
 
   users.sort((a, b) => {
-    const aAt = a.data.lastSuccessfulSyncAt || '';
-    const bAt = b.data.lastSuccessfulSyncAt || '';
+    const aAt = a.data[sortField] || '';
+    const bAt = b.data[sortField] || '';
     return aAt < bAt ? -1 : aAt > bAt ? 1 : 0;
   });
 

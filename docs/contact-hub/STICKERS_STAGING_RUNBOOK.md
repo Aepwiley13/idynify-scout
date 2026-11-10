@@ -86,7 +86,7 @@ Record each uid; the tool takes uids.
 **Rules.** Deploy `main`'s rules to **staging only**, with `scripts/staging/stagingRulesDeploy.mjs`. It takes the project from the env file the app runs with, so the browser, the functions, sign-in and the rules all use the same project. It refuses unless:
 - the env file passes every preflight check
 - `--project` repeats that file's project
-- the deploy credential (`GOOGLE_APPLICATION_CREDENTIALS` or `STAGING_SERVICE_ACCOUNT_KEY`, never both) belongs to it
+- the deploy credential (`GOOGLE_APPLICATION_CREDENTIALS`: short-lived, impersonating the staging service account; setup guide A5) belongs to it
 - it is listed in `STICKERS_STAGING_PROJECTS`
 - it is not `PRODUCTION_FIREBASE_PROJECT_ID`
 
@@ -109,13 +109,13 @@ Read the target and command it prints, then add `--apply`.
 **Rollout mode and beta list.** Use `scripts/staging/stickersStaging.mjs`, which writes only `feature_flags/stickers` and `sticker_enrollment/{uid}`. It refuses any target it cannot prove is non-production:
 - `--project` must be listed in `STICKERS_STAGING_PROJECTS`
 - the id must contain `staging` or `stg`
-- it must equal the `project_id` of the service account (`GOOGLE_APPLICATION_CREDENTIALS` or `STAGING_SERVICE_ACCOUNT_KEY`)
+- it must equal the `project_id` of the service account (`GOOGLE_APPLICATION_CREDENTIALS`, setup guide A5)
 - it must differ from `PRODUCTION_FIREBASE_PROJECT_ID`
 
 It is a dry run unless `--apply` is passed.
 
 ```bash
-export GOOGLE_APPLICATION_CREDENTIALS=/path/outside/repo/staging-service-account.json   # or STAGING_SERVICE_ACCOUNT_KEY (setup guide A5)
+export GOOGLE_APPLICATION_CREDENTIALS=$HOME/idynify-staging/gcloud/application_default_credentials.json   # short-lived (setup guide A5)
 ```
 ```bash
 export STICKERS_STAGING_PROJECTS=<staging-id>

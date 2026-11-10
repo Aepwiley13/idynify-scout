@@ -89,7 +89,10 @@ export function checkStagingEnv(env, { productionProjectId = null, fileCommittab
 
   const missingWeb = FIREBASE_WEB_KEYS.filter((k) => !filled(env[k]));
   add('web-config', missingWeb.length === 0, missingWeb.length ? `Missing: ${missingWeb.join(', ')}.` : 'The six VITE_FIREBASE_* values are set.');
-  const missingServer = FIREBASE_SERVER_KEYS.filter((k) => !filled(env[k]));
+  // Short-lived credentials (application default): no private key exists.
+  const shortLived = env.FIREBASE_ADMIN_CREDENTIALS === 'application-default';
+  const serverKeys = shortLived ? ['FIREBASE_PROJECT_ID', 'FIREBASE_CLIENT_EMAIL', 'GOOGLE_APPLICATION_CREDENTIALS'] : FIREBASE_SERVER_KEYS;
+  const missingServer = serverKeys.filter((k) => !filled(env[k]));
   add('server-config', missingServer.length === 0, missingServer.length ? `Missing: ${missingServer.join(', ')}.` : 'The functions have a project and a service account.');
 
   add('same-project', filled(project) && env.FIREBASE_PROJECT_ID === project,
@@ -110,8 +113,13 @@ export function checkStagingEnv(env, { productionProjectId = null, fileCommittab
   const account = env.FIREBASE_CLIENT_EMAIL ?? '';
   const accountOk = filled(project) && account.endsWith(`@${project}.iam.gserviceaccount.com`);
   add('service-account', accountOk, accountOk ? 'The service account belongs to the project.' : 'FIREBASE_CLIENT_EMAIL must be a service account of this project.');
-  const keyOk = /-----BEGIN (RSA )?PRIVATE KEY-----/.test(env.FIREBASE_PRIVATE_KEY ?? '');
-  add('private-key', keyOk, keyOk ? 'FIREBASE_PRIVATE_KEY looks like a private key.' : 'FIREBASE_PRIVATE_KEY does not look like a private key.');
+  if (shortLived) {
+    const noKey = !filled(env.FIREBASE_PRIVATE_KEY);
+    add('private-key', noKey, noKey ? 'Short-lived credentials: no private key is used.' : 'Short-lived credentials are set, so FIREBASE_PRIVATE_KEY must not be.');
+  } else {
+    const keyOk = /-----BEGIN (RSA )?PRIVATE KEY-----/.test(env.FIREBASE_PRIVATE_KEY ?? '');
+    add('private-key', keyOk, keyOk ? 'FIREBASE_PRIVATE_KEY looks like a private key.' : 'FIREBASE_PRIVATE_KEY does not look like a private key.');
+  }
 
   const integrations = INTEGRATION_KEYS.filter((k) => filled(env[k]));
   if (env.VITE_STRIPE_ENABLED === 'true') integrations.push('VITE_STRIPE_ENABLED=true');

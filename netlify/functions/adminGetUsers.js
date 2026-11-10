@@ -5,10 +5,20 @@
  * Uses Firebase Admin SDK with application default credentials.
  */
 
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import process from 'node:process';
+import { initializeApp, getApps, cert, applicationDefault } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
 import { requireProjectId } from './utils/firebaseEnv.js';
+import { wantsApplicationDefaultCredentials } from './utils/adminCredential.js';
+
+// Local staging QA only: short-lived credentials, no key, and only when
+// FIREBASE_ADMIN_CREDENTIALS=application-default (utils/adminCredential.js).
+// Nothing deployed sets it, so the block below runs exactly as before.
+// ("View as" in the admin tools loads the user through this function.)
+if (getApps().length === 0 && wantsApplicationDefaultCredentials(process.env)) {
+  initializeApp({ credential: applicationDefault(), projectId: requireProjectId() });
+}
 
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {

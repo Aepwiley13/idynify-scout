@@ -43,20 +43,42 @@
  * HTTP function and is NOT gated by this flag — it keeps working exactly
  * as it does today regardless of this worker's rollout state.
  *
- * Rollout procedure:
- *   1. Internal test — set GMAIL_REPLY_SYNC_ENABLED=true AND
- *      GMAIL_REPLY_SYNC_USER_ALLOWLIST=<comma-separated userIds> in the
- *      target environment (e.g. just Aaron's own userId). Only those
- *      users are ever passed to syncUserReplies; everyone else is skipped
- *      exactly as if the worker were off for them.
- *   2. Verify — watch the gmail.reply_sync.ok / gmail.reply_sync.partial_failure
- *      logs and alertOps output for those users over a few 10-minute runs.
- *   3. Broaden — once satisfied, remove GMAIL_REPLY_SYNC_USER_ALLOWLIST
- *      (leave GMAIL_REPLY_SYNC_ENABLED=true). With no allowlist set, every
- *      connected account is checked — the same accounts the manual button
- *      already reaches, just on a schedule.
+ * Rollout procedure — VERIFIED against Netlify's own documentation, not
+ * assumed: changing an environment variable's value does NOT take effect
+ * on its own. Netlify's docs state plainly that "environment variable
+ * changes require a build and deploy to take effect" — this applies to
+ * Functions reading a var at runtime just as much as to build-time usage,
+ * and scheduled functions only run on a published deploy (a Deploy
+ * Preview's build will never actually fire this cron), so the env var
+ * that matters here is the one on the deploy that is actually live.
+ *
+ *   1. Set the variable: Project configuration > Environment variables >
+ *      find the key > Options > Edit (or `netlify env:set KEY value`, or
+ *      the Netlify API). Set GMAIL_REPLY_SYNC_ENABLED=true AND
+ *      GMAIL_REPLY_SYNC_USER_ALLOWLIST=<comma-separated userIds> (e.g.
+ *      just Aaron's own userId) for the internal-test phase. If this
+ *      site uses scoped variables (Pro plan+), confirm the scope includes
+ *      "Functions" and the context you intend (Production) — a value
+ *      scoped only to Deploy Previews will never reach the scheduled run.
+ *   2. Redeploy — REQUIRED, not optional, even though nothing about the
+ *      code changed. From the Deploys page: "Trigger deploy" (production/
+ *      primary branch only — this worker's actual schedule only ever
+ *      fires there). There is no "apply env var without a new deploy"
+ *      option; the new deploy simply rebuilds the same code with the new
+ *      variable values baked in.
+ *   3. Verify — watch the gmail.reply_sync.ok / gmail.reply_sync.partial_failure
+ *      logs and alertOps output for the allowlisted users over a few
+ *      10-minute runs. (The "Run now" button or `netlify functions:invoke`
+ *      can trigger one run immediately rather than waiting for the cron
+ *      tick, for faster iteration during this step.)
+ *   4. Broaden — once satisfied, remove GMAIL_REPLY_SYNC_USER_ALLOWLIST
+ *      (leave GMAIL_REPLY_SYNC_ENABLED=true), then repeat step 2 — this
+ *      is itself a variable change and needs its own redeploy. With no
+ *      allowlist set, every connected account is checked — the same
+ *      accounts the manual button already reaches, just on a schedule.
  *   To pause entirely at any point, set GMAIL_REPLY_SYNC_ENABLED back to
- *   unset/false — no code change, no redeploy required.
+ *   unset/false, THEN repeat step 2 — the redeploy is required to turn
+ *   it off again too, same as turning it on.
  */
 
 import { schedule } from '@netlify/functions';
@@ -174,11 +196,67 @@ export async function syncUserReplies(db, user) {
 }
 
 /**
+ * Resolve the rollout allowlist directly against each userId's own
+ * integration document — NEVER through findConnectedGmailUsers's capped,
+ * sorted enumeration. An explicitly allowlisted internal-test user must be
+ * evaluated because they are named, not because they happened to survive
+ * a Firestore .limit() and a least-recently-synced sort that has nothing
+ * to do with being on this list. (This was the bug: the old code ran the
+ * capped enumeration FIRST and filtered to the allowlist AFTER, so a
+ * listed user outside that run's top MAX_USERS_PER_RUN — or outside the
+ * .limit(limit*4) pre-filter entirely, for a large account base — was
+ * silently dropped despite being named explicitly.)
+ *
+ * Still enforces the same ownership/eligibility check findConnectedGmailUsers
+ * uses — status === 'connected' on that user's own integration doc. The
+ * allowlist grants visibility into which users get evaluated this run; it
+ * is not an exemption from being a real, connected Gmail account. A listed
+ * id that is misspelled, was never connected, or has since disconnected is
+ * logged and excluded, never silently treated as eligible.
+ *
+ * Naturally bounded without a separate cap: this makes exactly one
+ * Firestore read per listed id (an operator-curated, short internal-test
+ * list — not the general account base), and the caller's own RUN_BUDGET_MS
+ * check still applies to how many of the resolved, eligible users actually
+ * get processed in one run.
+ *
+ * @param {import('firebase-admin/firestore').Firestore} db
+ * @param {Set<string>} allowlist
+ * @returns {Promise<Array<{ userId: string, docRef: object, data: object }>>}
+ */
+async function resolveAllowlistedUsers(db, allowlist) {
+  const resolved = await Promise.all(
+    [...allowlist].map(async (userId) => {
+      try {
+        const docRef = db.collection('users').doc(userId).collection('integrations').doc('gmail');
+        const snap = await docRef.get();
+        if (!snap.exists || snap.data()?.status !== 'connected') {
+          warn(`Allowlisted user ${userId} is not an eligible connected Gmail account — excluding from this run`);
+          return null;
+        }
+        return { userId, docRef, data: snap.data() || {} };
+      } catch (err) {
+        warn(`Could not resolve allowlisted user ${userId} (non-blocking): ${err.message}`);
+        return null;
+      }
+    })
+  );
+  return resolved.filter(Boolean);
+}
+
+/**
  * Run one full reply-check pass across every connected Gmail account.
  *
  * Gated by GMAIL_REPLY_SYNC_ENABLED (see this file's ROLLOUT CONTROL
- * docstring). When disabled, this returns immediately — before
- * findConnectedGmailUsers, before any OAuth client, before any Gmail call.
+ * docstring). When disabled, this returns immediately — before any
+ * account resolution, before any OAuth client, before any Gmail call.
+ *
+ * When a rollout allowlist is active, the user list comes ONLY from
+ * resolveAllowlistedUsers (direct per-id lookups) — findConnectedGmailUsers
+ * is not called at all, so its cap and rotation never apply during the
+ * internal-test phase. With no allowlist, behavior is unchanged from
+ * before the rollout flag existed: the normal capped, fairly-rotated
+ * enumeration runs exactly as it always has.
  *
  * @param {import('firebase-admin/firestore').Firestore} db
  * @param {{ now?: number, budgetMs?: number, enabled?: boolean, allowlist?: Set<string>|null }} [options]
@@ -202,10 +280,12 @@ export async function runReplySync(db, options = {}) {
 
   const allowlist = options.allowlist ?? getReplySyncAllowlist();
 
-  let users = await findConnectedGmailUsers(db, undefined, REPLY_SYNC_ROTATION_FIELD);
+  let users;
   if (allowlist) {
-    users = users.filter((u) => allowlist.has(u.userId));
-    log(`rollout allowlist active — restricting this run to ${users.length} user(s)`);
+    users = await resolveAllowlistedUsers(db, allowlist);
+    log(`rollout allowlist active — resolved ${users.length} of ${allowlist.size} listed user(s) directly (general enumeration not consulted)`);
+  } else {
+    users = await findConnectedGmailUsers(db, undefined, REPLY_SYNC_ROTATION_FIELD);
   }
   log(`starting run — ${users.length} connected account(s)`);
 

@@ -19,6 +19,15 @@ const h = vi.hoisted(() => ({
   pollResultByUser: {},
   alertCalls: [],
   docs: {},
+  // Backs the allowlist's direct per-user integration lookup
+  // (resolveAllowlistedUsers) — separate from `users`, which only backs
+  // the mocked findConnectedGmailUsers (the general, capped enumeration).
+  // Keyed by userId -> integration doc data, or absent entirely to model
+  // a userId that was never connected (or is misspelled).
+  integrationDocs: {},
+  // userIds whose integration-doc .get() should throw, to model a
+  // transient Firestore error resolving one specific allowlisted id.
+  throwOnIntegrationGet: new Set(),
 }));
 
 vi.mock('../../netlify/functions/gmail-sync-worker.js', () => ({
@@ -52,10 +61,25 @@ const { findConnectedGmailUsers } = await import('../../netlify/functions/gmail-
 const { getOAuthClient } = await import('../../netlify/functions/utils/gmailMessageService.js');
 const { pollRepliesForUser } = await import('../../netlify/functions/utils/replyPolling.js');
 
-/** Minimal fake supporting the lastReplySyncAt stamp syncUserReplies writes in its finally block. */
+/**
+ * Minimal fake supporting (1) the lastReplySyncAt stamp syncUserReplies
+ * writes in its finally block, and (2) resolveAllowlistedUsers's direct
+ * per-user integration-doc .get() — backed by h.integrationDocs, keyed by
+ * userId, deliberately separate from h.users (which only ever backs the
+ * mocked findConnectedGmailUsers / general enumeration).
+ */
 function makeFakeDb() {
   function docRef(path) {
     return {
+      get: async () => {
+        const m = path.match(/^users\/([^/]+)\/integrations\/gmail$/);
+        const userId = m ? m[1] : null;
+        if (userId != null && h.throwOnIntegrationGet.has(userId)) {
+          throw new Error('Firestore unavailable');
+        }
+        const exists = userId != null && Object.prototype.hasOwnProperty.call(h.integrationDocs, userId);
+        return { exists, data: () => (exists ? h.integrationDocs[userId] : undefined) };
+      },
       update: async (patch) => { h.docs[path] = { ...(h.docs[path] || {}), ...patch }; },
       collection: (sub) => collRef(`${path}/${sub}`),
     };
@@ -72,6 +96,8 @@ beforeEach(() => {
   h.pollResultByUser = {};
   h.alertCalls.length = 0;
   h.docs = {};
+  h.integrationDocs = {};
+  h.throwOnIntegrationGet = new Set();
   findConnectedGmailUsers.mockClear();
   getOAuthClient.mockClear();
   pollRepliesForUser.mockClear();
@@ -185,17 +211,64 @@ describe('rollout gating (GMAIL_REPLY_SYNC_ENABLED / allowlist)', () => {
     expect(pollRepliesForUser).not.toHaveBeenCalled();
   });
 
-  it('an allowlist restricts the run to only the listed userIds, independent of how many are connected', async () => {
-    h.users = [{ userId: 'u1' }, { userId: 'u2' }, { userId: 'u3' }];
+  it('an allowlist restricts the run to only the listed userIds, resolved directly rather than through the general enumeration', async () => {
+    h.integrationDocs.u2 = { status: 'connected' };
     h.pollResultByUser.u2 = { transitioned: [], checkedCount: 1, needsReconnect: false };
+    // findConnectedGmailUsers is mocked to return nothing — proves u2 was
+    // found via resolveAllowlistedUsers, not by filtering its result.
+    h.users = [];
 
     const summary = await runReplySync(makeFakeDb(), { enabled: true, allowlist: new Set(['u2']) });
 
     expect(summary.usersConsidered).toBe(1);
     expect(summary.usersSynced).toBe(1);
     expect(summary.results[0].userId).toBe('u2');
+    expect(findConnectedGmailUsers).not.toHaveBeenCalled();
     expect(getOAuthClient).toHaveBeenCalledTimes(1);
     expect(getOAuthClient).toHaveBeenCalledWith('u2', expect.anything());
+  });
+
+  it('an allowlisted account outside the normal first-50 selection is still evaluated — the bug this fixes', async () => {
+    // Models exactly the reported defect: u-outside is eligible and
+    // connected, but would never survive findConnectedGmailUsers's cap or
+    // its least-recently-synced sort (it is not even IN that mocked
+    // result here) — yet being named on the allowlist must still work.
+    h.integrationDocs['u-outside'] = { status: 'connected', lastReplySyncAt: '2026-01-01T00:00:00.000Z' };
+    h.pollResultByUser['u-outside'] = { transitioned: [], checkedCount: 2, needsReconnect: false };
+    h.users = []; // the general enumeration "knows" nothing about this user
+
+    const summary = await runReplySync(makeFakeDb(), { enabled: true, allowlist: new Set(['u-outside']) });
+
+    expect(summary.usersConsidered).toBe(1);
+    expect(summary.results[0].userId).toBe('u-outside');
+    expect(summary.totals.checked).toBe(2);
+  });
+
+  it('an invalid (never connected) or disconnected allowlisted account is excluded, not silently treated as eligible', async () => {
+    h.integrationDocs.good = { status: 'connected' };
+    h.integrationDocs.disconnected = { status: 'disconnected' };
+    // 'typo-d-id' has no integrationDocs entry at all — never connected / misspelled.
+    h.pollResultByUser.good = { transitioned: [], checkedCount: 1, needsReconnect: false };
+
+    const summary = await runReplySync(makeFakeDb(), {
+      enabled: true, allowlist: new Set(['good', 'disconnected', 'typo-d-id']),
+    });
+
+    expect(summary.usersConsidered).toBe(1);
+    expect(summary.results[0].userId).toBe('good');
+    expect(getOAuthClient).toHaveBeenCalledTimes(1);
+    expect(getOAuthClient).toHaveBeenCalledWith('good', expect.anything());
+  });
+
+  it('a Firestore error resolving one allowlisted id does not block the others', async () => {
+    h.integrationDocs.good = { status: 'connected' };
+    h.pollResultByUser.good = { transitioned: [], checkedCount: 1, needsReconnect: false };
+    h.throwOnIntegrationGet.add('broken');
+
+    const summary = await runReplySync(makeFakeDb(), { enabled: true, allowlist: new Set(['broken', 'good']) });
+
+    expect(summary.usersConsidered).toBe(1);
+    expect(summary.results[0].userId).toBe('good');
   });
 
   it('replySyncHandler itself stays off by default (the real entry point, not just the inner function)', async () => {

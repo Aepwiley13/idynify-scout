@@ -248,7 +248,7 @@ Resending an event that was already fully, correctly handled is harmless — `st
 own idempotency check (`stripeWebhookEvents/{eventId}` pre-check) short-circuits it to a plain
 `200` with no re-processing.
 
-### 6.3 Reconcile — distinguish delivered, applied, pending, flagged, and granted
+### 6.3 Reconcile — distinguish processed, synced, flagged, pending, and granted
 
 **An event-ledger entry alone must not be read as "credits granted."**
 `stripeWebhookEvents/{eventId}` existing means the event reached a transaction commit — nothing
@@ -258,14 +258,33 @@ non-grant outcome `decideAllocationEligibility` can return (ambiguous, non-credi
 already granted). The only direct evidence of an actual grant is
 `billingAllocations/{subscriptionId}` existing.
 
+A processed `customer.subscription.*` event is not proof the sync itself succeeded, either —
+`applySubscriptionLifecycleEvent` marks the ledger (`markLedger: true`) the same way whether
+`decideReconciliation` actually applied the fields or refused and flagged ambiguous
+(`user_not_found`, `unknown_price`, `customer_mismatch`, `replacement_not_authorized` — confirmed
+against every `flagAmbiguous` branch in `decideReconciliation`). "Processed" only means a decision
+was made and committed; it says nothing about which decision.
+
 For each event, in order:
-1. `stripeWebhookEvents/{event.id}` exists? → **delivered & processed**. If not, and the type is
+1. `stripeWebhookEvents/{event.id}` exists? → **processed**. If not, and the type is
    `customer.subscription.*`, check `stripeWebhookPendingEvents/{customer}/events/{event.id}` →
    **parked, pending** (benign — drains once a binding event arrives) or **not processed**
    (genuine gap).
-2. If delivered and the type is `customer.subscription.*` → **lifecycle sync only** — report this
-   plainly; never imply a credit outcome for a type that cannot produce one.
-3. If delivered and the type is `checkout.session.completed`:
+2. If processed and the type is `customer.subscription.*`: resolve the candidate uid the same
+   way the handler does (`event.data.object.metadata.firebaseUID`, else a `users` query by
+   `stripeCustomerId == event.data.object.customer`), then check for an associated ambiguous
+   record. Reconciliation's own `flagAmbiguous` writes use **two different detail field names**
+   depending on the reason (`details.subscriptionId` for `user_not_found`/`unknown_price`/
+   `customer_mismatch`; `details.incomingSubscription` for `replacement_not_authorized` — both
+   confirmed against the actual call sites, not assumed to share one field) — check both.
+   - Found → **FLAGGED, {status}** (report `reason`) — the lifecycle sync was refused, not
+     applied, for this event specifically.
+   - Not found → compare the resolved user doc's stored `subscriptionStatus` against this
+     event's own `data.object.status`. Match → **lifecycle synced, confirmed**. Mismatch → report
+     it, but don't treat it alone as a failure: if a *later* event for the same subscription id
+     is also in this inventory, its own processing legitimately moved the stored state further
+     forward after this one — check for that before escalating a mismatch as a real problem.
+3. If processed and the type is `checkout.session.completed`:
    - `billingAllocations/{event.data.object.subscription}` exists → **granted** (credits were
      allocated for this subscription — possibly by this exact event, possibly by a later one for
      the same subscription; this check cannot tell those apart, and doesn't need to: either way
@@ -280,9 +299,12 @@ For each event, in order:
      silently folding it into "granted" or "flagged" — a human scanning results should be able to
      tell "this was a free-tier purchase, nothing to grant" apart from "this actually got credits."
 
+This performs no writes — use the **read-only** service-account key (`roles/datastore.viewer`),
+the same convention `scripts/reconcileBillingSubscriptions.mjs` already documents, never the
+write-capable key `scripts/manualCreditRecovery.mjs` needs:
 ```js
 // scripts/reconcileIncidentEvents.mjs — paste as-is, run with:
-//   FIREBASE_SERVICE_ACCOUNT_PATH=<write-capable key> node scripts/reconcileIncidentEvents.mjs /tmp/incident_events.jsonl
+//   FIREBASE_SERVICE_ACCOUNT_PATH=<read-only key, roles/datastore.viewer> node scripts/reconcileIncidentEvents.mjs /tmp/incident_events.jsonl
 import { readFileSync } from 'node:fs';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -290,6 +312,22 @@ import { getFirestore } from 'firebase-admin/firestore';
 const key = JSON.parse(readFileSync(process.env.FIREBASE_SERVICE_ACCOUNT_PATH, 'utf8'));
 initializeApp({ credential: cert(key) });
 const db = getFirestore();
+
+async function resolveCandidateUid(subscription) {
+  if (subscription.metadata?.firebaseUID) return subscription.metadata.firebaseUID;
+  const q = await db.collection('users').where('stripeCustomerId', '==', subscription.customer).limit(1).get();
+  return q.empty ? null : q.docs[0].id;
+}
+
+async function findAmbiguousForSubscription(subscriptionId) {
+  const [bySubscriptionId, byIncomingSubscription] = await Promise.all([
+    db.collection('billingAmbiguousAccounts').where('details.subscriptionId', '==', subscriptionId).limit(1).get(),
+    db.collection('billingAmbiguousAccounts').where('details.incomingSubscription', '==', subscriptionId).limit(1).get(),
+  ]);
+  if (!bySubscriptionId.empty) return bySubscriptionId.docs[0].data();
+  if (!byIncomingSubscription.empty) return byIncomingSubscription.docs[0].data();
+  return null;
+}
 
 const events = readFileSync(process.argv[2], 'utf8').split('\n').map((s) => s.trim()).filter(Boolean).map(JSON.parse);
 for (const event of events) {
@@ -307,7 +345,21 @@ for (const event of events) {
   }
 
   if (event.type.startsWith('customer.subscription.')) {
-    console.log(`${event.id} [${event.type}]: delivered — lifecycle sync only, not a credit-granting event type`);
+    const subscription = event.data.object;
+    const flagged = await findAmbiguousForSubscription(subscription.id);
+    if (flagged) {
+      console.log(`${event.id} [${event.type}]: FLAGGED, ${flagged.status} (reason: ${flagged.reason}) — lifecycle NOT applied for this event`);
+      continue;
+    }
+    const uid = await resolveCandidateUid(subscription);
+    if (!uid) { console.log(`${event.id} [${event.type}]: processed, but no uid resolvable now and no flag found — investigate`); continue; }
+    const userDoc = await db.collection('users').doc(uid).get();
+    const storedStatus = userDoc.data()?.subscriptionStatus;
+    if (storedStatus === subscription.status) {
+      console.log(`${event.id} [${event.type}]: lifecycle synced, confirmed (subscriptionStatus matches: ${storedStatus})`);
+    } else {
+      console.log(`${event.id} [${event.type}]: stored subscriptionStatus "${storedStatus}" != event status "${subscription.status}" — check for a LATER event for ${subscription.id} in this inventory before escalating (it may have legitimately moved the state further)`);
+    }
     continue;
   }
 
@@ -330,11 +382,13 @@ for (const event of events) {
   console.log(`${event.id} [${event.type}]: processed, no grant and no flag — expected for a non-credit-granting price; confirm the price id before assuming this is correct`);
 }
 ```
-**Expected result:** every event prints exactly one of `GRANTED`, `FLAGGED, pending`, `FLAGGED,
-resolved`, `delivered — lifecycle sync only`, `processed, no grant and no flag`, `PARKED,
-pending`, or `NOT PROCESSED`. Treat `NOT PROCESSED` as still open; treat `FLAGGED, pending` as
-still open (needs a human decision, §7); only `GRANTED`, `delivered — lifecycle sync only`,
-`FLAGGED, resolved`, and a confirmed-correct `processed, no grant and no flag` count as closed.
+**Expected result:** every event prints exactly one of `GRANTED`, `FLAGGED, {pending|resolved}`,
+`lifecycle synced, confirmed`, a reported status mismatch, `processed, no grant and no flag`,
+`PARKED, pending`, or `NOT PROCESSED`. Treat `NOT PROCESSED` as still open; treat any `FLAGGED,
+pending` as still open (needs a human decision, §7); treat an unexplained status mismatch (no
+later event for the same subscription accounts for it) as still open. Only `GRANTED`, a
+confirmed `lifecycle synced`, `FLAGGED, resolved`, and a confirmed-correct `processed, no grant
+and no flag` count as closed.
 
 ## 7. Past the 30-day event-retrieval window, or no subscription id can be found at all
 

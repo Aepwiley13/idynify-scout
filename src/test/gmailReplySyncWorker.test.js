@@ -147,7 +147,7 @@ describe('runReplySync', () => {
 
     expect(summary.usersConsidered).toBe(2);
     expect(summary.usersSynced).toBe(2);
-    expect(summary.totals).toEqual({ checked: 5, transitioned: 1, failed: 0, contactFailures: 0, checkpointFailures: 0 });
+    expect(summary.totals).toEqual({ checked: 5, transitioned: 1, failed: 0, contactFailures: 0, checkpointFailures: 0, needsReconnect: 0 });
   });
 
   it('one user failing does not stop the loop — the other user is still processed', async () => {
@@ -204,7 +204,7 @@ describe('rollout gating (GMAIL_REPLY_SYNC_ENABLED / allowlist)', () => {
     expect(summary.disabled).toBe(true);
     expect(summary.usersConsidered).toBe(0);
     expect(summary.usersSynced).toBe(0);
-    expect(summary.totals).toEqual({ checked: 0, transitioned: 0, failed: 0, contactFailures: 0, checkpointFailures: 0 });
+    expect(summary.totals).toEqual({ checked: 0, transitioned: 0, failed: 0, contactFailures: 0, checkpointFailures: 0, needsReconnect: 0 });
     // The actual guarantee Aaron asked for: these never even get called.
     expect(findConnectedGmailUsers).not.toHaveBeenCalled();
     expect(getOAuthClient).not.toHaveBeenCalled();
@@ -330,5 +330,49 @@ describe('replySyncHandler (with the rollout flag enabled — processing behavio
     expect(JSON.parse(res.body).success).toBe(false);
     expect(h.alertCalls).toHaveLength(1);
     expect(h.alertCalls[0].severity).toBe('failed');
+  });
+
+  it('an account needing reconnect cannot be reported as fully healthy, even with zero account-level errors and zero contact failures', async () => {
+    // This is the gap: syncUserReplies sets summary.needsReconnect from a
+    // per-contact 403 surfacing inside pollRepliesForUser WITHOUT setting
+    // summary.error — so totals.failed stayed 0 and this run used to log
+    // 'gmail.reply_sync.ok' and never alert, despite an account genuinely
+    // needing reconnection.
+    h.users = [{ userId: 'u1' }];
+    h.pollResultByUser.u1 = {
+      transitioned: [], checkedCount: 2, needsReconnect: true, failures: [], checkpointFailures: [],
+    };
+    const res = await replySyncHandler();
+    expect(res.statusCode).toBe(207);
+    const body = JSON.parse(res.body);
+    expect(body.success).toBe(false);
+    expect(h.alertCalls).toHaveLength(1);
+    expect(h.alertCalls[0].severity).toBe('partial_failure');
+    expect(h.alertCalls[0].detail.needsReconnect).toBe(1);
+  });
+
+  it('zero successful checks with nonempty contact failures (every candidate\'s thread check failed, none a reconnect) is reported as partial_failure, not fully healthy', async () => {
+    h.users = [{ userId: 'u1' }];
+    h.pollResultByUser.u1 = {
+      transitioned: [], checkedCount: 0, needsReconnect: false,
+      failures: [{ contactId: 'c1', reason: 'Gmail API transient error' }], checkpointFailures: [],
+    };
+    const res = await replySyncHandler();
+    expect(res.statusCode).toBe(207);
+    const body = JSON.parse(res.body);
+    expect(body.success).toBe(false);
+    expect(h.alertCalls).toHaveLength(1);
+    expect(h.alertCalls[0].detail.contactFailures).toBe(1);
+  });
+
+  it('reconnect handling itself is unchanged — the per-user needsReconnect flag still passes through summary.results exactly as reported', async () => {
+    h.users = [{ userId: 'u1' }];
+    h.pollResultByUser.u1 = {
+      transitioned: [], checkedCount: 2, needsReconnect: true, failures: [], checkpointFailures: [],
+    };
+    const res = await replySyncHandler();
+    const body = JSON.parse(res.body);
+    expect(body.results[0].needsReconnect).toBe(true);
+    expect(body.results[0].error).toBeNull(); // unchanged: this path never set summary.error
   });
 });

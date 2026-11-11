@@ -131,7 +131,32 @@ describe('gmail-poll-replies.js HTTP contract', () => {
     h.pollResult = { transitioned: [], checkedCount: 2, needsReconnect: true, failures: [], checkpointFailures: [] };
     const res = await handler(makeEvent({ userId: USER_ID, authToken: 'tok' }));
     expect(res.statusCode).toBe(200);
-    expect(JSON.parse(res.body)).toEqual({ transitioned: [], code: 'NEEDS_RECONNECT' });
+    expect(JSON.parse(res.body)).toEqual({ transitioned: [], code: 'NEEDS_RECONNECT', failures: [], checkpointFailures: [] });
+  });
+
+  it('NEEDS_RECONNECT wins over the checkedCount===0 short-circuit — every candidate needing reconnect means checkedCount is 0 too, and that must not be reported as "nothing to report"', async () => {
+    h.pollResult = { transitioned: [], checkedCount: 0, needsReconnect: true, failures: [], checkpointFailures: [] };
+    const res = await handler(makeEvent({ userId: USER_ID, authToken: 'tok' }));
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({ transitioned: [], code: 'NEEDS_RECONNECT', failures: [], checkpointFailures: [] });
+  });
+
+  it('checkedCount===0 with nonempty failures (every candidate\'s thread check failed outright, none of them a reconnect) still reports the failures, not a silent "nothing happened"', async () => {
+    h.pollResult = {
+      transitioned: [],
+      checkedCount: 0,
+      needsReconnect: false,
+      failures: [{ contactId: 'c1', reason: 'Gmail API transient error' }],
+      checkpointFailures: [],
+    };
+    const res = await handler(makeEvent({ userId: USER_ID, authToken: 'tok' }));
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toEqual({
+      transitioned: [],
+      checkedCount: 0,
+      failures: [{ contactId: 'c1', reason: 'Gmail API transient error' }],
+      checkpointFailures: [],
+    });
   });
 
   it('needsReconnect is reported alongside any transitions that DID succeed, not swallowed', async () => {

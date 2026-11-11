@@ -139,12 +139,29 @@ export const handler = async (event) => {
     const { transitioned, checkedCount, needsReconnect, failures, checkpointFailures } =
       await pollRepliesForUser(db, gmail, userId, myEmail);
 
-    if (checkedCount === 0) {
-      return { statusCode: 200, headers: CORS_HEADERS, body: JSON.stringify({ transitioned: [], checkedCount: 0 }) };
+    // needsReconnect is checked FIRST, before the checkedCount===0
+    // short-circuit. checkedCount only counts contacts actually,
+    // successfully examined (see replyPolling.js), so a run where every
+    // candidate needed reconnect has checkedCount===0 too — checking that
+    // branch first would silently swallow the actionable NEEDS_RECONNECT
+    // code behind an empty "nothing to report" response.
+    if (needsReconnect && transitioned.length === 0) {
+      return {
+        statusCode: 200, headers: CORS_HEADERS,
+        body: JSON.stringify({ transitioned: [], code: 'NEEDS_RECONNECT', failures, checkpointFailures }),
+      };
     }
 
-    if (needsReconnect && transitioned.length === 0) {
-      return { statusCode: 200, headers: CORS_HEADERS, body: JSON.stringify({ transitioned: [], code: 'NEEDS_RECONNECT' }) };
+    if (checkedCount === 0) {
+      // Zero contacts successfully checked is not always "nothing to
+      // report" — every candidate's thread check can have failed outright
+      // (none of them 403s, or there'd be nothing left needing_reconnect
+      // above). failures/checkpointFailures are additive fields; existing
+      // callers reading only transitioned/checkedCount are unaffected.
+      return {
+        statusCode: 200, headers: CORS_HEADERS,
+        body: JSON.stringify({ transitioned: [], checkedCount: 0, failures, checkpointFailures }),
+      };
     }
 
     if (failures.length > 0 || checkpointFailures.length > 0) {

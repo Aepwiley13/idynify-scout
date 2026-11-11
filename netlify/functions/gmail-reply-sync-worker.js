@@ -285,7 +285,7 @@ export async function runReplySync(db, options = {}) {
     log('disabled via GMAIL_REPLY_SYNC_ENABLED — skipping run (no account enumeration, no OAuth, no Gmail calls)');
     return {
       usersConsidered: 0, usersSynced: 0, usersDeferred: 0,
-      totals: { checked: 0, transitioned: 0, failed: 0, contactFailures: 0, checkpointFailures: 0 },
+      totals: { checked: 0, transitioned: 0, failed: 0, contactFailures: 0, checkpointFailures: 0, needsReconnect: 0 },
       results: [], durationMs: Date.now() - startedAt, disabled: true,
     };
   }
@@ -327,14 +327,24 @@ export async function runReplySync(db, options = {}) {
       // run that actually had either.
       contactFailures: acc.contactFailures + (r.contactFailures?.length || 0),
       checkpointFailures: acc.checkpointFailures + (r.checkpointFailures?.length || 0),
+      // needsReconnect is set on a per-user summary two different ways:
+      // the account-level getProfile 403 check in syncUserReplies (which
+      // ALSO sets r.error, already counted in `failed` above), and a
+      // per-contact 403 surfacing from inside pollRepliesForUser (which
+      // does NOT set r.error — needsReconnect was the only signal, and
+      // nothing upstream of this reduce ever looked at it). Counting it
+      // here, independently of `failed`, is what closes that gap; a user
+      // can be counted in both without that being a bug.
+      needsReconnect: acc.needsReconnect + (r.needsReconnect ? 1 : 0),
     }),
-    { checked: 0, transitioned: 0, failed: 0, contactFailures: 0, checkpointFailures: 0 }
+    { checked: 0, transitioned: 0, failed: 0, contactFailures: 0, checkpointFailures: 0, needsReconnect: 0 }
   );
 
   log(
     `run complete — ${results.length} account(s), ${totals.checked} thread(s) checked, ` +
     `${totals.transitioned} transitioned, ${totals.failed} account(s) failed, ` +
-    `${totals.contactFailures} contact(s) failed, ${totals.checkpointFailures} checkpoint stamp(s) failed`
+    `${totals.contactFailures} contact(s) failed, ${totals.checkpointFailures} checkpoint stamp(s) failed, ` +
+    `${totals.needsReconnect} account(s) need reconnect`
   );
 
   return {
@@ -360,12 +370,18 @@ export const replySyncHandler = async () => {
     const summary = await runReplySync(getFirestore());
 
     // A run with zero account-level failures can still have contact-level
-    // ones — see totals' own comment. Treating only account failures as
-    // "not ok" is exactly how a run with real NOT_FOUND / checkpoint
-    // failures got reported as fully successful; both now count.
+    // ones, or an account that needs reconnecting — see totals' own
+    // comments. Treating only account failures as "not ok" is exactly how
+    // a run with real NOT_FOUND / checkpoint failures, or an account
+    // sitting in needs-reconnect, got reported as fully successful; all
+    // three now count. This does not change reconnect HANDLING — the
+    // manual button's own NEEDS_RECONNECT code path, and this worker's
+    // per-user needsReconnect flag, are unchanged — only whether the run's
+    // own health reporting notices it.
     const allOk = summary.totals.failed === 0
       && summary.totals.contactFailures === 0
-      && summary.totals.checkpointFailures === 0;
+      && summary.totals.checkpointFailures === 0
+      && summary.totals.needsReconnect === 0;
     console.log(allOk ? 'gmail.reply_sync.ok' : 'gmail.reply_sync.partial_failure', {
       usersConsidered: summary.usersConsidered,
       usersSynced: summary.usersSynced,
@@ -375,6 +391,7 @@ export const replySyncHandler = async () => {
       usersFailed: summary.totals.failed,
       contactFailures: summary.totals.contactFailures,
       checkpointFailures: summary.totals.checkpointFailures,
+      needsReconnect: summary.totals.needsReconnect,
       durationMs: summary.durationMs,
     });
 
@@ -382,11 +399,13 @@ export const replySyncHandler = async () => {
       await alertOps({
         db: safeFirestore(), job: 'gmail-reply-sync-worker', severity: 'partial_failure',
         summary: `${summary.totals.failed} account(s), ${summary.totals.contactFailures} contact(s), ` +
-          `and ${summary.totals.checkpointFailures} checkpoint stamp(s) failed.`,
+          `${summary.totals.checkpointFailures} checkpoint stamp(s) failed, and ` +
+          `${summary.totals.needsReconnect} account(s) need reconnect.`,
         detail: {
           usersConsidered: summary.usersConsidered, usersSynced: summary.usersSynced,
           threadsChecked: summary.totals.checked, failed: summary.totals.failed,
           contactFailures: summary.totals.contactFailures, checkpointFailures: summary.totals.checkpointFailures,
+          needsReconnect: summary.totals.needsReconnect,
           firstError: summary.results.find((r) => r.error)?.error || 'n/a',
         },
       });

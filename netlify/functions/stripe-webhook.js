@@ -243,8 +243,23 @@ function decideReconciliation({ userData, subscription, replacementStatus, resol
  * (isKnownIdynifyPrice) but is NOT credit-granting (isCreditGrantingPrice), e.g. the $0/month
  * Scout Starter price. That is expected, understood behavior, not an anomaly: no credits, no
  * ambiguous-account flag, nothing for anyone to review.
+ *
+ * Round-11 runtime allocation gate: BILLING_LEDGER_EPOCH_UNIX only protects against purchases
+ * that predate it — it says nothing about purchases created AFTER it whose webhook delivery was
+ * actually handled by unhardened or rolled-back code during an incident, then replayed into
+ * hardened code once it resumes. The billingAllocations/{subscriptionId} marker is the normal
+ * idempotency guard, but it is only ever written by THIS code path — code that predates the
+ * ledger (or a rollback to it) could grant credits directly, with no marker at all, exactly as
+ * the pre-ledger implementation used to. If the account already shows a COMPLETED grant for THIS
+ * SAME subscription with no marker, that mismatch is itself the anomaly: never silently re-grant
+ * on top of it. This check runs automatically on every invocation — it does not depend on an
+ * operator re-running the cutover/activation script first, and it closes the gap for the
+ * specific case that script can never close on its own (see billingLedgerCutover.mjs's header).
+ * Scoped to the SAME subscriptionId only, so it never interferes with a legitimate replacement
+ * (a different, new subscription replacing an old dead one already goes through its own,
+ * separately-authorized path above).
  */
-function decideAllocationEligibility({ userData, customerId, priceId, replacementStatus }) {
+function decideAllocationEligibility({ userData, customerId, priceId, replacementStatus, subscriptionId }) {
   if (!isKnownIdynifyPrice(priceId)) return { ok: false, flag: true, reason: 'unknown_price' };
   if (!isCreditGrantingPrice(priceId)) return { ok: false, flag: false, reason: 'not_credit_granting_price' };
   if (userData?.stripeCustomerId && userData.stripeCustomerId !== customerId) {
@@ -252,6 +267,9 @@ function decideAllocationEligibility({ userData, customerId, priceId, replacemen
   }
   if (replacementStatus.kind === 'retry_error') return { ok: false, flag: true, reason: 'onfile_retrieve_failed' };
   if (replacementStatus.kind === 'unauthorized') return { ok: false, flag: true, reason: 'replacement_not_authorized' };
+  if (userData?.stripeSubscriptionId === subscriptionId && userData?.hasCompletedPayment === true) {
+    return { ok: false, flag: true, reason: 'already_shows_completed_payment_no_marker' };
+  }
   return { ok: true };
 }
 
@@ -393,7 +411,7 @@ async function handleCheckoutCompleted(stripe, stripeEvent) {
         } else if (operationId && !opDecision.valid) {
           // claims new-flow provenance but it didn't check out — already flagged above
         } else {
-          const eligible = decideAllocationEligibility({ userData, customerId: session.customer, priceId, replacementStatus });
+          const eligible = decideAllocationEligibility({ userData, customerId: session.customer, priceId, replacementStatus, subscriptionId });
           if (!eligible.ok) {
             // A known-but-non-credit-granting price (e.g. the $0/month Scout Starter price) is
             // expected, understood behavior — no grant, and nothing for a human to review.

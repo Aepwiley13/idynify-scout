@@ -1,10 +1,13 @@
 #!/usr/bin/env node
 /**
- * Replaces "guess a timing buffer and hope the deploy finished by then" with a verified cutover —
- * and, as of this round, replaces a second, deeper guess this script itself used to make: that a
- * published deploy plus a successful `netlify env:set` call means automatic allocation is now
- * governed by the new value. It doesn't, on this platform, and this script no longer claims it
- * does. See "Why a publish timestamp and an env-var write are not proof" below.
+ * An ADVISORY check for operators, not an enforcement mechanism. It answers "has runtime
+ * activation been independently confirmed" — it cannot and does not gate what the live webhook
+ * actually does with any given event; the webhook enforces its own correctness at runtime (see
+ * netlify/functions/stripe-webhook.js's decideAllocationEligibility — the
+ * already_shows_completed_payment_no_marker check closes the gap this script, being external and
+ * optional, structurally cannot: a purchase that unhardened or rolled-back code already granted
+ * directly, then replayed into hardened code before anyone re-runs this script, must not grant
+ * again regardless of whether this script ever ran). Nothing here substitutes for that.
  *
  * ── Why a publish timestamp and an env-var write are not proof ───────────────────────────────
  *
@@ -14,27 +17,47 @@
  * ALREADY-DEPLOYED function never picks up a later `env:set` retroactively. It keeps running
  * with whatever value was baked in at ITS OWN build, until the NEXT deploy repackages it.
  *
- * The previous version of this script conflated two independent facts: "the expected commit is
- * the live, drained production deploy" (isDeployReadyToArm, still correct and still necessary)
- * and "that live deploy's packaged function sees the epoch value I just wrote" (false in
- * general — the write and the live deploy's own build are not ordered with respect to each
- * other just because the write succeeded). Writing the env var and reporting "Armed" was
- * therefore not evidence that automatic grants were actually governed by the new value — it was
- * evidence only that Netlify's config store accepted the write.
+ * isRuntimeActivationVerified() closes this the only way that's actually checkable: Netlify's
+ * env-var API returns `updated_at` per variable (verified 2026-11-10 against
+ * open-api.netlify.com's env_vars schema). Activation requires the live, matching, drained
+ * deploy's own `created_at` (when ITS build started) to be AFTER the env var's `updated_at`. A
+ * deploy that started building before the value changed could not have packaged it, no matter
+ * how long ago it published or how long it's been running since.
  *
- * isRuntimeActivationVerified() below closes this gap the only way that's actually checkable:
- * Netlify's env-var API returns `updated_at` per variable (verified 2026-11-10 against
- * open-api.netlify.com's env_vars schema). Activation requires BOTH facts, with an explicit
- * ORDER between them: the live, matching, drained deploy's own `created_at` (when ITS build
- * started) must be AFTER the env var's `updated_at`. A deploy that started building before the
- * value changed could not have packaged the new value, no matter how long ago it published or
- * how long it's been running since.
+ * ── Round-11: use the site's actual published deploy, not "newest production-context entry" ──
  *
- * This also makes rollback recovery automatic rather than a separate case: after a rollback (or
- * any deploy that predates the current env-var value), this function reports NOT active — not
- * because of anything rollback-specific, but because the ordinary ordering check fails. The same
- * check that protects the original cutover protects every redeploy after a rollback, with no
- * special-cased logic.
+ * The previous version picked the most-recent-by-timestamp entry from listSiteDeploys whose
+ * context was "production" — a heuristic over a list, not a query for what is actually live.
+ * Verified 2026-11-11 against open-api.netlify.com's Site schema: GET /sites/{site_id} returns
+ * `published_deploy`, the site's own authoritative pointer to what currently serves production
+ * traffic. This version reads that field directly instead of inferring it by sorting.
+ *
+ * ── Round-11: validate the effective value and its function scope, not only timestamps ───────
+ *
+ * Two more silent-failure modes this script now checks instead of assuming:
+ *   - SCOPE: an env var's `scopes` array (verified against open-api.netlify.com's env_vars
+ *     schema: "builds" | "functions" | "runtime" | "post-processing") controls which surfaces
+ *     ever see it. A value scoped only to "builds" would never reach a Netlify Function's
+ *     process.env at all, no matter how the deploy and update timestamps line up. Activation
+ *     requires "functions" to be present in scopes.
+ *   - VALUE: the stored value itself must parse to a finite, positive number — a blank, missing,
+ *     or non-numeric value is caught explicitly rather than surfacing later as a silent
+ *     `Number(...)` → NaN inside the webhook's own epoch comparison.
+ *
+ * ── Rollback recovery ──────────────────────────────────────────────────────────────────────────
+ *
+ * A rollback deploy, or any deploy whose build predates the current env-var value, fails the
+ * ordinary createdAt-vs-updated_at ordering check above — no rollback-specific branch needed for
+ * THIS script's own job (confirming activation). What a rollback can still do that this script
+ * cannot see or prevent: unhardened/rolled-back code processing a purchase during the rollback
+ * window with no ledger marker, then that event being replayed once hardened code resumes. That
+ * is a restriction on rollback strategy, made explicit here: never roll back to pre-ledger code
+ * as an incident response for this webhook, and never trust automatic allocation for anything
+ * that may have happened during ANY rollback until it's been through the webhook's own
+ * already_shows_completed_payment_no_marker check (always on, regardless of this script) and a
+ * human has cleared the account's flagged record if one was raised. Re-running this script after
+ * a rollback is necessary for ADVISORY confirmation, but the actual stop against a double grant
+ * is enforced in stripe-webhook.js, not here.
  *
  * ── Platform timing assumptions, verified (not guessed) ───────────────────────────────────────
  *
@@ -47,16 +70,8 @@
  *      2026-11-10). stripe-webhook.js carries no per-function `timeout` override in netlify.toml,
  *      so it is bound by this platform default.
  *   2. DEPLOY_PROPAGATION_MARGIN_MS: a deliberate buffer on top of (1) — Netlify's own API
- *      reference (open-api.netlify.com) publishes no SLA for edge/lambda propagation time after
- *      `published_at`. Absent a published number, this margin is conservative, not measured.
- *
- * ── Site selection, verified (not guessed) ────────────────────────────────────────────────────
- *
- * Netlify's own API reference documents no ordering guarantee for listSiteDeploys. This script
- * always picks the most recent production-context deploy by comparing timestamps explicitly,
- * never by array position. The write (when --apply is used) is scoped with the SAME --site the
- * read was verified against — never the CLI's ambient linked site (this repo checks in no
- * .netlify/state.json).
+ *      reference publishes no SLA for edge/lambda propagation time after `published_at`. Absent
+ *      a published number, this margin is conservative, not measured.
  *
  * USAGE
  *   node scripts/billingLedgerCutover.mjs --expect-commit <sha> --site <site-id>
@@ -64,9 +79,8 @@
  *   node scripts/billingLedgerCutover.mjs --expect-commit <sha> --site <site-id> --apply --epoch <unix-seconds>
  *     → writes BILLING_LEDGER_EPOCH_UNIX. Exits non-zero and says so explicitly: writing is never
  *       activation. Trigger a new production deploy yourself, then re-run WITHOUT --apply to
- *       verify activation before trusting automatic allocation. This script never triggers a
- *       deploy itself — that is a bigger production action than writing one env var, and stays
- *       the operator's own, explicit step.
+ *       verify activation. This script never triggers a deploy itself — that is a bigger
+ *       production action than writing one env var, and stays the operator's own, explicit step.
  *
  * Exit codes: 0 verified active; 1 not active yet (including immediately after --apply), or a
  * usage/API error.
@@ -75,6 +89,7 @@
 import { execFileSync } from 'node:child_process';
 
 export const EPOCH_ENV_VAR_KEY = 'BILLING_LEDGER_EPOCH_UNIX';
+export const REQUIRED_SCOPE = 'functions';
 
 // Verified 2026-11-10 against https://docs.netlify.com/build/functions/configuration/ — the
 // documented, non-configurable synchronous-function execution ceiling. See file header.
@@ -87,30 +102,22 @@ export const DEPLOY_PROPAGATION_MARGIN_MS = 30_000;
 export const DEFAULT_MIN_DRAIN_WAIT_MS = FUNCTION_MAX_EXECUTION_MS + DEPLOY_PROPAGATION_MARGIN_MS;
 
 /**
- * Picks the most recent production-context deploy by comparing timestamps explicitly — never by
- * trusting array position (see file header: Netlify documents no ordering guarantee).
+ * Pure decision — no network, no process, fully unit-testable. `site` is the raw object
+ * Netlify's getSite returns; this reads `site.published_deploy` directly — the site's own
+ * authoritative pointer to what is actually live — rather than inferring it by sorting
+ * listSiteDeploys. Answers only "is the expected commit the live, drained production deploy" —
+ * NOT "is automatic allocation governed by the current epoch value" (see
+ * isRuntimeActivationVerified for that).
  */
-function mostRecentProductionDeploy(deploys) {
-  const candidates = (deploys ?? []).filter((d) => d.context === 'production');
-  if (candidates.length === 0) return null;
-  return candidates.reduce((latest, d) => {
-    const dTime = Date.parse(d.created_at ?? d.published_at ?? 0) || 0;
-    const latestTime = Date.parse(latest.created_at ?? latest.published_at ?? 0) || 0;
-    return dTime > latestTime ? d : latest;
-  });
-}
-
-/**
- * Pure decision — no network, no process, fully unit-testable. Answers only "is the expected
- * commit the live, drained production deploy" — NOT "is automatic allocation governed by the
- * current epoch value" (see isRuntimeActivationVerified for that; a deploy being ready here says
- * nothing about what environment variables its packaged functions were actually built with).
- */
-export function isDeployReadyToArm({ deploys, expectedCommitSha, nowMs = Date.now(), minDrainWaitMs = DEFAULT_MIN_DRAIN_WAIT_MS }) {
+export function isDeployReadyToArm({ site, expectedCommitSha, nowMs = Date.now(), minDrainWaitMs = DEFAULT_MIN_DRAIN_WAIT_MS }) {
   if (!expectedCommitSha) return { ready: false, reason: 'expected_commit_sha_required' };
 
-  const deploy = mostRecentProductionDeploy(deploys);
-  if (!deploy) return { ready: false, reason: 'no_production_deploy_found' };
+  const deploy = site?.published_deploy;
+  if (!deploy) return { ready: false, reason: 'no_published_deploy_found' };
+
+  if (deploy.context && deploy.context !== 'production') {
+    return { ready: false, reason: 'published_deploy_not_production', deployId: deploy.id, context: deploy.context };
+  }
 
   if (deploy.state !== 'ready') return { ready: false, reason: `deploy_state_is_${deploy.state}`, deployId: deploy.id };
 
@@ -135,23 +142,35 @@ export function isDeployReadyToArm({ deploys, expectedCommitSha, nowMs = Date.no
 }
 
 /**
- * THE decisive check this round's review finding named: a publish timestamp and an env-var
- * write are each necessary but neither alone is sufficient. Automatic allocation is considered
- * runtime-verified active only when the live, matching, drained deploy's OWN build (createdAt)
- * started AFTER the epoch env var's last update (envVars[].updated_at) — proof the live
- * function's build could actually have packaged the current value, not merely that both facts
- * exist somewhere. Pure and fully unit-testable: `envVars` is the raw array Netlify's
- * getSiteEnvVars returns.
+ * THE decisive check: a publish timestamp and an env-var write are each necessary but neither
+ * alone is sufficient. Automatic allocation is considered runtime-verified active only when:
+ *   - the site's actual published deploy matches the expected commit, is ready, and is drained;
+ *   - the epoch env var is scoped to reach Netlify Functions at all;
+ *   - its stored value parses to a real, usable epoch; and
+ *   - that published deploy's OWN build started after the env var's last update.
+ * Pure and fully unit-testable: `envVars` is the raw array Netlify's getSiteEnvVars returns.
  */
-export function isRuntimeActivationVerified({ deploys, envVars, expectedCommitSha, nowMs = Date.now(), minDrainWaitMs = DEFAULT_MIN_DRAIN_WAIT_MS }) {
-  const deployVerdict = isDeployReadyToArm({ deploys, expectedCommitSha, nowMs, minDrainWaitMs });
+export function isRuntimeActivationVerified({ site, envVars, expectedCommitSha, nowMs = Date.now(), minDrainWaitMs = DEFAULT_MIN_DRAIN_WAIT_MS }) {
+  const deployVerdict = isDeployReadyToArm({ site, expectedCommitSha, nowMs, minDrainWaitMs });
   if (!deployVerdict.ready) return { active: false, reason: deployVerdict.reason, deploy: deployVerdict };
 
   const epochVar = (envVars ?? []).find((v) => v.key === EPOCH_ENV_VAR_KEY);
   if (!epochVar) return { active: false, reason: 'epoch_env_var_not_set', deploy: deployVerdict };
 
+  const scopes = epochVar.scopes ?? [];
+  if (!scopes.includes(REQUIRED_SCOPE)) {
+    return { active: false, reason: 'epoch_env_var_not_scoped_to_functions', scopes, deploy: deployVerdict };
+  }
+
   const prodValue = (epochVar.values ?? []).find((v) => v.context === 'production');
-  if (!prodValue || prodValue.value == null) return { active: false, reason: 'epoch_env_var_not_set_for_production', deploy: deployVerdict };
+  if (!prodValue || prodValue.value == null || prodValue.value === '') {
+    return { active: false, reason: 'epoch_env_var_not_set_for_production', deploy: deployVerdict };
+  }
+
+  const liveEpochUnix = Number(prodValue.value);
+  if (!Number.isFinite(liveEpochUnix) || liveEpochUnix <= 0) {
+    return { active: false, reason: 'epoch_env_var_value_invalid', rawValue: prodValue.value, deploy: deployVerdict };
+  }
 
   if (!epochVar.updated_at) return { active: false, reason: 'epoch_env_var_updated_at_unknown', deploy: deployVerdict };
 
@@ -166,7 +185,7 @@ export function isRuntimeActivationVerified({ deploys, envVars, expectedCommitSh
   }
 
   return {
-    active: true, deployId: deployVerdict.deployId, liveEpochUnix: Number(prodValue.value), envUpdatedAt: epochVar.updated_at,
+    active: true, deployId: deployVerdict.deployId, liveEpochUnix, envUpdatedAt: epochVar.updated_at,
   };
 }
 
@@ -182,10 +201,8 @@ function parseArgs(argv) {
   return args;
 }
 
-function fetchProductionDeploys(siteId) {
-  const out = execFileSync('netlify', ['api', 'listSiteDeploys', '--data', JSON.stringify({ site_id: siteId, per_page: 20 })], {
-    encoding: 'utf8',
-  });
+function fetchSite(siteId) {
+  const out = execFileSync('netlify', ['api', 'getSite', '--data', JSON.stringify({ site_id: siteId })], { encoding: 'utf8' });
   return JSON.parse(out);
 }
 
@@ -215,21 +232,22 @@ function main() {
     process.exit(1);
   }
 
-  let deploys, envVars;
+  let site, envVars;
   try {
-    deploys = fetchProductionDeploys(siteId);
+    site = fetchSite(siteId);
     envVars = fetchSiteEnvVars(siteId, 'production');
   } catch (err) {
     console.error('Failed to query Netlify:', err.message);
     process.exit(1);
   }
 
-  const activation = isRuntimeActivationVerified({ deploys, envVars, expectedCommitSha: expectCommitSha });
+  const activation = isRuntimeActivationVerified({ site, envVars, expectedCommitSha: expectCommitSha });
 
   if (activation.active) {
     console.log(
       `RUNTIME-VERIFIED ACTIVE: ${EPOCH_ENV_VAR_KEY}=${activation.liveEpochUnix} on site ${siteId}, deploy ${activation.deployId} ` +
-      `(built after the env var's last update at ${activation.envUpdatedAt}). Automatic allocation is governed by this value now.`
+      `(built after the env var's last update at ${activation.envUpdatedAt}). This is advisory confirmation only — the webhook ` +
+      `enforces its own correctness at runtime regardless of whether this script has ever been run (see stripe-webhook.js).`
     );
     process.exit(0);
   }
@@ -251,7 +269,9 @@ function main() {
     `Wrote ${EPOCH_ENV_VAR_KEY}=${epochUnix} to site ${siteId}, context production. THIS IS NOT YET ACTIVE: ` +
     'Netlify Functions only see an env var\'s current value starting from the first deploy BUILT after this write — ' +
     'an already-deployed function never picks it up retroactively. Trigger a new production deploy yourself, then ' +
-    're-run this script WITHOUT --apply to verify activation before trusting automatic allocation.'
+    're-run this script WITHOUT --apply to verify activation. Remember: this script is advisory only — the webhook\'s ' +
+    'own already_shows_completed_payment_no_marker check is what actually stops a rollback-window purchase from being ' +
+    'granted twice, whether or not this script is ever re-run.'
   );
   process.exit(1); // deliberately non-zero: writing is never success for activation purposes
 }

@@ -136,7 +136,8 @@ export const handler = async (event) => {
     }
 
     // ── Check tracked threads for replies — shared with the scheduled worker ──
-    const { transitioned, checkedCount, needsReconnect } = await pollRepliesForUser(db, gmail, userId, myEmail);
+    const { transitioned, checkedCount, needsReconnect, failures, checkpointFailures } =
+      await pollRepliesForUser(db, gmail, userId, myEmail);
 
     if (checkedCount === 0) {
       return { statusCode: 200, headers: CORS_HEADERS, body: JSON.stringify({ transitioned: [], checkedCount: 0 }) };
@@ -146,14 +147,25 @@ export const handler = async (event) => {
       return { statusCode: 200, headers: CORS_HEADERS, body: JSON.stringify({ transitioned: [], code: 'NEEDS_RECONNECT' }) };
     }
 
-    console.log(`✅ Poll complete — ${transitioned.length} transitions, ${checkedCount} checked`);
+    if (failures.length > 0 || checkpointFailures.length > 0) {
+      console.warn(
+        `⚠️ Poll complete with issues — ${transitioned.length} transitions, ${checkedCount} checked, ` +
+        `${failures.length} contact(s) failed, ${checkpointFailures.length} checkpoint stamp(s) failed`
+      );
+    } else {
+      console.log(`✅ Poll complete — ${transitioned.length} transitions, ${checkedCount} checked`);
+    }
 
+    // failures/checkpointFailures are additive — existing callers reading
+    // only transitioned/checkedCount are unaffected either way.
     return {
       statusCode: 200,
       headers: CORS_HEADERS,
       body: JSON.stringify({
         transitioned,
         checkedCount,
+        failures,
+        checkpointFailures,
       }),
     };
 

@@ -147,7 +147,7 @@ describe('runReplySync', () => {
 
     expect(summary.usersConsidered).toBe(2);
     expect(summary.usersSynced).toBe(2);
-    expect(summary.totals).toEqual({ checked: 5, transitioned: 1, failed: 0 });
+    expect(summary.totals).toEqual({ checked: 5, transitioned: 1, failed: 0, contactFailures: 0, checkpointFailures: 0 });
   });
 
   it('one user failing does not stop the loop — the other user is still processed', async () => {
@@ -204,7 +204,7 @@ describe('rollout gating (GMAIL_REPLY_SYNC_ENABLED / allowlist)', () => {
     expect(summary.disabled).toBe(true);
     expect(summary.usersConsidered).toBe(0);
     expect(summary.usersSynced).toBe(0);
-    expect(summary.totals).toEqual({ checked: 0, transitioned: 0, failed: 0 });
+    expect(summary.totals).toEqual({ checked: 0, transitioned: 0, failed: 0, contactFailures: 0, checkpointFailures: 0 });
     // The actual guarantee Aaron asked for: these never even get called.
     expect(findConnectedGmailUsers).not.toHaveBeenCalled();
     expect(getOAuthClient).not.toHaveBeenCalled();

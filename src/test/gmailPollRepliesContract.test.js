@@ -8,7 +8,10 @@
  */
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 
-const h = vi.hoisted(() => ({ docs: {}, pollResult: { transitioned: [], checkedCount: 0, needsReconnect: false } }));
+const h = vi.hoisted(() => ({
+  docs: {},
+  pollResult: { transitioned: [], checkedCount: 0, needsReconnect: false, failures: [], checkpointFailures: [] },
+}));
 
 vi.mock('firebase-admin/app', () => ({
   initializeApp: vi.fn(),
@@ -58,7 +61,7 @@ function makeEvent(body) {
 
 beforeEach(() => {
   for (const key of Object.keys(h.docs)) delete h.docs[key];
-  h.pollResult = { transitioned: [], checkedCount: 0, needsReconnect: false };
+  h.pollResult = { transitioned: [], checkedCount: 0, needsReconnect: false, failures: [], checkpointFailures: [] };
   pollRepliesForUser.mockClear();
   process.env.FIREBASE_API_KEY = 'test-key';
   process.env.GOOGLE_CLIENT_ID = 'id';
@@ -104,24 +107,28 @@ describe('gmail-poll-replies.js HTTP contract', () => {
     expect(JSON.parse(res.body)).toEqual({ transitioned: [], checkedCount: 0 });
   });
 
-  it('a successful poll with transitions returns { transitioned, checkedCount }, delegating to pollRepliesForUser exactly once', async () => {
+  it('a successful poll with transitions returns { transitioned, checkedCount, failures, checkpointFailures }, delegating to pollRepliesForUser exactly once', async () => {
     h.pollResult = {
       transitioned: [{ contactId: 'c1', name: 'Jane', threadId: 't1', fromEmail: 'jane@acme.com' }],
       checkedCount: 3,
       needsReconnect: false,
+      failures: [],
+      checkpointFailures: [],
     };
     const res = await handler(makeEvent({ userId: USER_ID, authToken: 'tok' }));
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body)).toEqual({
       transitioned: [{ contactId: 'c1', name: 'Jane', threadId: 't1', fromEmail: 'jane@acme.com' }],
       checkedCount: 3,
+      failures: [],
+      checkpointFailures: [],
     });
     expect(pollRepliesForUser).toHaveBeenCalledTimes(1);
     expect(pollRepliesForUser).toHaveBeenCalledWith(expect.anything(), expect.anything(), USER_ID, 'me@idynify.com');
   });
 
   it('NEEDS_RECONNECT when pollRepliesForUser reports it and nothing transitioned', async () => {
-    h.pollResult = { transitioned: [], checkedCount: 2, needsReconnect: true };
+    h.pollResult = { transitioned: [], checkedCount: 2, needsReconnect: true, failures: [], checkpointFailures: [] };
     const res = await handler(makeEvent({ userId: USER_ID, authToken: 'tok' }));
     expect(res.statusCode).toBe(200);
     expect(JSON.parse(res.body)).toEqual({ transitioned: [], code: 'NEEDS_RECONNECT' });
@@ -132,10 +139,27 @@ describe('gmail-poll-replies.js HTTP contract', () => {
       transitioned: [{ contactId: 'c1', name: 'Jane', threadId: 't1', fromEmail: 'jane@acme.com' }],
       checkedCount: 2,
       needsReconnect: true,
+      failures: [],
+      checkpointFailures: [],
     };
     const res = await handler(makeEvent({ userId: USER_ID, authToken: 'tok' }));
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
     expect(body.transitioned).toHaveLength(1);
+  });
+
+  it('failures and checkpointFailures surface in the response body — additive, existing shape unaffected', async () => {
+    h.pollResult = {
+      transitioned: [],
+      checkedCount: 3,
+      needsReconnect: false,
+      failures: [{ contactId: 'c2', reason: 'boom' }],
+      checkpointFailures: [{ contactId: 'c3', reason: 'NOT_FOUND' }],
+    };
+    const res = await handler(makeEvent({ userId: USER_ID, authToken: 'tok' }));
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.failures).toEqual([{ contactId: 'c2', reason: 'boom' }]);
+    expect(body.checkpointFailures).toEqual([{ contactId: 'c3', reason: 'NOT_FOUND' }]);
   });
 });

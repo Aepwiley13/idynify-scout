@@ -34,7 +34,17 @@ function makeFakeDb(seed = {}) {
     return {
       path,
       get: async () => ({ exists: docs[path] !== undefined, data: () => docs[path] }),
-      update: async (patch) => { docs[path] = { ...(docs[path] || {}), ...patch }; },
+      // Real Firestore throws NOT_FOUND updating a document that doesn't
+      // exist — load-bearing for the checkpoint-visibility tests below,
+      // which need a stale/wrong id to fail the same way production does.
+      update: async (patch) => {
+        if (docs[path] === undefined) {
+          const err = new Error(`NOT_FOUND: No document to update: ${path}`);
+          err.code = 5;
+          throw err;
+        }
+        docs[path] = { ...docs[path], ...patch };
+      },
       set: async (data) => { docs[path] = data; },
       collection: (sub) => collRef(`${path}/${sub}`),
     };
@@ -608,5 +618,159 @@ describe('hunter_status and contact_status disagreement', () => {
     expect(contact.contact_status).toBe('Active Customer'); // untouched
     expect(contact.hunter_status).toBe('awaiting_reply'); // untouched — not advanced either
     expect(timelineEntries(db)).toHaveLength(1); // the reply is still recorded
+  });
+});
+
+describe('contact.id projection: the real Firestore document id must survive a stored "id" field', () => {
+  it('a contact whose stored data has its own "id" field (e.g. an Apollo person id) still gets checked and updated at its REAL document path, not the stored one', async () => {
+    const db = makeFakeDb({
+      [contactPath()]: {
+        id: 'apollo-person-999', // stale/foreign id stored in the document's own data
+        hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply',
+        gmail_thread_id: 't1', email: 'jane@acme.com',
+      },
+    });
+    const gmail = makeGmail();
+    thread(gmail, 't1', [OUTBOUND, message('m1', [header('From', 'jane@acme.com'), header('Subject', 'Re: Checking in')])]);
+
+    const result = await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
+
+    // Reverting the candidate-projection fix makes contact.id resolve to
+    // 'apollo-person-999', which is not a real document: tx.get reports
+    // !exists, the reply is silently never applied, and the checkpoint
+    // stamp throws NOT_FOUND. Every assertion below would then fail.
+    expect(result.transitioned).toHaveLength(1);
+    expect(result.transitioned[0].contactId).toBe(CONTACT_ID); // the REAL doc id, not the stored one
+    expect(result.checkpointFailures).toHaveLength(0);
+    expect(result.failures).toHaveLength(0);
+
+    const contact = db._docs[contactPath()];
+    expect(contact.contact_status).toBe('In Conversation');
+    expect(contact.gmail_last_processed_reply_id).toBe('m1');
+    expect(contact.last_reply_check_at).toBeTruthy();
+    // The Apollo identity field is read, never written, by this fix —
+    // it survives in the persisted record exactly as it was.
+    expect(contact.id).toBe('apollo-person-999');
+
+    // No phantom document was ever created at a path keyed by the stale
+    // stored id — confirms the write landed at one place, not two.
+    expect(db._docs[contactPath('apollo-person-999')]).toBeUndefined();
+
+    const entries = timelineEntries(db);
+    expect(entries).toHaveLength(1);
+    expect(entries[0].metadata.gmailMessageId).toBe('m1');
+  });
+
+  it('the mission association write also uses the real document id, not a stale stored one', async () => {
+    const db = makeFakeDb({
+      [contactPath()]: {
+        id: 'apollo-person-999',
+        hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply',
+        gmail_thread_id: 't1', email: 'jane@acme.com', active_mission_id: 'mission-1',
+      },
+      [`users/${USER_ID}/missions/mission-1`]: {
+        contacts: [{ contactId: CONTACT_ID, replyStatus: 'pending' }],
+      },
+    });
+    const gmail = makeGmail();
+    thread(gmail, 't1', [OUTBOUND, message('m1', [header('From', 'jane@acme.com'), header('Subject', 'Re: Checking in')])]);
+
+    await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
+
+    const mission = db._docs[`users/${USER_ID}/missions/mission-1`];
+    const updated = mission.contacts.find((c) => c.contactId === CONTACT_ID);
+    expect(updated.replyStatus).toBe('replied');
+  });
+});
+
+describe('contact-processing failures are visible, not silently reported as fully successful', () => {
+  it('a contact deleted between the candidate query and the checkpoint stamp surfaces as a checkpointFailure, not a silent success', async () => {
+    const db = makeFakeDb({
+      [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1', email: 'jane@acme.com' },
+    });
+    // Models the race this metric exists to surface: the document is gone
+    // by the time the checkpoint stamp runs, even though the thread check
+    // that ran just before it succeeded cleanly (nothing new to report).
+    const gmail = {
+      users: {
+        threads: {
+          get: async () => {
+            delete db._docs[contactPath()];
+            return { data: { messages: [OUTBOUND] } };
+          },
+        },
+      },
+    };
+
+    const result = await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
+
+    expect(result.checkedCount).toBe(1); // the thread WAS genuinely, successfully examined
+    expect(result.transitioned).toHaveLength(0);
+    expect(result.failures).toHaveLength(0); // the thread check itself did not fail
+    expect(result.checkpointFailures).toHaveLength(1);
+    expect(result.checkpointFailures[0].contactId).toBe(CONTACT_ID);
+    expect(result.checkpointFailures[0].reason).toMatch(/NOT_FOUND/);
+  });
+
+  it('checkedCount only counts contacts actually, successfully examined — a thread-check failure is reported in failures, not counted as checked', async () => {
+    const db = makeFakeDb({
+      [contactPath('c1')]: { id: 'c1', hunter_status: 'awaiting_reply', gmail_thread_id: 't1' },
+      [contactPath('c2')]: { id: 'c2', hunter_status: 'awaiting_reply', gmail_thread_id: 't2', email: 'jane@acme.com' },
+    });
+    const gmail = {
+      users: {
+        threads: {
+          get: async ({ id }) => {
+            if (id === 't1') throw new Error('Gmail API transient error');
+            return { data: { messages: [OUTBOUND, message('m1', [header('From', 'jane@acme.com'), header('Subject', 'Re: hi')])] } };
+          },
+        },
+      },
+    };
+
+    const result = await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
+
+    expect(result.checkedCount).toBe(1); // only c2 — c1's thread check failed
+    expect(result.failures).toEqual([{ contactId: 'c1', reason: 'Gmail API transient error' }]);
+    expect(result.checkpointFailures).toHaveLength(0); // c1's checkpoint stamp still succeeded (the doc exists)
+    expect(result.transitioned).toHaveLength(1);
+    expect(result.transitioned[0].contactId).toBe('c2');
+  });
+});
+
+describe('verified vs unverified sender: relationship transition exactly once, or never', () => {
+  it('a genuine verified reply transitions its contact to In Conversation exactly once; an unverified sender on a different contact never transitions', async () => {
+    const db = makeFakeDb({
+      [contactPath('verified')]: { id: 'verified', hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1', email: 'jane@acme.com' },
+      [contactPath('unverified')]: { id: 'unverified', hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't2', email: 'bob@acme.com' },
+    });
+    const gmail = {
+      users: {
+        threads: {
+          get: async ({ id }) => {
+            if (id === 't1') return { data: { messages: [OUTBOUND, message('m1', [header('From', 'jane@acme.com'), header('Subject', 'Re: hi')])] } };
+            return { data: { messages: [OUTBOUND, message('m2', [header('From', 'someone-else@example.com'), header('Subject', 'Re: hi')])] } };
+          },
+        },
+      },
+    };
+
+    const result = await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
+
+    // Verified contact: exactly one transition.
+    expect(result.transitioned).toHaveLength(1);
+    expect(result.transitioned[0].contactId).toBe('verified');
+    expect(db._docs[contactPath('verified')].contact_status).toBe('In Conversation');
+    expect(db._docs[contactPath('verified')].hunter_status).toBe('in_conversation');
+    const verifiedEntries = timelineEntries(db, 'verified');
+    expect(verifiedEntries).toHaveLength(1);
+    expect(verifiedEntries[0].metadata.senderVerified).toBe(true);
+
+    // Unverified contact: timelined for visibility, but no transition at all.
+    expect(db._docs[contactPath('unverified')].contact_status).toBe('Awaiting Reply');
+    expect(db._docs[contactPath('unverified')].hunter_status).toBe('awaiting_reply');
+    const unverifiedEntries = timelineEntries(db, 'unverified');
+    expect(unverifiedEntries).toHaveLength(1);
+    expect(unverifiedEntries[0].metadata.senderVerified).toBe(false);
   });
 });

@@ -216,7 +216,21 @@ function classifyReply(message, contact, myEmail) {
  * @param {object} gmail — authenticated gmail_v1 client
  * @param {string} userId
  * @param {string} myEmail — the connected Gmail address, lowercased
- * @returns {Promise<{ transitioned: Array<object>, checkedCount: number, needsReconnect: boolean }>}
+ * @returns {Promise<{
+ *   transitioned: Array<object>, checkedCount: number, needsReconnect: boolean,
+ *   failures: Array<{contactId: string, reason: string}>,
+ *   checkpointFailures: Array<{contactId: string, reason: string}>,
+ * }>}
+ *   `checkedCount` counts only contacts actually, successfully examined —
+ *   not every candidate, so a thread-check failure no longer inflates it
+ *   into a false "fully successful" count. `failures` are contacts whose
+ *   thread check itself failed (not meaningfully examined this run).
+ *   `checkpointFailures` are contacts whose thread check succeeded (any
+ *   reply found was still correctly detected and applied) but whose
+ *   best-effort `last_reply_check_at` stamp failed — most often NOT_FOUND,
+ *   the signature of a contact.id that does not resolve to a real
+ *   document. Both are new, additive fields; existing callers destructuring
+ *   only `{ transitioned, checkedCount, needsReconnect }` are unaffected.
  */
 export async function pollRepliesForUser(db, gmail, userId, myEmail) {
   const contactsSnap = await db
@@ -225,8 +239,19 @@ export async function pollRepliesForUser(db, gmail, userId, myEmail) {
     .where('hunter_status', 'in', ['active_mission', 'awaiting_reply', 'in_conversation'])
     .get();
 
+  // `id: d.id` must be spread LAST. Object-spread resolves left to right
+  // with later keys winning — the opposite order silently let a stored
+  // `id` field inside the document's own data (e.g. the Apollo person id;
+  // see scoutContactContract.js's SCOUT_CONTACT_FIELDS.id) overwrite the
+  // real Firestore document id, corrupting every downstream
+  // .doc(contact.id) reference (the checkpoint stamp, the reply
+  // transaction, the timeline write, the mission lookup — all four derive
+  // from this one value). Nothing here reads or writes the document's own
+  // `id` field in Firestore; this only fixes which value wins in this
+  // in-memory projection, so a contact's persisted Apollo identity data is
+  // untouched either way.
   const candidates = contactsSnap.docs
-    .map(d => ({ id: d.id, ...d.data() }))
+    .map(d => ({ ...d.data(), id: d.id }))
     .filter(c => !!c.gmail_thread_id)
     .sort((a, b) => {
       const aAt = a.last_reply_check_at || '';
@@ -236,48 +261,84 @@ export async function pollRepliesForUser(db, gmail, userId, myEmail) {
     .slice(0, MAX_CONTACTS);
 
   if (candidates.length === 0) {
-    return { transitioned: [], checkedCount: 0, needsReconnect: false };
+    return { transitioned: [], checkedCount: 0, needsReconnect: false, failures: [], checkpointFailures: [] };
   }
 
   const transitioned = [];
+  const failures = [];
+  const checkpointFailures = [];
   let needsReconnect = false;
+  let checkedCount = 0;
 
   await Promise.all(candidates.map(async (contact) => {
     try {
-      const result = await pollRepliesForContact(db, gmail, userId, contact, myEmail);
-      if (result) transitioned.push(result);
+      const { transition, checkpointError } = await pollRepliesForContact(db, gmail, userId, contact, myEmail);
+      checkedCount++;
+      if (transition) transitioned.push(transition);
+      if (checkpointError) {
+        checkpointFailures.push({ contactId: contact.id, reason: checkpointError });
+      }
     } catch (err) {
       if (err.status === 403 || err.code === 403) {
         needsReconnect = true;
       } else {
         console.warn(`[replyPolling] Skipping contact ${contact.id}:`, err.message);
+        failures.push({ contactId: contact.id, reason: err.message });
       }
     }
   }));
 
-  return { transitioned, checkedCount: candidates.length, needsReconnect };
+  return { transitioned, checkedCount, needsReconnect, failures, checkpointFailures };
 }
 
 /**
- * Check and process one contact's thread. Returns a transition summary if
- * at least one genuine reply advanced the contact, else null.
+ * Check and process one contact's thread.
+ *
+ * Returns { transition, checkpointError }: `transition` is the transition
+ * summary when at least one genuine reply advanced the contact, else null.
+ * `checkpointError` is null on a successful stamp, else the stamp
+ * failure's message — see stampCheckpoint below. A thread-check failure
+ * (Gmail API error, 403, etc.) still stamps the checkpoint before
+ * rethrowing, then propagates to the caller unchanged — only the
+ * checkpoint's OWN failure is caught and returned here rather than thrown,
+ * so it is distinguishable from "this contact's thread check failed"
+ * rather than conflated with it.
  *
  * last_reply_check_at is stamped unconditionally before returning, on
- * every path including "nothing new" — it is the fairness-rotation field
- * pollRepliesForUser sorts candidates by, not a reply-specific marker, so
- * it must advance on every examination, not just a productive one.
- * Best-effort: a failure to stamp it is logged, never thrown — it would
- * otherwise turn a cheap bookkeeping write into a reason to report this
- * contact as failed.
+ * every path including "nothing new" and a thread-check failure — it is
+ * the fairness-rotation field pollRepliesForUser sorts candidates by, not
+ * a reply-specific marker, so it must advance on every examination, not
+ * just a productive one.
  */
 async function pollRepliesForContact(db, gmail, userId, contact, myEmail) {
   try {
-    return await checkContactThread(db, gmail, userId, contact, myEmail);
-  } finally {
-    const contactRef = db.collection('users').doc(userId).collection('contacts').doc(contact.id);
-    await contactRef.update({ last_reply_check_at: new Date().toISOString() }).catch((err) => {
-      console.warn(`[replyPolling] Could not stamp last_reply_check_at for ${contact.id} (non-blocking):`, err.message);
-    });
+    const transition = await checkContactThread(db, gmail, userId, contact, myEmail);
+    const checkpointError = await stampCheckpoint(db, userId, contact);
+    return { transition, checkpointError };
+  } catch (err) {
+    await stampCheckpoint(db, userId, contact);
+    throw err;
+  }
+}
+
+/**
+ * Best-effort fairness-rotation stamp — never throws. A failure here
+ * (most often NOT_FOUND, the signature of a contact.id that does not
+ * resolve to a real document) is returned as a string reason rather than
+ * only logged, so the caller can surface it distinctly: the thread WAS
+ * examined; only this bookkeeping write wasn't applied. Turning a cheap
+ * bookkeeping write's failure into a reason to report the whole contact
+ * as failed would conflate two different things, so this stays
+ * non-blocking — just no longer silent.
+ */
+async function stampCheckpoint(db, userId, contact) {
+  const contactRef = db.collection('users').doc(userId).collection('contacts').doc(contact.id);
+  try {
+    await contactRef.update({ last_reply_check_at: new Date().toISOString() });
+    return null;
+  } catch (err) {
+    console.warn(`[replyPolling] Could not stamp last_reply_check_at for ${contact.id} (non-blocking):`, err.message);
+    return err.message;
   }
 }
 

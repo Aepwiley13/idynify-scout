@@ -50,7 +50,11 @@ import { alertOps } from './utils/alertOps.js';
 import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 import { buildPlainTextEmail } from './utils/emailHeaders.js';
 import { isInConversation, hasReplied } from '../../src/utils/relationshipRead.js';
-import { CONTACT_STATUSES } from '../../src/utils/contactStateMachine.js';
+// Pure, dependency-free — NOT contactStateMachine.js, which imports the
+// browser Firebase client SDK and crashes under Netlify's esbuild-bundled
+// Functions runtime (no import.meta.env there). See
+// src/constants/contactStatuses.js's own header for the full story.
+import { CONTACT_STATUSES } from '../../src/constants/contactStatuses.js';
 
 // Initialize Firebase Admin (singleton guard)
 if (getApps().length === 0) {

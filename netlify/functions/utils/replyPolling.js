@@ -27,7 +27,11 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { ACTORS } from './timelineWrite.js';
 import { classifyMessage } from './gmailMessageService.js';
 import { MESSAGE_CATEGORIES } from '../../../src/types/normalizedMessage.js';
-import { CONTACT_STATUSES } from '../../../src/utils/contactStateMachine.js';
+// Pure, dependency-free — NOT contactStateMachine.js, which imports the
+// browser Firebase client SDK and crashes under Netlify's esbuild-bundled
+// Functions runtime (no import.meta.env there). See
+// src/constants/contactStatuses.js's own header for the full story.
+import { CONTACT_STATUSES } from '../../../src/constants/contactStatuses.js';
 
 /** Per-user cap on threads checked in one pass — unchanged from the original manual handler. */
 export const MAX_CONTACTS = 50;

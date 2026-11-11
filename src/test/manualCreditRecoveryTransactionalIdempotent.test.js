@@ -25,13 +25,15 @@ const FIRESTORE_EMULATOR_AVAILABLE = Boolean(process.env.FIRESTORE_EMULATOR_HOST
 /**
  * A minimal, literal fake — no vi.mock needed since applyManualRecovery takes `stripe` as a
  * plain injected parameter, same as `db`. Each test builds one consistent with its own scenario
- * (matching customer, price, status, and evidence), since verifyPurchaseAgainstStripe now
+ * (matching customer identity, price, status, and evidence), since verifyPurchaseAgainstStripe
  * independently checks all of that before any write happens.
  */
-function fakeStripe({ subscriptions = {}, sessions = {} } = {}) {
+function fakeStripe({ subscriptions = {}, sessions = {}, customers = {}, invoices = {} } = {}) {
   return {
     subscriptions: { retrieve: async (id) => { if (!subscriptions[id]) throw new Error(`no such subscription: ${id}`); return subscriptions[id]; } },
     checkout: { sessions: { retrieve: async (id) => { if (!sessions[id]) throw new Error(`no such checkout session: ${id}`); return sessions[id]; } } },
+    customers: { retrieve: async (id) => { if (!customers[id]) throw new Error(`no such customer: ${id}`); return customers[id]; } },
+    invoices: { retrieve: async (id) => { if (!invoices[id]) throw new Error(`no such invoice: ${id}`); return invoices[id]; } },
   };
 }
 
@@ -58,6 +60,7 @@ describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
 
     const stripe = fakeStripe({
       subscriptions: { sub_recover_1: { customer: 'cus_recover_1', status: 'active', items: { data: [{ price: { id: 'price_starter' } }] } } },
+      customers: { cus_recover_1: { metadata: { firebaseUID: 'uid_recover_1' } } },
       sessions: { cs_recover_1: { subscription: 'sub_recover_1', payment_status: 'paid' } },
     });
 
@@ -87,6 +90,7 @@ describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
     await db.collection('users').doc('uid_recover_2').set({ email: 'recover2@example.test' });
     const stripe = fakeStripe({
       subscriptions: { sub_recover_2: { customer: 'cus_recover_2', status: 'active', items: { data: [{ price: { id: 'price_starter' } }] } } },
+      customers: { cus_recover_2: { metadata: { firebaseUID: 'uid_recover_2' } } },
       sessions: { cs_recover_2: { subscription: 'sub_recover_2', payment_status: 'paid' } },
     });
     const args = {
@@ -108,6 +112,7 @@ describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
     await db.collection('users').doc('uid_recover_3').set({ email: 'recover3@example.test' });
     const stripe = fakeStripe({
       subscriptions: { sub_recover_3: { customer: 'cus_recover_3', status: 'active', items: { data: [{ price: { id: 'price_pro' } }] } } },
+      customers: { cus_recover_3: { metadata: { firebaseUID: 'uid_recover_3' } } },
       sessions: { cs_recover_3: { subscription: 'sub_recover_3', payment_status: 'paid' } },
     });
     const args = {
@@ -146,6 +151,7 @@ describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
     await db.collection('users').doc('uid_recover_4').set({ email: 'recover4@example.test' });
     const stripe = fakeStripe({
       subscriptions: { sub_recover_4: { customer: 'cus_recover_4', status: 'active', items: { data: [{ price: { id: 'price_starter' } }] } } },
+      customers: { cus_recover_4: { metadata: { firebaseUID: 'uid_recover_4' } } },
       sessions: { cs_recover_4: { subscription: 'sub_recover_4', payment_status: 'paid' } },
     });
     const result = await applyManualRecovery(db, stripe, {

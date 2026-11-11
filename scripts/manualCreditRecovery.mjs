@@ -6,7 +6,7 @@
  * SEPARATE tool from the webhook, never invoked automatically, and requires a human to supply
  * purchase-specific evidence on every run — it will not run without it.
  *
- * ── Round-10 review finding: evidence is an approval record, not a substitute for validation ──
+ * ── Evidence is an approval record, not a substitute for validation ───────────────────────────
  *
  * The CLI's required --evidence-stripe-session-id/--evidence-note arguments used to be the
  * ENTIRE gate: whatever an operator typed was trusted at face value and just stored alongside the
@@ -16,18 +16,35 @@
  * before any write happens:
  *   - priceId must be a recognized, CREDIT-GRANTING Idynify price — rejects both a totally
  *     unknown price and a known-but-free one (e.g. the $0/month Scout Starter price).
- *   - the subscription's actual Stripe customer must match the account's recorded
- *     stripeCustomerId (when one is already on file) — rejects a mismatched account.
+ *   - POSITIVE account ownership, not merely "no stated contradiction": the Stripe customer's own
+ *     metadata.firebaseUID must equal --uid. This is a materially stronger check than comparing
+ *     against the account's OWN stripeCustomerId field, which may simply be unset (nothing in
+ *     Firestore to contradict an operator's claim with) — the webhook path (stripe-webhook.js
+ *     6c) gets its identity from a verified Firebase ID token or session metadata; manual
+ *     recovery has no such independent identity source unless it asks Stripe directly, which is
+ *     what this check does.
  *   - the subscription's actual purchased price must match the claimed --price-id — rejects a
  *     mismatched purchase record (the operator claiming a different price than what was bought).
  *   - the subscription must not be canceled/incomplete_expired — never restores access for a
  *     subscription that is not currently in force.
+ *   - PAYMENT must be independently confirmed, not assumed from status alone. When the evidence
+ *     is a checkout session (cs_...), its own payment_status must be "paid". When the evidence is
+ *     the subscription id itself (sub_..., the legacy-Payment-Link case with no checkout session
+ *     to point at), the subscription's own latest invoice must be "paid" — an unpaid, open, or
+ *     uncollectible invoice means no payment was ever actually confirmed, however plausible the
+ *     operator's note reads.
  *   - the account must not already have a DIFFERENT subscription on file — granting for this one
  *     would overwrite that unrelated subscription's balance and usage, not just add to it.
+ *   - the account must not already show a completed grant or recorded usage for THIS SAME
+ *     subscription (hasCompletedPayment already true, or an object-shaped credits.used > 0) —
+ *     if it does, something already applied this purchase through a different path (or the data
+ *     is otherwise inconsistent), and overwriting would reset real usage history. That needs
+ *     human review, not an automatic overwrite — this script preserves what's already there and
+ *     refuses instead.
  *   - the evidence pointer itself must independently resolve to a real Stripe object that
  *     actually supports this grant (a checkout session for this exact subscription, paid; or the
- *     subscription id itself) — an operator typing ANY string into --evidence-stripe-session-id
- *     is never sufficient on its own.
+ *     subscription id itself, with its own payment independently confirmed as above) — an
+ *     operator typing ANY string into --evidence-stripe-session-id is never sufficient on its own.
  * Any failure throws EvidenceValidationError and nothing is written — not even the ambiguous-
  * account record is touched.
  *
@@ -131,6 +148,21 @@ export async function verifyPurchaseAgainstStripe({ stripe, userData, uid, subsc
     throw new EvidenceValidationError(`could not retrieve subscription ${subscriptionId} from Stripe: ${err.message}`);
   }
 
+  // Positive ownership, not merely "no stated contradiction". userData.stripeCustomerId being
+  // unset proves nothing either way — it's simply absent, not a cleared contradiction. The
+  // Stripe customer's OWN metadata is the independent identity source here, mirroring how the
+  // webhook path (stripe-webhook.js 6c) cross-checks customer.metadata.firebaseUID.
+  let customer;
+  try {
+    customer = await stripe.customers.retrieve(subscription.customer);
+  } catch (err) {
+    throw new EvidenceValidationError(`could not retrieve Stripe customer ${subscription.customer} for subscription ${subscriptionId}: ${err.message}`);
+  }
+  if (customer.metadata?.firebaseUID !== uid) {
+    throw new EvidenceValidationError(
+      `Stripe customer ${subscription.customer} has metadata.firebaseUID "${customer.metadata?.firebaseUID ?? 'unset'}", not "${uid}" — refusing without positive proof of account ownership (missing customer binding)`
+    );
+  }
   if (userData.stripeCustomerId && subscription.customer !== userData.stripeCustomerId) {
     throw new EvidenceValidationError(
       `subscription ${subscriptionId} belongs to Stripe customer ${subscription.customer}, but users/${uid} is recorded under ${userData.stripeCustomerId} — refusing (mismatched account)`
@@ -154,8 +186,22 @@ export async function verifyPurchaseAgainstStripe({ stripe, userData, uid, subsc
     );
   }
 
+  // Preserve existing balance and usage: if this account already shows a completed grant or
+  // recorded usage for THIS SAME subscription, something already applied this purchase through
+  // another path (or the data is otherwise inconsistent) — overwriting would reset real usage
+  // history. That needs human review, not an automatic overwrite.
+  if (userData.stripeSubscriptionId === subscriptionId) {
+    const hasObjectUsage = userData.credits && typeof userData.credits === 'object' && userData.credits.used > 0;
+    if (userData.hasCompletedPayment === true || hasObjectUsage) {
+      throw new EvidenceValidationError(
+        `users/${uid} already shows ${userData.hasCompletedPayment === true ? 'a completed payment' : 'recorded usage'} for subscription ${subscriptionId} with no billingAllocations marker — refusing to overwrite existing balance and usage; this needs human review`
+      );
+    }
+  }
+
   // The evidence pointer itself must independently check out — never trusted just because an
   // operator supplied one. --evidence-stripe-session-id is documented as <cs_...|sub_...>.
+  // Either form must also independently confirm PAYMENT, not just existence.
   if (evidenceStripeSessionId.startsWith('cs_')) {
     let session;
     try {
@@ -171,7 +217,26 @@ export async function verifyPurchaseAgainstStripe({ stripe, userData, uid, subsc
     if (session.payment_status !== 'paid') {
       throw new EvidenceValidationError(`evidence checkout session ${evidenceStripeSessionId} has payment_status "${session.payment_status}", not "paid"`);
     }
-  } else if (evidenceStripeSessionId !== subscriptionId) {
+  } else if (evidenceStripeSessionId === subscriptionId) {
+    // No checkout session to point at (the legacy Payment Link case) — the subscription's own
+    // latest invoice is the only remaining source of independent payment confirmation. The
+    // subscription's status alone is not enough: 'active' can occur mid-cycle with the CURRENT
+    // invoice still open/unpaid, so the invoice itself must say "paid", not merely "not canceled".
+    if (!subscription.latest_invoice) {
+      throw new EvidenceValidationError(`subscription ${subscriptionId} has no latest_invoice to confirm payment against — refusing unpaid subscription-id evidence`);
+    }
+    let invoice;
+    try {
+      invoice = await stripe.invoices.retrieve(subscription.latest_invoice);
+    } catch (err) {
+      throw new EvidenceValidationError(`could not retrieve invoice ${subscription.latest_invoice} for subscription ${subscriptionId}: ${err.message}`);
+    }
+    if (invoice.status !== 'paid') {
+      throw new EvidenceValidationError(
+        `subscription ${subscriptionId}'s latest invoice has status "${invoice.status}", not "paid" — refusing unpaid subscription-id evidence`
+      );
+    }
+  } else {
     throw new EvidenceValidationError(
       `--evidence-stripe-session-id ${evidenceStripeSessionId} is neither a checkout session for ${subscriptionId} nor the subscription id itself — the evidence does not point at this purchase`
     );
@@ -221,6 +286,14 @@ export async function applyManualRecovery(db, stripe, args) {
       throw new EvidenceValidationError(
         `users/${uid} now has a different subscription (${userData.stripeSubscriptionId}) on file — aborting to avoid overwriting its balance and usage`
       );
+    }
+    if (userData.stripeSubscriptionId === subscriptionId) {
+      const hasObjectUsage = userData.credits && typeof userData.credits === 'object' && userData.credits.used > 0;
+      if (userData.hasCompletedPayment === true || hasObjectUsage) {
+        throw new EvidenceValidationError(
+          `users/${uid} now shows ${userData.hasCompletedPayment === true ? 'a completed payment' : 'recorded usage'} for subscription ${subscriptionId} — aborting to avoid overwriting existing balance and usage`
+        );
+      }
     }
 
     let ambiguousRef = null;

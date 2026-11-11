@@ -1,37 +1,44 @@
 /**
  * Pure unit tests — no network, no Netlify CLI, no emulator. Runs under plain `npm test`.
  *
- * isDeployReadyToArm() is the enforceable precondition that replaces a guessed timing buffer:
- * the billing ledger (BILLING_LEDGER_EPOCH_UNIX) must never be armed until the expected commit
- * is confirmed as the live, fully-published production deploy, with a minimum wait elapsed since
- * publish as a bounded stand-in for "old invocations drained" (no stronger signal is available).
- *
- * Round-10 review findings fixed here, each with its own regression test below:
- *   1. The write must target the exact site the readiness check verified, and the armed epoch
- *      must be deterministic (tied to the deploy's own publish time) so a rollback-then-redeploy
- *      and an idempotent re-run both behave correctly with no separate procedure.
- *   2. (manual recovery — see manualCreditRecovery*.test.js)
- *   3. (manual recovery — see manualCreditRecovery*.test.js)
+ * isDeployReadyToArm() answers only "is the expected commit the live, drained production
+ * deploy" — a necessary precondition, not proof that automatic allocation is governed by the
+ * current epoch value. isRuntimeActivationVerified() is the actual answer to that: a publish
+ * timestamp and a successful env-var write are each necessary but neither is sufficient, because
+ * Netlify Functions only see an env var's current value starting from the first deploy BUILT
+ * after that value last changed (docs.netlify.com/build/environment-variables/get-started/,
+ * verified 2026-11-10) — an already-deployed function never picks up a later write
+ * retroactively. Activation requires the live deploy's OWN build (createdAt) to postdate the
+ * env var's own last-updated timestamp (updated_at, from Netlify's getSiteEnvVars).
  */
 import { describe, it, expect } from 'vitest';
 import {
-  isDeployReadyToArm, buildEnvSetArgs, DEFAULT_MIN_DRAIN_WAIT_MS,
-  FUNCTION_MAX_EXECUTION_MS, DEPLOY_PROPAGATION_MARGIN_MS,
+  isDeployReadyToArm, isRuntimeActivationVerified, buildEnvSetArgs,
+  DEFAULT_MIN_DRAIN_WAIT_MS, FUNCTION_MAX_EXECUTION_MS, DEPLOY_PROPAGATION_MARGIN_MS, EPOCH_ENV_VAR_KEY,
 } from '../../scripts/billingLedgerCutover.mjs';
 
 const SHA = '06bc6f42d10ceb7a297b9c09ef6675667bfe96ec';
 const NOW = Date.parse('2026-11-10T12:00:00Z');
 
 function readyDeploy(overrides = {}) {
+  const createdAt = new Date(NOW - DEFAULT_MIN_DRAIN_WAIT_MS - 2000).toISOString();
+  const publishedAt = new Date(NOW - DEFAULT_MIN_DRAIN_WAIT_MS - 1000).toISOString();
   return {
     id: 'deploy_1', state: 'ready', context: 'production', commit_ref: SHA,
-    created_at: new Date(NOW - DEFAULT_MIN_DRAIN_WAIT_MS - 1000).toISOString(),
-    published_at: new Date(NOW - DEFAULT_MIN_DRAIN_WAIT_MS - 1000).toISOString(),
+    created_at: createdAt, published_at: publishedAt,
     ...overrides,
   };
 }
 
-describe('isDeployReadyToArm — the verified-cutover precondition', () => {
+function epochEnvVars(valueByContext, updatedAt) {
+  return [{
+    key: EPOCH_ENV_VAR_KEY,
+    updated_at: updatedAt,
+    values: Object.entries(valueByContext).map(([context, value]) => ({ context, value: String(value) })),
+  }];
+}
+
+describe('isDeployReadyToArm — the live-deploy precondition', () => {
   it('is ready when the expected commit is the live production deploy and the drain wait has elapsed', () => {
     const verdict = isDeployReadyToArm({ deploys: [readyDeploy()], expectedCommitSha: SHA, nowMs: NOW });
     expect(verdict.ready).toBe(true);
@@ -100,15 +107,11 @@ describe('isDeployReadyToArm — the verified-cutover precondition', () => {
     expect(verdict.reason).toBe('deploy_state_is_error');
   });
 
-  // ── Round-10 finding: platform timing assumptions, verified not guessed ──────────────────────
-
   it('the drain wait is the documented function execution ceiling plus an explicit, separate margin — not a bare magic number', () => {
     expect(FUNCTION_MAX_EXECUTION_MS).toBe(60_000); // docs.netlify.com/build/functions/configuration/
     expect(DEPLOY_PROPAGATION_MARGIN_MS).toBeGreaterThan(0); // no published SLA exists; this is a deliberate buffer
     expect(DEFAULT_MIN_DRAIN_WAIT_MS).toBe(FUNCTION_MAX_EXECUTION_MS + DEPLOY_PROPAGATION_MARGIN_MS);
   });
-
-  // ── Round-10 finding: selection must never trust array order (Netlify documents none) ────────
 
   it('picks the most recent production deploy by timestamp even when it is NOT the first production entry in the array', () => {
     const older = readyDeploy({
@@ -117,60 +120,103 @@ describe('isDeployReadyToArm — the verified-cutover precondition', () => {
       published_at: new Date(NOW - DEFAULT_MIN_DRAIN_WAIT_MS - 50_000).toISOString(),
     });
     const newer = readyDeploy(); // SHA, more recent timestamps
-    // Older listed FIRST — if array position were ever trusted, this would resolve to the wrong
-    // deploy and either falsely refuse (commit mismatch against SHA) or falsely approve a stale one.
     const verdict = isDeployReadyToArm({ deploys: [older, newer], expectedCommitSha: SHA, nowMs: NOW });
     expect(verdict.ready).toBe(true);
     expect(verdict.deployId).toBe('deploy_1'); // the newer one, not deploy_old
   });
+});
 
-  // ── Round-10 finding: the armed epoch must be deterministic, not wall-clock-at-invocation ────
-
-  it('computes the identical epoch on repeated invocations for the same still-live deploy — idempotent re-runs never creep the epoch forward', () => {
-    const v1 = isDeployReadyToArm({ deploys: [readyDeploy()], expectedCommitSha: SHA, nowMs: NOW });
-    const v2 = isDeployReadyToArm({ deploys: [readyDeploy()], expectedCommitSha: SHA, nowMs: NOW + 45_000 }); // run again, later
-    expect(v1.ready).toBe(true);
-    expect(v2.ready).toBe(true);
-    expect(v2.computedEpochUnix).toBe(v1.computedEpochUnix);
+describe('isRuntimeActivationVerified — a publish timestamp and an env-var write are each necessary, neither sufficient', () => {
+  it('is NOT active when the deploy is ready but the epoch env var is not set at all', () => {
+    const verdict = isRuntimeActivationVerified({ deploys: [readyDeploy()], envVars: [], expectedCommitSha: SHA, nowMs: NOW });
+    expect(verdict.active).toBe(false);
+    expect(verdict.reason).toBe('epoch_env_var_not_set');
   });
 
-  it('the computed epoch is tied to the deploy\'s own published_at, not to nowMs at invocation', () => {
-    const publishedAt = new Date(NOW - DEFAULT_MIN_DRAIN_WAIT_MS - 1000).toISOString();
-    const verdict = isDeployReadyToArm({ deploys: [readyDeploy({ published_at: publishedAt })], expectedCommitSha: SHA, nowMs: NOW });
-    expect(verdict.computedEpochUnix).toBe(Math.floor(Date.parse(publishedAt) / 1000));
+  it('is NOT active when the live deploy is not itself ready (commit mismatch) — env var state is irrelevant', () => {
+    const envVars = epochEnvVars({ production: 1000 }, new Date(NOW - 10_000_000).toISOString());
+    const verdict = isRuntimeActivationVerified({
+      deploys: [readyDeploy({ commit_ref: 'different-sha' })], envVars, expectedCommitSha: SHA, nowMs: NOW,
+    });
+    expect(verdict.active).toBe(false);
+    expect(verdict.reason).toBe('commit_mismatch');
   });
 
-  it('a rollback followed by a forward redeploy computes a fresh epoch anchored to the NEW deploy, independent of the previous arm', () => {
-    const rollbackCommit = 'rollback-sha';
-    const forwardCommit = 'forward-sha';
+  it('is ACTIVE when the live deploy was built after the env var was last updated', () => {
+    // Env var updated well before this deploy's own build started.
+    const envUpdatedAt = new Date(NOW - DEFAULT_MIN_DRAIN_WAIT_MS - 3600_000).toISOString();
+    const envVars = epochEnvVars({ production: 1762776000 }, envUpdatedAt);
+    const verdict = isRuntimeActivationVerified({ deploys: [readyDeploy()], envVars, expectedCommitSha: SHA, nowMs: NOW });
+    expect(verdict.active).toBe(true);
+    expect(verdict.liveEpochUnix).toBe(1762776000);
+  });
 
-    // Original cutover.
-    const firstPublishedAt = new Date(NOW - DEFAULT_MIN_DRAIN_WAIT_MS - 1000).toISOString();
-    const first = isDeployReadyToArm({
-      deploys: [readyDeploy({ commit_ref: SHA, published_at: firstPublishedAt, created_at: firstPublishedAt })],
-      expectedCommitSha: SHA, nowMs: NOW,
+  it('is NOT active — THE decisive case — when the live deploy\'s own build predates the env var\'s last update: a publish timestamp plus a successful write is not proof', () => {
+    // The deploy BUILT (created_at) before the env var was written. Even though the deploy is
+    // "ready", published, and drained, and the env var IS set — the live function's build could
+    // not have packaged a value that didn't exist yet when it was built.
+    const deploy = readyDeploy(); // created_at is DEFAULT_MIN_DRAIN_WAIT_MS + 2s before NOW
+    const envUpdatedAfterBuild = new Date(Date.parse(deploy.created_at) + 1000).toISOString(); // 1s AFTER the build started
+    const envVars = epochEnvVars({ production: 1762776000 }, envUpdatedAfterBuild);
+
+    const verdict = isRuntimeActivationVerified({ deploys: [deploy], envVars, expectedCommitSha: SHA, nowMs: NOW });
+
+    expect(verdict.active).toBe(false);
+    expect(verdict.reason).toBe('live_deploy_predates_env_var_update');
+  });
+
+  it('is NOT active when the env var has no production value, even if some other context has one', () => {
+    const envVars = epochEnvVars({ 'deploy-preview': 999 }, new Date(NOW - 10_000_000).toISOString());
+    const verdict = isRuntimeActivationVerified({ deploys: [readyDeploy()], envVars, expectedCommitSha: SHA, nowMs: NOW });
+    expect(verdict.active).toBe(false);
+    expect(verdict.reason).toBe('epoch_env_var_not_set_for_production');
+  });
+
+  it('is NOT active when the env var\'s updated_at is itself missing — cannot verify ordering at all', () => {
+    const envVars = [{ key: EPOCH_ENV_VAR_KEY, values: [{ context: 'production', value: '123' }] }]; // no updated_at
+    const verdict = isRuntimeActivationVerified({ deploys: [readyDeploy()], envVars, expectedCommitSha: SHA, nowMs: NOW });
+    expect(verdict.active).toBe(false);
+    expect(verdict.reason).toBe('epoch_env_var_updated_at_unknown');
+  });
+
+  it('rollback/redeployment before gate activation: a rollback to an earlier commit is never active, regardless of env var state', () => {
+    const envVars = epochEnvVars({ production: 1762776000 }, new Date(NOW - 10_000_000).toISOString());
+    // Ops rolled back to a different (earlier, or simply not-the-expected) commit.
+    const rolledBackDeploy = readyDeploy({ id: 'deploy_rollback', commit_ref: 'rollback-sha' });
+    const verdict = isRuntimeActivationVerified({ deploys: [rolledBackDeploy], envVars, expectedCommitSha: SHA, nowMs: NOW });
+    expect(verdict.active).toBe(false);
+    expect(verdict.reason).toBe('commit_mismatch');
+  });
+
+  it('rollback/redeployment before gate activation: a forward redeploy that lands BEFORE a pending env var change is not active until its OWN build postdates that change', () => {
+    // Scenario: ops fixes the rollback and redeploys the expected commit — but the env var write
+    // (e.g. a fresh epoch chosen for THIS recovery) happens to land after this redeploy's build
+    // already started (a plausible ordering if the operator writes the env var "at the same
+    // time" as triggering the deploy). The redeploy is live, matching, and drained — but its own
+    // build predates the write, so it must NOT be trusted yet.
+    const forwardDeploy = readyDeploy({ id: 'deploy_forward_redeploy' });
+    const envUpdatedAfterThisBuild = new Date(Date.parse(forwardDeploy.created_at) + 500).toISOString();
+    const envVars = epochEnvVars({ production: 1762776000 }, envUpdatedAfterThisBuild);
+
+    const verdict = isRuntimeActivationVerified({ deploys: [forwardDeploy], envVars, expectedCommitSha: SHA, nowMs: NOW });
+    expect(verdict.active).toBe(false);
+    expect(verdict.reason).toBe('live_deploy_predates_env_var_update');
+  });
+
+  it('rollback/redeployment before gate activation: becomes active only once a SUBSEQUENT redeploy is built after the env var update', () => {
+    const envUpdatedAt = new Date(NOW - 10_000_000).toISOString();
+    const envVars = epochEnvVars({ production: 1762776000 }, envUpdatedAt);
+
+    // A later redeploy, built well after the env var change above.
+    const laterDeploy = readyDeploy({
+      id: 'deploy_after_recovery',
+      created_at: new Date(NOW - DEFAULT_MIN_DRAIN_WAIT_MS - 1000).toISOString(), // after envUpdatedAt
+      published_at: new Date(NOW - DEFAULT_MIN_DRAIN_WAIT_MS).toISOString(),
     });
-    expect(first.ready).toBe(true);
 
-    // Incident: Netlify rolls back to an earlier deploy. Nothing from this PR is live; arming
-    // against it is simply never attempted (ops wouldn't pass --expect-commit for this one).
-
-    // Recovery: a forward redeploy, hours later, to a fixed commit. Same command, new timestamps.
-    const laterNow = NOW + 3 * 60 * 60 * 1000;
-    const secondPublishedAt = new Date(laterNow - DEFAULT_MIN_DRAIN_WAIT_MS - 1000).toISOString();
-    const second = isDeployReadyToArm({
-      deploys: [
-        readyDeploy({ commit_ref: rollbackCommit, published_at: firstPublishedAt, created_at: firstPublishedAt }),
-        readyDeploy({ id: 'deploy_forward', commit_ref: forwardCommit, published_at: secondPublishedAt, created_at: secondPublishedAt }),
-      ],
-      expectedCommitSha: forwardCommit, nowMs: laterNow,
-    });
-
-    expect(second.ready).toBe(true);
-    expect(second.deployId).toBe('deploy_forward');
-    expect(second.computedEpochUnix).not.toBe(first.computedEpochUnix);
-    expect(second.computedEpochUnix).toBeGreaterThan(first.computedEpochUnix);
-    expect(second.computedEpochUnix).toBe(Math.floor(Date.parse(secondPublishedAt) / 1000));
+    const verdict = isRuntimeActivationVerified({ deploys: [laterDeploy], envVars, expectedCommitSha: SHA, nowMs: NOW });
+    expect(verdict.active).toBe(true);
+    expect(verdict.deployId).toBe('deploy_after_recovery');
   });
 });
 

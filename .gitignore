@@ -37,3 +37,8 @@ dist-ssr
 
 # Staging env for manual QA lives outside the repo; never commit one by accident.
 .env.staging
+
+# scripts/verifyFunctionBundlesInitialize.mjs's own esbuild output, written
+# under the repo root (not the system tmpdir) so Node's module resolution
+# finds node_modules; cleaned up after each run regardless.
+/.verify-bundle-tmp/

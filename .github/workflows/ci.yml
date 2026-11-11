@@ -26,6 +26,28 @@ jobs:
       # than after the full corpus.
       - name: No hardcoded Firebase project id
         run: npm run check:env
+      # src/test/noBrowserImportsInFunctions.test.js (part of "Run tests"
+      # below) statically proves no Function's import graph reaches a
+      # browser-only package. This step proves the thing that check predicts:
+      # the actual bundled output Netlify deploys initializes under plain
+      # Node. Deliberately NOT part of `npx vitest run` — Vite (and
+      # therefore Vitest) injects a working import.meta.env, which is
+      # exactly what is absent from Netlify's real esbuild-bundled runtime.
+      # A check that only runs under Vitest cannot catch this class of bug;
+      # see scripts/verifyFunctionBundlesInitialize.mjs's own header for the
+      # production incident this is here because of, and why both the 'cjs'
+      # and 'esm' esbuild output formats are checked.
+      #
+      # Scoped to the functions this incident actually touched, not --all:
+      # a repo-wide run surfaces 9 pre-existing, unrelated bundle failures
+      # ("Dynamic require of 'firebase-admin' is not supported" — an esbuild
+      # limitation on some CommonJS-source files under ESM output) that
+      # have nothing to do with this fix. Making this gate block on those
+      # would entangle an unrelated, pre-existing issue with this one; run
+      # `node scripts/verifyFunctionBundlesInitialize.mjs --all` by hand to
+      # audit the rest as its own, separate piece of work.
+      - name: Verify function bundles initialize (production-equivalent)
+        run: node scripts/verifyFunctionBundlesInitialize.mjs
       # Test exclusions (policy, 2026-08-28): this gate runs the whole corpus.
       # An exclusion added here must carry, in a comment beside it: the reason,
       # a named owner, and the condition or date on which it is removed. An

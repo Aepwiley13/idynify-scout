@@ -58,28 +58,15 @@ import {
   engagementPromotionFields,
   isEngagedRecord,
 } from '../constants/statusModel';
+import { CONTACT_STATUSES } from '../constants/contactStatuses.js';
 
 // ── Allowed Statuses ────────────────────────────────────
 
-export const CONTACT_STATUSES = {
-  // Active lead statuses
-  NEW: 'New',
-  ENGAGED: 'Engaged',
-  AWAITING_REPLY: 'Awaiting Reply',
-  IN_CONVERSATION: 'In Conversation',
-  DORMANT: 'Dormant',
-
-  // Relationship statuses (person_type-driven)
-  ACTIVE_CUSTOMER: 'Active Customer',
-  PAST_CUSTOMER: 'Past Customer',
-  PARTNER: 'Partner',
-  NETWORK: 'Network',
-
-  // Legacy statuses (maintained for backward compatibility — do not use for new contacts)
-  IN_CAMPAIGN: 'In Campaign',
-  ACTIVE_MISSION: 'Active Mission',
-  MISSION_COMPLETE: 'Mission Complete'
-};
+// CONTACT_STATUSES now lives in ../constants/contactStatuses.js (pure, no
+// Firebase/browser imports) so server-side code can read it without pulling
+// in this file's browser-only dependencies above. Re-exported here,
+// unchanged, for every existing caller of contactStateMachine.js.
+export { CONTACT_STATUSES };
 
 // Ordered list for validation
 const VALID_STATUSES = Object.values(CONTACT_STATUSES);

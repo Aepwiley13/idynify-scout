@@ -189,7 +189,7 @@ credits with no marker at all, and nothing in this system can detect or undo tha
 later, `reenabled_at`, as Unix timestamps, written somewhere that survives the incident (a ticket,
 an incident doc — not just memory). This window is what bounds the recovery query in §6.
 
-## 6. Recovery after re-enabling: paginated inventory, explicit resend, completion checks
+## 6. Recovery after re-enabling: inventory, resend, then reconcile outcomes
 
 Once a genuinely fixed hardened commit is confirmed live (§3–4), re-enable the endpoint and find
 its id (`we_...`, from the Dashboard endpoint URL, or `stripe webhook_endpoints list`).
@@ -204,52 +204,85 @@ its id (`we_...`, from the Dashboard endpoint URL, or `stripe webhook_endpoints 
 | CLI resend (`stripe events resend`) | 30 days from creation | docs.stripe.com/cli/events/resend |
 | Financial records (charges, invoices, subscriptions) | **Do not expire** — distinct from the event log entirely | Stripe's standard account data retention |
 
-**Paginated inventory**, filtered on exactly what needs attention
-(`delivery_success=false` — "pending or failed all delivery attempts," per the Events API docs —
-rather than guessing at date/type combinations):
+### 6.1 Inventory ALL relevant events in the window — not filtered by delivery outcome
+
+`delivery_success` is **not** scoped to this one endpoint — it reflects whether *every*
+registered destination on the account succeeded (confirmed against docs.stripe.com/api/events/
+list: "whether **all webhooks** were successfully delivered"). If this account has any other
+destination configured, an event that never reached our disabled endpoint can still read
+`delivery_success: true` overall — filtering on it would silently exclude exactly the events this
+recovery exists for. Separately, a `200` from *our* endpoint has never meant "credits granted" —
+most of `decideAllocationEligibility`'s own outcomes (flagged ambiguous, a non-credit-granting
+price, already-granted) return `200` with no allocation. Inventory by window and type only;
+§6.3 is what actually sorts out what happened to each one.
+
 ```bash
 NEXT=""
 > /tmp/incident_events.jsonl
-while :; do
-  PAGE=$(stripe get /v1/events -d "created[gte]=<disabled_at>" -d "created[lte]=<reenabled_at>" \
-    -d "delivery_success=false" -d limit=100 ${NEXT:+-d "starting_after=$NEXT"})
-  echo "$PAGE" | jq -c '.data[]' >> /tmp/incident_events.jsonl
-  HAS_MORE=$(echo "$PAGE" | jq -r '.has_more')
-  NEXT=$(echo "$PAGE" | jq -r '.data[-1].id // empty')
-  [ "$HAS_MORE" = "true" ] || break
+for TYPE in checkout.session.completed customer.subscription.created customer.subscription.updated customer.subscription.deleted; do
+  NEXT=""
+  while :; do
+    PAGE=$(stripe get /v1/events -d "created[gte]=<disabled_at>" -d "created[lte]=<reenabled_at>" \
+      -d "type=$TYPE" -d limit=100 ${NEXT:+-d "starting_after=$NEXT"})
+    echo "$PAGE" | jq -c '.data[]' >> /tmp/incident_events.jsonl
+    HAS_MORE=$(echo "$PAGE" | jq -r '.has_more')
+    NEXT=$(echo "$PAGE" | jq -r '.data[-1].id // empty')
+    [ "$HAS_MORE" = "true" ] || break
+  done
 done
 ```
-**Expected result:** `/tmp/incident_events.jsonl` has one full event object per line, covering
-every event in the window that was never successfully delivered — not just the first 100.
+**Expected result:** `/tmp/incident_events.jsonl` has one full event object per line — every
+event of a relevant type created in the window, regardless of what Stripe's own delivery
+bookkeeping says about any destination.
 
-**Explicit resend**, one at a time (`stripe events resend` defaults to the CLI's own local
-listener — `--webhook-endpoint` must be passed or nothing reaches production, verified against
-docs.stripe.com/cli/events/resend):
+### 6.2 Explicit resend
+
+`stripe events resend` defaults to the CLI's own local listener — `--webhook-endpoint` must be
+passed or nothing reaches production (verified against docs.stripe.com/cli/events/resend):
 ```bash
 jq -r '.id' /tmp/incident_events.jsonl | while read -r EVENT_ID; do
   stripe events resend "$EVENT_ID" --webhook-endpoint=<we_...>
 done
 ```
+Resending an event that was already fully, correctly handled is harmless — `stripe-webhook.js`'s
+own idempotency check (`stripeWebhookEvents/{eventId}` pre-check) short-circuits it to a plain
+`200` with no re-processing.
 
-**Completion check** — for each id, confirm it was actually applied, not just re-sent. Verified
-against the actual commit logic (`stripe-webhook.js`): every `checkout.session.completed` event
-that reaches a transaction commit sets `stripeWebhookEvents/{eventId}` unconditionally, whether
-it granted or was flagged ambiguous — either outcome counts as "handled," only an id with no
-marker at all was dropped. `customer.subscription.*` events are the one exception: if no uid can
-be resolved yet, the event is deliberately parked at
-`stripeWebhookPendingEvents/{customerId}/events/{eventId}` and is **not** marked applied — that's
-a benign, expected pending state (it drains automatically once a binding event arrives for that
-customer), not a failure, so check there too before concluding an id was dropped.
+### 6.3 Reconcile — distinguish delivered, applied, pending, flagged, and granted
 
-No `firebase` CLI subcommand reads an individual document (confirmed: `firebase firestore
---help` lists only delete/bulkdelete/indexes/locations/operations/databases/backups), so this
-needs a short, complete script against firebase-admin directly — the same WRITE-capable key
-already required for `scripts/manualCreditRecovery.mjs`. Pass the same paginated event JSON
-captured above (`/tmp/incident_events.jsonl`, one event object per line) so the script has each
-event's own `type` and `data.object.customer` without a second Stripe lookup:
+**An event-ledger entry alone must not be read as "credits granted."**
+`stripeWebhookEvents/{eventId}` existing means the event reached a transaction commit — nothing
+more. `customer.subscription.*` events never grant credits at all (only
+`checkout.session.completed` does); even for that type, reaching a commit includes every
+non-grant outcome `decideAllocationEligibility` can return (ambiguous, non-credit-granting price,
+already granted). The only direct evidence of an actual grant is
+`billingAllocations/{subscriptionId}` existing.
+
+For each event, in order:
+1. `stripeWebhookEvents/{event.id}` exists? → **delivered & processed**. If not, and the type is
+   `customer.subscription.*`, check `stripeWebhookPendingEvents/{customer}/events/{event.id}` →
+   **parked, pending** (benign — drains once a binding event arrives) or **not processed**
+   (genuine gap).
+2. If delivered and the type is `customer.subscription.*` → **lifecycle sync only** — report this
+   plainly; never imply a credit outcome for a type that cannot produce one.
+3. If delivered and the type is `checkout.session.completed`:
+   - `billingAllocations/{event.data.object.subscription}` exists → **granted** (credits were
+     allocated for this subscription — possibly by this exact event, possibly by a later one for
+     the same subscription; this check cannot tell those apart, and doesn't need to: either way
+     the subscription is correctly funded now).
+   - Otherwise, query `billingAmbiguousAccounts` for `details.sessionId == event.data.object.id`
+     (every checkout-originated ambiguous write includes this field — confirmed against every
+     `ambiguous.push(...)` call site in `handleCheckoutCompleted`) → **flagged, pending** or
+     **flagged, resolved** (report `reason` and `status`).
+   - Neither exists → **processed, no grant and no flag** — this is the expected, correct outcome
+     for a non-credit-granting price (e.g. the $0 Scout Starter price; `decideAllocationEligibility`
+     returns `flag: false` for exactly this case, by design), but report it explicitly rather than
+     silently folding it into "granted" or "flagged" — a human scanning results should be able to
+     tell "this was a free-tier purchase, nothing to grant" apart from "this actually got credits."
+
 ```js
-// scripts/checkIncidentEventsApplied.mjs — paste as-is, run with:
-//   FIREBASE_SERVICE_ACCOUNT_PATH=<write-capable key> node scripts/checkIncidentEventsApplied.mjs /tmp/incident_events.jsonl
+// scripts/reconcileIncidentEvents.mjs — paste as-is, run with:
+//   FIREBASE_SERVICE_ACCOUNT_PATH=<write-capable key> node scripts/reconcileIncidentEvents.mjs /tmp/incident_events.jsonl
 import { readFileSync } from 'node:fs';
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
@@ -261,21 +294,47 @@ const db = getFirestore();
 const events = readFileSync(process.argv[2], 'utf8').split('\n').map((s) => s.trim()).filter(Boolean).map(JSON.parse);
 for (const event of events) {
   const applied = await db.collection('stripeWebhookEvents').doc(event.id).get();
-  if (applied.exists) { console.log(`${event.id}: applied`); continue; }
-  if (event.type.startsWith('customer.subscription.')) {
-    const customerId = event.data.object.customer;
-    const parked = await db.collection('stripeWebhookPendingEvents').doc(customerId).collection('events').doc(event.id).get();
-    console.log(parked.exists ? `${event.id}: parked, awaiting a binding event for ${customerId}` : `${event.id}: NOT PROCESSED — recheck function logs for this delivery`);
+
+  if (!applied.exists) {
+    if (event.type.startsWith('customer.subscription.')) {
+      const customerId = event.data.object.customer;
+      const parked = await db.collection('stripeWebhookPendingEvents').doc(customerId).collection('events').doc(event.id).get();
+      console.log(parked.exists ? `${event.id} [${event.type}]: PARKED, pending (awaiting a binding event for ${customerId})` : `${event.id} [${event.type}]: NOT PROCESSED — recheck function logs`);
+    } else {
+      console.log(`${event.id} [${event.type}]: NOT PROCESSED — recheck function logs`);
+    }
     continue;
   }
-  console.log(`${event.id}: NOT PROCESSED — recheck function logs for this delivery`);
+
+  if (event.type.startsWith('customer.subscription.')) {
+    console.log(`${event.id} [${event.type}]: delivered — lifecycle sync only, not a credit-granting event type`);
+    continue;
+  }
+
+  // checkout.session.completed from here on.
+  const subscriptionId = event.data.object.subscription;
+  const allocation = subscriptionId ? await db.collection('billingAllocations').doc(subscriptionId).get() : null;
+  if (allocation?.exists) {
+    console.log(`${event.id} [${event.type}]: GRANTED — billingAllocations/${subscriptionId} exists (grantedAt ${allocation.data().grantedAt})`);
+    continue;
+  }
+
+  const sessionId = event.data.object.id;
+  const ambiguous = await db.collection('billingAmbiguousAccounts').where('details.sessionId', '==', sessionId).limit(1).get();
+  if (!ambiguous.empty) {
+    const d = ambiguous.docs[0].data();
+    console.log(`${event.id} [${event.type}]: FLAGGED, ${d.status} (reason: ${d.reason})`);
+    continue;
+  }
+
+  console.log(`${event.id} [${event.type}]: processed, no grant and no flag — expected for a non-credit-granting price; confirm the price id before assuming this is correct`);
 }
 ```
-**Expected result:** every event id prints `applied` or `parked, awaiting...`. An id printing
-`NOT PROCESSED` has not actually been handled
-despite the resend call; check the Netlify function logs for that specific delivery, and if still
-parked after the incident's related events have all drained, resend the specific
-`customer.subscription.*` event (not just the checkout event) that would establish the binding.
+**Expected result:** every event prints exactly one of `GRANTED`, `FLAGGED, pending`, `FLAGGED,
+resolved`, `delivered — lifecycle sync only`, `processed, no grant and no flag`, `PARKED,
+pending`, or `NOT PROCESSED`. Treat `NOT PROCESSED` as still open; treat `FLAGGED, pending` as
+still open (needs a human decision, §7); only `GRANTED`, `delivered — lifecycle sync only`,
+`FLAGGED, resolved`, and a confirmed-correct `processed, no grant and no flag` count as closed.
 
 ## 7. Past the 30-day event-retrieval window, or no subscription id can be found at all
 

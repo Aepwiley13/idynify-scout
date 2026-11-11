@@ -244,22 +244,40 @@ function decideReconciliation({ userData, subscription, replacementStatus, resol
  * Scout Starter price. That is expected, understood behavior, not an anomaly: no credits, no
  * ambiguous-account flag, nothing for anyone to review.
  *
- * Round-11 runtime allocation gate: BILLING_LEDGER_EPOCH_UNIX only protects against purchases
- * that predate it — it says nothing about purchases created AFTER it whose webhook delivery was
- * actually handled by unhardened or rolled-back code during an incident, then replayed into
- * hardened code once it resumes. The billingAllocations/{subscriptionId} marker is the normal
- * idempotency guard, but it is only ever written by THIS code path — code that predates the
- * ledger (or a rollback to it) could grant credits directly, with no marker at all, exactly as
- * the pre-ledger implementation used to. If the account already shows a COMPLETED grant for THIS
- * SAME subscription with no marker, that mismatch is itself the anomaly: never silently re-grant
- * on top of it. This check runs automatically on every invocation — it does not depend on an
- * operator re-running the cutover/activation script first, and it closes the gap for the
- * specific case that script can never close on its own (see billingLedgerCutover.mjs's header).
- * Scoped to the SAME subscriptionId only, so it never interferes with a legitimate replacement
- * (a different, new subscription replacing an old dead one already goes through its own,
- * separately-authorized path above).
+ * Round-11/12 consistency guards against a rollback-window replay — NOT a cutover/activation
+ * gate. Correction: an earlier version of this comment called the check below "a runtime
+ * allocation gate" as if it answered "should automatic allocation be active right now." It
+ * doesn't, and nothing here does — that question is still answered only by
+ * BILLING_LEDGER_EPOCH_UNIX, read directly from process.env with no runtime-enforced connection
+ * to verified deploy/activation state (billingLedgerCutover.mjs is advisory only; see its
+ * header). What the two checks below actually are: narrow, specific consistency checks that
+ * catch two concrete symptoms of unhardened-or-rolled-back code having processed a purchase with
+ * no billingAllocations marker, each covering a different failure shape found by review:
+ *
+ *   1. already_shows_completed_payment_no_marker — the account still shows a completed grant for
+ *      THIS SAME subscription, no marker. Catches a replay while the subscription is still
+ *      active. Does NOT catch it once something legitimately clears hasCompletedPayment — see (2).
+ *   2. subscription_dead_no_marker — the subscription's CURRENT status (fetched fresh from
+ *      Stripe at the top of this handler, never a cached/local flag) is canceled or
+ *      incomplete_expired, no marker. Catches exactly the gap in (1): old code grants credits:
+ *      hasCompletedPayment=true; the subscription is later, legitimately, canceled through
+ *      hardened reconciliation, which clears hasCompletedPayment (buildNormalizedFields) but
+ *      touches nothing else — so check (1) no longer fires; a stale/replayed
+ *      checkout.session.completed for the ORIGINAL purchase then arrives with no marker, and
+ *      nothing before this check would have refused it. Checking the subscription's own current
+ *      status instead of a locally-resettable account flag is what makes this one not similarly
+ *      defeatable by the next lifecycle event.
+ *
+ * Both run automatically on every invocation — no operator action, no script. Both are scoped so
+ * they never interfere with the legitimate order-independence case (subscription.created binds
+ * stripeSubscriptionId first, checkout.session.completed grants second, for a freshly-active
+ * subscription that was never previously granted): (1) requires hasCompletedPayment already
+ * true, which a first-ever binding never has; (2) requires the subscription to be DEAD, which a
+ * fresh signup never is. Neither claims to be, nor substitutes for, a general answer to "is
+ * automatic allocation currently active" — see docs/BILLING_CUTOVER_RUNBOOK.md for that question
+ * and the deployment procedure that actually controls it.
  */
-function decideAllocationEligibility({ userData, customerId, priceId, replacementStatus, subscriptionId }) {
+function decideAllocationEligibility({ userData, customerId, priceId, replacementStatus, subscriptionId, subscriptionStatus }) {
   if (!isKnownIdynifyPrice(priceId)) return { ok: false, flag: true, reason: 'unknown_price' };
   if (!isCreditGrantingPrice(priceId)) return { ok: false, flag: false, reason: 'not_credit_granting_price' };
   if (userData?.stripeCustomerId && userData.stripeCustomerId !== customerId) {
@@ -269,6 +287,9 @@ function decideAllocationEligibility({ userData, customerId, priceId, replacemen
   if (replacementStatus.kind === 'unauthorized') return { ok: false, flag: true, reason: 'replacement_not_authorized' };
   if (userData?.stripeSubscriptionId === subscriptionId && userData?.hasCompletedPayment === true) {
     return { ok: false, flag: true, reason: 'already_shows_completed_payment_no_marker' };
+  }
+  if (DEAD_SUBSCRIPTION_STATUSES.has(subscriptionStatus)) {
+    return { ok: false, flag: true, reason: 'subscription_dead_no_marker' };
   }
   return { ok: true };
 }
@@ -411,7 +432,7 @@ async function handleCheckoutCompleted(stripe, stripeEvent) {
         } else if (operationId && !opDecision.valid) {
           // claims new-flow provenance but it didn't check out — already flagged above
         } else {
-          const eligible = decideAllocationEligibility({ userData, customerId: session.customer, priceId, replacementStatus, subscriptionId });
+          const eligible = decideAllocationEligibility({ userData, customerId: session.customer, priceId, replacementStatus, subscriptionId, subscriptionStatus: subscription?.status });
           if (!eligible.ok) {
             // A known-but-non-credit-granting price (e.g. the $0/month Scout Starter price) is
             // expected, understood behavior — no grant, and nothing for a human to review.

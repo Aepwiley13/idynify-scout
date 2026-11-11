@@ -2,12 +2,12 @@
 /**
  * An ADVISORY check for operators, not an enforcement mechanism. It answers "has runtime
  * activation been independently confirmed" — it cannot and does not gate what the live webhook
- * actually does with any given event; the webhook enforces its own correctness at runtime (see
- * netlify/functions/stripe-webhook.js's decideAllocationEligibility — the
- * already_shows_completed_payment_no_marker check closes the gap this script, being external and
- * optional, structurally cannot: a purchase that unhardened or rolled-back code already granted
- * directly, then replayed into hardened code before anyone re-runs this script, must not grant
- * again regardless of whether this script ever ran). Nothing here substitutes for that.
+ * actually does with any given event. decideAllocationEligibility (netlify/functions/
+ * stripe-webhook.js) enforces correctness at runtime regardless of whether this script has ever
+ * been run, via narrow consistency guards (already_shows_completed_payment_no_marker,
+ * subscription_dead_no_marker) — not a general "is allocation active" gate; see that function's
+ * own comment and docs/BILLING_CUTOVER_RUNBOOK.md for the deployment procedure that actually
+ * governs whether automatic allocation is on at all. Nothing in THIS file substitutes for either.
  *
  * ── Why a publish timestamp and an env-var write are not proof ───────────────────────────────
  *
@@ -44,20 +44,18 @@
  *     or non-numeric value is caught explicitly rather than surfacing later as a silent
  *     `Number(...)` → NaN inside the webhook's own epoch comparison.
  *
- * ── Rollback recovery ──────────────────────────────────────────────────────────────────────────
+ * ── Rollback recovery and the deployable initial-cutover procedure ──────────────────────────────
  *
  * A rollback deploy, or any deploy whose build predates the current env-var value, fails the
  * ordinary createdAt-vs-updated_at ordering check above — no rollback-specific branch needed for
- * THIS script's own job (confirming activation). What a rollback can still do that this script
- * cannot see or prevent: unhardened/rolled-back code processing a purchase during the rollback
- * window with no ledger marker, then that event being replayed once hardened code resumes. That
- * is a restriction on rollback strategy, made explicit here: never roll back to pre-ledger code
- * as an incident response for this webhook, and never trust automatic allocation for anything
- * that may have happened during ANY rollback until it's been through the webhook's own
- * already_shows_completed_payment_no_marker check (always on, regardless of this script) and a
- * human has cleared the account's flagged record if one was raised. Re-running this script after
- * a rollback is necessary for ADVISORY confirmation, but the actual stop against a double grant
- * is enforced in stripe-webhook.js, not here.
+ * THIS script's own job (confirming activation). What this script cannot see or prevent:
+ * unhardened/rolled-back code processing a purchase during a rollback window with no ledger
+ * marker, then that event being replayed once hardened code resumes — that is stopped by
+ * stripe-webhook.js's own consistency guards, always on, regardless of whether this script is
+ * ever run. The full initial-cutover sequence (deploy with allocation OFF by default → confirm
+ * live+drained → arm → force a rebuild → confirm activation), and the incident-response
+ * alternative to a prohibited pre-ledger rollback, are in docs/BILLING_CUTOVER_RUNBOOK.md as one
+ * executable procedure — not duplicated here.
  *
  * ── Platform timing assumptions, verified (not guessed) ───────────────────────────────────────
  *
@@ -269,9 +267,8 @@ function main() {
     `Wrote ${EPOCH_ENV_VAR_KEY}=${epochUnix} to site ${siteId}, context production. THIS IS NOT YET ACTIVE: ` +
     'Netlify Functions only see an env var\'s current value starting from the first deploy BUILT after this write — ' +
     'an already-deployed function never picks it up retroactively. Trigger a new production deploy yourself, then ' +
-    're-run this script WITHOUT --apply to verify activation. Remember: this script is advisory only — the webhook\'s ' +
-    'own already_shows_completed_payment_no_marker check is what actually stops a rollback-window purchase from being ' +
-    'granted twice, whether or not this script is ever re-run.'
+    're-run this script WITHOUT --apply to verify activation. See docs/BILLING_CUTOVER_RUNBOOK.md for the full ' +
+    'procedure — this script only confirms activation, it does not gate the webhook either way.'
   );
   process.exit(1); // deliberately non-zero: writing is never success for activation purposes
 }

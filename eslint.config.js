@@ -54,6 +54,10 @@ export default defineConfig([
       'src/hooks/usePendingReplies.js',
       'netlify/functions/barryOrientationBrief.js',
       'netlify/functions/gmail-poll-replies.js',
+      // The same already-accepted legacy write as gmail-poll-replies.js
+      // above — moved here, not introduced here, when its per-contact logic
+      // was extracted into this shared module.
+      'netlify/functions/utils/replyPolling.js',
       'netlify/functions/utils/barryInboxAnalyzer.js',
       'netlify/functions/utils/barryStrategyRecommender.js',
       'netlify/functions/utils/barryContextAssembler.js',

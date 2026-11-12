@@ -59,11 +59,19 @@ own changelog: as of `2025-03-31.basil` and every later version including clover
 `current_period_start`/`current_period_end` are **removed entirely** from the top-level
 Subscription object (docs.stripe.com/changelog/basil/2025-03-31/
 deprecate-subscription-current-period-start-and-end) — replaced by
-`items.data[].current_period_start/end` on each subscription item. This is not a rare edge case:
-`2025-09-30.clover` also made flexible billing mode (the mode that produces this per-item shape)
-the **default for every new subscription**, including ones created through Checkout Sessions and
-Payment Links (docs.stripe.com/changelog/clover/2025-09-30/billing-mode-default-flexible) — this
-app's live default checkout flow. Every new signup is shaped this way now.
+`items.data[].current_period_start/end` on each subscription item.
+
+**Correction**: this was first (wrongly) attributed to "flexible billing mode" becoming the
+Clover default. A real production payload supplied by the account owner carries
+`billing_mode.type: "classic"` and **still** has item-level-only periods — direct proof the
+removal is a property of the API version rendering the object, not of which `billing_mode` a
+given subscription happens to use. Do not assume any particular `billing_mode` distribution
+across live subscriptions; the code doesn't need to know — `resolvePeriod()`'s fallback is driven
+entirely by which fields are present, never by `billing_mode`, confirmed by a dedicated test
+(`src/test/stripeWebhookCloverApiVersionCompat.test.js`) that classic and flexible resolve
+identically. Separately, this app's own `VITE_STRIPE_CHECKOUT_MODE` build flag (§0.2 — session
+vs. legacy Payment Link) is unrelated to Stripe's `billing_mode` and carries no implication about
+it either way.
 
 `resolvePeriod()` (`netlify/functions/stripe-webhook.js`) already had a fallback to item-level
 fields, written before this was confirmed. **Verified this session**, against representative

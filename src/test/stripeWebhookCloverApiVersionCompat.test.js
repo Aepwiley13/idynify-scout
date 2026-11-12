@@ -3,17 +3,33 @@
  * skips this file.
  *
  * Production's webhook endpoint is pinned to Stripe API version 2025-10-29.clover — confirmed
- * by the user, not the SDK's own default (2025-02-24.acacia, read from
+ * by the account owner, not the SDK's own default (2025-02-24.acacia, read from
  * node_modules/stripe/cjs/apiVersion.js — see docs/BILLING_CUTOVER_RUNBOOK.md §0.3). Verified
- * this session against Stripe's own changelog (docs.stripe.com/changelog/basil/2025-03-31/
+ * against Stripe's own changelog (docs.stripe.com/changelog/basil/2025-03-31/
  * deprecate-subscription-current-period-start-and-end): as of 2025-03-31.basil and every later
  * version including clover, `current_period_start`/`current_period_end` are REMOVED from the
  * top-level Subscription object entirely — replaced by `items.data[].current_period_start/end`
- * on each subscription item. This is not a theoretical edge case: a second changelog entry
- * (docs.stripe.com/changelog/clover/2025-09-30/billing-mode-default-flexible) confirms flexible
- * billing mode — the mode that produces this per-item shape — is now the DEFAULT for every new
- * subscription created through Checkout Sessions and Payment Links, which is this app's live
- * default checkout flow. Every new signup's webhook payloads are shaped this way.
+ * on each subscription item.
+ *
+ * Correction: an earlier version of this file attributed that removal to "flexible billing
+ * mode" and assumed every live subscription uses it. Both were wrong. A REAL production payload
+ * supplied by the account owner carries `billing_mode.type: "classic"` and *still* has
+ * item-level-only periods — proof the top-level field removal is a property of the API VERSION
+ * rendering the object, applying uniformly regardless of `billing_mode`, not a consequence of
+ * which mode a given subscription happens to use. `cloverSubscription()` below preserves that
+ * real example (`billing_mode: { type: 'classic' }`) rather than a guessed/labeled one, and a
+ * dedicated test confirms the code's behavior doesn't depend on `billing_mode` at all — it never
+ * reads that field, only whichever period fields are actually present.
+ *
+ * Separately: this app's OWN `VITE_STRIPE_CHECKOUT_MODE` build flag (session vs. legacy Payment
+ * Link — src/pages/CheckoutPage.jsx) is unrelated to Stripe's `billing_mode` and was never meant
+ * to imply anything about it; confirmed by grep, this repo's committed config
+ * (netlify.toml, .env.example) sets neither VITE_STRIPE_CHECKOUT_MODE nor any Stripe billing-mode
+ * value — the actual live Netlify value is a production-only setting outside this repo, checked
+ * per docs/BILLING_CUTOVER_RUNBOOK.md §0.2, and the per-subscription billing_mode Stripe assigns
+ * at creation time is not something this session has live access to confirm either way. Neither
+ * matters for correctness here: resolvePeriod's fallback is driven entirely by which fields are
+ * present on the object it's given, not by any mode flag on either side.
  *
  * resolvePeriod() (netlify/functions/stripe-webhook.js) was already written with a fallback to
  * item-level fields — this file is what actually proves that fallback produces the correct
@@ -44,16 +60,20 @@ vi.mock('stripe', () => {
 });
 
 /**
- * A genuinely Clover-shaped subscription: NO current_period_start/current_period_end keys at
- * the top level at all (not null — absent, exactly as Stripe sends it on this version), with
- * those fields living only on the single item. This is the default shape for every new
- * subscription on this account now (flexible billing mode, confirmed clover default).
+ * A genuinely clover-shaped subscription, preserving the REAL example supplied by the account
+ * owner: `billing_mode.type` is "classic" — NOT "flexible" — and current_period_start/
+ * current_period_end are still absent at the top level (not null — the key is simply not
+ * present, exactly as Stripe sends it), with those fields living only on the single item. This
+ * is the proof that the shape is version-driven, not mode-driven: a classic-mode subscription,
+ * rendered through the clover API version, gets the same item-level-only periods a
+ * flexible-mode one would.
  */
 function cloverSubscription(overrides = {}) {
   const { itemOverrides, ...subOverrides } = overrides;
   return {
     id: 'sub_clover_1', customer: 'cus_clover_1', status: 'active', created: 2000000000,
     cancel_at_period_end: false, pause_collection: null,
+    billing_mode: { type: 'classic' }, // the real, supplied example — not "flexible"
     metadata: { firebaseUID: 'uid_clover_1' },
     items: {
       data: [{
@@ -63,7 +83,8 @@ function cloverSubscription(overrides = {}) {
       }],
     },
     ...subOverrides,
-    // current_period_start/current_period_end deliberately NOT included — Clover omits them.
+    // current_period_start/current_period_end deliberately NOT included at the top level —
+    // confirmed absent on this API version regardless of billing_mode.
   };
 }
 
@@ -83,9 +104,18 @@ describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
   });
 
   describe('resolvePeriod — the item-level fallback this PR already built, verified against the real shape', () => {
-    it('reads the period from the single item when the top-level fields are absent (the clover shape)', () => {
-      const result = resolvePeriod(cloverSubscription());
+    it('reads the period from the single item when the top-level fields are absent (the clover shape, billing_mode.type: "classic" — the real supplied example)', () => {
+      const subscription = cloverSubscription();
+      expect(subscription.billing_mode).toEqual({ type: 'classic' }); // sanity: preserving the real example, not a guess
+      const result = resolvePeriod(subscription);
       expect(result).toEqual({ start: 2000000000, end: 2003000000 });
+    });
+
+    it('is driven entirely by which fields are present, never by billing_mode — classic and flexible resolve identically', () => {
+      const classic = cloverSubscription({ billing_mode: { type: 'classic' } });
+      const flexible = cloverSubscription({ billing_mode: { type: 'flexible' } });
+      expect(resolvePeriod(classic)).toEqual(resolvePeriod(flexible));
+      expect(resolvePeriod(classic)).toEqual({ start: 2000000000, end: 2003000000 });
     });
 
     it('still prefers top-level fields when present — no regression against the pre-clover (acacia) shape', () => {

@@ -2,10 +2,20 @@
  * KEY METRICS GRID
  *
  * 2×2 grid showing four relationship health metrics:
- *   Touchpoints  |  Referrals Out
- *   Reply Rate   |  Days in Stage
+ *   Touchpoints      |  Referrals Out
+ *   Replies Received |  Days in Stage
  *
  * Data sourced from contact.engagement_summary and referral analytics.
+ *
+ * "Replies Received" is a plain count (getReplyCount), not a rate or
+ * ratio. This card is per contact, and reply_count has no pairing to
+ * which specific outbound message each reply answered — the data model
+ * cannot support a "fraction of my messages that got a reply" (as a
+ * capped percentage implied) or a meaningful per-send ratio (which still
+ * invites reading "2.0x" as some kind of responsiveness score a single
+ * contact's count doesn't actually represent). A count is the one claim
+ * this data straightforwardly supports. Reply-to-send ratios belong at
+ * the campaign/cadence level (aggregate analytics), not here.
  */
 
 import { useT } from '../../theme/ThemeContext';
@@ -38,14 +48,8 @@ function MetricCell({ label, value, subtext }) {
 
 export default function KeyMetricsGrid({ contact, referralData }) {
   const touchpoints = contact?.engagement_summary?.total_messages_sent || 0;
-  const replies     = getReplyCount(contact);
-  // Capped at touchpoints: reply_count counts individual reply messages,
-  // which can exceed the number of sends in an active back-and-forth
-  // thread. This is a per-contact rate, not a count of distinct responding
-  // contacts, and must never display over 100%.
-  const replyRate   = touchpoints > 0
-    ? `${Math.round((Math.min(replies, touchpoints) / touchpoints) * 100)}%`
-    : '—';
+  // See the file header for why this is a plain count, not a rate/ratio.
+  const repliesReceived = getReplyCount(contact);
   const referralsOut = referralData?.referrals_sent_to_you || 0;
 
   // Days in current stage — derived from stage-specific move timestamps.
@@ -75,10 +79,10 @@ export default function KeyMetricsGrid({ contact, referralData }) {
       gridTemplateColumns: '1fr 1fr',
       gap: 8,
     }}>
-      <MetricCell label="Touchpoints"  value={touchpoints}  />
-      <MetricCell label="Referrals Out" value={referralsOut} />
-      <MetricCell label="Reply Rate"   value={replyRate}     />
-      <MetricCell label="In Stage"     value={daysInStage}   />
+      <MetricCell label="Touchpoints"      value={touchpoints}      />
+      <MetricCell label="Referrals Out"    value={referralsOut}     />
+      <MetricCell label="Replies Received" value={repliesReceived} />
+      <MetricCell label="In Stage"         value={daysInStage}      />
     </div>
   );
 }

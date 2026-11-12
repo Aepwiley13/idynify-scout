@@ -136,24 +136,53 @@ export const handler = async (event) => {
     }
 
     // ── Check tracked threads for replies — shared with the scheduled worker ──
-    const { transitioned, checkedCount, needsReconnect } = await pollRepliesForUser(db, gmail, userId, myEmail);
+    const { transitioned, checkedCount, needsReconnect, failures, checkpointFailures } =
+      await pollRepliesForUser(db, gmail, userId, myEmail);
+
+    // needsReconnect is checked FIRST, before the checkedCount===0
+    // short-circuit. checkedCount only counts contacts actually,
+    // successfully examined (see replyPolling.js), so a run where every
+    // candidate needed reconnect has checkedCount===0 too — checking that
+    // branch first would silently swallow the actionable NEEDS_RECONNECT
+    // code behind an empty "nothing to report" response.
+    if (needsReconnect && transitioned.length === 0) {
+      return {
+        statusCode: 200, headers: CORS_HEADERS,
+        body: JSON.stringify({ transitioned: [], code: 'NEEDS_RECONNECT', failures, checkpointFailures }),
+      };
+    }
 
     if (checkedCount === 0) {
-      return { statusCode: 200, headers: CORS_HEADERS, body: JSON.stringify({ transitioned: [], checkedCount: 0 }) };
+      // Zero contacts successfully checked is not always "nothing to
+      // report" — every candidate's thread check can have failed outright
+      // (none of them 403s, or there'd be nothing left needing_reconnect
+      // above). failures/checkpointFailures are additive fields; existing
+      // callers reading only transitioned/checkedCount are unaffected.
+      return {
+        statusCode: 200, headers: CORS_HEADERS,
+        body: JSON.stringify({ transitioned: [], checkedCount: 0, failures, checkpointFailures }),
+      };
     }
 
-    if (needsReconnect && transitioned.length === 0) {
-      return { statusCode: 200, headers: CORS_HEADERS, body: JSON.stringify({ transitioned: [], code: 'NEEDS_RECONNECT' }) };
+    if (failures.length > 0 || checkpointFailures.length > 0) {
+      console.warn(
+        `⚠️ Poll complete with issues — ${transitioned.length} transitions, ${checkedCount} checked, ` +
+        `${failures.length} contact(s) failed, ${checkpointFailures.length} checkpoint stamp(s) failed`
+      );
+    } else {
+      console.log(`✅ Poll complete — ${transitioned.length} transitions, ${checkedCount} checked`);
     }
 
-    console.log(`✅ Poll complete — ${transitioned.length} transitions, ${checkedCount} checked`);
-
+    // failures/checkpointFailures are additive — existing callers reading
+    // only transitioned/checkedCount are unaffected either way.
     return {
       statusCode: 200,
       headers: CORS_HEADERS,
       body: JSON.stringify({
         transitioned,
         checkedCount,
+        failures,
+        checkpointFailures,
       }),
     };
 

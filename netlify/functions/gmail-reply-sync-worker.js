@@ -148,7 +148,16 @@ const warn = (...args) => console.warn('[gmail-reply-sync]', ...args);
  */
 export async function syncUserReplies(db, user) {
   const { userId } = user;
-  const summary = { userId, checkedCount: 0, transitionedCount: 0, needsReconnect: false, error: null };
+  const summary = {
+    userId, checkedCount: 0, transitionedCount: 0, needsReconnect: false, error: null,
+    // Per-contact failures, distinct from `error` (a whole-user failure).
+    // A contact-level checkpoint failure most often means its id does not
+    // resolve to a real document — see replyPolling.js's candidate-
+    // projection fix. Non-empty here with summary.error === null means
+    // the user's run otherwise succeeded; this is visibility, not a
+    // reason to report the run itself as failed.
+    contactFailures: [], checkpointFailures: [],
+  };
 
   try {
     const auth = await getOAuthClient(userId, db);
@@ -176,10 +185,13 @@ export async function syncUserReplies(db, user) {
       warn(`getProfile failed for ${userId} (non-blocking): ${scopeErr.message}`);
     }
 
-    const { transitioned, checkedCount, needsReconnect } = await pollRepliesForUser(db, gmail, userId, myEmail);
+    const { transitioned, checkedCount, needsReconnect, failures, checkpointFailures } =
+      await pollRepliesForUser(db, gmail, userId, myEmail);
     summary.checkedCount = checkedCount;
     summary.transitionedCount = transitioned.length;
     summary.needsReconnect = needsReconnect;
+    summary.contactFailures = failures;
+    summary.checkpointFailures = checkpointFailures;
     return summary;
   } catch (err) {
     warn(`Sync failed for ${userId}:`, err.message);
@@ -273,7 +285,7 @@ export async function runReplySync(db, options = {}) {
     log('disabled via GMAIL_REPLY_SYNC_ENABLED — skipping run (no account enumeration, no OAuth, no Gmail calls)');
     return {
       usersConsidered: 0, usersSynced: 0, usersDeferred: 0,
-      totals: { checked: 0, transitioned: 0, failed: 0 },
+      totals: { checked: 0, transitioned: 0, failed: 0, contactFailures: 0, checkpointFailures: 0, needsReconnect: 0 },
       results: [], durationMs: Date.now() - startedAt, disabled: true,
     };
   }
@@ -306,13 +318,33 @@ export async function runReplySync(db, options = {}) {
       checked: acc.checked + r.checkedCount,
       transitioned: acc.transitioned + r.transitionedCount,
       failed: acc.failed + (r.error ? 1 : 0),
+      // Contact-level failures, distinct from an account-level `error`
+      // above. A run with zero account failures can still have contacts
+      // whose thread check failed (contactFailures) or whose best-effort
+      // checkpoint stamp failed (checkpointFailures, most often NOT_FOUND
+      // — see replyPolling.js). Both used to be invisible outside a
+      // console.warn; counted here so "0 failed" can no longer describe a
+      // run that actually had either.
+      contactFailures: acc.contactFailures + (r.contactFailures?.length || 0),
+      checkpointFailures: acc.checkpointFailures + (r.checkpointFailures?.length || 0),
+      // needsReconnect is set on a per-user summary two different ways:
+      // the account-level getProfile 403 check in syncUserReplies (which
+      // ALSO sets r.error, already counted in `failed` above), and a
+      // per-contact 403 surfacing from inside pollRepliesForUser (which
+      // does NOT set r.error — needsReconnect was the only signal, and
+      // nothing upstream of this reduce ever looked at it). Counting it
+      // here, independently of `failed`, is what closes that gap; a user
+      // can be counted in both without that being a bug.
+      needsReconnect: acc.needsReconnect + (r.needsReconnect ? 1 : 0),
     }),
-    { checked: 0, transitioned: 0, failed: 0 }
+    { checked: 0, transitioned: 0, failed: 0, contactFailures: 0, checkpointFailures: 0, needsReconnect: 0 }
   );
 
   log(
     `run complete — ${results.length} account(s), ${totals.checked} thread(s) checked, ` +
-    `${totals.transitioned} transitioned, ${totals.failed} failed`
+    `${totals.transitioned} transitioned, ${totals.failed} account(s) failed, ` +
+    `${totals.contactFailures} contact(s) failed, ${totals.checkpointFailures} checkpoint stamp(s) failed, ` +
+    `${totals.needsReconnect} account(s) need reconnect`
   );
 
   return {
@@ -337,7 +369,19 @@ export const replySyncHandler = async () => {
   try {
     const summary = await runReplySync(getFirestore());
 
-    const allOk = summary.totals.failed === 0;
+    // A run with zero account-level failures can still have contact-level
+    // ones, or an account that needs reconnecting — see totals' own
+    // comments. Treating only account failures as "not ok" is exactly how
+    // a run with real NOT_FOUND / checkpoint failures, or an account
+    // sitting in needs-reconnect, got reported as fully successful; all
+    // three now count. This does not change reconnect HANDLING — the
+    // manual button's own NEEDS_RECONNECT code path, and this worker's
+    // per-user needsReconnect flag, are unchanged — only whether the run's
+    // own health reporting notices it.
+    const allOk = summary.totals.failed === 0
+      && summary.totals.contactFailures === 0
+      && summary.totals.checkpointFailures === 0
+      && summary.totals.needsReconnect === 0;
     console.log(allOk ? 'gmail.reply_sync.ok' : 'gmail.reply_sync.partial_failure', {
       usersConsidered: summary.usersConsidered,
       usersSynced: summary.usersSynced,
@@ -345,16 +389,23 @@ export const replySyncHandler = async () => {
       threadsChecked: summary.totals.checked,
       transitioned: summary.totals.transitioned,
       usersFailed: summary.totals.failed,
+      contactFailures: summary.totals.contactFailures,
+      checkpointFailures: summary.totals.checkpointFailures,
+      needsReconnect: summary.totals.needsReconnect,
       durationMs: summary.durationMs,
     });
 
     if (!allOk) {
       await alertOps({
         db: safeFirestore(), job: 'gmail-reply-sync-worker', severity: 'partial_failure',
-        summary: `${summary.totals.failed} Gmail account(s) failed to check for replies.`,
+        summary: `${summary.totals.failed} account(s), ${summary.totals.contactFailures} contact(s), ` +
+          `${summary.totals.checkpointFailures} checkpoint stamp(s) failed, and ` +
+          `${summary.totals.needsReconnect} account(s) need reconnect.`,
         detail: {
           usersConsidered: summary.usersConsidered, usersSynced: summary.usersSynced,
           threadsChecked: summary.totals.checked, failed: summary.totals.failed,
+          contactFailures: summary.totals.contactFailures, checkpointFailures: summary.totals.checkpointFailures,
+          needsReconnect: summary.totals.needsReconnect,
           firstError: summary.results.find((r) => r.error)?.error || 'n/a',
         },
       });

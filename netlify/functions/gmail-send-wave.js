@@ -12,10 +12,9 @@ import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
-import { engagementPromotionPatch } from './utils/engagementPromotion.js';
+import { applySendContactUpdate } from './utils/applySendContactUpdate.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 import { buildPlainTextEmail } from './utils/emailHeaders.js';
-import { sendShouldMarkAwaitingReply } from '../../src/utils/relationshipRead.js';
 
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {
@@ -209,32 +208,21 @@ export const handler = async (event) => {
           try {
             const contactRef = db.collection('users').doc(userId)
               .collection('contacts').doc(recipient.contactId);
-            // Fresh read — recipient.* is client-supplied request data, not
-            // this contact's current Firestore state.
-            const currentSnap = await contactRef.get();
-            const currentContact = currentSnap.exists ? currentSnap.data() : null;
 
-            const contactUpdate = {
+            const baseUpdate = {
               gmail_last_message_id: gmailMessageId,
               last_sent_at: sentAt,
               updated_at: sentAt,
             };
             if (!recipient.existingThreadId && gmailThreadId) {
-              contactUpdate.gmail_thread_id = gmailThreadId;
+              baseUpdate.gmail_thread_id = gmailThreadId;
             }
-            // A follow-up never regresses an already-in-conversation
-            // contact, or one holding an advanced relationship status,
-            // back to awaiting_reply.
-            if (sendShouldMarkAwaitingReply(currentContact)) {
-              contactUpdate.hunter_status = 'awaiting_reply';
-            }
-            // Engaging a contact means the user kept it, so it can no longer
-            // be a discovery suggestion. Merged into the send's own write.
-            Object.assign(
-              contactUpdate,
-              await engagementPromotionPatch(contactRef, 'gmail_send_wave'),
-            );
-            await contactRef.update(contactUpdate);
+            // Transactional read-decide-write — recipient.* is
+            // client-supplied request data, not this contact's current
+            // Firestore state, and a plain get()-then-update() leaves a
+            // window for replyPolling.js's own transaction to land in
+            // between; see applySendContactUpdate's docstring.
+            await applySendContactUpdate(contactRef, baseUpdate, 'gmail_send_wave');
           } catch (err) {
             console.warn(`Failed to update contact ${recipient.contactId}:`, err.message);
           }

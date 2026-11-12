@@ -13,11 +13,10 @@ import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getGmailSignatureHtml, appendSignatureHtml, resolveFallbackSignOff } from './utils/gmailSignature.js';
-import { engagementPromotionPatch } from './utils/engagementPromotion.js';
+import { applySendContactUpdate } from './utils/applySendContactUpdate.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 import { encodeHeaderValue, formatAddress } from './utils/emailHeaders.js';
 import { displayNameFor } from '../../src/utils/userIdentity.js';
-import { sendShouldMarkAwaitingReply } from '../../src/utils/relationshipRead.js';
 
 /**
  * Syntax check only — `local@domain.tld` shape. This does NOT verify the
@@ -503,32 +502,24 @@ export const handler = async (event) => {
         const contactRef = db
           .collection('users').doc(userId)
           .collection('contacts').doc(contactId);
-        // Fresh read — a send must decide against the contact's CURRENT
-        // state, not a queued-time or client-supplied belief about it.
-        const currentSnap = await contactRef.get();
-        const currentContact = currentSnap.exists ? currentSnap.data() : null;
 
-        const contactUpdate = {
+        const baseUpdate = {
           gmail_last_message_id: gmailMessageId,
           last_sent_at: sentAt,
           updated_at: sentAt,
         };
         if (!existingThreadId && gmailThreadId) {
           // Fresh send — record the new thread so replies can be tracked
-          contactUpdate.gmail_thread_id = gmailThreadId;
+          baseUpdate.gmail_thread_id = gmailThreadId;
         }
-        let markedAwaitingReply = false;
-        if (sendShouldMarkAwaitingReply(currentContact)) {
-          contactUpdate.hunter_status = 'awaiting_reply';
-          markedAwaitingReply = true;
-        }
-        // Engaging a contact means the user kept it, so it can no longer be a
-        // discovery suggestion. Merged into the send's own write.
-        Object.assign(
-          contactUpdate,
-          await engagementPromotionPatch(contactRef, 'gmail_send_quick'),
+        // Transactional read-decide-write — see applySendContactUpdate's
+        // docstring for why a plain get()-then-update() isn't safe here:
+        // replyPolling.js's own transaction can land in the gap between
+        // them and have its result overwritten by this call's now-stale
+        // decision.
+        const { markedAwaitingReply } = await applySendContactUpdate(
+          contactRef, baseUpdate, 'gmail_send_quick',
         );
-        await contactRef.update(contactUpdate);
         const threadLabel = existingThreadId ? `existing thread ${existingThreadId}` : `new thread ${gmailThreadId}`;
         console.log(
           `✅ Contact updated — ${threadLabel}` +

@@ -47,9 +47,9 @@ import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
 import { writeTimelineEvent, ACTORS } from './utils/timelineWrite.js';
 import { alertOps } from './utils/alertOps.js';
-import { engagementPromotionPatch } from './utils/engagementPromotion.js';
+import { applySendContactUpdate } from './utils/applySendContactUpdate.js';
 import { buildPlainTextEmail } from './utils/emailHeaders.js';
-import { isInConversation, hasReplied, sendShouldMarkAwaitingReply } from '../../src/utils/relationshipRead.js';
+import { isInConversation, hasReplied } from '../../src/utils/relationshipRead.js';
 // Pure, dependency-free — NOT contactStateMachine.js, which imports the
 // browser Firebase client SDK and crashes under Netlify's esbuild-bundled
 // Functions runtime (no import.meta.env there). See
@@ -465,30 +465,22 @@ async function sendScheduledEmail(userId, docRef, eng, results) {
 
   // Update contact status
   if (contactId) {
-    const contactUpdate = {
+    const baseUpdate = {
       gmail_last_message_id: gmailMessageId,
       last_sent_at: sentAt,
       updated_at: sentAt
     };
     if (!existingThreadId && gmailThreadId) {
-      contactUpdate.gmail_thread_id = gmailThreadId;
-    }
-    // freshContact is the same send-time read checkSendSuppressed already
-    // did above — a follow-up never regresses an already-in-conversation
-    // contact, or one holding an advanced relationship status, back to
-    // awaiting_reply.
-    if (sendShouldMarkAwaitingReply(freshContact)) {
-      contactUpdate.hunter_status = 'awaiting_reply';
+      baseUpdate.gmail_thread_id = gmailThreadId;
     }
     const contactRef = db.collection('users').doc(userId)
       .collection('contacts').doc(contactId);
-    // Engaging a contact means the user kept it, so it can no longer be a
-    // discovery suggestion. Merged into the send's own write.
-    Object.assign(
-      contactUpdate,
-      await engagementPromotionPatch(contactRef, 'scheduled_engagement'),
-    );
-    await contactRef.update(contactUpdate).catch(() => {});
+    // Transactional read-decide-write, re-reading fresh rather than reusing
+    // freshContact (which predates the Gmail send call above, itself real
+    // network time) — see applySendContactUpdate's docstring for why a
+    // plain get()-then-update() leaves a window for replyPolling.js's own
+    // transaction to land in between and have its result overwritten.
+    await applySendContactUpdate(contactRef, baseUpdate, 'scheduled_engagement').catch(() => {});
   }
 
   // Log timeline event
@@ -737,26 +729,21 @@ async function sendScheduledWave(userId, waveRef, wave, results) {
       sentCount++;
 
       // Update contact
-      const contactUpdate = {
+      const baseUpdate = {
         gmail_last_message_id: gmailMessageId,
         last_sent_at: sentAt,
         updated_at: sentAt
       };
       if (!existingThreadId && gmailThreadId) {
-        contactUpdate.gmail_thread_id = gmailThreadId;
+        baseUpdate.gmail_thread_id = gmailThreadId;
       }
-      // `contact` here is the same fresh, send-time read used for the
-      // suppression check above — a follow-up never regresses an
-      // already-in-conversation contact, or one holding an advanced
-      // relationship status, back to awaiting_reply.
-      if (sendShouldMarkAwaitingReply(contact)) {
-        contactUpdate.hunter_status = 'awaiting_reply';
-      }
-      Object.assign(
-        contactUpdate,
-        await engagementPromotionPatch(contactDoc.ref, 'scheduled_wave'),
-      );
-      await contactDoc.ref.update(contactUpdate).catch(() => {});
+      // Transactional read-decide-write, re-reading fresh rather than
+      // reusing `contact` (which predates the Gmail send call above,
+      // itself real network time) — see applySendContactUpdate's docstring
+      // for why a plain get()-then-update() leaves a window for
+      // replyPolling.js's own transaction to land in between and have its
+      // result overwritten.
+      await applySendContactUpdate(contactDoc.ref, baseUpdate, 'scheduled_wave').catch(() => {});
 
       // Log to email_logs
       await db.collection('email_logs').add({

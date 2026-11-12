@@ -11,16 +11,39 @@ vi.mock('firebase-admin/app', () => ({ initializeApp: vi.fn(), getApps: () => [{
 
 vi.mock('firebase-admin/firestore', () => {
   function docRef(path) {
-    return {
+    const ref = {
+      path,
       get: async () => ({ exists: h.docs[path] !== undefined, data: () => h.docs[path] }),
       update: async (patch) => { h.docs[path] = { ...(h.docs[path] || {}), ...patch }; },
       collection: (sub) => collRef(`${path}/${sub}`),
     };
+    ref.firestore = db; // applySendContactUpdate runs its transaction via contactRef.firestore
+    return ref;
   }
   function collRef(path) {
     return { doc: (id) => docRef(`${path}/${id}`), add: async () => ({ id: 'log1' }) };
   }
-  return { getFirestore: () => ({ collection: (name) => collRef(name) }), FieldValue: { increment: (n) => ({ __increment: n }) } };
+  // No concurrency to simulate in these handler-level tests (that's
+  // applySendContactUpdateConcurrency.test.js's job) — a single pass
+  // through tx.get/tx.update against the same shared store is enough.
+  // tx.update DOES still enforce real Firestore's "fails if the document
+  // doesn't exist" — needed for the deleted-recipient test below to be
+  // meaningful rather than silently no-op-succeeding.
+  const db = {
+    collection: (name) => collRef(name),
+    runTransaction: async (fn) => fn({
+      get: async (ref) => ref.get(),
+      update: (ref, patch) => {
+        if (h.docs[ref.path] === undefined) {
+          const err = new Error(`NOT_FOUND: No document to update: ${ref.path}`);
+          err.code = 5;
+          throw err;
+        }
+        h.docs[ref.path] = { ...(h.docs[ref.path] || {}), ...patch };
+      },
+    }),
+  };
+  return { getFirestore: () => db, FieldValue: { increment: (n) => ({ __increment: n }) } };
 });
 
 let callIdx = 0;
@@ -123,5 +146,26 @@ describe('gmail-send-wave.js: a confirmed wave send never regresses an establish
     expect(res.statusCode).toBe(200);
     expect(h.docs[docPath('fresh')].hunter_status).toBe('awaiting_reply');
     expect(h.docs[docPath('active')].hunter_status).toBe('in_conversation');
+  });
+
+  it('a recipient deleted before this handler runs does not fail the overall wave or block other recipients\' updates — Gmail already accepted both messages', async () => {
+    // No seed for docPath('gone') — simulates it being deleted between
+    // the wave being queued and this recipient's turn in the loop.
+    h.docs[docPath('fresh')] = { contact_status: 'New', email: 'new@acme.com' };
+    h.sendResults = [
+      { data: { id: 'm1', threadId: 't1' } }, // for 'gone'
+      { data: { id: 'm2', threadId: 't2' } }, // for 'fresh'
+    ];
+    const res = await sendWave([
+      { contactId: 'gone', email: 'gone@acme.com', firstName: 'Gone' },
+      { contactId: 'fresh', email: 'new@acme.com', firstName: 'New' },
+    ]);
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.success).toBe(true);
+    expect(body.sent).toBe(2); // the contact-update failure never touches sentCount — Gmail accepted both
+    // The other recipient's update is unaffected by the first one's failure.
+    expect(h.docs[docPath('fresh')].hunter_status).toBe('awaiting_reply');
+    expect(h.docs[docPath('gone')]).toBeUndefined();
   });
 });

@@ -27,6 +27,7 @@ vi.mock('firebase-admin/firestore', () => {
       update: async (patch) => { h.docs[path] = { ...(h.docs[path] || {}), ...flatten(patch) }; },
       collection: (sub) => collRef(`${path}/${sub}`),
     };
+    self.firestore = db; // applySendContactUpdate runs its transaction via contactRef.firestore
     return self;
   }
   // Firestore dot-path updates ('stats.sent') merge into a nested field —
@@ -65,8 +66,18 @@ vi.mock('firebase-admin/firestore', () => {
       add: async (data) => { const ref = docRef(`${path}/auto_${Object.keys(h.docs).length}`); h.docs[ref.path] = data; return ref; },
     };
   }
+  // No concurrency to simulate in these handler-level tests (that's
+  // applySendContactUpdateConcurrency.test.js's job) — a single pass
+  // through tx.get/tx.update against the same shared store is enough.
+  const db = {
+    collection: (name) => collRef(name),
+    runTransaction: async (fn) => fn({
+      get: async (ref) => ref.get(),
+      update: (ref, patch) => { h.docs[ref.path] = { ...(h.docs[ref.path] || {}), ...flatten(patch) }; },
+    }),
+  };
   return {
-    getFirestore: () => ({ collection: (name) => collRef(name) }),
+    getFirestore: () => db,
     FieldValue: { serverTimestamp: () => '__SERVER_TIMESTAMP__' },
   };
 });
@@ -201,6 +212,10 @@ describe('sendScheduledEmail: fresh suppression check before the Gmail send', ()
     setupPending();
     await processScheduledEngagements();
     expect(h.docs[contactPath('c1')].hunter_status).toBe('awaiting_reply');
+    // Not seeded above — only true if the contact update actually ran
+    // (hunter_status alone would trivially "pass" even if it silently no-
+    // op'd, since the seed already holds that value).
+    expect(h.docs[contactPath('c1')].gmail_last_message_id).toBeTruthy();
   });
 
   it('skips and marks the engagement skipped (contact_replied) when the contact already replied since queuing', async () => {
@@ -319,6 +334,8 @@ describe('sendScheduledWave: same suppression check in the per-recipient loop', 
     // The eligible recipient's send still marks hunter_status — same
     // defense-in-depth confirmation as the single-engagement path above.
     expect(h.docs[contactPath('eligible')].hunter_status).toBe('awaiting_reply');
+    // Not seeded above — only true if the contact update actually ran.
+    expect(h.docs[contactPath('eligible')].gmail_last_message_id).toBeTruthy();
     // The suppressed recipient was never sent to at all, so untouched.
     expect(h.docs[contactPath('replied')].hunter_status).toBe('in_conversation');
   });

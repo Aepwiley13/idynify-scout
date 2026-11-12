@@ -13,16 +13,39 @@ vi.mock('firebase-admin/app', () => ({ initializeApp: vi.fn(), getApps: () => [{
 
 vi.mock('firebase-admin/firestore', () => {
   function docRef(path) {
-    return {
+    const ref = {
+      path,
       get: async () => ({ exists: h.docs[path] !== undefined, data: () => h.docs[path] }),
       update: async (patch) => { h.docs[path] = { ...(h.docs[path] || {}), ...patch }; },
       collection: (sub) => collRef(`${path}/${sub}`),
     };
+    ref.firestore = db; // applySendContactUpdate runs its transaction via contactRef.firestore
+    return ref;
   }
   function collRef(path) {
     return { doc: (id) => docRef(`${path}/${id}`), add: async () => ({ id: 'log1' }) };
   }
-  return { getFirestore: () => ({ collection: (name) => collRef(name) }), FieldValue: { increment: (n) => ({ __increment: n }) } };
+  // No concurrency to simulate in these handler-level tests (that's
+  // applySendContactUpdateConcurrency.test.js's job) — a single pass
+  // through tx.get/tx.update against the same shared store is enough.
+  // tx.update DOES still enforce real Firestore's "fails if the document
+  // doesn't exist" — needed for the deleted-contact test below to be
+  // meaningful rather than silently no-op-succeeding.
+  const db = {
+    collection: (name) => collRef(name),
+    runTransaction: async (fn) => fn({
+      get: async (ref) => ref.get(),
+      update: (ref, patch) => {
+        if (h.docs[ref.path] === undefined) {
+          const err = new Error(`NOT_FOUND: No document to update: ${ref.path}`);
+          err.code = 5;
+          throw err;
+        }
+        h.docs[ref.path] = { ...(h.docs[ref.path] || {}), ...patch };
+      },
+    }),
+  };
+  return { getFirestore: () => db, FieldValue: { increment: (n) => ({ __increment: n }) } };
 });
 
 vi.mock('googleapis', () => ({
@@ -114,5 +137,15 @@ describe('gmail-send-quick.js: a confirmed send never regresses an established r
     expect(doc.gmail_thread_id).toBe('thread1');
     expect(doc.last_sent_at).toBeTruthy();
     expect(doc.hunter_status).toBe('in_conversation'); // still preserved
+  });
+
+  it('a contact deleted before this handler runs still reports the send as successful — Gmail already accepted the message, and the contact-update failure is caught, not surfaced', async () => {
+    // No seed for docPath() at all — simulates the contact being gone by
+    // the time the (already-successful) Gmail send gets here.
+    const res = await send(CONTACT_ID);
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body).success).toBe(true);
+    // Nothing was phantom-created from the failed update.
+    expect(h.docs[docPath()]).toBeUndefined();
   });
 });

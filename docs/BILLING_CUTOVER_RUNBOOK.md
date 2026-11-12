@@ -45,41 +45,49 @@ when actually running it): `STRIPE_SECRET_KEY` and `FIREBASE_SERVICE_ACCOUNT_PAT
 WRITE-capable key, never the read-only one) for `scripts/manualCreditRecovery.mjs`. These are
 unrelated to the Netlify table above and are never set as site environment variables.
 
-### 0.3 API compatibility — verify actual payload shapes, not version-string equality
+### 0.3 API compatibility — CONFIRMED, not just checked
 
-A different webhook endpoint API version and a different SDK default version are **not
-automatically incompatible** — only a mismatch that actually changes a field this code reads
-matters. Don't stop on a string difference alone; check the fields.
+**Resolved this session.** Production's webhook endpoint is pinned to **`2025-10-29.clover`** —
+confirmed by the account owner, not inferred. This differs from the installed Stripe SDK's own
+default (`2025-02-24.acacia`, read from `node_modules/stripe/cjs/apiVersion.js` — no `apiVersion`
+is pinned anywhere in this codebase, so every outgoing `stripe.*.retrieve()` call uses acacia
+regardless of what the webhook endpoint delivers). A version-string difference is **not**
+automatically incompatible — only a mismatch that changes a field this code reads matters.
 
-The installed Stripe SDK (`stripe` npm package, v17.7.0 within `^17.4.0`) defaults to
-**`2025-02-24.acacia`** — read directly from `node_modules/stripe/cjs/apiVersion.js`. No
-`apiVersion` is pinned anywhere in this codebase, so every outgoing `stripe.*.retrieve()` call
-uses this version self-consistently. The only real external variable is the **incoming webhook
-payload shape**, which Stripe renders according to the endpoint's own configured API version
-(confirmed against docs.stripe.com/api/events/list: "Each event data is rendered according to
-[the] Stripe API version at its creation time" — the endpoint's pinned version, not the caller's).
+One real, verified breaking change exists between these two versions, confirmed against Stripe's
+own changelog: as of `2025-03-31.basil` and every later version including clover,
+`current_period_start`/`current_period_end` are **removed entirely** from the top-level
+Subscription object (docs.stripe.com/changelog/basil/2025-03-31/
+deprecate-subscription-current-period-start-and-end) — replaced by
+`items.data[].current_period_start/end` on each subscription item. This is not a rare edge case:
+`2025-09-30.clover` also made flexible billing mode (the mode that produces this per-item shape)
+the **default for every new subscription**, including ones created through Checkout Sessions and
+Payment Links (docs.stripe.com/changelog/clover/2025-09-30/billing-mode-default-flexible) — this
+app's live default checkout flow. Every new signup is shaped this way now.
 
-1. In the Stripe Dashboard: **Developers → Webhooks → (the production endpoint) →** note the
-   configured API version.
-2. If it reads `2025-02-24.acacia`, done — self-consistent, proceed.
-3. If it differs, pull one real recent delivery for this endpoint (**Webhooks → endpoint →
-   Recent deliveries → open any `checkout.session.completed` and any
-   `customer.subscription.updated` → view payload**) and confirm these exact fields are present
-   with the expected shape — the complete set this code reads:
-   - Subscription: `status`, `current_period_start`, `current_period_end` (or the per-item
-     fallback under `items.data[].current_period_start/end`), `cancel_at_period_end`,
-     `pause_collection`, `items.data[].price.id`, `customer`, `created`, `metadata.firebaseUID`,
-     `latest_invoice`.
-   - Checkout Session: `customer`, `subscription`, `payment_status`, `metadata.firebaseUID`,
-     `metadata.userId`, `metadata.checkoutOperationId`, `client_reference_id`, `created`.
-   - Invoice (reached via `latest_invoice`, used by `scripts/manualCreditRecovery.mjs`): `status`.
+`resolvePeriod()` (`netlify/functions/stripe-webhook.js`) already had a fallback to item-level
+fields, written before this was confirmed. **Verified this session**, against representative
+clover-shaped fixtures for all four relevant event types (`checkout.session.completed`,
+`customer.subscription.created/updated/deleted`), including the per-item disambiguation path for
+a multi-item subscription — see `src/test/stripeWebhookCloverApiVersionCompat.test.js` (12/12
+passing). No code change was needed; the gap was test coverage, not behavior.
 
-   **Expected result:** every field above is present with the shape the code assumes (a string
-   for ids, a unix integer for `created`/period fields, a boolean for `cancel_at_period_end`). If
-   any of these specifically changed shape between the two versions (check
-   docs.stripe.com/changelog for the object types above, between the endpoint's version and
-   `2025-02-24.acacia`), stop and resolve before proceeding — a difference confined to fields this
-   code never reads is not a blocker.
+Checked and ruled out as *not* affecting this code, also against the real changelog rather than
+assumed:
+- `cancel_at_period_end` (docs.stripe.com/changelog/basil/2025-07-30/cancel-at-enums): the
+  `basil`/`clover` change here only adds new `cancel_at` enum values (`min_period_end`/
+  `max_period_end`) for *creating/updating* mixed-interval subscriptions.
+  `cancel_at_period_end` itself is unchanged as a read field, and this account doesn't use mixed
+  intervals.
+- Checkout Session `shipping_details` moved to `collected_information.shipping_details` on
+  basil — irrelevant, this codebase never reads `shipping_details` at all (confirmed by grep).
+- `items.data[].price.id` (used by `priceIdOfSubscription`/`priceIdOfSession`): unaffected by
+  any changelog entry found for these versions.
+
+No further action needed for this item — if the endpoint's configured version changes again in
+the future, re-run the same comparison: check docs.stripe.com/changelog between the old and new
+version for the object types this code reads (Subscription, Checkout Session, Invoice), and
+extend `stripeWebhookCloverApiVersionCompat.test.js` with fixtures for whatever changed.
 
 ### 0.4 Monitoring owner
 

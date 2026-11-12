@@ -192,6 +192,17 @@ describe('sendScheduledEmail: fresh suppression check before the Gmail send', ()
     expect(h.docs[engagementPath('e1')].status).toBe('sent');
   });
 
+  it('an eligible send still marks hunter_status awaiting_reply — sendShouldMarkAwaitingReply correctly allows the normal case', async () => {
+    // isSendSuppressed already blocks reaching the send at all for an
+    // in-conversation or advanced-status contact (tests above) — this
+    // confirms the ADDITIONAL, defense-in-depth sendShouldMarkAwaitingReply
+    // guard added alongside it does not itself break the ordinary,
+    // genuinely-eligible path.
+    setupPending();
+    await processScheduledEngagements();
+    expect(h.docs[contactPath('c1')].hunter_status).toBe('awaiting_reply');
+  });
+
   it('skips and marks the engagement skipped (contact_replied) when the contact already replied since queuing', async () => {
     setupPending({ hunter_status: 'in_conversation' }); // the race: replied AFTER this was queued
     await processScheduledEngagements();
@@ -305,6 +316,11 @@ describe('sendScheduledWave: same suppression check in the per-recipient loop', 
     expect(wave.stats.sent).toBe(1);
     expect(wave.stats.skipped).toBe(1);
     expect(wave.status).toBe('processed');
+    // The eligible recipient's send still marks hunter_status — same
+    // defense-in-depth confirmation as the single-engagement path above.
+    expect(h.docs[contactPath('eligible')].hunter_status).toBe('awaiting_reply');
+    // The suppressed recipient was never sent to at all, so untouched.
+    expect(h.docs[contactPath('replied')].hunter_status).toBe('in_conversation');
   });
 
   it('a malformed recipientIds entry (null/empty) is skipped without crashing the rest of the wave', async () => {

@@ -17,6 +17,7 @@ import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 import { encodeHeaderValue, formatAddress } from './utils/emailHeaders.js';
 import { displayNameFor } from '../../src/utils/userIdentity.js';
+import { sendShouldMarkAwaitingReply } from '../../src/utils/relationshipRead.js';
 
 /**
  * Syntax check only — `local@domain.tld` shape. This does NOT verify the
@@ -492,14 +493,23 @@ export const handler = async (event) => {
 
     console.log('✅ Email sent successfully, Gmail message ID:', gmailMessageId, 'thread ID:', gmailThreadId);
 
-    // Store threadId on contact + mark as awaiting_reply (non-blocking)
-    // If existingThreadId was provided (in-thread follow-up), gmail_thread_id is
-    // preserved — only last_message and timestamps are updated.
+    // Store threadId on contact + mark as awaiting_reply, UNLESS the
+    // contact is already mid-conversation or holds an advanced
+    // relationship status (non-blocking either way). If existingThreadId
+    // was provided (in-thread follow-up), gmail_thread_id is preserved —
+    // only last_message and timestamps are updated.
     if (contactId) {
       try {
+        const contactRef = db
+          .collection('users').doc(userId)
+          .collection('contacts').doc(contactId);
+        // Fresh read — a send must decide against the contact's CURRENT
+        // state, not a queued-time or client-supplied belief about it.
+        const currentSnap = await contactRef.get();
+        const currentContact = currentSnap.exists ? currentSnap.data() : null;
+
         const contactUpdate = {
           gmail_last_message_id: gmailMessageId,
-          hunter_status: 'awaiting_reply',
           last_sent_at: sentAt,
           updated_at: sentAt,
         };
@@ -507,9 +517,11 @@ export const handler = async (event) => {
           // Fresh send — record the new thread so replies can be tracked
           contactUpdate.gmail_thread_id = gmailThreadId;
         }
-        const contactRef = db
-          .collection('users').doc(userId)
-          .collection('contacts').doc(contactId);
+        let markedAwaitingReply = false;
+        if (sendShouldMarkAwaitingReply(currentContact)) {
+          contactUpdate.hunter_status = 'awaiting_reply';
+          markedAwaitingReply = true;
+        }
         // Engaging a contact means the user kept it, so it can no longer be a
         // discovery suggestion. Merged into the send's own write.
         Object.assign(
@@ -518,7 +530,10 @@ export const handler = async (event) => {
         );
         await contactRef.update(contactUpdate);
         const threadLabel = existingThreadId ? `existing thread ${existingThreadId}` : `new thread ${gmailThreadId}`;
-        console.log(`✅ Contact updated — ${threadLabel}, hunter_status → awaiting_reply`);
+        console.log(
+          `✅ Contact updated — ${threadLabel}` +
+          (markedAwaitingReply ? ', hunter_status → awaiting_reply' : ' (relationship status preserved — already in conversation or an advanced status)')
+        );
       } catch (updateErr) {
         console.warn('Failed to update contact after send, non-blocking:', updateErr);
       }

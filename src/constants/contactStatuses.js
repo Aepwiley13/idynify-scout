@@ -53,3 +53,22 @@ export const CONTACT_STATUSES = {
   ACTIVE_MISSION: 'Active Mission',
   MISSION_COMPLETE: 'Mission Complete'
 };
+
+/**
+ * Relationship statuses set by an explicit person-type reclassification —
+ * a dimension the lead-lifecycle fields (hunter_status, and contact_status
+ * outside this set) know nothing about — plus the terminal lead status.
+ * Neither an outbound send nor an inbound reply may regress a contact out
+ * of one of these; both directions share this one set so the rule cannot
+ * drift between them. Used by replyPolling.js (an inbound reply must not
+ * regress them) and the outbound send paths (gmail-send-quick.js,
+ * gmail-send-wave.js, process-scheduled-engagements.js) that mark a
+ * contact newly awaiting reply.
+ */
+export const ADVANCED_RELATIONSHIP_STATUSES = new Set([
+  CONTACT_STATUSES.ACTIVE_CUSTOMER,
+  CONTACT_STATUSES.PAST_CUSTOMER,
+  CONTACT_STATUSES.PARTNER,
+  CONTACT_STATUSES.NETWORK,
+  CONTACT_STATUSES.MISSION_COMPLETE,
+]);

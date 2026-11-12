@@ -15,6 +15,7 @@ import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
 import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 import { buildPlainTextEmail } from './utils/emailHeaders.js';
+import { sendShouldMarkAwaitingReply } from '../../src/utils/relationshipRead.js';
 
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {
@@ -206,17 +207,27 @@ export const handler = async (event) => {
         // Update contact in Firestore (non-blocking)
         if (recipient.contactId) {
           try {
+            const contactRef = db.collection('users').doc(userId)
+              .collection('contacts').doc(recipient.contactId);
+            // Fresh read — recipient.* is client-supplied request data, not
+            // this contact's current Firestore state.
+            const currentSnap = await contactRef.get();
+            const currentContact = currentSnap.exists ? currentSnap.data() : null;
+
             const contactUpdate = {
               gmail_last_message_id: gmailMessageId,
-              hunter_status: 'awaiting_reply',
               last_sent_at: sentAt,
               updated_at: sentAt,
             };
             if (!recipient.existingThreadId && gmailThreadId) {
               contactUpdate.gmail_thread_id = gmailThreadId;
             }
-            const contactRef = db.collection('users').doc(userId)
-              .collection('contacts').doc(recipient.contactId);
+            // A follow-up never regresses an already-in-conversation
+            // contact, or one holding an advanced relationship status,
+            // back to awaiting_reply.
+            if (sendShouldMarkAwaitingReply(currentContact)) {
+              contactUpdate.hunter_status = 'awaiting_reply';
+            }
             // Engaging a contact means the user kept it, so it can no longer
             // be a discovery suggestion. Merged into the send's own write.
             Object.assign(

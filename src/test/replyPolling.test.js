@@ -24,6 +24,32 @@ function contactPath(id = CONTACT_ID) {
   return `users/${USER_ID}/contacts/${id}`;
 }
 
+/**
+ * Applies one patch object to a document the way real Firestore's
+ * .update() does for the two things this file's reply-count assertions
+ * need: a dotted key ('relationship.reply_count') targets the NESTED
+ * field, not a literal flat key with a dot in its name, and a
+ * FieldValue.increment(n) sentinel reads the current nested value and
+ * adds n, rather than overwriting it with the sentinel object itself.
+ */
+function applyPatch(current, patch) {
+  const next = { ...(current || {}) };
+  for (const [key, value] of Object.entries(patch)) {
+    const path = key.split('.');
+    let node = next;
+    for (let i = 0; i < path.length - 1; i++) {
+      const segment = path[i];
+      node[segment] = { ...(node[segment] || {}) };
+      node = node[segment];
+    }
+    const leaf = path[path.length - 1];
+    const isIncrement = value && typeof value === 'object' && typeof value.operand === 'number'
+      && value.constructor?.name === 'NumericIncrementTransform';
+    node[leaf] = isIncrement ? (node[leaf] || 0) + value.operand : value;
+  }
+  return next;
+}
+
 /** A minimal Firestore admin-SDK-shaped fake: enough for replyPolling.js's needs. */
 function makeFakeDb(seed = {}) {
   const docs = { ...seed };
@@ -43,7 +69,7 @@ function makeFakeDb(seed = {}) {
           err.code = 5;
           throw err;
         }
-        docs[path] = { ...docs[path], ...patch };
+        docs[path] = applyPatch(docs[path], patch);
       },
       set: async (data) => { docs[path] = data; },
       collection: (sub) => collRef(`${path}/${sub}`),
@@ -108,7 +134,7 @@ function makeFakeDb(seed = {}) {
         if (conflicted) continue; // another transaction committed since our read — retry from scratch
 
         for (const op of pending) {
-          docs[op.path] = op.kind === 'update' ? { ...(docs[op.path] || {}), ...op.value } : op.value;
+          docs[op.path] = op.kind === 'update' ? applyPatch(docs[op.path], op.value) : op.value;
           versions[op.path] = (versions[op.path] || 0) + 1;
         }
         return result;
@@ -321,6 +347,36 @@ describe('durable, message-level idempotency', () => {
     expect(totalTransitions).toBe(1);
     expect(timelineEntries(db)).toHaveLength(1);
   });
+
+  it('two overlapping calls racing the exact same new reply increment relationship.reply_count exactly once, not twice', async () => {
+    const db = makeFakeDb({
+      [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1', email: 'jane@acme.com' },
+    });
+    const gmail = makeGmail();
+    thread(gmail, 't1', [OUTBOUND, message('m1', [header('From', 'jane@acme.com'), header('Subject', 'Re: Checking in')])]);
+
+    await Promise.all([
+      pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com'),
+      pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com'),
+    ]);
+
+    const contact = db._docs[contactPath()];
+    expect(contact.relationship.reply_count).toBe(1);
+    expect(contact.engagement_summary.replies_received).toBe(1);
+  });
+
+  it('a later, non-overlapping poll of the same already-processed message does not increment reply_count again', async () => {
+    const db = makeFakeDb({
+      [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1', email: 'jane@acme.com' },
+    });
+    const gmail = makeGmail();
+    thread(gmail, 't1', [OUTBOUND, message('m1', [header('From', 'jane@acme.com'), header('Subject', 'Re: Checking in')])]);
+
+    await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com'); // first pass — processes m1
+    await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com'); // second pass — nothing new past the marker
+
+    expect(db._docs[contactPath()].relationship.reply_count).toBe(1);
+  });
 });
 
 describe('multiple replies within one thread', () => {
@@ -339,6 +395,39 @@ describe('multiple replies within one thread', () => {
     expect(entries).toHaveLength(2);
     expect(entries.map((e) => e.metadata.gmailMessageId).sort()).toEqual(['m1', 'm2']);
     expect(db._docs[contactPath()].gmail_last_processed_reply_id).toBe('m2'); // the latest
+  });
+
+  it('two new GENUINE (verified) replies in one pass increment reply_count by 2, not 1', async () => {
+    const db = makeFakeDb({
+      [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1', email: 'jane@acme.com' },
+    });
+    const gmail = makeGmail();
+    const reply1 = message('m1', [header('From', 'jane@acme.com'), header('Subject', 'Re: Checking in')]);
+    const reply2 = message('m2', [header('From', 'jane@acme.com'), header('Subject', 'Re: Checking in')]);
+    thread(gmail, 't1', [OUTBOUND, reply1, reply2]);
+
+    await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
+
+    const contact = db._docs[contactPath()];
+    expect(contact.relationship.reply_count).toBe(2);
+    expect(contact.engagement_summary.replies_received).toBe(2);
+  });
+
+  it('an automated reply and an unverified sender do not increment reply_count — only the genuine one does', async () => {
+    const db = makeFakeDb({
+      [contactPath()]: { id: CONTACT_ID, hunter_status: 'awaiting_reply', contact_status: 'Awaiting Reply', gmail_thread_id: 't1', email: 'jane@acme.com' },
+    });
+    const gmail = makeGmail();
+    const automated = message('m1', [header('From', 'jane@acme.com'), header('Subject', 'Automatic reply: out of office')]);
+    const unverified = message('m2', [header('From', 'someone-else@example.com'), header('Subject', 'Re: Checking in')]);
+    const genuine = message('m3', [header('From', 'jane@acme.com'), header('Subject', 'Re: Checking in')]);
+    thread(gmail, 't1', [OUTBOUND, automated, unverified, genuine]);
+
+    await pollRepliesForUser(db, gmail, USER_ID, 'me@idynify.com');
+
+    const contact = db._docs[contactPath()];
+    expect(contact.relationship.reply_count).toBe(1);
+    expect(contact.engagement_summary.replies_received).toBe(1);
   });
 
   it('a mix of one automated and one genuine new reply only timelines the genuine one, but advances past both', async () => {

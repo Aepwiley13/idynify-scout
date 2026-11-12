@@ -49,7 +49,7 @@ import { writeTimelineEvent, ACTORS } from './utils/timelineWrite.js';
 import { alertOps } from './utils/alertOps.js';
 import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 import { buildPlainTextEmail } from './utils/emailHeaders.js';
-import { isInConversation, hasReplied } from '../../src/utils/relationshipRead.js';
+import { isInConversation, hasReplied, sendShouldMarkAwaitingReply } from '../../src/utils/relationshipRead.js';
 // Pure, dependency-free — NOT contactStateMachine.js, which imports the
 // browser Firebase client SDK and crashes under Netlify's esbuild-bundled
 // Functions runtime (no import.meta.env there). See
@@ -467,12 +467,18 @@ async function sendScheduledEmail(userId, docRef, eng, results) {
   if (contactId) {
     const contactUpdate = {
       gmail_last_message_id: gmailMessageId,
-      hunter_status: 'awaiting_reply',
       last_sent_at: sentAt,
       updated_at: sentAt
     };
     if (!existingThreadId && gmailThreadId) {
       contactUpdate.gmail_thread_id = gmailThreadId;
+    }
+    // freshContact is the same send-time read checkSendSuppressed already
+    // did above — a follow-up never regresses an already-in-conversation
+    // contact, or one holding an advanced relationship status, back to
+    // awaiting_reply.
+    if (sendShouldMarkAwaitingReply(freshContact)) {
+      contactUpdate.hunter_status = 'awaiting_reply';
     }
     const contactRef = db.collection('users').doc(userId)
       .collection('contacts').doc(contactId);
@@ -733,12 +739,18 @@ async function sendScheduledWave(userId, waveRef, wave, results) {
       // Update contact
       const contactUpdate = {
         gmail_last_message_id: gmailMessageId,
-        hunter_status: 'awaiting_reply',
         last_sent_at: sentAt,
         updated_at: sentAt
       };
       if (!existingThreadId && gmailThreadId) {
         contactUpdate.gmail_thread_id = gmailThreadId;
+      }
+      // `contact` here is the same fresh, send-time read used for the
+      // suppression check above — a follow-up never regresses an
+      // already-in-conversation contact, or one holding an advanced
+      // relationship status, back to awaiting_reply.
+      if (sendShouldMarkAwaitingReply(contact)) {
+        contactUpdate.hunter_status = 'awaiting_reply';
       }
       Object.assign(
         contactUpdate,

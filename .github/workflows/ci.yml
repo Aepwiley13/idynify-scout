@@ -97,3 +97,30 @@ jobs:
       # behaviour.
       - name: Run the rules suite
         run: npx --yes firebase-tools@15 emulators:exec --only firestore --project demo-icp-rules "node scripts/rules-check/cases.mjs && node scripts/rules-check/stickers.mjs && node scripts/rules-check/sticker-services.mjs && node scripts/rules-check/stickers-flag-parity.mjs && node scripts/rules-check/write-semantics.mjs"
+
+  # Billing hardening (PR 1): webhook/checkout/credit-tracking concurrency and fencing, against a
+  # real Firestore emulator. These are vitest files under src/test/ that the plain `test` job
+  # above SKIPS (describe.skipIf — no FIRESTORE_EMULATOR_HOST there), by design, so that `npm
+  # test` doesn't crash for anyone without the emulator. That design only stays safe if this job
+  # exists and is required: skipped tests report green, so without this job a PR touching
+  # stripe-webhook.js / create-checkout-session.js / creditTracking.js could merge never having
+  # actually run the ownership/fencing/concurrency assertions — exactly the class of bug a mock
+  # can't catch, which is why these are real-transaction tests, not mocked ones.
+  billing-emulator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm install
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Install rules-check dependencies (hosts the firebase-tools emulator binary)
+        working-directory: scripts/rules-check
+        run: npm install
+      - name: Run the billing emulator suite
+        run: npm run test:billing-emulator

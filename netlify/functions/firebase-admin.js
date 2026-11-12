@@ -19,6 +19,15 @@ if (getApps().length === 0 && wantsApplicationDefaultCredentials(process.env)) {
   initializeApp({ credential: applicationDefault(), projectId: requireProjectId() });
 }
 
+// Test runs against the Firestore emulator (billing hardening PR 1's integration suite,
+// `firebase emulators:exec` sets this). The emulator doesn't check credentials — only a
+// project id is needed, never real service-account values. A separate, earlier guard
+// (not nested inside the block below) so that block stays byte-for-byte the original
+// deployed path — asserted directly by src/test/adminCredential.test.js.
+if (getApps().length === 0 && process.env.FIRESTORE_EMULATOR_HOST) {
+  initializeApp({ projectId: requireProjectId() });
+}
+
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {
   const privateKey = process.env.FIREBASE_PRIVATE_KEY

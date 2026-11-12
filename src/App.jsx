@@ -5,6 +5,7 @@ import { auth, db } from './firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 import { ImpersonationProvider } from './context/ImpersonationContext';
 import { useVersionCheck } from './hooks/useVersionCheck';
+import { hasActiveAccess } from './utils/billingEntitlement';
 
 // Pages
 import Homepage from './pages/Homepage';
@@ -140,7 +141,7 @@ function ShellRoute({ loading, user, userData, requirePayment = true }) {
     return <Navigate to="/login" />;
   }
 
-  if (requirePayment && !userData?.hasCompletedPayment) {
+  if (requirePayment && !hasActiveAccess(userData)) {
     return <Navigate to="/checkout" />;
   }
 
@@ -279,7 +280,7 @@ function App() {
     }
 
     // Check if user has completed payment (unless explicitly disabled)
-    if (requirePayment && !userData?.hasCompletedPayment) {
+    if (requirePayment && !hasActiveAccess(userData)) {
       return <Navigate to="/checkout" />;
     }
 
@@ -309,7 +310,7 @@ function App() {
     }
 
     // ✅ NEW FLOW: Check payment status first
-    if (!userData?.hasCompletedPayment) {
+    if (!hasActiveAccess(userData)) {
       // User hasn't paid yet - send to checkout
       return <Navigate to="/checkout" />;
     }

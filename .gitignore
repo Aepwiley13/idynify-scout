@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# vitest JSON report written by `npm run test:billing-emulator` for assertBillingTestsRan.mjs
+.billing-emulator-report.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

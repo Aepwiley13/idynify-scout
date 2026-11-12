@@ -108,12 +108,11 @@ export default function Signup() {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
-      // ── UNCHANGED FROM THE PREVIOUS IMPLEMENTATION ──────────────────────
-      // Same keys, same order, same types. `credits` is a number here and is
-      // later replaced by an object in CheckoutPage — a known inconsistency
-      // that this sprint documents rather than fixes, so the shape written at
-      // signup must stay exactly what production writes today. Test 12 asserts
-      // this payload field by field.
+      // Billing hardening PR 1: `credits` now matches the object shape stripe-webhook.js writes
+      // after checkout, instead of the bare number this used to write (which later got
+      // overwritten by an incompatible object shape — a real inconsistency, not a cosmetic one;
+      // see firestore.rules signupBilling(), which still accepts the old numeric shape too, for
+      // any already-open tab still running the previous bundle).
       const initialCredits = tier === 'pro' ? 1250 : 400;
 
       await setDoc(doc(db, 'users', userCredential.user.uid), {
@@ -123,10 +122,9 @@ export default function Signup() {
         subscriptionTier: tier,
         status: 'pending_payment',
         hasCompletedPayment: false,
-        credits: initialCredits,
+        credits: { total: initialCredits, used: 0, remaining: initialCredits, resetDate: null },
         monthlyCredits: initialCredits
       });
-      // ────────────────────────────────────────────────────────────────────
 
       // Genuinely fire-and-forget now. The previous code awaited this despite
       // a comment promising it did not, so a slow Resend call sat between the

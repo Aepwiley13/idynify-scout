@@ -42,6 +42,7 @@ import { StickersProvider } from '../../components/stickers/StickersContext';
 import { useStickers } from '../../components/stickers/stickersRegistry';
 import StickerFilterChip from '../../components/stickers/StickerFilterChip';
 import ContactCardStickers from '../../components/stickers/ContactCardStickers';
+import ContactCardStickersInteractive from '../../components/stickers/ContactCardStickersInteractive';
 import BulkStickerAction from '../../components/stickers/BulkStickerAction';
 import StickersWall from '../../components/stickers/StickersWall';
 import { readUrlSticker, writeUrlSticker, resolveStickerFilter, hasSticker, matchesStickerName } from '../../components/stickers/peopleStickers';
@@ -456,6 +457,7 @@ function AllLeadsCard({
   inSniper = false, onAddToSniper,
   onArchive,
   signalChip = null,
+  onStickerChange,
 }) {
   const T = useT();
   const color = BRAND.pink;
@@ -747,8 +749,8 @@ function AllLeadsCard({
           {mode === 'hunter' ? getHunterLastAction(contact) : getLastAction(contact)}
         </div>
 
-        {/* Stickers (ADR-007): nothing unless available */}
-        <ContactCardStickers contact={contact} max={2} style={{ marginBottom: 6 }} />
+        {/* Stickers (ADR-007): interactive add/remove */}
+        <ContactCardStickersInteractive contact={contact} max={2} onUpdate={onStickerChange} style={{ marginBottom: 6 }} />
 
         {/* Tags */}
         {Array.isArray(contact.tags) && contact.tags.length > 0 && (
@@ -1577,6 +1579,12 @@ function AllLeadsPage({ mode = 'people', activeFilter = null }) {
     setContacts(prev => prev.map(c => (c.id === updated.id ? { ...c, ...updated } : c)));
   }
 
+  // Update contact sticker membership when changed from card picker
+  // Uses same safe pattern as bulk sticker action (line 2585)
+  function handleStickerChange(contactId, stickerId, op) {
+    setContacts(prev => prev.map(c => (c.id === contactId ? withMembershipChange(c, stickerId, op) : c)));
+  }
+
   // Bulk: toggle one contact in/out of selectedIds
   function toggleSelect(contactId) {
     setSelectedIds(prev => {
@@ -2181,15 +2189,59 @@ function AllLeadsPage({ mode = 'people', activeFilter = null }) {
           )}
         </div>
 
-        {/* Active filter count badge */}
-        {activeFilterCount > 0 && (
-          <button
-            onClick={() => { setIndustryFilter(null); setWarmthFilter(null); setSourceFilter(null); setSmartFilter(null); setDataFilter(null); setTagFilter(null); setStickerFilterId(null); setWarmSignalFilter(false); }}
-            style={{ padding: '4px 10px', minHeight: 44, borderRadius: 20, border: `1px solid ${BRAND.pink}40`, background: `${BRAND.pink}12`, color: BRAND.pink, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
-          >
-            <X size={9} />{activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} — Clear
-          </button>
-        )}
+        {/* All People button — always visible, clears filters and exits Stickers wall */}
+        <button
+          onClick={() => {
+            // Clear all filters
+            setIndustryFilter(null);
+            setWarmthFilter(null);
+            setSourceFilter(null);
+            setSmartFilter(null);
+            setDataFilter(null);
+            setTagFilter(null);
+            setStickerFilterId(null);
+            setWarmSignalFilter(false);
+            // Reset to "All People" action lens
+            setActionFilter('all');
+            // Exit Stickers wall, return to Cards or List (whichever was last used)
+            if (viewMode === 'stickers') {
+              setViewMode(lastListView.current);
+            }
+          }}
+          style={{
+            padding: '6px 14px',
+            minHeight: 44,
+            borderRadius: 20,
+            border: `1px solid ${activeFilterCount > 0 || viewMode === 'stickers' ? BRAND.pink : T.border}`,
+            background: activeFilterCount > 0 || viewMode === 'stickers' ? `${BRAND.pink}12` : 'transparent',
+            color: activeFilterCount > 0 || viewMode === 'stickers' ? BRAND.pink : T.textMuted,
+            fontSize: 11,
+            fontWeight: activeFilterCount > 0 || viewMode === 'stickers' ? 700 : 600,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            flexShrink: 0,
+          }}
+          title={activeFilterCount > 0 || viewMode === 'stickers' ? 'Show all people (clear filters)' : 'All people'}
+        >
+          <Users size={12} />
+          All People
+          {activeFilterCount > 0 && (
+            <span style={{
+              fontSize: 9,
+              fontWeight: 700,
+              background: BRAND.pink,
+              color: '#fff',
+              borderRadius: 10,
+              padding: '1px 5px',
+              marginLeft: 2,
+            }}>
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
 
         {/* Sort selector */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 7, padding: '5px 10px', flexShrink: 0 }}>
@@ -2317,6 +2369,7 @@ function AllLeadsPage({ mode = 'people', activeFilter = null }) {
                   onAddToSniper={() => handleAddToSniper(c)}
                   onArchive={handleContactArchived}
                   signalChip={getSignalChip(c, serviceProfiles)}
+                  onStickerChange={handleStickerChange}
                 />
               ))}
             </div>

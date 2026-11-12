@@ -27,6 +27,7 @@ import { db, auth } from '../../firebase/config';
 import { logTimelineEvent, ACTORS } from '../../utils/timelineLogger';
 import './NextBestStep.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { deriveContactNextBestStep } from '../../utils/deriveContactNextBestStep.js';
 
 // ── Step Types ───────────────────────────────────────────
 
@@ -90,79 +91,6 @@ const FOLLOWUP_TIMINGS = [
   { id: '1m', label: '1 month', days: 30 }
 ];
 
-// ── Derive proposal from engagement history ───────────────
-
-function deriveNextBestStep(contact, events) {
-  const sentEvents = events.filter(e => e.type === 'message_sent');
-  const lastSent = sentEvents[0];
-  const daysSinceLastSent = lastSent?.timestamp
-    ? (Date.now() - (lastSent.timestamp.toDate
-        ? lastSent.timestamp.toDate()
-        : new Date(lastSent.timestamp)).getTime()) / (1000 * 60 * 60 * 24)
-    : null;
-
-  const contactStatus = contact?.contact_status || contact?.lead_status;
-
-  // No engagement yet — suggest starting
-  if (sentEvents.length === 0) return null;
-
-  // They replied — accelerate
-  if (contactStatus === 'replied' || contactStatus === 'engaged') {
-    return {
-      type: 'accelerate',
-      message: `${contact?.firstName || 'They'} replied — this is momentum. Keep it going.`,
-      suggestion: 'Book a call or send a value-led follow-up while the door is open.',
-      timing: null
-    };
-  }
-
-  // Multiple sends, no reply — try a new channel
-  if (sentEvents.length >= 2 && daysSinceLastSent > 5) {
-    const channels = sentEvents.map(e => e.metadata?.channel).filter(Boolean);
-    const uniqueChannels = [...new Set(channels)];
-    if (uniqueChannels.length === 1) {
-      return {
-        type: 'try_new_channel',
-        message: `${sentEvents.length} messages via ${uniqueChannels[0]} — no response yet.`,
-        suggestion: 'Switch channels. The right message in the wrong place gets ignored.',
-        timing: null
-      };
-    }
-  }
-
-  // Single send, awaiting reply
-  if (sentEvents.length === 1 && daysSinceLastSent > 3) {
-    return {
-      type: 'follow_up',
-      message: `Sent ${Math.round(daysSinceLastSent)} days ago — no reply yet.`,
-      suggestion: `Barry recommends a warm follow-up. Want him to draft it?`,
-      timing: '3d'
-    };
-  }
-
-  // Many attempts, consider low-touch
-  if (sentEvents.length >= 3 && daysSinceLastSent > 10) {
-    return {
-      type: 'low_touch',
-      message: `${sentEvents.length} attempts — no response in ${Math.round(daysSinceLastSent)} days.`,
-      suggestion: `Is this still a priority? Move to low-touch and check back in a month.`,
-      timing: '1m'
-    };
-  }
-
-  // Standard follow-up if recent send
-  if (daysSinceLastSent !== null && daysSinceLastSent > 2) {
-    return {
-      type: 'follow_up',
-      message: `Last contacted ${Math.round(daysSinceLastSent)} day${daysSinceLastSent >= 2 ? 's' : ''} ago.`,
-      suggestion: 'Time for a follow-up. Barry will draft it with full context loaded.',
-      timing: '2d'
-    };
-  }
-
-  return null;
-}
-
 // ── Component ────────────────────────────────────────────
 
 export default function NextBestStep({ contact, onEngageClick, onStepConfirmed }) {
@@ -203,7 +131,7 @@ export default function NextBestStep({ contact, onEngageClick, onStepConfirmed }
       }
 
       // Derive proposal from events
-      const derived = deriveNextBestStep(contact, evts);
+      const derived = deriveContactNextBestStep(contact, evts);
       setProposal(derived);
       if (derived?.timing) {
         setSelectedTiming(derived.timing);

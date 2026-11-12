@@ -67,7 +67,6 @@ export default defineConfig([
       'src/utils/contactEngageStatus.js',
       'src/services/healthScore.js',
       'src/services/barryMemoryService.js',
-      'src/components/contacts/KeyMetricsGrid.jsx',
       'src/components/csm/CSMCard.jsx',
       'src/components/csm/CSMDashboard.jsx',
       'src/components/onboarding/RelationshipFirstValue.jsx',

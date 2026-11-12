@@ -9,6 +9,7 @@
  */
 
 import { useT } from '../../theme/ThemeContext';
+import { getReplyCount } from '../../utils/relationshipRead.js';
 
 function MetricCell({ label, value, subtext }) {
   const T = useT();
@@ -37,9 +38,13 @@ function MetricCell({ label, value, subtext }) {
 
 export default function KeyMetricsGrid({ contact, referralData }) {
   const touchpoints = contact?.engagement_summary?.total_messages_sent || 0;
-  const replies     = contact?.engagement_summary?.replies_received || 0;
+  const replies     = getReplyCount(contact);
+  // Capped at touchpoints: reply_count counts individual reply messages,
+  // which can exceed the number of sends in an active back-and-forth
+  // thread. This is a per-contact rate, not a count of distinct responding
+  // contacts, and must never display over 100%.
   const replyRate   = touchpoints > 0
-    ? `${Math.round((replies / touchpoints) * 100)}%`
+    ? `${Math.round((Math.min(replies, touchpoints) / touchpoints) * 100)}%`
     : '—';
   const referralsOut = referralData?.referrals_sent_to_you || 0;
 

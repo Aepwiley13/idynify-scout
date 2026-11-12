@@ -17,18 +17,16 @@ follow command-by-command during the deploy.
 
 ## 1. Roles
 
-**Pending confirmation — deliberately left unassigned.** No name is filled in below; this
-section is not approved until the account owner assigns each row explicitly.
+**Confirmed by the account owner.** This assignment confirms ownership only — it does **not**
+authorize merging, deployment, production configuration changes, or repair writes. Those remain
+separately gated by the sign-off checklist's own "Approved to execute" line and the overall
+`NOT EXECUTED` status at the top of this packet.
 
 | Role | Name | Basis |
 |---|---|---|
-| Deployment operator | **PENDING** | Awaiting confirmation. |
-| Monitoring owner | **PENDING** | Awaiting confirmation. May be the same person as the operator or a separate on-call assignment — team's call. |
-| Payment-recovery responsibility | **PENDING**, using `scripts/manualCreditRecovery.mjs` once assigned | Whoever is named owns every `billingAmbiguousAccounts` record this cutover produces, end to end: review, verify, and either run the recovery script with real evidence or leave it flagged pending with a documented reason. No one is assumed to have write access to the production Firebase project for this until named. |
-
-This table must have all three rows filled in before the sign-off checklist below can be
-checked — the procedure assumes one accountable person per row, not a diffusion of
-responsibility across whoever happens to be online during the deploy.
+| Deployment operator | **Aaron Wiley** (aaron@idynify.com) | Confirmed by the account owner. |
+| Monitoring owner | **Aaron Wiley** (aaron@idynify.com) | Confirmed by the account owner — same person as the deployment operator, by explicit assignment, not a default. |
+| Payment-recovery responsibility | **Aaron Wiley** (aaron@idynify.com), using `scripts/manualCreditRecovery.mjs` | Confirmed by the account owner. Owns every `billingAmbiguousAccounts` record this cutover produces, end to end: review, verify, and either run the recovery script with real evidence or leave it flagged pending with a documented reason. |
 
 ## 2. Exact environment changes
 
@@ -102,7 +100,9 @@ there is the same owner named in §1.
 
 ## Sign-off
 
-- [ ] Roles in §1 confirmed or reassigned
+- [x] Roles in §1 confirmed — **Aaron Wiley (aaron@idynify.com)**, all three rows. This confirms
+      ownership only; it does **not**, by itself, authorize merging, deployment, production
+      configuration changes, or repair writes — those require the remaining items below.
 - [ ] Environment changes in §2 reviewed, including that `STRIPE_PRICE_SCOUT_STARTER_FREE` is
       still unset and must be set to `price_1T3UsqJEdYAFEzC36VCvIZ90` during step 2 if so
 - [ ] Procedure in §3 reviewed, no steps skipped — including that step 6 is an approved GitHub
@@ -112,4 +112,6 @@ there is the same owner named in §1.
       configuration validation
 - [ ] Approved to execute
 
-No step above has been executed. Execution begins only after this packet is signed off.
+**Status: NOT EXECUTED.** Ownership is confirmed; execution is not. No step above has run, PR
+#769 remains unmerged, and nothing in production has changed. Execution begins only once every
+remaining item is checked and the release is explicitly approved.

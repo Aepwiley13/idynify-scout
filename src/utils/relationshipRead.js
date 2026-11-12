@@ -26,6 +26,8 @@
  * numbers and strings, so both runtimes and the tests share one answer.
  */
 
+import { ADVANCED_RELATIONSHIP_STATUSES } from '../constants/contactStatuses.js';
+
 /**
  * How many replies we have from this person.
  *
@@ -85,6 +87,25 @@ export function isInConversation(contact) {
 }
 
 /**
+ * Whether a confirmed outbound send should mark the contact as newly
+ * awaiting a reply (hunter_status/contact_status -> Awaiting Reply).
+ *
+ * False for a contact already mid-conversation — a follow-up does not
+ * end an active exchange, it continues one — or holding an advanced
+ * relationship status (Active Customer, Partner, Network, Past Customer,
+ * Mission Complete; see ADVANCED_RELATIONSHIP_STATUSES). Sending to
+ * either must never regress them back into the lead lifecycle. This is
+ * the send-side half of the same forward-only rule replyPolling.js
+ * already applies on the reply side — one rule, read from one place, so
+ * the two directions cannot drift apart.
+ */
+export function sendShouldMarkAwaitingReply(contact) {
+  if (isInConversation(contact)) return false;
+  if (ADVANCED_RELATIONSHIP_STATUSES.has(contact?.contact_status)) return false;
+  return true;
+}
+
+/**
  * The WORKFLOW state — where this conversation sits in the outreach lifecycle.
  *
  * Deliberately separate from `getRelationshipState`, which answers a different
@@ -116,5 +137,5 @@ export function awaitsUserAction(contact) {
 export default {
   getReplyCount, hasReplied, getLastInboundAt,
   daysSinceLastInbound, getRelationshipState, isInConversation,
-  getConversationState, awaitsUserAction,
+  sendShouldMarkAwaitingReply, getConversationState, awaitsUserAction,
 };

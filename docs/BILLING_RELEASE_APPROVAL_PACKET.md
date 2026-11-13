@@ -173,7 +173,7 @@ a buyer waits for a manual grant.
 
 ### 0A.5 Release-readiness considerations — open
 
-- **No staging rehearsal has been done.** Staging (`idynify-staging`) still has the pre-#769
+- **Superseded: a staging rehearsal has since passed (§0C.1).** As recorded at the time: no staging rehearsal had been done. Staging (`idynify-staging`) still has the pre-#769
   rules deployed (verified 2026-11-13: byte-identical to `e87691d`'s `firestore.rules`), so
   `main`'s signup and this sequence have not been exercised end to end anywhere. A rehearsal
   needs `main`'s rules deployed to staging and Stripe test mode. Whether to rehearse before
@@ -280,7 +280,7 @@ infrastructure and a separate decision. Without it, that half stays covered by u
 the read path already exercised against the real API, and the first live run of `--apply` is
 at Gate D. This is a risk to accept explicitly or close by creating the site.
 
-### 0B.5 Proposed staging rehearsal — AWAITING APPROVAL, NOT RUN
+### 0B.5 Proposed staging rehearsal — as proposed; since run and passed, see §0C.1
 
 Target: `idynify-staging` only. Every step refuses to run if the resolved project id is
 `idynify-scout-dev` or is not on the staging allowlist. No Stripe account is contacted in any
@@ -327,6 +327,165 @@ modelled on them), Netlify's function runtime, or the Netlify activation steps.
 4. **Staging credential permissions are untested** until R0.
 5. **Decision on the Netlify half of activation**: accept it as unrehearsed, or create a
    staging Netlify site first.
+
+## 0C. Release preparation: rehearsal result, owner confirmation, cutover checklist, blockers (recorded 2026-11-13)
+
+**This section authorizes nothing.** The checklist in §0C.3 is a plan for approval; every
+production action in it needs its own explicit approval at the time. Production release status:
+**NO-GO**. Where this section and §0A.4, §0A.5, §0B.5 or §3 differ, this section is the later one.
+
+### 0C.1 Staging rehearsal — PASSED
+
+| Item | Value |
+|---|---|
+| Result | **PASS, 11 of 11 scenarios (S0–S10)** |
+| Run id | `261113200635xqrx` |
+| Code | `main` at `c13074f2` |
+| Target | `idynify-staging`, 2026-11-13 20:49:56–20:50:41 UTC |
+| Staging rules | Ruleset `35136160-8beb-410e-9ed7-6bdc0f03da63`, deployed 2026-11-13 19:34 UTC, read back byte-identical to `main`'s `firestore.rules` |
+| Stripe | Not contacted. Fixture client; events signed locally and verified by the Stripe library's offline code |
+| Clean-up | 34 documents removed by the driver; an independent read afterwards found 0 remaining |
+| Permission errors | None |
+
+What passed: with the epoch unset a paid checkout is flagged (`epoch_unset`) and nothing is
+granted; with it set, Starter grants 400 and Pro 1,250 credits, once, with a marker; a pre-epoch
+checkout is flagged; replays, repeats and out-of-order delivery never grant twice or reset
+usage; an account the pre-ledger handler already granted is not granted again; bad signatures
+write nothing; a failed delivery returns 500, writes no grant, and applies once on redelivery;
+an identity mismatch is queued and neither account changes; manual recovery refuses weak
+evidence, dry-runs without writing, grants once and resolves the review record.
+
+An earlier attempt the same day (run id `261113194446eroe`) refused at start-up before any step
+ran and wrote nothing; the cause was fixed in PR #793.
+
+What the rehearsal does **not** show: real Stripe payloads and delivery timing, the Netlify
+function runtime, the client checkout flow, or the Netlify activation steps (§0C.3 D–E).
+
+### 0C.2 November 12 exposure period — owner-confirmed
+
+| Evidence | Source | Status |
+|---|---|---|
+| No new checkouts or subscriptions occurred during the 2026-11-12 exposure period | **Owner-confirmed**, stated by the account owner on 2026-11-13 | Accepted as the owner's confirmation. Not independently verified. |
+| Supporting observations O1–O4 (§0B.1): last successful payments and last payment-related events 2026-11-09; last webhook delivery 2026-11-09, HTTP 200 | Owner-reported, from dashboard screenshots | Consistent with the confirmation |
+| Netlify deploy windows and the published commit | Verified from Netlify records | §0 |
+
+Verification that remains unavailable or unrecorded:
+
+- **Independent verification is not possible with current access.** There is no read access to
+  Stripe, and production Firestore returns HTTP 403 to the tooling account.
+- **Not recorded with the confirmation:** the time it was checked, the date range and status
+  filter used, whether failed or pending webhook deliveries were in view (§0B.2 G3), and whether
+  `/stripeWebhookEvents` and `/billingAmbiguousAccounts` were opened by direct path (G4).
+- The confirmation covers the period up to when it was made. Step C1 below repeats the check
+  immediately before publishing.
+
+On this evidence the working conclusion is **no customer requires recovery from the
+November 12 period**. It rests on the owner's confirmation.
+
+### 0C.3 Production cutover checklist — FOR APPROVAL, NOT APPROVED
+
+Operator for every step: the deployment operator in §1. Site: `idynify` on Netlify. Production
+Firebase: `idynify-scout-dev`. Netlify auto-publishing stays **locked** until step F2.
+
+**A. Recovery operator and access — before anything is published**
+
+| # | Step | Done when |
+|---|---|---|
+| A1 | Recovery operator named (§1: payment-recovery responsibility) and available for the cutover sitting | Confirmed |
+| A2 | On the operator machine, outside the repository: a **write-capable** service-account key for `idynify-scout-dev` (`FIREBASE_SERVICE_ACCOUNT_PATH`) | Key file present; never committed |
+| A3 | A Stripe **live** key the owner enters themselves (`STRIPE_SECRET_KEY`), able to read subscriptions, customers, checkout sessions and invoices. A restricted read-only key is sufficient | Owner has set it in their own shell |
+| A4 | `STRIPE_PRICE_STARTER` and `STRIPE_PRICE_PRO` exported with the live price ids. `scripts/manualCreditRecovery.mjs` refuses any price it does not recognise from these | Set in the same shell |
+| A5 | Operator can read `billingAmbiguousAccounts` in production (Console is enough) | Confirmed |
+| A6 | Proof it works end to end: the first real use is `--dry-run`, which writes nothing | Understood |
+
+**B. Payment Link customers and manual recovery**
+
+The recovery tool requires the Stripe customer's `metadata.firebaseUID` to equal the account's
+uid. Payment Link customers do not have it. For each purchase being recovered:
+
+1. Take the uid from the checkout session's `client_reference_id` (it is also the `uid` on the
+   review record) and confirm it is the right account.
+2. In the Stripe Dashboard, set `metadata.firebaseUID` to that uid on that one customer. This is
+   a Stripe write, done by the owner, for that customer only. Record who and when.
+3. Evidence must be the paid checkout session id (`cs_…`), or the subscription id when its
+   latest invoice is paid.
+4. Run the tool with `--dry-run`, then for real, passing `--ambiguous-account-doc-id` so the
+   review record is resolved in the same commit. A second run is refused; that is correct.
+
+**C. Clear the old epoch**
+
+| # | Step | Expected | Stop if |
+|---|---|---|---|
+| C1 | Owner repeats the Stripe check (§0B.3 step 1) for 2026-11-12 to now | No checkout or subscription events | Any event: reconcile it first (runbook §6.3) |
+| C2 | Remove `BILLING_LEDGER_EPOCH_UNIX` (currently `1794507945`, production context) in the Netlify UI or with `netlify env:unset` | Read back through `getEnvVars`: the variable is absent | It is still present in any context |
+
+Clearing it does not affect the live site: the published commit does not read it. The value
+`1794507945` is never reused.
+
+**D. Fresh build, published with allocation off**
+
+| # | Step | Expected | Stop if |
+|---|---|---|---|
+| D1 | Production Firestore rules confirmed byte-identical to `main`'s `firestore.rules`, by diff or by deploying them (`firebase deploy --only firestore:rules`, rules only) | Identical | Any difference not understood |
+| D2 | Trigger a new build of `main` in Netlify. With the lock on it is built, not published | State `ready`; commit is `main`'s head; **created after C2**; build log successful | Build fails, or it predates C2 |
+| D3 | Publish **that specific deploy** manually. Lock left on | It is the published deploy | Any other deploy is published |
+| D4 | After 90 seconds: `node scripts/billingLedgerCutover.mjs --expect-commit <sha> --site <SITE_ID>` | `NOT RUNTIME-VERIFIED ACTIVE`, reason `epoch_env_var_not_set`, `deploy.ready: true` | Any other reason |
+| D5 | Site loads and sign-in works; `STRIPE_PRICE_SCOUT_STARTER_FREE`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO` still present | As stated | Site broken: see G |
+
+Never publish the five existing unpublished production builds (`c13074f2`, `dd6a6667`,
+`d7f6d811`, `68c02dd7`, `2b0c0053`): all were built with the old epoch set. From D3 until E4 a
+purchase is flagged `epoch_unset` and granted by hand (B); it is not lost and not mis-granted.
+
+Publishing `main` also releases everything else merged since `e87691d`: 32 commits, including
+the Contact Hub UX changes (PR #789). That is a product decision to make knowingly.
+
+**E. Activation with a fresh epoch — same sitting as D, in a quiet period**
+
+| # | Step | Expected | Stop if |
+|---|---|---|---|
+| E1 | `node scripts/billingLedgerCutover.mjs --expect-commit <sha> --site <SITE_ID> --apply --epoch "$(date +%s)"` | Exits 1, "THIS IS NOT YET ACTIVE". If the write errors, set the variable in the Netlify UI (production context, Functions scope) | The value cannot be read back |
+| E2 | Trigger another build of `main` | `ready`, created after E1 | Build fails |
+| E3 | Publish that deploy manually | It is the published deploy | — |
+| E4 | After 90 seconds, run the script again without `--apply` | **`RUNTIME-VERIFIED ACTIVE`** — the completion criterion | Not active: re-check E1–E3; do not call the release complete |
+
+This write path has never run against the live site; the fallback in E1 is the mitigation.
+
+**F. Runtime verification and unlock**
+
+| # | Step | Expected |
+|---|---|---|
+| F1 | First real purchase: a `billingAllocations` record, access granted, the Stripe delivery answered 200. Review `billingAmbiguousAccounts` for anything pending from D3–E4 and recover it (B) | As stated |
+| F2 | Unlock Netlify auto-publishing | Only after F1, by explicit decision |
+
+**G. Rollback**
+
+| Situation | Action |
+|---|---|
+| Allocation misbehaves after E4 | Remove the epoch variable, rebuild, publish. Hardened code stays live with allocation off; purchases are flagged and granted by hand |
+| The webhook must stop entirely | Disable the endpoint in the Stripe Dashboard (owner). Record `disabled_at` and `reenabled_at`; recover with runbook §6. Events created while disabled are not replayed automatically |
+| The site itself is broken after D3 | Fix forward. Republishing `e87691d` is acceptable **only** if Stripe shows zero webhook deliveries since D3; otherwise it is prohibited (runbook §5), because pre-ledger code can grant with no marker |
+| A failed delivery is resent by hand and returns 500 | Expected for 60 seconds after a mid-flight failure, while the account lock ages out. Wait and resend |
+
+Never: reuse epoch `1794507945`; resend pre-epoch Stripe events expecting a grant; grant
+credits by editing Firestore directly.
+
+### 0C.4 Remaining production release blockers
+
+1. **Recovery access is not in place** (A2–A4). Nothing should be published until a flagged
+   buyer could be granted.
+2. **Production rules are inspected, not diffed** (D1). Needs a byte-level comparison or a rules
+   deploy.
+3. **The old epoch is still set** (C2), and no usable build exists until it is cleared (D2).
+4. **Exposure-period evidence is owner-confirmed only** (§0C.2). To be accepted as such by the
+   owner, or completed with the unrecorded details. C1 is required either way.
+5. **The activation write and verification have never run on the live site** (E1–E4). A risk to
+   accept explicitly; a staging Netlify site is the only way to rehearse it.
+6. **The non-billing changes in `main` ship with it** (D). To be acknowledged.
+7. **Approvals.** Each of C2, D1 (if a deploy), D3, E1, E3 and F2 is a separate production
+   action. The sign-off list below is unchecked.
+
+Not blockers, already done: the Netlify env-var fix, the review-queue fix, CI on `main`, the
+staging rules deploy and the staging rehearsal.
 
 ## 1. Roles
 

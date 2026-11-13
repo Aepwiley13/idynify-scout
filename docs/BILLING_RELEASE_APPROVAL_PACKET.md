@@ -1,8 +1,58 @@
 # Billing ledger — release approval packet
 
-**Status: NOT EXECUTED.** This is an approval document, not a log of actions taken. No
-production environment variable, Firestore rule, or deploy has been changed. PR #769 is frozen
-at the commit below and remains unmerged until this packet is signed off.
+**Status: ATTEMPTED, THEN ROLLED BACK — NOT COMPLETE.** PR #769 was merged and a cutover was
+attempted on 2026-11-12. Production was then rolled back to a commit that predates this PR. The
+hardened billing code is **not** what production currently serves, and the release's completion
+criterion (§3 step 10, on the currently published deploy) is **not** met. See §0 for the record.
+Everything from §1 onward is the original approval text, kept for reference; where it says
+"unmerged" or describes a step as not yet run, §0 is the correction.
+
+## 0. What actually happened, and the current state (recorded 2026-11-13)
+
+Read from Netlify's own deploy and environment-variable records and from git. Times are UTC.
+
+| When (2026-11-12) | Event |
+|---|---|
+| 00:00 | `e87691d` (PR #785 merge, pre-#769) built and published to production. |
+| 18:01 | `STRIPE_PRICE_SCOUT_STARTER_FREE` set for the production context. |
+| 18:16 | PR #769 merged (`2f53861f`); Netlify built it. That build predates the epoch write, so it carries **no** `BILLING_LEDGER_EPOCH_UNIX`. |
+| 18:26:07 | `BILLING_LEDGER_EPOCH_UNIX=1794507945` (2026-11-12T18:25:45Z) written, production context. |
+| 18:28:08 | A rebuild of `2f53861f`, built after that write, published. Automatic allocation was active from here. |
+| 18:57:12 | The **first** `2f53861f` build (no epoch) was published again. Automatic allocation off; purchases flagged `epoch_unset`. |
+| 19:11:44 | `e87691d` published again and Netlify auto-publishing **locked**. |
+
+**Current state:**
+
+- **Published:** `e87691d`, locked. Its `stripe-webhook.js` is the pre-hardening handler — no
+  `billingAllocations`, no event ledger, no consistency guards. This is the pre-ledger rollback
+  the runbook's §5 prohibits; it has happened, and the recovery work it implies is still open.
+- **`main`:** `2b0c0053` (#769 plus the Contact Hub PR #789). Netlify built it for production on
+  2026-11-13 but did not publish it, because of the lock.
+- **Epoch:** `BILLING_LEDGER_EPOCH_UNIX` is still set in Netlify, but it is **not active in the
+  published runtime** — the published code never reads it. Any production build made after
+  18:26:07 on 2026-11-12 (including the existing unpublished `2b0c0053` build) carries the value,
+  so publishing such a build turns automatic allocation on immediately, with no separate arming step.
+- **Firestore rules (production, `idynify-scout-dev`):** **not verified.** Whether step 5 was run
+  has not been confirmed from the Firebase Console. This matters: `main`'s `Signup.jsx` writes
+  `credits` as an object, which only this PR's rules accept — publishing `main` over the old rules
+  would reject every new signup.
+- **The "RUNTIME-VERIFIED ACTIVE" confirmation was never produced by the script.**
+  `scripts/billingLedgerCutover.mjs` called `netlify api getSiteEnvVars`, which returns
+  `JSONHTTPError: Not Found` for this site, so it could only ever exit at "Failed to query
+  Netlify". The script now uses the account-scoped `getEnvVars`. Any earlier report of step 10
+  passing rests on something other than this script's output.
+
+**Open before `main` can be published** (none of these are done):
+
+1. Confirm in the Firebase Console that production rules are `main`'s `firestore.rules`, or
+   deploy them (step 5) first.
+2. Review `billingAmbiguousAccounts` for records created 18:16–19:11 on 2026-11-12 — purchases in
+   the two epoch-less windows (18:16–18:28, 18:57–19:11) were flagged, not granted.
+3. Purchases since 19:11:44 were handled by pre-ledger code: granted with no
+   `billingAllocations` marker and no event-ledger entry. Inventory them (runbook §6) before
+   any event from that period is resent.
+4. Decide whether the existing epoch value stands or is re-armed, then verify activation with
+   the corrected script after publishing (steps 7–10 against the new deployed SHA).
 
 **PR:** [#769](https://github.com/Aepwiley13/idynify-scout/pull/769)
 **Branch:** `claude/billing-hardening-pr1`
@@ -58,7 +108,7 @@ and the condition that means **stop, do not proceed**.
 | # | Step | Command (see runbook §) | Expected result | Stop if |
 |---|---|---|---|---|
 | 1 | Check out the exact frozen commit (local verification only — steps 2–5 below; this checkout is never what gets deployed, see step 6) | `git checkout f96f115` (§0.1) | `git log -1` shows `f96f115` | Any other commit is checked out |
-| 2 | Confirm required variables; set `STRIPE_PRICE_SCOUT_STARTER_FREE` if still absent | `netlify api getSiteEnvVars ...` (§0.2); if `STRIPE_PRICE_SCOUT_STARTER_FREE` is absent, set it to `price_1T3UsqJEdYAFEzC36VCvIZ90` | Table in §2 above matches exactly, including `STRIPE_PRICE_SCOUT_STARTER_FREE` present with that value | Any pre-existing variable is missing, `STRIPE_PRICE_SCOUT_STARTER_FREE` holds an unexpected value, or `BILLING_LEDGER_EPOCH_UNIX` is already set |
+| 2 | Confirm required variables; set `STRIPE_PRICE_SCOUT_STARTER_FREE` if still absent | `netlify api getEnvVars ...` with `account_id` and `site_id` (§0.2 — the site-scoped `getSiteEnvVars` returns Not Found); if `STRIPE_PRICE_SCOUT_STARTER_FREE` is absent, set it to `price_1T3UsqJEdYAFEzC36VCvIZ90` | Table in §2 above matches exactly, including `STRIPE_PRICE_SCOUT_STARTER_FREE` present with that value | Any pre-existing variable is missing, `STRIPE_PRICE_SCOUT_STARTER_FREE` holds an unexpected value, or `BILLING_LEDGER_EPOCH_UNIX` is already set |
 | 3 | Confirm Stripe API compatibility | Dashboard check (§0.3) | Already resolved this session for `2025-10-29.clover` — re-check only if the endpoint's configured version has changed since | The configured version changed AND a field this code reads changed shape for it (see §0.3's field list) |
 | 4 | Diff Firestore rules against current `main` | `git diff origin/main -- firestore.rules` (§0.5) | Every removed line is one this branch itself rewrote | Any removed line has no corresponding rewrite — `main` gained something this branch doesn't have |
 | 5 | Deploy Firestore rules | `firebase deploy --only firestore:rules --project idynify-scout-dev` (§1) | `✔ Deploy complete!`; Console "Last published" timestamp is fresh | Deploy errors, or the Console timestamp doesn't update |
@@ -112,6 +162,7 @@ there is the same owner named in §1.
       configuration validation
 - [ ] Approved to execute
 
-**Status: NOT EXECUTED.** Ownership is confirmed; execution is not. No step above has run, PR
-#769 remains unmerged, and nothing in production has changed. Execution begins only once every
-remaining item is checked and the release is explicitly approved.
+**Status: ATTEMPTED, THEN ROLLED BACK — NOT COMPLETE.** The checklist above was never fully
+checked, yet PR #769 was merged and a cutover attempted on 2026-11-12; production was rolled back
+the same day and is serving pre-#769 code (§0). Nothing in this packet should be read as approval
+to publish `main`. Re-execution needs the open items in §0 closed and a fresh, explicit approval.

@@ -67,6 +67,43 @@ describe.skipIf(!FIRESTORE_EMULATOR_AVAILABLE)(
       expect(ambiguous.docs.some((d) => d.data().reason === 'identity_mismatch')).toBe(true);
     });
 
+    it('an identity mismatch lands in the manual-review queue (status: pending) and changes nothing else', async () => {
+      scenario.handlers.customersRetrieve = async (id) => ({ id, metadata: {} });
+      await db.collection('users').doc('uid_a').set({ email: 'a@example.test' });
+      await db.collection('users').doc('uid_b').set({ email: 'b@example.test' });
+
+      const event = {
+        id: 'evt_mismatch_pending', type: 'checkout.session.completed',
+        data: {
+          object: {
+            id: 'cs_mismatch_pending', customer: 'cus_mismatch', subscription: 'sub_mismatch_pending', payment_status: 'paid',
+            created: 2000000000, metadata: { firebaseUID: 'uid_a' }, client_reference_id: 'uid_b',
+          },
+        },
+      };
+      const response = await handler(fakeHttpEvent(event));
+      expect(response.statusCode).toBe(200);
+
+      // The queue is defined as `status == 'pending'` — the record must be findable that way.
+      const pending = await db.collection('billingAmbiguousAccounts').where('status', '==', 'pending').get();
+      expect(pending.size).toBe(1);
+      expect(pending.docs[0].data()).toMatchObject({
+        uid: 'uid_a', reason: 'identity_mismatch', status: 'pending',
+        details: { candidates: ['uid_a', 'uid_b'], sessionId: 'cs_mismatch_pending' },
+      });
+
+      // Visibility only: no grant, no allocation marker, neither account touched.
+      const [a, b, allocation, applied] = await Promise.all([
+        db.collection('users').doc('uid_a').get(), db.collection('users').doc('uid_b').get(),
+        db.collection('billingAllocations').doc('sub_mismatch_pending').get(),
+        db.collection('stripeWebhookEvents').doc('evt_mismatch_pending').get(),
+      ]);
+      expect(a.data()).toEqual({ email: 'a@example.test' });
+      expect(b.data()).toEqual({ email: 'b@example.test' });
+      expect(allocation.exists).toBe(false);
+      expect(applied.exists).toBe(true);
+    });
+
     it('a customer whose own metadata.firebaseUID disagrees with the session is quarantined too', async () => {
       scenario.handlers.customersRetrieve = async (id) => ({ id, metadata: { firebaseUID: 'uid_c_wrong' } });
       await db.collection('users').doc('uid_c').set({ email: 'c@example.test' });

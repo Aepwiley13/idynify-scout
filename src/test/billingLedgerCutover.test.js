@@ -17,6 +17,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   isDeployReadyToArm, isRuntimeActivationVerified, buildEnvSetArgs,
+  buildGetSiteArgs, buildGetEnvVarsArgs, accountIdOfSite, fetchSite, fetchSiteEnvVars,
   DEFAULT_MIN_DRAIN_WAIT_MS, FUNCTION_MAX_EXECUTION_MS, DEPLOY_PROPAGATION_MARGIN_MS, EPOCH_ENV_VAR_KEY,
 } from '../../scripts/billingLedgerCutover.mjs';
 
@@ -255,5 +256,92 @@ describe('buildEnvSetArgs — the write must target the exact site the readiness
     expect(args).toContain('--site');
     expect(args[args.indexOf('--site') + 1]).toBe('site_other');
     expect(args).not.toContain('site_abc123');
+  });
+});
+
+/**
+ * Regression for the env-var read (2026-11-13). The script used to call the site-scoped
+ * `netlify api getSiteEnvVars`, which returns `JSONHTTPError: Not Found` against the real
+ * production site — so main() could never get past "Failed to query Netlify". The pure decision
+ * tests above all passed anyway, because they hand isRuntimeActivationVerified a fixture and
+ * never exercise the call that produces it. These tests pin the call itself.
+ */
+describe('Netlify env-var read — account-scoped getEnvVars, never the site-scoped call that 404s', () => {
+  const SITE_ID = 'site_abc';
+  const ACCOUNT_ID = 'acct_123';
+
+  // Mirrors what the real API does: the site-scoped operation is Not Found; the account-scoped
+  // one answers only when given BOTH ids.
+  function fakeNetlify({ site, envVars }) {
+    const calls = [];
+    const run = (args) => {
+      calls.push(args);
+      const [, operation, flag, data] = args;
+      expect(args[0]).toBe('api');
+      expect(flag).toBe('--data');
+      const payload = JSON.parse(data);
+      if (operation === 'getSite') return JSON.stringify(site);
+      if (operation === 'getEnvVars' && payload.account_id === ACCOUNT_ID && payload.site_id === SITE_ID) {
+        return JSON.stringify(envVars);
+      }
+      throw new Error('JSONHTTPError: Not Found');
+    };
+    return { run, calls };
+  }
+
+  it('builds an account-scoped getEnvVars call carrying both account_id and site_id', () => {
+    const args = buildGetEnvVarsArgs({ accountId: ACCOUNT_ID, siteId: SITE_ID });
+    expect(args.slice(0, 3)).toEqual(['api', 'getEnvVars', '--data']);
+    expect(JSON.parse(args[3])).toEqual({ account_id: ACCOUNT_ID, site_id: SITE_ID });
+  });
+
+  it('never issues the site-scoped getSiteEnvVars operation', () => {
+    expect(buildGetEnvVarsArgs({ accountId: ACCOUNT_ID, siteId: SITE_ID })).not.toContain('getSiteEnvVars');
+  });
+
+  it('refuses to build the call without an account id or without a site id', () => {
+    expect(() => buildGetEnvVarsArgs({ siteId: SITE_ID })).toThrow(/accountId is required/);
+    expect(() => buildGetEnvVarsArgs({ accountId: ACCOUNT_ID })).toThrow(/siteId is required/);
+  });
+
+  it('reads the site by site_id', () => {
+    const args = buildGetSiteArgs(SITE_ID);
+    expect(args.slice(0, 3)).toEqual(['api', 'getSite', '--data']);
+    expect(JSON.parse(args[3])).toEqual({ site_id: SITE_ID });
+  });
+
+  it('takes the account id from the getSite response, and fails loudly when it is absent', () => {
+    expect(accountIdOfSite({ account_id: ACCOUNT_ID })).toBe(ACCOUNT_ID);
+    expect(() => accountIdOfSite({})).toThrow(/no account_id/);
+    expect(() => accountIdOfSite(undefined)).toThrow(/no account_id/);
+  });
+
+  it('end to end: site then env vars are fetched with calls the API actually answers, and feed a verdict', () => {
+    const site = { ...siteWith(), account_id: ACCOUNT_ID };
+    const afterEnvUpdate = new Date(Date.parse(site.published_deploy.created_at) - 60_000).toISOString();
+    // Shaped like the real account-scoped response: several scopes, a production-context value.
+    const envVars = epochEnvVars({ production: 1794507945 }, afterEnvUpdate, ['builds', 'functions', 'post_processing', 'runtime']);
+    const { run, calls } = fakeNetlify({ site, envVars });
+
+    const fetchedSite = fetchSite(SITE_ID, run);
+    const fetchedEnvVars = fetchSiteEnvVars(fetchedSite, SITE_ID, run);
+
+    expect(calls.map((c) => c[1])).toEqual(['getSite', 'getEnvVars']);
+    expect(fetchedEnvVars).toEqual(envVars);
+    const verdict = isRuntimeActivationVerified({ site: fetchedSite, envVars: fetchedEnvVars, expectedCommitSha: SHA, nowMs: NOW });
+    expect(verdict).toMatchObject({ active: true, liveEpochUnix: 1794507945 });
+  });
+
+  it('the original call shape fails against the same fake API — this is the failure the fix removes', () => {
+    const { run } = fakeNetlify({ site: { account_id: ACCOUNT_ID }, envVars: [] });
+    const original = ['api', 'getSiteEnvVars', '--data', JSON.stringify({ site_id: SITE_ID, context_name: 'production' })];
+    expect(() => run(original)).toThrow(/Not Found/);
+  });
+
+  it('a getSite response with no account_id stops before any env-var call is attempted', () => {
+    const { run, calls } = fakeNetlify({ site: siteWith(), envVars: [] });
+    const fetchedSite = fetchSite(SITE_ID, run);
+    expect(() => fetchSiteEnvVars(fetchedSite, SITE_ID, run)).toThrow(/no account_id/);
+    expect(calls.map((c) => c[1])).toEqual(['getSite']);
   });
 });

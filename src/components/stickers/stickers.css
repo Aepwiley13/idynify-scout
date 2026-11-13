@@ -143,8 +143,10 @@
 .stk-picker-limit, .stk-picker-empty { font-size: 11px; margin: 0; padding: 2px 4px; }
 
 /* Phone: a bottom sheet */
-.stk-sheet-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); z-index: 59; }
+.stk-sheet-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); z-index: 209; }
+/* Portaled to <body>; above the app's bottom nav (.bottom-nav, z-index 200). */
 .stk-picker--sheet {
+  z-index: 210;
   position: fixed;
   left: 0;
   right: 0;
@@ -189,6 +191,11 @@
 }
 
 .stk-picker--above { top: auto; bottom: calc(100% + 8px); }
+
+/* A host card that lifts on hover (a transform makes it its own stacking
+   context) is raised while its picker is open, so later siblings cannot
+   paint over the popover. */
+.stk-host:has(.stk-picker--popover) { z-index: 61; }
 
 /* ── People: filter, cards, bulk (S6) ───────────────────────────────────── */
 .stk-filter { position: relative; flex-shrink: 0; display: inline-flex; align-items: center; gap: 2px; }

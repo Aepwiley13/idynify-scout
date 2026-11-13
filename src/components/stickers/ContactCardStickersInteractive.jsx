@@ -169,7 +169,7 @@ function CardStickers({ contact, max, onUpdate, style, stickers }) {
           aria-haspopup="listbox"
           aria-expanded={open ? 'true' : 'false'}
           title="Add sticker"
-          style={{ color: T.textFaint, border: `1.5px dashed ${T.border}` }}
+          style={{ color: T.textMuted, border: `1.5px dashed ${T.textFaint}` }}
           onClick={() => (open ? closePicker() : setOpen(true))}
         >
           <Plus size={10} aria-hidden="true" />

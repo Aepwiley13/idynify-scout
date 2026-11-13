@@ -6,15 +6,20 @@
  * listbox is multi-select in meaning: stickers already on the contact are
  * aria-selected and cannot be added again.
  *
- * Desktop: a popover under its button. Phone-sized screens (the app's one
- * breakpoint, useIsMobile): a bottom sheet that keeps focus inside it.
+ * Desktop: a popover beside its button. placement 'auto' (the default) opens
+ * it below, or above when the space below — inside the viewport and every
+ * scrolling ancestor — is too short and there is more room above. Phone-sized
+ * screens (the app's one breakpoint, useIsMobile): a bottom sheet that keeps
+ * focus inside it, portaled to <body> so it layers above the app's bottom nav.
  */
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Check, Plus, X } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { STICKER_NAME_MAX } from '../../services/stickers/stickerCore';
 import { buildPickerOptions } from './stickerPickerOptions';
+import { shouldOpenAbove } from './pickerPlacement';
 import { hexOf } from './stickerPalette';
 import { LIMIT_MESSAGE } from './stickerMessages';
 import './stickers.css';
@@ -32,12 +37,13 @@ export default function StickerPicker({
   onClose,
   ignoreRef = null,
   label = 'Add a sticker',
-  placement = 'below',
+  placement = 'auto',
 }) {
   const T = useT();
   const isMobile = useIsMobile();
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(-1);
+  const [autoAbove, setAutoAbove] = useState(false);
   const rootRef = useRef(null);
   const inputRef = useRef(null);
   const closeRef = useRef(null);
@@ -50,7 +56,15 @@ export default function StickerPicker({
   );
   const enabled = options.map((o, i) => (o.disabled ? -1 : i)).filter((i) => i >= 0);
 
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  // The popover places itself (below or above), so focusing must not scroll
+  // its container first: that would move the anchor before it is measured.
+  useEffect(() => { inputRef.current?.focus(isMobile ? undefined : { preventScroll: true }); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 'auto': measure once, before paint, against the visible area.
+  useLayoutEffect(() => {
+    if (isMobile || placement !== 'auto' || !rootRef.current) return;
+    setAutoAbove(shouldOpenAbove(rootRef.current));
+  }, [isMobile, placement]);
 
   // A click outside closes the popover (the sheet has its own backdrop).
   useEffect(() => {
@@ -154,7 +168,7 @@ export default function StickerPicker({
             ) : (
               <>
                 <span className="stk-dot" style={{ background: hexOf(option.sticker.color) }} aria-hidden="true" />
-                <span className="stk-picker-emoji" aria-hidden="true">{option.sticker.emoji ?? ''}</span>
+                {option.sticker.emoji ? <span className="stk-picker-emoji" aria-hidden="true">{option.sticker.emoji}</span> : null}
                 <span className="stk-picker-name">{option.sticker.name}</span>
                 {option.assigned ? <Check size={12} className="stk-picker-check" aria-hidden="true" /> : null}
               </>
@@ -195,7 +209,10 @@ export default function StickerPicker({
   );
 
   if (isMobile) {
-    return (
+    // Portaled: the sheet is position:fixed, but inside the page it would
+    // share an ancestor's stacking context and sit under the bottom nav.
+    // React events (Escape, Tab, clicks) still bubble through the React tree.
+    return createPortal(
       <>
         <div className="stk-sheet-backdrop" onMouseDown={onClose} aria-hidden="true" />
         <div
@@ -214,14 +231,17 @@ export default function StickerPicker({
           </div>
           {body}
         </div>
-      </>
+      </>,
+      document.body,
     );
   }
+
+  const above = placement === 'above' || (placement === 'auto' && autoAbove);
 
   return (
     <div
       ref={rootRef}
-      className={`stk-picker stk-picker--popover${placement === 'above' ? ' stk-picker--above' : ''}`}
+      className={`stk-picker stk-picker--popover${above ? ' stk-picker--above' : ''}`}
       style={{ background: T.cardBg, border: `1px solid ${T.border}`, boxShadow: `0 8px 24px ${T.isDark ? '#00000080' : '#00000018'}` }}
     >
       {body}

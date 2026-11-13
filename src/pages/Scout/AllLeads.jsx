@@ -601,6 +601,7 @@ function AllLeadsCard({
 
   return (
     <div
+      className="stk-host"
       onClick={handleCardClick}
       style={{
         background: isSelected ? T.accentBg : T.cardBg,

@@ -479,3 +479,43 @@ export const STEPS = [
 ];
 
 export const STEP_IDS = STEPS.map((s) => s.id);
+
+/**
+ * Runs steps one at a time and FAILS FAST. Steps build on each other, so after the first
+ * failure nothing else is run: every later step, clean-up included, is reported as skipped
+ * and the run's documents stay in place as evidence.
+ *
+ * A step fails if any check is not ok, if it returns no checks, or if it throws (the error is
+ * recorded as a failed check instead of being lost).
+ *
+ * run(step, ctx) -> { skipped: true } | { skipped: false, pass, checks, failed }
+ */
+export function createStepRunner() {
+  const results = [];
+  let halted = null;
+  return {
+    results,
+    /** The id of the first failed step, or null. */
+    get halted() {
+      return halted;
+    },
+    async run(step, ctx) {
+      if (halted) return { skipped: true };
+      let checks;
+      try {
+        checks = await step.run(ctx);
+      } catch (err) {
+        checks = [{ name: 'step ran to completion', ok: false, detail: `${err?.name ?? 'Error'}: ${err?.message ?? err}` }];
+      }
+      if (!Array.isArray(checks) || checks.length === 0) {
+        checks = [{ name: 'step produced at least one check', ok: false, detail: 'the step returned no checks' }];
+      }
+      const failed = checks.filter((check) => !check.ok);
+      const pass = failed.length === 0;
+      results.push({ id: step.id, title: step.title, pass, checks });
+      if (!pass) halted = step.id;
+      return { skipped: false, pass, checks, failed };
+    },
+  };
+}
+

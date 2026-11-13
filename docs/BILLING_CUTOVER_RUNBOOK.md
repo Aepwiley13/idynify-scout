@@ -80,9 +80,10 @@ includes secret values; do not paste it anywhere.) Check the `production`-contex
 absent; `VITE_STRIPE_CHECKOUT_MODE` is absent or not `'session'`.
 
 **Operator-local** (not deployed anywhere — set only on the machine running the command, only
-when actually running it): `STRIPE_SECRET_KEY` and `FIREBASE_SERVICE_ACCOUNT_PATH` (a
-WRITE-capable key, never the read-only one) for `scripts/manualCreditRecovery.mjs`. These are
-unrelated to the Netlify table above and are never set as site environment variables.
+when actually running it): `STRIPE_SECRET_KEY` and a WRITE-capable Firestore credential for
+`scripts/manualCreditRecovery.mjs` — short-lived credentials (preferred) or
+`FIREBASE_SERVICE_ACCOUNT_PATH`, never the read-only one. See §8 for the operator workflow.
+These are unrelated to the Netlify table above and are never set as site environment variables.
 
 ### 0.3 API compatibility — CONFIRMED, not just checked
 
@@ -467,3 +468,73 @@ For the subscription-id form, the tool itself (not the operator) fetches that su
   be used. This requires a manual, ad hoc Firestore write outside this tool's validation, which
   means outside this runbook's scope entirely — it needs its own explicit approval and is not a
   step to perform as part of this checklist.
+
+## 8. Production manual recovery — operator workflow
+
+For the payment-recovery owner named in the approval packet (§1). This is the only way credits
+are granted for a purchase the webhook flagged. Nothing here is run as part of a deploy, and
+nothing here is automated.
+
+### 8.1 Access, set up once before any cutover
+
+| What | Least privilege | How it is held |
+|---|---|---|
+| Firestore, write | A service account in the production project used for recovery only, with the Cloud Datastore User role (`roles/datastore.user`) and no other role | **Short-lived credentials (preferred):** the operator is granted Service Account Token Creator on that one account and creates an impersonation credential file outside the repository. No key exists. **Fallback:** a key file outside the repository, created for the sitting and deleted afterwards |
+| Stripe, read | A **restricted** live key with Read on Customers, Subscriptions, Checkout Sessions and Invoices, and nothing else. The tool makes no Stripe write | Created by the account owner in the Stripe Dashboard. Entered into the operator's own shell at a hidden prompt for the sitting; never written to a file, the repository, a ticket or a chat. Deleted in the Dashboard afterwards |
+| Price ids | `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO`: the same values the site uses. Identifiers, not secrets | Exported in the same shell. The tool refuses any price it does not recognise from these |
+| Review queue, read | Read access to `billingAmbiguousAccounts` (the Firebase Console is enough) | — |
+
+Short-lived credentials, as the tool expects them:
+
+```bash
+gcloud auth application-default login \
+  --impersonate-service-account=<recovery-account>@<production-project>.iam.gserviceaccount.com
+export FIREBASE_ADMIN_CREDENTIALS=application-default
+export GOOGLE_APPLICATION_CREDENTIALS=<the file gcloud wrote, outside the repository>
+export FIREBASE_PROJECT_ID=<production-project>
+read -rs STRIPE_SECRET_KEY && export STRIPE_SECRET_KEY     # typed, not pasted into a file
+export STRIPE_PRICE_STARTER=<price id> STRIPE_PRICE_PRO=<price id>
+```
+
+The tool stops before connecting to anything unless exactly one credential mode is fully
+configured. It refuses a personal Google login, a credential whose service account is in a
+different project than `FIREBASE_PROJECT_ID`, a delegation chain, and a half-configured
+environment. It prints the project and service account it resolved, never a secret. Creating
+the service account, granting roles and creating the Stripe key are each the account owner's
+own, separately approved actions; no tool in this repository performs them.
+
+### 8.2 For each flagged purchase
+
+1. **Read the review record** in `billingAmbiguousAccounts` (`status == 'pending'`): its id, `uid`,
+   `reason` and `details`.
+2. **Verify the customer's identity, independently of the record.** In Stripe, open the checkout
+   session or subscription. Confirm the payment is real and paid, and that the buyer is the
+   account in question: the session's `client_reference_id` equals the account's uid, and the
+   Stripe customer's email matches the account's email. If they do not agree, stop: this is an
+   `identity_mismatch` to resolve with the customer, not a grant.
+3. **Payment Link customers only: one metadata update, separately approved.** The tool requires
+   the Stripe customer's `metadata.firebaseUID` to equal the uid, and Payment Link customers do
+   not have it. After step 2, and only with the account owner's approval for that specific
+   customer, the owner sets `metadata.firebaseUID` on that one customer in the Stripe Dashboard.
+   Record who approved it, who made it, when, and for which customer. This is the only Stripe
+   write in the whole workflow; the tool never makes it.
+4. **Dry run.** Writes nothing; shows what would be written.
+   ```bash
+   node scripts/manualCreditRecovery.mjs --uid <uid> --subscription-id <sub_...> --price-id <price_...> \
+     --evidence-stripe-session-id <cs_...|sub_...> --evidence-note "<why this is a genuine, never-granted purchase>" \
+     --ambiguous-account-doc-id <review record id> --operator "<name>" --dry-run
+   ```
+   If it refuses, read the reason. A refusal is the tool working: do not work around it.
+5. **Apply.** The same command without `--dry-run`. One transaction grants the credits, writes
+   the `billingAllocations` marker and marks the review record `resolved`.
+6. **Confirm.** The account shows access and the plan's credits; the marker exists with
+   `recoveredManually: true`; the record is `resolved`. Running the command again is refused,
+   which is correct.
+
+### 8.3 What the operator never does
+
+- Grant credits by editing Firestore directly.
+- Resend a Stripe event expecting it to grant a purchase made before the epoch.
+- Reuse another customer's evidence, or run without evidence.
+- Put a Stripe key or a service-account key in the repository, a file under it, a ticket or a chat.
+- Leave the Stripe key or a key file in place after the sitting.

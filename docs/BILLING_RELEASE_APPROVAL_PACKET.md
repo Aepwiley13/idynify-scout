@@ -233,7 +233,7 @@ That is the expected conclusion. It is not yet the recorded one, because of the 
 | G2 — O2 covers active subscriptions only | A subscription created in the period that is now canceled, incomplete, incomplete_expired, past_due or trialing would not appear. |
 | G3 — O3 does not say whether failed deliveries were in view | A non-2xx delivery may still be in Stripe's retry schedule and would arrive at whatever code is published then. |
 | G4 — F1 not opened by direct path | The root list hides empty collections and depends on the database selected. |
-| G5 — F2 is an inspection, not a diff | Unchanged from §0A. Not needed to close reconciliation; needed before Gate C. |
+| G5 — F2 is an inspection, not a diff | As recorded then. **Since closed:** verified byte-identical on 2026-11-13 (§0C.4 item 2). |
 
 ### 0B.3 Smallest additional read-only verification to close historical reconciliation
 
@@ -392,7 +392,7 @@ Firebase: `idynify-scout-dev`. Netlify auto-publishing stays **locked** until st
 | # | Step | Done when |
 |---|---|---|
 | A1 | Recovery operator named (§1: payment-recovery responsibility) and available for the cutover sitting | Confirmed |
-| A2 | On the operator machine, outside the repository: a **write-capable** service-account key for `idynify-scout-dev` (`FIREBASE_SERVICE_ACCOUNT_PATH`) | Key file present; never committed |
+| A2 | A write-capable Firestore credential for `idynify-scout-dev`, held outside the repository. **Preferred: short-lived credentials** impersonating a recovery-only service account with the Cloud Datastore User role (runbook §8.1); fallback: a key file (`FIREBASE_SERVICE_ACCOUNT_PATH`) created for the sitting and deleted afterwards | The tool prints the expected project and service account on a `--dry-run` |
 | A3 | A Stripe **live** key the owner enters themselves (`STRIPE_SECRET_KEY`), able to read subscriptions, customers, checkout sessions and invoices. A restricted read-only key is sufficient | Owner has set it in their own shell |
 | A4 | `STRIPE_PRICE_STARTER` and `STRIPE_PRICE_PRO` exported with the live price ids. `scripts/manualCreditRecovery.mjs` refuses any price it does not recognise from these | Set in the same shell |
 | A5 | Operator can read `billingAmbiguousAccounts` in production (Console is enough) | Confirmed |
@@ -426,7 +426,7 @@ Clearing it does not affect the live site: the published commit does not read it
 
 | # | Step | Expected | Stop if |
 |---|---|---|---|
-| D1 | Production Firestore rules confirmed byte-identical to `main`'s `firestore.rules`, by diff or by deploying them (`firebase deploy --only firestore:rules`, rules only) | Identical | Any difference not understood |
+| D1 | Re-read the published production rules and compare bytes with `main`'s `firestore.rules`. **Verified once already:** on 2026-11-13 production ruleset `004fb6b9-8c1a-449c-b4b0-c775673bb4b8` (published 2026-11-12 18:13 UTC) was read through the Firebase Rules API and was byte-identical to `main`'s file (24,263 bytes). No rules deploy is needed unless this re-check differs | Identical, same ruleset id | Any difference, or a different ruleset id not understood |
 | D2 | Trigger a new build of `main` in Netlify. With the lock on it is built, not published | State `ready`; commit is `main`'s head; **created after C2**; build log successful | Build fails, or it predates C2 |
 | D3 | Publish **that specific deploy** manually. Lock left on | It is the published deploy | Any other deploy is published |
 | D4 | After 90 seconds: `node scripts/billingLedgerCutover.mjs --expect-commit <sha> --site <SITE_ID>` | `NOT RUNTIME-VERIFIED ACTIVE`, reason `epoch_env_var_not_set`, `deploy.ready: true` | Any other reason |
@@ -472,9 +472,13 @@ credits by editing Firestore directly.
 ### 0C.4 Remaining production release blockers
 
 1. **Recovery access is not in place** (A2–A4). Nothing should be published until a flagged
-   buyer could be granted.
-2. **Production rules are inspected, not diffed** (D1). Needs a byte-level comparison or a rules
-   deploy.
+   buyer could be granted. The tool now accepts short-lived credentials, so no long-lived
+   production key is needed; the service account, its role and the restricted Stripe key still
+   have to be created by the owner. The operator workflow is runbook §8.
+2. **Closed 2026-11-13: production rules match `main`.** Production ruleset
+   `004fb6b9-8c1a-449c-b4b0-c775673bb4b8` was verified byte-identical to `main`'s
+   `firestore.rules` (D1). It is re-read immediately before publishing; it is not otherwise a
+   blocker.
 3. **The old epoch is still set** (C2), and no usable build exists until it is cleared (D2).
 4. **Exposure-period evidence is owner-confirmed only** (§0C.2). To be accepted as such by the
    owner, or completed with the unrecorded details. C1 is required either way.

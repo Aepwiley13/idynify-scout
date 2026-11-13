@@ -68,16 +68,38 @@
  * function the automated webhook path uses — so a manual grant is byte-for-byte what an
  * automated one would have produced, never a hand-rolled approximation.
  *
- * This writes to Firestore. It needs a WRITE-capable service account key, not the read-only one
- * used for verification/reconciliation elsewhere in this project — do not point
- * FIREBASE_SERVICE_ACCOUNT_PATH at the read-only key; every write will fail with
- * PERMISSION_DENIED, which is a safe failure, not a usage error to work around. It also needs a
- * real STRIPE_SECRET_KEY to independently verify the purchase — this tool cannot run on claimed
- * evidence alone.
+ * This writes to Firestore. It needs a WRITE-capable Firestore credential, not the read-only one
+ * used for verification/reconciliation elsewhere in this project; with a read-only credential
+ * every write fails with PERMISSION_DENIED, which is a safe failure, not a usage error to work
+ * around. It also needs a real STRIPE_SECRET_KEY to independently verify the purchase — this
+ * tool cannot run on claimed evidence alone. A restricted, read-only Stripe key is enough: it
+ * only ever reads subscriptions, customers, checkout sessions and invoices.
+ *
+ * ── Firestore credential: exactly one of two modes (resolveFirestoreCredential) ──────────────
+ *
+ *   SHORT-LIVED (preferred — no long-lived key exists anywhere):
+ *     FIREBASE_ADMIN_CREDENTIALS=application-default
+ *     GOOGLE_APPLICATION_CREDENTIALS=<file outside the repo>   an "impersonated_service_account"
+ *                            (gcloud auth application-default login --impersonate-service-account=…)
+ *                            or "external_account" credential that impersonates ONE service account
+ *     FIREBASE_PROJECT_ID=<the project to write to>            required; never inferred
+ *   The impersonated service account must belong to FIREBASE_PROJECT_ID. A personal login
+ *   ("authorized_user") is refused: it reaches every project that person can. So is a delegation
+ *   chain, a credential billed to another project, and a file whose target cannot be read.
+ *
+ *   KEY FILE (unchanged):
+ *     FIREBASE_SERVICE_ACCOUNT_PATH=<write-capable service-account key, outside the repo>
+ *   If FIREBASE_PROJECT_ID is also set it must name the key's own project.
+ *
+ * Both modes set, neither set, or anything half-configured: the tool stops before it connects
+ * to Firestore or Stripe. It prints the project and service account it resolved (never a key)
+ * before doing anything else.
  *
  * USAGE
- *   FIREBASE_SERVICE_ACCOUNT_PATH=/path/to/write-capable-key.json \
- *   STRIPE_SECRET_KEY=sk_live_... \
+ *   FIREBASE_ADMIN_CREDENTIALS=application-default \
+ *   GOOGLE_APPLICATION_CREDENTIALS=/path/outside/repo/recovery-credential.json \
+ *   FIREBASE_PROJECT_ID=<project> \
+ *   STRIPE_SECRET_KEY=<entered by the operator, never stored in a file> \
  *     node scripts/manualCreditRecovery.mjs \
  *       --uid <firebase-uid> \
  *       --subscription-id <sub_...> \
@@ -102,11 +124,125 @@ export class UsageError extends Error {}
 export class AlreadyGrantedError extends Error {}
 export class EvidenceValidationError extends Error {}
 
-export const USAGE = `Usage: FIREBASE_SERVICE_ACCOUNT_PATH=<write-capable key> STRIPE_SECRET_KEY=<key> node scripts/manualCreditRecovery.mjs \\
+export const USAGE = `Usage: <Firestore credential: see the file header> STRIPE_SECRET_KEY=<key> node scripts/manualCreditRecovery.mjs \\
   --uid <firebase-uid> --subscription-id <sub_...> --price-id <price_...> \\
   --evidence-stripe-session-id <cs_...|sub_...> --evidence-note "<why this is genuine>" \\
   [--ambiguous-account-doc-id <id>] [--operator "<name>"] [--dry-run]
 `;
+
+export class CredentialError extends Error {}
+
+/** Mirrors netlify/functions/utils/adminCredential.js: the one accepted value. */
+export const ADC_MODE = 'application-default';
+const IMPERSONATION_URL = /^https:\/\/iamcredentials\.googleapis\.com\/v1\/projects\/-\/serviceAccounts\/([^/:?#]+):generateAccessToken$/;
+const SERVICE_ACCOUNT_EMAIL = /^[a-z0-9-]+@([a-z0-9-]+)\.iam\.gserviceaccount\.com$/;
+const isSet = (v) => typeof v === 'string' && v.trim() !== '';
+
+/**
+ * Which Firestore credential will this run use, and for which project? Pure apart from reading
+ * the one credential file it is pointed at. FAILS CLOSED: every case that is not exactly one
+ * fully specified mode throws CredentialError, and the caller connects to nothing.
+ *
+ * Returns { mode: 'short-lived' | 'key-file', projectId, clientEmail, key? } — `key` only in
+ * key-file mode. Error messages name variables and fields, never credential content.
+ */
+export function resolveFirestoreCredential(env, { readFile = readFileSync } = {}) {
+  const adc = env.FIREBASE_ADMIN_CREDENTIALS;
+  const keyPath = env.FIREBASE_SERVICE_ACCOUNT_PATH;
+  const wantsAdc = isSet(adc);
+  const wantsKey = isSet(keyPath);
+
+  if (wantsAdc && adc !== ADC_MODE) {
+    throw new CredentialError(`FIREBASE_ADMIN_CREDENTIALS must be "${ADC_MODE}" or unset.`);
+  }
+  if (wantsAdc && wantsKey) {
+    throw new CredentialError('Set FIREBASE_ADMIN_CREDENTIALS (short-lived credentials) or FIREBASE_SERVICE_ACCOUNT_PATH (a key file), not both.');
+  }
+  if (!wantsAdc && !wantsKey) {
+    throw new CredentialError(
+      `A WRITE-capable Firestore credential is required: FIREBASE_ADMIN_CREDENTIALS=${ADC_MODE} with GOOGLE_APPLICATION_CREDENTIALS and FIREBASE_PROJECT_ID (short-lived, preferred), or FIREBASE_SERVICE_ACCOUNT_PATH (a key file).`
+    );
+  }
+
+  const readJson = (path, label) => {
+    let text;
+    try {
+      text = readFile(path, 'utf8');
+    } catch {
+      throw new CredentialError(`${label} could not be read.`);
+    }
+    try {
+      const json = JSON.parse(text);
+      if (!json || typeof json !== 'object') throw new Error('not an object');
+      return json;
+    } catch {
+      throw new CredentialError(`${label} is not valid JSON.`);
+    }
+  };
+
+  if (wantsKey) {
+    const key = readJson(keyPath, 'FIREBASE_SERVICE_ACCOUNT_PATH');
+    if (key.type !== 'service_account' || !isSet(key.project_id) || !isSet(key.client_email) || !isSet(key.private_key)) {
+      throw new CredentialError('FIREBASE_SERVICE_ACCOUNT_PATH is not a service-account key. For short-lived credentials use FIREBASE_ADMIN_CREDENTIALS instead.');
+    }
+    if (isSet(env.FIREBASE_PROJECT_ID) && env.FIREBASE_PROJECT_ID !== key.project_id) {
+      throw new CredentialError('FIREBASE_PROJECT_ID names a different project than the service-account key.');
+    }
+    return { mode: 'key-file', projectId: key.project_id, clientEmail: key.client_email, key };
+  }
+
+  // Short-lived mode. Nothing is inferred: the file, and the project, must both be stated.
+  const projectId = env.FIREBASE_PROJECT_ID;
+  if (!isSet(projectId)) {
+    throw new CredentialError('FIREBASE_PROJECT_ID is required with short-lived credentials: the project is never inferred.');
+  }
+  const file = env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (!isSet(file)) {
+    throw new CredentialError('GOOGLE_APPLICATION_CREDENTIALS is required with short-lived credentials: this tool does not fall back to whatever default login the machine has.');
+  }
+  const json = readJson(file, 'GOOGLE_APPLICATION_CREDENTIALS');
+  if (json.type === 'authorized_user') {
+    throw new CredentialError('GOOGLE_APPLICATION_CREDENTIALS is a personal Google login, which reaches every project you can. Use credentials that impersonate the recovery service account.');
+  }
+  if (json.type === 'service_account') {
+    throw new CredentialError('GOOGLE_APPLICATION_CREDENTIALS is a service-account key, not a short-lived credential. Use FIREBASE_SERVICE_ACCOUNT_PATH for a key file.');
+  }
+  if (json.type !== 'impersonated_service_account' && json.type !== 'external_account') {
+    throw new CredentialError('GOOGLE_APPLICATION_CREDENTIALS is not a short-lived credential type this tool accepts (impersonated_service_account or external_account).');
+  }
+  const match = IMPERSONATION_URL.exec(json.service_account_impersonation_url ?? '');
+  if (!match) {
+    throw new CredentialError('GOOGLE_APPLICATION_CREDENTIALS does not impersonate a service account, so its project cannot be checked.');
+  }
+  if (Array.isArray(json.delegates) && json.delegates.length > 0) {
+    throw new CredentialError('GOOGLE_APPLICATION_CREDENTIALS uses a delegation chain. Impersonate the recovery service account directly.');
+  }
+  if (json.type === 'impersonated_service_account' && !json.source_credentials) {
+    throw new CredentialError('GOOGLE_APPLICATION_CREDENTIALS has no source credentials.');
+  }
+  let clientEmail;
+  try {
+    clientEmail = decodeURIComponent(match[1]);
+  } catch {
+    throw new CredentialError('GOOGLE_APPLICATION_CREDENTIALS names a service account that cannot be read.');
+  }
+  const account = SERVICE_ACCOUNT_EMAIL.exec(clientEmail);
+  if (!account) {
+    throw new CredentialError('GOOGLE_APPLICATION_CREDENTIALS impersonates something that is not a project service account.');
+  }
+  if (account[1] !== projectId) {
+    throw new CredentialError('The impersonated service account belongs to a different project than FIREBASE_PROJECT_ID.');
+  }
+  if (isSet(json.quota_project_id) && json.quota_project_id !== projectId) {
+    throw new CredentialError('GOOGLE_APPLICATION_CREDENTIALS is billed to another project (quota_project_id).');
+  }
+  for (const name of ['GCLOUD_PROJECT', 'GOOGLE_CLOUD_PROJECT']) {
+    if (isSet(env[name]) && env[name] !== projectId) {
+      throw new CredentialError(`${name} names a different project than FIREBASE_PROJECT_ID.`);
+    }
+  }
+  return { mode: 'short-lived', projectId, clientEmail };
+}
 
 export function parseArgs(argv) {
   const args = {};
@@ -339,28 +475,29 @@ async function main() {
     throw err;
   }
 
-  const keyPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH;
-  if (!keyPath) {
-    console.error('FIREBASE_SERVICE_ACCOUNT_PATH is required: a WRITE-capable service-account key.');
-    process.exit(1);
+  // Resolved BEFORE anything connects anywhere; any doubt about the credential stops here.
+  let credential;
+  try {
+    credential = resolveFirestoreCredential(process.env);
+  } catch (err) {
+    if (err instanceof CredentialError) { console.error(err.message); process.exit(1); }
+    throw err;
   }
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
   if (!stripeSecretKey) {
     console.error('STRIPE_SECRET_KEY is required: this tool independently verifies the purchase against Stripe, it does not run on claimed evidence alone.');
     process.exit(1);
   }
-  let key;
-  try {
-    key = JSON.parse(readFileSync(keyPath, 'utf8'));
-  } catch {
-    console.error('FIREBASE_SERVICE_ACCOUNT_PATH could not be read as a service-account key.');
-    process.exit(1);
-  }
+  console.error(`Firestore project: ${credential.projectId} | service account: ${credential.clientEmail} | ${credential.mode === 'short-lived' ? 'short-lived credentials' : 'key file'}${args.dryRun ? ' | DRY RUN' : ''}`);
 
-  const { initializeApp, cert } = await import('firebase-admin/app');
+  const { initializeApp, cert, applicationDefault } = await import('firebase-admin/app');
   const { getFirestore } = await import('firebase-admin/firestore');
   const { default: Stripe } = await import('stripe');
-  initializeApp({ credential: cert(key) });
+  if (credential.mode === 'short-lived') {
+    initializeApp({ credential: applicationDefault(), projectId: credential.projectId });
+  } else {
+    initializeApp({ credential: cert(credential.key) }); // unchanged: the key decides the project
+  }
   const db = getFirestore();
   const stripe = new Stripe(stripeSecretKey);
 

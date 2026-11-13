@@ -3,7 +3,8 @@
 **Status: ATTEMPTED, THEN ROLLED BACK — NOT COMPLETE.** PR #769 was merged and a cutover was
 attempted on 2026-11-12. Production was then rolled back to a commit that predates this PR. The
 hardened billing code is **not** what production currently serves, and the release's completion
-criterion (§3 step 10, on the currently published deploy) is **not** met. See §0 for the record.
+criterion (§3 step 10, on the currently published deploy) is **not** met. See §0 for the record
+and §0A for the reconciliation checklist and the proposed (not approved) cutover plan.
 Everything from §1 onward is the original approval text, kept for reference; where it says
 "unmerged" or describes a step as not yet run, §0 is the correction.
 
@@ -70,6 +71,126 @@ is what Netlify actually deploys and what §3 step 7 onward verifies. See step 6
 **Full operational detail:** [docs/BILLING_CUTOVER_RUNBOOK.md](BILLING_CUTOVER_RUNBOOK.md) — this
 packet is the approval-level summary of that document; the runbook is the copy to actually
 follow command-by-command during the deploy.
+
+## 0A. Reconciliation checklist and proposed cutover plan (recorded 2026-11-13)
+
+**This section is a checklist and a plan under review. It is not an approved procedure and it
+authorizes nothing.** Every production action in §0A.4 needs its own explicit approval at the
+time it is taken.
+
+Each row says where the evidence came from:
+
+- **Verified** — read directly from Netlify, GitHub or git during this work, and reproducible.
+- **Owner-reported** — observed by the account owner in the Stripe Dashboard or Firebase
+  Console and relayed. Not independently checked: this work had no read access to production
+  Firestore (HTTP 403 on count-only queries) and no Stripe access at all.
+
+### 0A.1 Reconciliation status
+
+The period to reconcile runs from **2026-11-12 18:16 UTC** (first hardened build) **through the
+final verification time**, which must be recorded when the checks are done and repeated
+immediately before any publish. Convert the range to the Stripe Dashboard's display timezone.
+
+| # | Check | Source | Status |
+|---|---|---|---|
+| S1 | Stripe **Live** mode, Payments with status Succeeded, in the period | Owner-reported | "Zero new successful payments during the period reviewed." **Exact start/end of the period reviewed and the status filter are not yet recorded** — incomplete until they are. |
+| S2 | Stripe Live mode, Subscriptions **created** in the period, **including $0** ones (a $0 checkout creates a subscription and a `checkout.session.completed` event with no payment) | — | **Not yet checked.** |
+| S3 | Stripe Live mode, deliveries to the production webhook endpoint in the period: every `checkout.session.completed` and `customer.subscription.created/updated/deleted`, with response codes. Any non-2xx may still be in Stripe's retry schedule. | — | **Not yet checked.** |
+| F1 | Production Firestore (`idynify-scout-dev`): `billingAmbiguousAccounts`, `billingAllocations`, `stripeWebhookEvents`, `stripeWebhookPendingEvents`, `billingCheckoutOperations` | Owner-reported | Not visible in the Console's root collection list. **Inconclusive, not proof of absence** — the list shows only collections with documents and depends on the selected database. To close: confirm the database selector is `(default)` and open each path directly (e.g. `/stripeWebhookEvents`). |
+| F2 | Production rules accept both numeric and object `credits` and lock the ledger collections | Owner-reported | Inspected 2026-11-13 (§0). Not a full diff against `main`'s `firestore.rules`. |
+| N1 | Deploy windows on 2026-11-12 and the currently published commit (`e87691d`, locked) | Verified | §0 timeline, from Netlify deploy records. |
+| N2 | `BILLING_LEDGER_EPOCH_UNIX` is set to `1794507945` (2026-11-12T18:25:45Z), production context, written 18:26:07 UTC; not read by the published code | Verified | From Netlify's env-var API. |
+| N3 | PR #790 CI (`rules`, `test`, `billing-emulator`) | Verified | Passing; PR unmerged. |
+
+What the hardened handler would have written, by window — this is what S1–S3 and F1 are testing
+for:
+
+| Window (2026-11-12 UTC) | Code live | A purchase in this window would be |
+|---|---|---|
+| ~18:16 – 18:28:08 | Hardened, no epoch | Flagged `epoch_unset` in `billingAmbiguousAccounts`; **no access granted** |
+| 18:28:08 – 18:57:12 | Hardened, epoch active | Granted, with a `billingAllocations` marker |
+| 18:57:12 – 19:11:44 | Hardened, no epoch | Flagged `epoch_unset`; **no access granted** |
+| 19:11:44 onward | Pre-ledger handler | Granted with **no** marker and no `stripeWebhookEvents` entry |
+
+The start of the first window is approximate: Netlify no longer records when that build first
+went live, only when it was built.
+
+### 0A.2 Evidence required to conclude no customer needs recovery
+
+All of the following, recorded with the time each was checked and who checked it:
+
+1. **S1** — zero succeeded Live payments for the full period, with the range and filter stated.
+2. **S2** — zero subscriptions created in the period, $0 included.
+3. **S3** — zero `checkout.session.completed` and zero `customer.subscription.*` deliveries to
+   the production endpoint in the period, or every such delivery individually accounted for.
+4. **F1** — each of the five collections confirmed empty by direct path in the `(default)`
+   database.
+
+S1–S3 empty and F1 empty are mutually consistent: the hardened handler writes
+`stripeWebhookEvents` for every checkout or subscription event it commits, so events in the
+18:16–19:11 window would have left that collection non-empty.
+
+If **any** of S1–S3 is non-zero, or any F1 collection has documents, the conclusion does not
+hold: each event must be reconciled individually (runbook §6.3) before any release, and any
+grant is a separate, explicitly approved repair. Until all four are recorded, the status is
+**unknown — not zero**.
+
+### 0A.3 Ledger epoch: current value and recommendation
+
+- **Current:** `1794507945` (2026-11-12T18:25:45Z), still set in Netlify, not active in the
+  published runtime. Any production build made while it is set has automatic allocation on from
+  the moment that build is published.
+- **Recommendation: a fresh epoch, armed after the hardened code is live — do not reuse the
+  current value.** The current value predates the rollback. Under it, any purchase handled by the
+  pre-ledger code since 19:11:44 (granted, no marker) counts as eligible for automatic
+  allocation, and only the handler's two narrow consistency guards would stop a replayed event
+  crediting it twice. Under a fresh epoch, any checkout created before the epoch with no marker is
+  flagged `pre_epoch_no_marker` and never auto-granted, so a double credit for those accounts is
+  ruled out by construction rather than by the guards.
+- Two rules follow from that: never resend pre-epoch Stripe events expecting them to grant, and
+  make manual grants only through `scripts/manualCreditRecovery.mjs`, which writes the marker.
+
+### 0A.4 Proposed cutover sequence — PLAN FOR REVIEW, NOT APPROVED
+
+Each gate is a separate, explicit approval by the account owner, given at the time. Approval of
+one gate does not carry to the next.
+
+| Step | Action | Gate |
+|---|---|---|
+| 1 | Record S1–S3 and F1 (§0A.2) with times | — (read-only) |
+| 2 | Clear `BILLING_LEDGER_EPOCH_UNIX` in Netlify, so the next build has allocation off | **Gate A — configuration change** |
+| 3 | Merge PR #790. With publishing locked, Netlify builds `main` and does not publish it. Confirm that build was created after step 2. | **Gate B — merge** |
+| 4 | Repeat S1–S3 immediately before publishing, so the result covers the whole period | — (read-only) |
+| 5 | Publish that specific build manually, lock left on. Allocation is off: a purchase is flagged for manual grant, not lost and not mis-granted. | **Gate C — publish** |
+| 6 | `node scripts/billingLedgerCutover.mjs --expect-commit <sha> --site <SITE_ID>` — expect `epoch_env_var_not_set` with `deploy.ready: true`. Read-only. | — |
+| 7 | Arm with the current time (`--apply --epoch "$(date +%s)"`), rebuild, publish the rebuilt deploy manually | **Gate D — activation** (a configuration change and a publish) |
+| 8 | Run the script again. `RUNTIME-VERIFIED ACTIVE` on the published deploy is the completion criterion. | — |
+| 9 | Observe the first real purchase: a `billingAllocations` record and access. Review `billingAmbiguousAccounts` for anything pending from steps 5–7. | — |
+| 10 | Unlock Netlify auto-publishing | **Gate E — unlock**, only after step 9 |
+
+Steps 5–8 belong in one sitting in a quiet period: the time between them is the window in which
+a buyer waits for a manual grant.
+
+### 0A.5 Release-readiness considerations — open
+
+- **No staging rehearsal has been done.** Staging (`idynify-staging`) still has the pre-#769
+  rules deployed (verified 2026-11-13: byte-identical to `e87691d`'s `firestore.rules`), so
+  `main`'s signup and this sequence have not been exercised end to end anywhere. A rehearsal
+  needs `main`'s rules deployed to staging and Stripe test mode. Whether to rehearse before
+  Gate C is an open decision; skipping it is a risk accepted, not a step completed.
+- **Manual recovery capability is not in place.** `scripts/manualCreditRecovery.mjs` needs a
+  write-capable Firestore service-account key and a Stripe key on the operator's machine. Neither
+  is available on the machine used for this work. Without it, a buyer flagged during steps 5–7
+  cannot be granted access until it is set up. It should be ready, and its owner named (§1),
+  before Gate C.
+- **Read-only reconciliation access is not in place.** A `roles/datastore.viewer` key for
+  `idynify-scout-dev` and a restricted read-only Stripe key would let S1–S3 and F1 be verified
+  independently instead of owner-reported, and are what runbook §6.3 assumes.
+- **The arming write has never run against this site.** `--apply` uses `netlify env:set`; only
+  the script's read path has been exercised against the real API, and the corrected script has
+  not yet been run end to end. Fallback if it errors: set the variable in the Netlify UI
+  (production context, Functions scope), then continue from the rebuild.
+- **The corrected script is advisory.** It confirms activation; it does not gate the webhook.
 
 ## 1. Roles
 

@@ -88,3 +88,46 @@ describe('ContactProfile reports saved updates to its host', () => {
     expect(screen.getByTestId('identity')).toHaveTextContent('S2');
   });
 });
+
+describe('ContactProfile shows sticker changes made elsewhere on the page', () => {
+  const Panel = ({ change, onContactChange }) => (
+    <MemoryRouter>
+      <ContactProfile contactId="c1" onClose={() => {}} onContactChange={onContactChange} externalStickerChange={change} />
+    </MemoryRouter>
+  );
+
+  it('applies an add, then a remove, for the contact it shows, keeping everything else', async () => {
+    const onContactChange = vi.fn();
+    const { rerender } = render(<Panel change={null} onContactChange={onContactChange} />);
+    expect(await screen.findByTestId('identity')).toHaveTextContent('none');
+
+    rerender(<Panel change={{ contactIds: ['c1'], stickerId: 'S1', op: 'add' }} onContactChange={onContactChange} />);
+    expect(screen.getByTestId('identity')).toHaveTextContent('S1');
+    expect(probe.props.contact).toMatchObject({ id: 'c1', name: 'Pat Lee', tags: ['vip'], sticker_ids: ['S1'] });
+
+    rerender(<Panel change={{ contactIds: ['c1'], stickerId: 'S1', op: 'remove' }} onContactChange={onContactChange} />);
+    expect(screen.getByTestId('identity')).toHaveTextContent('none');
+    // The host made the change, so it is not reported back to it.
+    expect(onContactChange).not.toHaveBeenCalled();
+  });
+
+  it('applies a bulk add that includes this contact', async () => {
+    const { rerender } = render(<Panel change={null} />);
+    await screen.findByTestId('identity');
+    rerender(<Panel change={{ contactIds: ['c9', 'c1', 'c7'], stickerId: 'S3', op: 'add' }} />);
+    expect(screen.getByTestId('identity')).toHaveTextContent('S3');
+  });
+
+  it('ignores a change for another contact', async () => {
+    const { rerender } = render(<Panel change={null} />);
+    await screen.findByTestId('identity');
+    rerender(<Panel change={{ contactIds: ['c2'], stickerId: 'S1', op: 'add' }} />);
+    expect(screen.getByTestId('identity')).toHaveTextContent('none');
+  });
+
+  it('an earlier change present when the panel opens does not touch the freshly loaded contact', async () => {
+    stored.contact = { ...stored.contact, sticker_ids: ['S1'] };
+    render(<Panel change={{ contactIds: ['c1'], stickerId: 'S1', op: 'remove' }} />);
+    expect(await screen.findByTestId('identity')).toHaveTextContent('S1');
+  });
+});

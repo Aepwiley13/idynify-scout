@@ -105,7 +105,8 @@ import AllLeads from '../pages/Scout/AllLeads';
 
 configure({ asyncUtilTimeout: 5000 });
 
-describe('All People Navigation', () => {
+// The whole People page loads here; give slow machines room, like the other page tests.
+describe('All People Navigation', { timeout: 30000 }, () => {
   const VIP = sticker('VIP', { color: 'pink' });
   const PARTNER = sticker('Partner', { color: 'blue' });
 

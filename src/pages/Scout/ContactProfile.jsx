@@ -48,6 +48,7 @@ import { archivePerson } from '../../services/peopleService';
 import './ContactProfile.css';
 import { getEffectiveUser, useActiveUserId } from '../../context/ImpersonationContext';
 import { StickersProvider } from '../../components/stickers/StickersContext';
+import { withMembershipChange } from '../../services/stickers/stickerCore';
 import { useShell } from '../../context/ShellContext';
 import { MODULES } from '../../constants/navigationModel';
 import { openCompany, openContact, ENTRY_POINTS } from '../../utils/navigation';
@@ -122,6 +123,10 @@ export default function ContactProfile({
   // Told about each saved update (stickers, tags, fields), so a list showing
   // this contact can reflect it without a reload or a listener of its own.
   onContactChange = null,
+  // The other way: a sticker change confirmed somewhere else on the page (a
+  // People card, list row or bulk add), { contactIds, stickerId, op }, a new
+  // object each time. Applied only when it names the contact shown here.
+  externalStickerChange = null,
 } = {}) {
   const { contactId: paramContactId } = useParams();
   const contactId = propContactId || paramContactId;
@@ -167,6 +172,12 @@ export default function ContactProfile({
   useEffect(() => {
     loadContactProfile();
   }, [contactId]);
+
+  useEffect(() => {
+    if (!externalStickerChange) return;
+    const { contactIds, stickerId, op } = externalStickerChange;
+    setContact(prev => (prev && contactIds.includes(prev.id) ? withMembershipChange(prev, stickerId, op) : prev));
+  }, [externalStickerChange]);
 
   // Auto-trigger engage when navigated here with autoEngage:true state.
   // Clears the flag from history so back-navigation doesn't re-trigger.

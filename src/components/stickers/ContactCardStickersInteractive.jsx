@@ -1,101 +1,113 @@
 /**
- * ContactCardStickersInteractive — Interactive sticker display for contact cards.
+ * ContactCardStickersInteractive — a contact's stickers on a People card (up
+ * to 2) or list row (1), with "+n" for the rest, plus add and remove in place.
  *
- * Extends the existing ContactCardStickers with add/remove capabilities.
- * Shows up to `max` stickers as removable chips, plus a + button to add more.
- * Reuses StickerPicker and established service contracts.
+ * Behaves like the Contact Profile row (ContactStickersRow): the same picker
+ * (search, recent first, create inline), nothing optimistic (a chip is
+ * pending until its write resolves), remove with Undo, and the same error
+ * messages. Active stickers only, so archived ones are never shown or
+ * counted. Nothing at all unless stickers are available.
  *
- * Usage: <ContactCardStickersInteractive contact={contact} max={2} onUpdate={fn} />
+ * onUpdate(contactId, stickerId, op) lets the page apply the confirmed change
+ * to its own copy of the contact. It is id-based, so it is still called when
+ * an Undo finishes after this card has left the screen (for example, a
+ * sticker filter hid it), and the card comes back.
  */
 import { useEffect, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
-import { BRAND } from '../../theme/tokens';
-import { addSticker, removeSticker, storedStickerIds, withMembershipChange, STICKER_LIMIT } from '../../services/contactStickers';
+import { addSticker, removeSticker } from '../../services/contactStickers';
 import { createSticker } from '../../services/stickerService';
-import { STICKER_STATUS, cleanStickerName } from '../../services/stickers/stickerCore';
+import {
+  STICKER_LIMIT, STICKER_STATUS, cleanStickerName, storedStickerIds, visibleStickers,
+} from '../../services/stickers/stickerCore';
 import { useStickers } from './stickersRegistry';
 import StickerPicker from './StickerPicker';
 import StickerChip from './StickerChip';
+import { UNDO_MS } from './ContactStickersRow';
 import { nextStickerColor } from './stickerPalette';
 import { describeStickerError, logStickerFailure } from './stickerMessages';
 import { readRecentStickerIds, rememberRecentSticker } from './recentStickers';
 import './stickers.css';
 
 export default function ContactCardStickersInteractive({ contact, max = 2, onUpdate, style = null }) {
-  const { ready, uid, active, all, byId, notify, recheck } = useStickers();
+  const stickers = useStickers();
+  if (!stickers.ready || !contact?.id) return null;
+  // Keyed like the profile row: an Undo or Retry raised for one contact can
+  // never write to another if the card is reused.
+  return <CardStickers key={contact.id} contact={contact} max={max} onUpdate={onUpdate} style={style} stickers={stickers} />;
+}
+
+function CardStickers({ contact, max, onUpdate, style, stickers }) {
+  const { uid, byId, active, all, recheck, notify } = stickers;
   const T = useT();
   const [open, setOpen] = useState(false);
-  const [pending, setPending] = useState(new Map()); // stickerId -> {op, sticker}
+  const [pending, setPending] = useState(() => new Map());
   const [recentIds, setRecentIds] = useState(() => readRecentStickerIds(uid));
   const buttonRef = useRef(null);
-  const latest = useRef(contact);
+  const contactId = contact.id;
   const registry = useRef(byId);
   const mounted = useRef(true);
-  const writingRef = useRef(new Set()); // Synchronous concurrency guard
+  const writing = useRef(new Set());
 
-  useEffect(() => { latest.current = contact; }, [contact]);
   useEffect(() => { registry.current = byId; }, [byId]);
   useEffect(() => () => { mounted.current = false; }, []);
-
-  if (!ready || !contact?.id) return null;
 
   const stored = storedStickerIds(contact);
   const assigned = new Set(stored);
   const pendingAdds = [...pending.values()].filter((p) => p.op === 'add' && !assigned.has(p.sticker.id));
   const atLimit = stored.length + pendingAdds.length >= STICKER_LIMIT;
 
-  // Get visible stickers for display
-  const shown = stored
-    .map(id => byId.get(id))
-    .filter(s => s && s.status === STICKER_STATUS.ACTIVE)
-    .slice(0, max);
-
-  const more = Math.max(0, stored.length - max);
+  const visible = visibleStickers(contact, byId);
+  const chips = [
+    ...visible.map((sticker) => ({ sticker, busy: pending.has(sticker.id) })),
+    ...pendingAdds.map(({ sticker }) => ({ sticker, busy: true })),
+  ];
+  const shown = chips.slice(0, max);
+  const more = chips.length - shown.length;
 
   function setBusy(sticker, op) {
-    setPending(prev => {
+    if (!mounted.current) return;
+    setPending((prev) => {
       const next = new Map(prev);
-      if (op) next.set(sticker.id, { op, sticker });
-      else next.delete(sticker.id);
+      if (op) next.set(sticker.id, { op, sticker }); else next.delete(sticker.id);
       return next;
     });
-  }
-
-  function apply(op, stickerId) {
-    const next = withMembershipChange(latest.current, stickerId, op);
-    latest.current = next;
-    // Pass (contactId, stickerId, op) to parent so it can apply to its latest state
-    onUpdate?.(contact.id, stickerId, op);
   }
 
   function fail(action, error, retry) {
     logStickerFailure(action, error);
     const { message, retryable, writeDenied } = describeStickerError(error);
     if (writeDenied) recheck();
-    notify({ tone: 'error', message, action: retryable && retry ? { label: 'Retry', run: retry } : null, duration: 6000 });
+    notify({ tone: 'error', message, action: retryable ? { label: 'Retry', run: retry } : null, duration: 6000 });
   }
 
   async function change(op, sticker) {
-    const contactId = latest.current.id;
-    const key = `${contactId}:${sticker.id}:${op}`;
-
-    // Synchronous guard: prevent duplicate concurrent operations
-    if (writingRef.current.has(key)) return;
-    writingRef.current.add(key);
-
+    const key = `${sticker.id}:${op}`;
+    if (writing.current.has(key)) return;
+    writing.current.add(key);
     setBusy(sticker, op);
     try {
       if (op === 'add') await addSticker(uid, contactId, sticker.id);
       else await removeSticker(uid, contactId, sticker.id);
-      if (!mounted.current) return;
-      apply(op, sticker.id);
-      if (op === 'add') setRecentIds(rememberRecentSticker(uid, sticker.id));
+      onUpdate?.(contactId, sticker.id, op);
+      if (op === 'add') {
+        const recent = rememberRecentSticker(uid, sticker.id);
+        if (mounted.current) setRecentIds(recent);
+      } else {
+        // Page-level notice (StickersProvider): it outlives this card.
+        notify({
+          message: `Removed ${sticker.name}`,
+          description: 'Undo adds it again, dated now.',
+          action: { label: 'Undo', run: () => change('add', sticker) },
+          duration: UNDO_MS,
+        });
+      }
     } catch (error) {
-      if (mounted.current) fail(op, error, () => change(op, sticker));
+      fail(op, error, () => change(op, sticker));
     } finally {
-      writingRef.current.delete(key);
-      if (mounted.current) setBusy(sticker, null);
+      writing.current.delete(key);
+      setBusy(sticker, null);
     }
   }
 
@@ -112,114 +124,57 @@ export default function ContactCardStickersInteractive({ contact, max = 2, onUpd
   async function create(name) {
     closePicker();
     const color = nextStickerColor(all.length);
-    let createdId;
+    let created;
     try {
-      const result = await createSticker(uid, { name, color });
-      createdId = result.id; // Extract id from {id: ...} return value
+      created = await createSticker(uid, { name, color });
     } catch (error) {
-      if (mounted.current) fail('create', error, () => create(name));
+      fail('create', error, () => create(name));
       return;
     }
-    if (!mounted.current) return;
-
-    // Registry may not have the new sticker yet, construct it
-    const sticker = registry.current.get(createdId) ?? {
-      id: createdId,
-      name: cleanStickerName(name),
-      color,
-      emoji: null,
-      status: STICKER_STATUS.ACTIVE,
-    };
-
-    // Add to contact (separate operation, can fail independently)
+    const sticker = registry.current.get(created.id)
+      ?? { id: created.id, name: cleanStickerName(name), color, emoji: null, status: STICKER_STATUS.ACTIVE };
     await change('add', sticker);
   }
 
+  const who = contact.name ? ` to ${contact.name}` : '';
+
   return (
+    // The card and row open the contact on click and on Enter/Space; sticker
+    // controls are their own targets.
     <span
-      className="stk-card-row"
+      className="stk-card-row stk-card-row--interactive"
       data-testid="card-stickers-interactive"
       style={style ?? undefined}
-      onClick={e => e.stopPropagation()}
-      onKeyDown={e => {
-        // Prevent card navigation on Enter/Space when interacting with stickers
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.stopPropagation();
-        }
-      }}
+      onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') e.stopPropagation(); }}
     >
-      {/* Existing stickers as removable chips */}
-      {shown.map(sticker => {
-        const isBusy = pending.has(sticker.id);
-        return (
-          <StickerChip
-            key={sticker.id}
-            sticker={sticker}
-            pending={isBusy}
-            compact
-            onRemove={e => {
-              e?.stopPropagation();
-              change('remove', sticker);
-            }}
-          />
-        );
-      })}
-
-      {/* Pending additions */}
-      {pendingAdds.map(({ sticker }) => (
-        <StickerChip
-          key={sticker.id}
-          sticker={sticker}
-          pending
-          compact
-        />
-      ))}
-
-      {/* +N indicator for hidden stickers */}
-      {more > 0 && (
-        <span
-          className="stk-card-more"
-          style={{ color: T.textFaint }}
-          aria-label={`${more} more ${more === 1 ? 'sticker' : 'stickers'}`}
-        >
-          +{more}
+      {chips.length ? (
+        <span className="stk-card-row" data-testid="card-stickers" role="list" aria-label="Stickers">
+          {shown.map(({ sticker, busy }) => (
+            <span key={sticker.id} role="listitem" className="stk-card-item">
+              <StickerChip sticker={sticker} pending={busy} compact onRemove={() => change('remove', sticker)} />
+            </span>
+          ))}
+          {more > 0 ? (
+            <span className="stk-card-more" style={{ color: T.textFaint }} aria-label={`${more} more ${more === 1 ? 'sticker' : 'stickers'}`}>+{more}</span>
+          ) : null}
         </span>
-      )}
-
-      {/* Add button */}
-      <span style={{ position: 'relative', display: 'inline-block' }}>
+      ) : null}
+      <span className="stk-add-item">
         <button
           ref={buttonRef}
           type="button"
-          className="stk-add-btn-compact"
-          aria-label="Add sticker"
+          className="stk-add-btn stk-add-btn--compact"
+          aria-label={`Add sticker${who}`}
           aria-haspopup="listbox"
           aria-expanded={open ? 'true' : 'false'}
-          disabled={atLimit}
-          onClick={e => {
-            e.stopPropagation();
-            setOpen(o => !o);
-          }}
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 2,
-            padding: '2px 6px',
-            borderRadius: 10,
-            border: `1px dashed ${open ? BRAND.pink : T.border}`,
-            background: open ? `${BRAND.pink}08` : 'transparent',
-            color: open ? BRAND.pink : T.textFaint,
-            fontSize: 8,
-            fontWeight: 600,
-            cursor: atLimit ? 'not-allowed' : 'pointer',
-            transition: 'all 0.15s',
-            opacity: atLimit ? 0.4 : 1,
-          }}
-          title={atLimit ? `Limit: ${STICKER_LIMIT} stickers` : 'Add sticker'}
+          title="Add sticker"
+          style={{ color: T.textFaint, border: `1.5px dashed ${T.border}` }}
+          onClick={() => (open ? closePicker() : setOpen(true))}
         >
-          <Plus size={8} aria-hidden="true" />
+          <Plus size={10} aria-hidden="true" />
         </button>
-        {open && (
+        {open ? (
           <StickerPicker
             stickers={active}
             assignedIds={assigned}
@@ -229,9 +184,8 @@ export default function ContactCardStickersInteractive({ contact, max = 2, onUpd
             onCreate={create}
             onClose={closePicker}
             ignoreRef={buttonRef}
-            placement="below"
           />
-        )}
+        ) : null}
       </span>
     </span>
   );

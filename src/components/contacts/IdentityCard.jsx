@@ -40,6 +40,8 @@ import { BRAND } from '../../theme/tokens';
 import { getUniqueTags } from '../../services/peopleService';
 import './IdentityCard.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { saveContactEmailEdit } from '../../services/contactEmailService';
+import { readContactEmails, applyEmailEdit, pickEmailFields } from '../../utils/contactEmails';
 import ContactPhones from './ContactPhones';
 import ContactIdentityViewer from './ContactIdentityViewer';
 import ContactStickersRow from '../stickers/ContactStickersRow';
@@ -371,6 +373,10 @@ export default function IdentityCard({
   onUpdate,
 }) {
   const T = useT();
+  // The contact as the page holds it now. An email save resolves later, and
+  // whatever landed meanwhile (a sticker added in the row above) must stay.
+  const latestContact = useRef(contact);
+  useEffect(() => { latestContact.current = contact; }, [contact]);
   const [imgBroken, setImgBroken] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(false);
   const photoButtonRef = useRef(null);
@@ -468,12 +474,7 @@ export default function IdentityCard({
 
   // Sync email list from contact data
   useEffect(() => {
-    if (contact.emails && contact.emails.length > 0) {
-      setEmailsList(contact.emails.map((e, i) => ({ ...e, id: e.id || String(i) })));
-    } else {
-      const primary = contact.email || contact.work_email;
-      setEmailsList(primary ? [{ id: '0', value: primary, label: 'work' }] : []);
-    }
+    setEmailsList(readContactEmails(contact));
   }, [contact.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Editing ─────────────────────────────────────────────────────────────────
@@ -522,33 +523,34 @@ export default function IdentityCard({
 
   // ── Multi-field (email / phone) mutations ────────────────────────────────────
 
-  async function persistFields(fieldName, list) {
+  /**
+   * Save one email edit. It is applied to the contact as stored now, in a
+   * transaction, and written with email and email_normalized
+   * (services/contactEmailService.js), so the identity engine matches the
+   * address the contact actually has and a concurrent change is kept.
+   */
+  async function saveEmailEdit(edit) {
     const user = getEffectiveUser();
     if (!user) return;
-    const updateData = {
-      [fieldName]: list,
-      updated_at: new Date().toISOString(),
-    };
-    // Keep primary single-value field in sync for backward compat
-    if (fieldName === 'emails') updateData.email = list[0]?.value || null;
-    onUpdate?.({ ...contact, ...updateData });
     try {
-      await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), updateData);
+      const saved = await saveContactEmailEdit(user.uid, contact.id, edit);
+      setEmailsList(readContactEmails(saved));
+      // Only the email fields: the page keeps what it computed for display.
+      onUpdate?.({ ...latestContact.current, ...pickEmailFields(saved), updated_at: saved.updated_at });
     } catch (err) {
-      console.error(`[IdentityCard] Save ${fieldName} failed:`, err);
-      onUpdate?.(contact);
+      console.error('[IdentityCard] Save emails failed:', err?.code ?? err?.name ?? 'error');
+      setEmailsList(readContactEmails(latestContact.current));
+      onUpdate?.(latestContact.current);
     }
   }
 
   function handleEmailUpdate(updated) {
-    const next = emailsList.map(e => e.id === updated.id ? updated : e);
-    setEmailsList(next);
-    persistFields('emails', next);
+    setEmailsList(prev => applyEmailEdit(prev, { type: 'upsert', entry: updated }));
+    saveEmailEdit({ type: 'upsert', entry: updated });
   }
   function handleEmailDelete(id) {
-    const next = emailsList.filter(e => e.id !== id);
-    setEmailsList(next);
-    persistFields('emails', next);
+    setEmailsList(prev => applyEmailEdit(prev, { type: 'remove', id }));
+    saveEmailEdit({ type: 'remove', id });
   }
   function handleAddEmail() {
     const newEntry = { id: Date.now().toString(), value: '', label: 'work' };

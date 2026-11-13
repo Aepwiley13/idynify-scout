@@ -137,3 +137,63 @@ describe('People card after a change in the side-panel profile', { timeout: 3000
     expect(within(anaCard).getByTestId('card-stickers')).not.toHaveTextContent('Gala');
   });
 });
+
+describe('The side-panel profile after a sticker change on a People card or row', { timeout: 30000 }, () => {
+  async function openPanelFor(user, name) {
+    window.history.replaceState(null, '', '/command-center?tab=people');
+    render(<MemoryRouter><AllLeads mode="people" /></MemoryRouter>);
+    await screen.findByRole('button', { name: 'Filter by sticker' });
+    await user.click(within(card(name)).getByRole('button', { name: /^Engage$/ }));
+    await screen.findByTestId('panel-profile');
+  }
+
+  it('a sticker added on the card is passed to the open panel once confirmed', async () => {
+    const user = userEvent.setup();
+    await openPanelFor(user, 'Ben Plain');
+    expect(panel.props.externalStickerChange).toBeNull();
+    await user.click(within(card('Ben Plain')).getByRole('button', { name: 'Add sticker to Ben Plain' }));
+    await user.click(screen.getByRole('option', { name: 'Gala' }));
+    await waitFor(() => expect(panel.props.externalStickerChange).toEqual({ contactIds: ['p2'], stickerId: GALA.id, op: 'add' }));
+    expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'p2', GALA.id]]);
+    expect(within(card('Ben Plain')).getByTestId('card-stickers')).toHaveTextContent('Gala');
+  });
+
+  it('a sticker removed on the card, and its Undo, are both passed to the panel', async () => {
+    const user = userEvent.setup();
+    await openPanelFor(user, 'Ana Board');
+    await user.click(within(card('Ana Board')).getByRole('button', { name: 'Remove sticker Board' }));
+    await waitFor(() => expect(panel.props.externalStickerChange).toEqual({ contactIds: ['p1'], stickerId: BOARD.id, op: 'remove' }));
+    await user.click(await within(screen.getByRole('status')).findByRole('button', { name: 'Undo' }));
+    await waitFor(() => expect(panel.props.externalStickerChange).toEqual({ contactIds: ['p1'], stickerId: BOARD.id, op: 'add' }));
+  });
+
+  it('with a sticker filter on, removing it hides the card; Undo brings the card back', async () => {
+    const user = userEvent.setup();
+    window.history.replaceState(null, '', `/command-center?tab=people&sticker=${BOARD.id}`);
+    render(<MemoryRouter><AllLeads mode="people" /></MemoryRouter>);
+    await screen.findByRole('button', { name: 'Remove sticker Board' });
+    expect(screen.queryByText('Ben Plain')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Remove sticker Board' }));
+    await waitFor(() => expect(screen.queryByText('Ana Board')).toBeNull());
+    expect(window.location.search).toContain(`sticker=${BOARD.id}`);
+    await user.click(within(screen.getByRole('status')).getByRole('button', { name: 'Undo' }));
+    await waitFor(() => expect(screen.getByText('Ana Board')).toBeInTheDocument());
+    expect(within(card('Ana Board')).getByTestId('card-stickers')).toHaveTextContent('Board');
+    expect(fake.current.callsOf('removeSticker')).toEqual([['u1', 'p1', BOARD.id]]);
+    expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'p1', BOARD.id]]);
+  });
+
+  it('a list row change is passed to the panel the same way', async () => {
+    const user = userEvent.setup();
+    await openPanelFor(user, 'Ben Plain');
+    const list = await screen.findByRole('button', { name: /List/ });
+    await user.click(list);
+    expect(list).toHaveAttribute('aria-pressed', 'true');
+    // Rows, not cards: no Engage buttons, one add control per person.
+    await waitFor(() => expect(screen.queryAllByRole('button', { name: /^Engage$/ })).toHaveLength(0));
+    expect(screen.getAllByRole('button', { name: 'Add sticker to Ben Plain' })).toHaveLength(1);
+    await user.click(screen.getByRole('button', { name: 'Add sticker to Ben Plain' }));
+    await user.click(screen.getByRole('option', { name: 'Board' }));
+    await waitFor(() => expect(panel.props.externalStickerChange).toEqual({ contactIds: ['p2'], stickerId: BOARD.id, op: 'add' }));
+  });
+});

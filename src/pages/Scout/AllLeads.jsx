@@ -41,7 +41,7 @@ import { needsName } from '../../utils/contactDisplayName';
 import { StickersProvider } from '../../components/stickers/StickersContext';
 import { useStickers } from '../../components/stickers/stickersRegistry';
 import StickerFilterChip from '../../components/stickers/StickerFilterChip';
-import ContactCardStickers from '../../components/stickers/ContactCardStickers';
+import ContactCardStickersInteractive from '../../components/stickers/ContactCardStickersInteractive';
 import BulkStickerAction from '../../components/stickers/BulkStickerAction';
 import StickersWall from '../../components/stickers/StickersWall';
 import { readUrlSticker, writeUrlSticker, resolveStickerFilter, hasSticker, matchesStickerName } from '../../components/stickers/peopleStickers';
@@ -456,6 +456,7 @@ function AllLeadsCard({
   inSniper = false, onAddToSniper,
   onArchive,
   signalChip = null,
+  onStickerChange,
 }) {
   const T = useT();
   const color = BRAND.pink;
@@ -600,6 +601,7 @@ function AllLeadsCard({
 
   return (
     <div
+      className="stk-host"
       onClick={handleCardClick}
       style={{
         background: isSelected ? T.accentBg : T.cardBg,
@@ -747,8 +749,8 @@ function AllLeadsCard({
           {mode === 'hunter' ? getHunterLastAction(contact) : getLastAction(contact)}
         </div>
 
-        {/* Stickers (ADR-007): nothing unless available */}
-        <ContactCardStickers contact={contact} max={2} style={{ marginBottom: 6 }} />
+        {/* Stickers (ADR-007): interactive add/remove */}
+        <ContactCardStickersInteractive contact={contact} max={2} onUpdate={onStickerChange} style={{ marginBottom: 6 }} />
 
         {/* Tags */}
         {Array.isArray(contact.tags) && contact.tags.length > 0 && (
@@ -1024,7 +1026,7 @@ function AllLeadsCard({
 }
 
 // ─── AllLeadsRow (Gmail-style) ────────────────────────────────────────────────
-function AllLeadsRow({ contact, company, selected, onClick, onCompanyClick, onArchive, bulkMode = false, isSelected = false, onSelect }) {
+function AllLeadsRow({ contact, company, selected, onClick, onCompanyClick, onArchive, bulkMode = false, isSelected = false, onSelect, onStickerChange }) {
   const T = useT();
   const color = BRAND.pink;
   const email = contact.email || contact.work_email;
@@ -1079,7 +1081,7 @@ function AllLeadsRow({ contact, company, selected, onClick, onCompanyClick, onAr
       </div>
       <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 7 }}>
         <span style={{ fontSize: 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 1 }}>{contact.title}</span>
-        <ContactCardStickers contact={contact} max={1} style={{ flexShrink: 0, flexWrap: 'nowrap' }} />
+        <ContactCardStickersInteractive contact={contact} max={1} onUpdate={onStickerChange} style={{ flexShrink: 0, flexWrap: 'nowrap' }} />
         {Array.isArray(contact.tags) && contact.tags.slice(0, 2).map(tag => {
           const tc = getTagColor(tag);
           return (
@@ -1305,6 +1307,8 @@ function AllLeadsPage({ mode = 'people', activeFilter = null }) {
   const [modal, setModal] = useState(null);
   const [listSelected, setListSelected] = useState(null);
   const [panelContactId, setPanelContactId] = useState(null);
+  // The latest sticker change made outside the side panel (applyStickerChange).
+  const [panelStickerChange, setPanelStickerChange] = useState(null);
   const [panelAutoEngage, setPanelAutoEngage] = useState(false);
   const [panelLayout, setPanelLayout] = useState(() => localStorage.getItem('al_panelLayout') || 'split'); // 'split' | 'list-full' | 'profile-full'
 
@@ -1575,6 +1579,19 @@ function AllLeadsPage({ mode = 'people', activeFilter = null }) {
   function handlePanelContactChange(updated) {
     if (!updated?.id) return;
     setContacts(prev => prev.map(c => (c.id === updated.id ? { ...c, ...updated } : c)));
+  }
+
+  // A sticker added or removed on a card or row (or its Undo), or a bulk add:
+  // apply the confirmed change to those contacts here, and tell the open
+  // side-panel profile, which keeps its own copy of the contact.
+  function applyStickerChange(contactIds, stickerId, op) {
+    const changed = new Set(contactIds);
+    setContacts(prev => prev.map(c => (changed.has(c.id) ? withMembershipChange(c, stickerId, op) : c)));
+    setPanelStickerChange({ contactIds: [...changed], stickerId, op });
+  }
+
+  function handleStickerChange(contactId, stickerId, op) {
+    applyStickerChange([contactId], stickerId, op);
   }
 
   // Bulk: toggle one contact in/out of selectedIds
@@ -2181,15 +2198,59 @@ function AllLeadsPage({ mode = 'people', activeFilter = null }) {
           )}
         </div>
 
-        {/* Active filter count badge */}
-        {activeFilterCount > 0 && (
-          <button
-            onClick={() => { setIndustryFilter(null); setWarmthFilter(null); setSourceFilter(null); setSmartFilter(null); setDataFilter(null); setTagFilter(null); setStickerFilterId(null); setWarmSignalFilter(false); }}
-            style={{ padding: '4px 10px', minHeight: 44, borderRadius: 20, border: `1px solid ${BRAND.pink}40`, background: `${BRAND.pink}12`, color: BRAND.pink, fontSize: 10, cursor: 'pointer', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 4 }}
-          >
-            <X size={9} />{activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} — Clear
-          </button>
-        )}
+        {/* All People button — always visible, clears filters and exits Stickers wall */}
+        <button
+          onClick={() => {
+            // Clear all filters
+            setIndustryFilter(null);
+            setWarmthFilter(null);
+            setSourceFilter(null);
+            setSmartFilter(null);
+            setDataFilter(null);
+            setTagFilter(null);
+            setStickerFilterId(null);
+            setWarmSignalFilter(false);
+            // Reset to "All People" action lens
+            setActionFilter('all');
+            // Exit Stickers wall, return to Cards or List (whichever was last used)
+            if (viewMode === 'stickers') {
+              setViewMode(lastListView.current);
+            }
+          }}
+          style={{
+            padding: '6px 14px',
+            minHeight: 44,
+            borderRadius: 20,
+            border: `1px solid ${activeFilterCount > 0 || viewMode === 'stickers' ? BRAND.pink : T.border}`,
+            background: activeFilterCount > 0 || viewMode === 'stickers' ? `${BRAND.pink}12` : 'transparent',
+            color: activeFilterCount > 0 || viewMode === 'stickers' ? BRAND.pink : T.textMuted,
+            fontSize: 11,
+            fontWeight: activeFilterCount > 0 || viewMode === 'stickers' ? 700 : 600,
+            cursor: 'pointer',
+            whiteSpace: 'nowrap',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            flexShrink: 0,
+          }}
+          title={activeFilterCount > 0 || viewMode === 'stickers' ? 'Show all people (clear filters)' : 'All people'}
+        >
+          <Users size={12} />
+          All People
+          {activeFilterCount > 0 && (
+            <span style={{
+              fontSize: 9,
+              fontWeight: 700,
+              background: BRAND.pink,
+              color: '#fff',
+              borderRadius: 10,
+              padding: '1px 5px',
+              marginLeft: 2,
+            }}>
+              {activeFilterCount}
+            </span>
+          )}
+        </button>
 
         {/* Sort selector */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, background: T.surface, border: `1px solid ${T.border}`, borderRadius: 7, padding: '5px 10px', flexShrink: 0 }}>
@@ -2317,6 +2378,7 @@ function AllLeadsPage({ mode = 'people', activeFilter = null }) {
                   onAddToSniper={() => handleAddToSniper(c)}
                   onArchive={handleContactArchived}
                   signalChip={getSignalChip(c, serviceProfiles)}
+                  onStickerChange={handleStickerChange}
                 />
               ))}
             </div>
@@ -2335,6 +2397,7 @@ function AllLeadsPage({ mode = 'people', activeFilter = null }) {
                 <AllLeadsRow
                   key={c.id}
                   contact={c}
+                  onStickerChange={handleStickerChange}
                   company={companies[c.company_id]}
                   selected={c.id === listSelected}
                   onClick={() => {
@@ -2468,6 +2531,7 @@ function AllLeadsPage({ mode = 'people', activeFilter = null }) {
               autoEngageContext={firstTouchContext?.contactId === panelContactId ? firstTouchContext : null}
               onReadyForHunter={handleReadyForHunter}
               onContactChange={handlePanelContactChange}
+              externalStickerChange={panelStickerChange}
               onClose={() => isMobile ? closeMobileProfile() : (() => {
                 setPanelContactId(null);
                 setListSelected(null);
@@ -2536,10 +2600,7 @@ function AllLeadsPage({ mode = 'people', activeFilter = null }) {
           <BulkStickerAction
             selectedIds={selectedIds}
             nameOf={(id) => { const c = contacts.find(x => x.id === id); return c?.name || c?.email || 'Unnamed contact'; }}
-            onApplied={(stickerId, ids) => {
-              const changed = new Set(ids);
-              setContacts(prev => prev.map(c => (changed.has(c.id) ? withMembershipChange(c, stickerId, 'add') : c)));
-            }}
+            onApplied={(stickerId, ids) => applyStickerChange(ids, stickerId, 'add')}
             onReduceSelection={(ids) => setSelectedIds(new Set(ids))}
             onRunningChange={setBulkStickerRunning}
           />

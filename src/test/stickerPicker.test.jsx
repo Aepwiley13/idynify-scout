@@ -8,6 +8,7 @@ import userEvent from '@testing-library/user-event';
 import { setViewportWidth } from './helpers/matchMedia';
 import { sticker } from './helpers/stickersUi';
 import StickerPicker from '../components/stickers/StickerPicker';
+import { shouldOpenAbove } from '../components/stickers/pickerPlacement';
 import { buildPickerOptions } from '../components/stickers/stickerPickerOptions';
 
 const BOARD = sticker('Board');
@@ -123,5 +124,63 @@ describe('StickerPicker, desktop and phone', () => {
     expect(sheet.contains(document.activeElement)).toBe(true);
     await user.click(close);
     expect(onClose).toHaveBeenCalled();
+  });
+
+  it('phone: the sheet and its backdrop are portaled to <body>, outside the page', async () => {
+    setViewportWidth(390);
+    const handlers = { onPick: vi.fn(), onCreate: vi.fn(), onClose: vi.fn() };
+    const user = userEvent.setup();
+    const { container } = render(<div className="page"><StickerPicker stickers={ALL} {...handlers} /></div>);
+    const sheet = screen.getByRole('dialog', { name: 'Add a sticker' });
+    expect(container.contains(sheet)).toBe(false);
+    expect(sheet.parentElement).toBe(document.body);
+    expect(document.body.querySelector(':scope > .stk-sheet-backdrop')).not.toBeNull();
+    await user.keyboard('{Escape}');
+    expect(handlers.onClose).toHaveBeenCalled();
+  });
+
+  it('options without an emoji render no empty emoji slot', () => {
+    setViewportWidth(1280);
+    renderPicker({ stickers: [BOARD, { ...DONOR, emoji: '⭐' }] });
+    expect(screen.getByRole('option', { name: 'Board' }).querySelector('.stk-picker-emoji')).toBeNull();
+    expect(screen.getByRole('option', { name: /Donor/ }).querySelector('.stk-picker-emoji')).toHaveTextContent('⭐');
+  });
+});
+
+describe('shouldOpenAbove', () => {
+  const rect = (top, bottom) => ({ top, bottom, height: bottom - top, left: 0, right: 0, width: 0, x: 0, y: top });
+  function layout({ viewport = 800, scroller = null, anchor, popover = 180 }) {
+    const outer = document.createElement('div');
+    const anchorEl = document.createElement('span');
+    const pop = document.createElement('div');
+    anchorEl.appendChild(pop);
+    outer.appendChild(anchorEl);
+    document.body.appendChild(outer);
+    window.innerHeight = viewport;
+    anchorEl.getBoundingClientRect = () => rect(...anchor);
+    pop.getBoundingClientRect = () => rect(0, popover);
+    if (scroller) {
+      outer.style.overflowY = 'auto';
+      outer.getBoundingClientRect = () => rect(...scroller);
+    }
+    return pop;
+  }
+  afterEach(() => { document.body.innerHTML = ''; });
+
+  it('stays below when it fits', () => {
+    expect(shouldOpenAbove(layout({ anchor: [100, 124] }))).toBe(false);
+  });
+
+  it('opens above near the bottom of the viewport', () => {
+    expect(shouldOpenAbove(layout({ anchor: [700, 724] }))).toBe(true);
+  });
+
+  it('measures against a scrolling ancestor, not only the viewport', () => {
+    // Fits in the 800px viewport, but the scroll area ends at 500.
+    expect(shouldOpenAbove(layout({ anchor: [400, 424], scroller: [100, 500] }))).toBe(true);
+  });
+
+  it('stays below when there is even less room above', () => {
+    expect(shouldOpenAbove(layout({ viewport: 300, anchor: [40, 64] }))).toBe(false);
   });
 });

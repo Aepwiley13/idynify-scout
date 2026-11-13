@@ -81,6 +81,8 @@ const ALLOWED = new Map([
    'Emulator fixture, as cases.mjs: a "demo-" project, which cannot reach a real backend.'],
   ['src/test/stickersStaging.test.js',
    'Fixture. Inputs to the staging guard, which must accept or refuse them; the ids are the thing under test, never a target.'],
+  ['scripts/staging/billingRehearsal/guard.mjs',
+   'An allowlist of one, not configuration. The billing rehearsal refuses every project that is not this pinned staging name (and, against the emulator, a "demo-" namespace that cannot reach a real backend). Nothing falls back to either literal.'],
 ]);
 
 /** A line that is only a comment cannot configure anything. */

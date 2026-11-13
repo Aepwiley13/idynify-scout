@@ -183,6 +183,13 @@ function printReport(report) {
   const ran = report.steps.length;
   const passed = report.steps.filter((s) => s.pass).length;
   console.log(`\n${passed}/${STEPS.length} steps passed (${ran} ran) on ${report.projectId}, run id ${report.runId}.`);
+  if (report.halted) {
+    console.log(`Stopped at ${report.halted}: the steps after it were not run.`);
+    if (report.dataPreservedAfterFailure) {
+      console.log(`The run's documents were left in place as evidence. Nothing was cleaned up. When they are no longer needed:`);
+      console.log(`  --cleanup-only --run-id=${report.runId}   (add --apply --confirm-project=<the staging project id> to remove them)`);
+    }
+  }
   if (report.cleanup?.deleted) console.log(`Clean-up removed ${report.cleanup.deleted.length} documents.`);
   if (report.cleanup?.kept) console.log(`Data kept on request: ${report.cleanup.kept.length} documents. Remove with --cleanup-only --run-id=${report.runId}.`);
   if (report.safetyNetCleanup) console.log(`The run stopped early; the safety net ${report.safetyNetCleanup.error ? `could not clean up (${report.safetyNetCleanup.error})` : `removed ${report.safetyNetCleanup.deleted.length} documents`}.`);

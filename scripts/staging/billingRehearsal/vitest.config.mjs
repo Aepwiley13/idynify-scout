@@ -10,7 +10,14 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   root: fileURLToPath(new URL('../../..', import.meta.url)),
+  // Load NO .env files. Vitest otherwise reads the repository's .env.test and copies its
+  // VITE_* values into process.env, which put a unit-test project name
+  // (VITE_FIREBASE_PROJECT_ID) into a staging run. The launcher builds this run's whole
+  // environment explicitly; nothing may be added to it from a file.
+  envDir: false,
   test: {
+    // Second layer of fail-fast (the spec halts itself too): stop at the first failed step.
+    bail: 1,
     environment: 'node',
     include: ['src/test/stripeWebhookStagingRehearsal.test.js'],
     fileParallelism: false,

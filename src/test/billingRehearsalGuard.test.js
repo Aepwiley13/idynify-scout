@@ -20,7 +20,10 @@ import {
 } from '../../scripts/staging/billingRehearsal/fixtures.mjs';
 import { findRunDocs, deleteRunDocs } from '../../scripts/staging/billingRehearsal/cleanup.mjs';
 import { parseArgs, planRehearsal, dropFromShell, describeRun } from '../../scripts/staging/billingRehearsal.mjs';
+import { createStepRunner } from '../../scripts/staging/billingRehearsal/steps.mjs';
 import { createMemoryFirestore } from './helpers/memoryFirestore.js';
+import { execFileSync } from 'node:child_process';
+import process from 'node:process';
 
 const PROD = 'acme-production';
 const OTHER = 'acme-staging';
@@ -400,6 +403,124 @@ describe('billing rehearsal — the launcher: dry run by default, a sealed envir
     expect(run.users).toHaveLength(SLOTS.length);
     expect(run.users.every((path) => path.startsWith('users/rehearsal-fixedrunid01-'))).toBe(true);
     expect(run.steps).toHaveLength(11);
+  });
+});
+
+describe('billing rehearsal — a staging run takes its configuration from the launcher only', () => {
+  const here = dirname(fileURLToPath(import.meta.url));
+  const REPO = resolve(here, '../..');
+  const CONFIG = resolve(REPO, 'scripts/staging/billingRehearsal/vitest.config.mjs');
+  const TEST_FILE_PROJECT = /^VITE_FIREBASE_PROJECT_ID=(.+)$/m.exec(readFileSync(resolve(REPO, '.env.test'), 'utf8'))?.[1];
+
+  /**
+   * Starts the staging run exactly as the launcher does, but with no credential and no
+   * confirmation, so it is certain to refuse before the Firestore client is imported. What
+   * it refuses WITH shows what the run saw in its environment. Nothing is contacted.
+   */
+  function refusalOf(extraEnv = {}) {
+    const env = {
+      PATH: process.env.PATH, HOME: process.env.HOME, NO_COLOR: '1',
+      [MODE_VARIABLE]: 'staging', FIREBASE_PROJECT_ID: STAGING_PROJECT, PRODUCTION_FIREBASE_PROJECT_ID: PROD, ...extraEnv,
+    };
+    let output;
+    try {
+      output = execFileSync('npx', ['vitest', 'run', '--config', CONFIG], { cwd: REPO, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    } catch (err) {
+      output = `${err.stdout ?? ''}${err.stderr ?? ''}`;
+    }
+    return output;
+  }
+
+  it('the unit-test env file really does name another project (the hazard this guards against)', () => {
+    expect(TEST_FILE_PROJECT).toBeTruthy();
+    expect(TEST_FILE_PROJECT).not.toBe(STAGING_PROJECT);
+    expect(refusal(() => resolveTarget(stagingEnv({ VITE_FIREBASE_PROJECT_ID: TEST_FILE_PROJECT }), { credential: stagingCredential }))).toMatch(/VITE_FIREBASE_PROJECT_ID names a different project/);
+  });
+
+  it('the staging configuration loads no env file and stops at the first failure', () => {
+    const config = readFileSync(CONFIG, 'utf8').split('\n').filter((line) => !/^\s*(\/\/|\*|\/\*)/.test(line)).join('\n');
+    expect(config).toMatch(/^\s*envDir: false,$/m);
+    expect(config).toMatch(/^\s*bail: 1,$/m);
+    expect(config).toMatch(/^\s*environment: 'node',$/m);
+    expect(config).toMatch(/include: \['src\/test\/stripeWebhookStagingRehearsal\.test\.js'\]/);
+  });
+
+  it('.env.test does not reach a staging run: it gets as far as asking for the confirmation', () => {
+    const output = refusalOf();
+    expect(output).toMatch(/RehearsalRefusal: Writing to staging needs the explicit confirmation/);
+    expect(output).not.toMatch(/VITE_FIREBASE_PROJECT_ID/);
+    expect(output).not.toContain(TEST_FILE_PROJECT);
+    expect(output).toMatch(/11 skipped/);
+  }, 60_000);
+
+  it('a conflicting project id that IS in the environment is still refused, by name', () => {
+    for (const name of ['VITE_FIREBASE_PROJECT_ID', 'GCLOUD_PROJECT', 'GOOGLE_CLOUD_PROJECT']) {
+      const output = refusalOf({ [name]: TEST_FILE_PROJECT, [CONFIRM_VARIABLE]: STAGING_PROJECT });
+      expect(output).toMatch(new RegExp(`RehearsalRefusal: ${name} names a different project`));
+      expect(output).toMatch(/11 skipped/);
+    }
+  }, 120_000);
+
+  it('any project but the staging one is refused, confirmation or not', () => {
+    for (const projectId of [PROD, OTHER, TEST_FILE_PROJECT]) {
+      const output = refusalOf({ FIREBASE_PROJECT_ID: projectId, [CONFIRM_VARIABLE]: STAGING_PROJECT });
+      expect(output).toMatch(/RehearsalRefusal: (That is the production project|The project is not the staging project)/);
+      expect(output).toMatch(/11 skipped/);
+    }
+  }, 120_000);
+
+  it('with everything else right, no credential is still a refusal', () => {
+    const output = refusalOf({ [CONFIRM_VARIABLE]: STAGING_PROJECT });
+    expect(output).toMatch(/RehearsalRefusal: A credential for the staging project is required/);
+  }, 60_000);
+});
+
+describe('billing rehearsal — fail fast: nothing runs after a failed step', () => {
+  const passing = (id, log) => ({ id, title: id, run: async () => { log.push(id); return [{ name: 'ok', ok: true, detail: '' }]; } });
+
+  it('runs every step while they pass', async () => {
+    const log = [];
+    const runner = createStepRunner();
+    for (const step of [passing('A', log), passing('B', log), passing('C', log)]) expect((await runner.run(step, {})).pass).toBe(true);
+    expect(log).toEqual(['A', 'B', 'C']);
+    expect(runner.halted).toBeNull();
+    expect(runner.results.map((r) => [r.id, r.pass])).toEqual([['A', true], ['B', true], ['C', true]]);
+  });
+
+  it('after a failed check, later steps are skipped and never executed, clean-up included', async () => {
+    const log = [];
+    const failing = { id: 'B', title: 'B', run: async () => { log.push('B'); return [{ name: 'grant', ok: false, detail: 'granted twice' }]; } };
+    const runner = createStepRunner();
+    const outcomes = [];
+    for (const step of [passing('A', log), failing, passing('C', log), passing('CLEANUP', log)]) outcomes.push(await runner.run(step, {}));
+    expect(log).toEqual(['A', 'B']);
+    expect(outcomes.map((o) => o.skipped)).toEqual([false, false, true, true]);
+    expect(outcomes[1].failed).toEqual([{ name: 'grant', ok: false, detail: 'granted twice' }]);
+    expect(runner.halted).toBe('B');
+    expect(runner.results.map((r) => r.id)).toEqual(['A', 'B']);
+  });
+
+  it('a step that throws, or returns no checks, is a failure and halts the run', async () => {
+    for (const run of [async () => { throw new Error('PERMISSION_DENIED: missing permission'); }, async () => [], async () => undefined]) {
+      const log = [];
+      const runner = createStepRunner();
+      const outcome = await runner.run({ id: 'S1', title: 'S1', run }, {});
+      expect(outcome.pass).toBe(false);
+      expect(outcome.failed).toHaveLength(1);
+      expect((await runner.run(passing('S2', log), {})).skipped).toBe(true);
+      expect(log).toEqual([]);
+      expect(runner.halted).toBe('S1');
+    }
+    const runner = createStepRunner();
+    const thrown = await runner.run({ id: 'S1', title: 'S1', run: async () => { throw new Error('PERMISSION_DENIED: missing permission'); } }, {});
+    expect(thrown.failed[0].detail).toContain('PERMISSION_DENIED');
+  });
+
+  it('the real-Firestore spec uses the runner and never cleans up after a failure', () => {
+    const spec = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), 'stripeWebhookStagingRehearsal.test.js'), 'utf8');
+    expect(spec).toContain('const outcome = await runner.run(step, ctx);');
+    expect(spec).toContain('if (outcome.skipped) test.skip();');
+    expect(spec).toMatch(/!ctx\.keepData && !ctx\.state\?\.cleanup && !failed/);
   });
 });
 

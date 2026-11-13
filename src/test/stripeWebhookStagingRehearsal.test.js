@@ -18,7 +18,7 @@ import {
   MODE_VARIABLE, RUN_ID_VARIABLE, KEEP_VARIABLE, REPORT_VARIABLE,
 } from '../../scripts/staging/billingRehearsal/guard.mjs';
 import { store, resetStore, idsFor, makeFixtureStripeClass } from '../../scripts/staging/billingRehearsal/fixtures.mjs';
-import { STEPS } from '../../scripts/staging/billingRehearsal/steps.mjs';
+import { STEPS, createStepRunner } from '../../scripts/staging/billingRehearsal/steps.mjs';
 import { deleteRunDocs } from '../../scripts/staging/billingRehearsal/cleanup.mjs';
 import { readStagingCredential } from '../../scripts/staging/stagingCredentials.mjs';
 
@@ -37,7 +37,8 @@ describe.skipIf(!EMULATOR && !STAGING)(
   'billing cutover rehearsal against real Firestore (emulator: npm run test:billing-emulator; staging: scripts/staging/billingRehearsal.mjs)',
   () => {
     const saved = {};
-    const results = [];
+    const runner = createStepRunner();
+    const { results } = runner;
     let ctx = null;
     let target = null;
 
@@ -82,8 +83,10 @@ describe.skipIf(!EMULATOR && !STAGING)(
 
     afterAll(async () => {
       // Safety net: if the run stopped before its own clean-up step, remove what it left.
+      // Never after a failed step: what the run wrote is then evidence, and is left in place.
       let leftover = null;
-      if (ctx && !ctx.keepData && !ctx.state?.cleanup) {
+      const failed = results.some((step) => !step.pass);
+      if (ctx && !ctx.keepData && !ctx.state?.cleanup && !failed) {
         try {
           leftover = await deleteRunDocs(ctx.db, ctx.ids.runId);
         } catch (err) {
@@ -94,6 +97,7 @@ describe.skipIf(!EMULATOR && !STAGING)(
         writeFileSync(process.env[REPORT_VARIABLE], JSON.stringify({
           mode: target?.mode ?? null, projectId: target?.projectId ?? null, runId: ctx?.ids.runId ?? null,
           steps: results, cleanup: ctx?.state?.cleanup ?? null, safetyNetCleanup: leftover,
+          halted: runner.halted, dataPreservedAfterFailure: Boolean(ctx) && failed && !ctx.state?.cleanup,
         }, null, 2));
       }
       for (const [name, value] of Object.entries(saved)) {
@@ -102,13 +106,13 @@ describe.skipIf(!EMULATOR && !STAGING)(
       }
     }, STEP_TIMEOUT);
 
+    // FAIL FAST (steps.mjs: createStepRunner). Once a step fails, nothing after it is run:
+    // the remaining steps are skipped, clean-up included, and the run's documents stay as evidence.
     for (const step of STEPS) {
-      it(`${step.id} — ${step.title}`, async () => {
-        const checks = await step.run(ctx);
-        const failed = checks.filter((check) => !check.ok);
-        results.push({ id: step.id, title: step.title, pass: failed.length === 0, checks });
-        expect(failed).toEqual([]);
-        expect(checks.length).toBeGreaterThan(0);
+      it(`${step.id} — ${step.title}`, async (test) => {
+        const outcome = await runner.run(step, ctx);
+        if (outcome.skipped) test.skip();
+        expect(outcome.failed).toEqual([]);
       }, STEP_TIMEOUT);
     }
   },

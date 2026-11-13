@@ -146,7 +146,7 @@ export function isDeployReadyToArm({ site, expectedCommitSha, nowMs = Date.now()
  *   - the epoch env var is scoped to reach Netlify Functions at all;
  *   - its stored value parses to a real, usable epoch; and
  *   - that published deploy's OWN build started after the env var's last update.
- * Pure and fully unit-testable: `envVars` is the raw array Netlify's getSiteEnvVars returns.
+ * Pure and fully unit-testable: `envVars` is the raw array Netlify's account-scoped getEnvVars returns.
  */
 export function isRuntimeActivationVerified({ site, envVars, expectedCommitSha, nowMs = Date.now(), minDrainWaitMs = DEFAULT_MIN_DRAIN_WAIT_MS }) {
   const deployVerdict = isDeployReadyToArm({ site, expectedCommitSha, nowMs, minDrainWaitMs });
@@ -199,16 +199,51 @@ function parseArgs(argv) {
   return args;
 }
 
-function fetchSite(siteId) {
-  const out = execFileSync('netlify', ['api', 'getSite', '--data', JSON.stringify({ site_id: siteId })], { encoding: 'utf8' });
-  return JSON.parse(out);
+/**
+ * Pure — the exact argv for reading the site record. Exported for the same reason as
+ * buildEnvSetArgs below: the call shape is directly unit-testable without shelling out.
+ */
+export function buildGetSiteArgs(siteId) {
+  return ['api', 'getSite', '--data', JSON.stringify({ site_id: siteId })];
 }
 
-function fetchSiteEnvVars(siteId, contextName) {
-  const out = execFileSync('netlify', ['api', 'getSiteEnvVars', '--data', JSON.stringify({ site_id: siteId, context_name: contextName })], {
-    encoding: 'utf8',
-  });
-  return JSON.parse(out);
+/**
+ * Pure — the exact argv for reading the site's environment variables.
+ *
+ * Correction (2026-11-13): this script used to call `netlify api getSiteEnvVars` with only a
+ * site_id. Run against the real production site (netlify-cli 27.15.0) that call returns
+ * `JSONHTTPError: Not Found`, so main() always stopped at "Failed to query Netlify" and could
+ * never report RUNTIME-VERIFIED ACTIVE. The call that works is the ACCOUNT-scoped `getEnvVars`,
+ * which needs both the owning account's id and the site id. No `context_name` filter is passed:
+ * isRuntimeActivationVerified selects the production value itself.
+ */
+export function buildGetEnvVarsArgs({ accountId, siteId }) {
+  if (!accountId) throw new Error('buildGetEnvVarsArgs: accountId is required — the env-var API is account-scoped');
+  if (!siteId) throw new Error('buildGetEnvVarsArgs: siteId is required');
+  return ['api', 'getEnvVars', '--data', JSON.stringify({ account_id: accountId, site_id: siteId })];
+}
+
+/**
+ * Pure — the owning account's id, read from the same getSite response the deploy check uses, so
+ * the operator never has to supply it and it can never name a different account than the site's.
+ */
+export function accountIdOfSite(site) {
+  const accountId = site?.account_id;
+  if (!accountId) throw new Error('getSite response has no account_id — cannot query the account-scoped env-var API');
+  return accountId;
+}
+
+function runNetlify(args) {
+  return execFileSync('netlify', args, { encoding: 'utf8' });
+}
+
+/** `run` is injectable so the exact Netlify calls made are testable without the CLI. */
+export function fetchSite(siteId, run = runNetlify) {
+  return JSON.parse(run(buildGetSiteArgs(siteId)));
+}
+
+export function fetchSiteEnvVars(site, siteId, run = runNetlify) {
+  return JSON.parse(run(buildGetEnvVarsArgs({ accountId: accountIdOfSite(site), siteId })));
 }
 
 /**
@@ -233,7 +268,7 @@ function main() {
   let site, envVars;
   try {
     site = fetchSite(siteId);
-    envVars = fetchSiteEnvVars(siteId, 'production');
+    envVars = fetchSiteEnvVars(site, siteId);
   } catch (err) {
     console.error('Failed to query Netlify:', err.message);
     process.exit(1);

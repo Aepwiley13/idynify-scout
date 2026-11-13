@@ -326,7 +326,7 @@ async function handleCheckoutCompleted(stripe, stripeEvent) {
       if (eventSnap.exists) return;
       tx.set(db.collection('billingAmbiguousAccounts').doc(), {
         uid: candidates[0] ?? null, reason: 'identity_mismatch', details: { candidates, sessionId: session.id },
-        flaggedAt: new Date().toISOString(),
+        status: 'pending', flaggedAt: new Date().toISOString(),
       });
       tx.set(eventRef, { type: stripeEvent.type, appliedAt: new Date().toISOString() });
     });

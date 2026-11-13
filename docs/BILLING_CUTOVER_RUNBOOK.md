@@ -10,6 +10,36 @@ protects against a double grant is `decideAllocationEligibility`'s own consisten
 followed. This document governs the one thing those guards don't: whether automatic allocation
 is active at all.
 
+## Current state (recorded 2026-11-13) — read this first
+
+This checklist was written for a first deployment of PR #769. That deployment was **attempted on
+2026-11-12 and rolled back the same day**; the release is **not complete**. The timeline and the
+open items are in [BILLING_RELEASE_APPROVAL_PACKET.md §0](BILLING_RELEASE_APPROVAL_PACKET.md).
+What that changes about following this document now:
+
+- **Production serves `e87691d`, pre-#769 code, with Netlify auto-publishing locked.** The live
+  webhook is the unhardened handler. §5's "never roll back below the ledger commit" was violated
+  by that rollback, so §6's inventory applies to every purchase since 2026-11-12 19:11:44 UTC —
+  the unhardened handler granted them with no `billingAllocations` marker.
+- **PR #769 is already merged** (`2f53861f`); `main` is `2b0c0053`. §0.1's "check out the PR
+  branch, never `main`" is obsolete — `main` now contains this code and these rules. §2's merge
+  is done; what remains is *publishing*, which is blocked by the lock and by the open items.
+- **`BILLING_LEDGER_EPOCH_UNIX` is already set** (`1794507945`, written 2026-11-12 18:26:07 UTC).
+  §0.2's "must be unset" no longer holds, and §2's "allocation is OFF during the deploy" is
+  **false** for any build made after that write — such a build has allocation on from the moment
+  it is published. Either clear the variable first to get §2–§4's sequence back, or accept that
+  publishing arms it and go straight to §4's verification.
+- **§1 (production rules): inspected in the Firebase Console on 2026-11-13.** The published
+  version contains `signupBillingLegacyNumber()`, `signupBillingObjectShape()` and
+  `signupBilling()` (both numeric and object `credits` accepted at signup) and the server-only
+  blocks for the billing ledger collections, so `main`'s signup is not rejected by production
+  rules. This was a check for those elements, not a full diff against `main`'s `firestore.rules`,
+  and it covers rules only — it is not a statement that the billing workflow is safe to publish.
+  Re-check if rules are deployed again before release.
+- **`scripts/billingLedgerCutover.mjs` could not have produced any result on 2026-11-12** — its
+  env-var read used an API call that returns Not Found. It is fixed now (§0.2); treat any
+  activation claim from before the fix as unverified.
+
 ## 0. Preconditions — all of this before any production deployment
 
 ### 0.1 Check out the exact reviewed commit
@@ -24,7 +54,16 @@ contain this PR's code or rules.
 
 ### 0.2 Required variables
 
-**Netlify production environment** (`netlify api getSiteEnvVars --data '{"site_id":"<SITE_ID>","context_name":"production"}'`):
+**Netlify production environment.** The env-var API is account-scoped — it needs the owning
+account's id as well as the site id:
+
+```bash
+netlify api getSite --data '{"site_id":"<SITE_ID>"}'          # read "account_id" from the output
+netlify api getEnvVars --data '{"account_id":"<ACCOUNT_ID>","site_id":"<SITE_ID>"}'
+```
+(The site-scoped `netlify api getSiteEnvVars` this document used to give returns
+`JSONHTTPError: Not Found` — verified 2026-11-13, netlify-cli 27.15.0. The output of `getEnvVars`
+includes secret values; do not paste it anywhere.) Check the `production`-context value of each:
 
 | Variable | Status for this deploy |
 |---|---|

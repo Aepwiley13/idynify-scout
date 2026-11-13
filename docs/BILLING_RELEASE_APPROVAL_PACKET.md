@@ -192,6 +192,142 @@ a buyer waits for a manual grant.
   (production context, Functions scope), then continue from the rebuild.
 - **The corrected script is advisory.** It confirms activation; it does not gate the webhook.
 
+## 0B. Owner Stripe review, remaining evidence gaps, and staging rehearsal plan (recorded 2026-11-13)
+
+**This section records observations and a plan awaiting approval. It authorizes nothing.** The
+rehearsal in §0B.5 has not been run. Production release status is unchanged: **NO-GO**.
+
+State changes since §0A was written, all verified from GitHub and Netlify on 2026-11-13:
+
+- PR #790 merged into `main` as `68c02dd7` at 14:35:59 UTC. CI on `main` (`rules`, `test`,
+  `billing-emulator`) passed.
+- Published deploy is still `e87691d`, locked, published 2026-11-12 19:11:44 UTC.
+- The merge happened **before** the epoch variable was cleared (§0A.4 lists them the other way
+  round). Netlify therefore built `68c02dd7` as deploy `6af7205155e9e4d701920a6e` with
+  `BILLING_LEDGER_EPOCH_UNIX=1794507945` set. **That deploy must not be published**, and neither
+  must the earlier unpublished build of `2b0c0053`. A fresh build is needed after Gate A.
+
+### 0B.1 Owner-reported observations (Stripe Dashboard and Firebase Console, from screenshots)
+
+None of these was independently checked. They were read from dashboard lists, not from an
+exhaustive date-filtered query, and the time of each observation was not recorded.
+
+| # | Observation | Maps to |
+|---|---|---|
+| O1 | Stripe Live, Payments: most recent successful payments are dated 2026-11-09. Nothing newer in the list reviewed. | S1 |
+| O2 | Stripe Live, Subscriptions: newest **active** subscription was created 2026-09-29. | S2 (active status only) |
+| O3 | Production webhook endpoint `https://idynify.com/.netlify/functions/stripe-webhook` is active. Latest visible delivery 2026-11-09, HTTP 200. | S3 |
+| O4 | Stripe Workbench, Events: latest events are `balance.available` on 2026-11-11 and 2026-11-12. Latest payment-related events 2026-11-09. No `checkout.session.completed` or `customer.subscription.*` after that date in the list reviewed. | S2, S3 |
+| O5 | Production Firestore (`idynify-scout-dev`): the five ledger collections are not in the root collection list. | F1 — still inconclusive |
+| O6 | Production rules contain the dual credit-format validation and the server-only ledger protections. | F2 |
+
+O1–O4 agree with each other and all point the same way: nothing reached the webhook, hardened
+or pre-ledger, at any time after 2026-11-09, so no purchase fell into any window in §0A.1.
+That is the expected conclusion. It is not yet the recorded one, because of the gaps below.
+
+### 0B.2 Remaining evidence gaps
+
+| Gap | Why it matters |
+|---|---|
+| G1 — no observation time and no date filter on O1–O4 | "Nothing newer in the list" depends on sort order, paging and any filter left on. The period also runs to the present, so the result must be re-read immediately before any publish. |
+| G2 — O2 covers active subscriptions only | A subscription created in the period that is now canceled, incomplete, incomplete_expired, past_due or trialing would not appear. |
+| G3 — O3 does not say whether failed deliveries were in view | A non-2xx delivery may still be in Stripe's retry schedule and would arrive at whatever code is published then. |
+| G4 — F1 not opened by direct path | The root list hides empty collections and depends on the database selected. |
+| G5 — F2 is an inspection, not a diff | Unchanged from §0A. Not needed to close reconciliation; needed before Gate C. |
+
+### 0B.3 Smallest additional read-only verification to close historical reconciliation
+
+Two Stripe reads and one Firestore read, all by the account owner, each recorded with the UTC
+time it was done:
+
+1. **Stripe Live → Workbench → Events**, date filter **from 2026-11-12 00:00 UTC to now**, no
+   type filter. Record the count of `checkout.session.completed`, `customer.subscription.created`,
+   `customer.subscription.updated`, `customer.subscription.deleted` and `invoice.*` events.
+   Every subscription in every status emits `customer.subscription.created`, so this one
+   filtered list closes G1 and G2 together. Expected: none of those types.
+2. **Stripe Live → the webhook endpoint → event deliveries**, with the failed/pending view
+   selected. Record the count of deliveries on or after 2026-11-12. Closes G3. Expected: zero.
+3. **Firebase Console → `idynify-scout-dev` → Firestore, database `(default)`**, open the path
+   `/stripeWebhookEvents` directly, then `/billingAmbiguousAccounts`. Closes G4. Expected:
+   both empty. This is corroboration: if step 1 shows no events, the hardened handler received
+   nothing to write. If step 1 is clean and either collection has documents, stop — that is a
+   contradiction to investigate, not a rounding error.
+
+If steps 1–3 come back as expected, historical reconciliation is closed as **"no customer event
+in the period; nothing to recover"**, owner-verified. If step 1 or 2 is non-zero, each event is
+reconciled individually (runbook §6.3) and the status stays unknown until that is done. Step 1
+is repeated immediately before any publish (§0A.4 step 4).
+
+### 0B.4 Staging readiness — verified 2026-11-13 on the operator machine, nothing run
+
+| Item | State | Blocker? |
+|---|---|---|
+| Staging Firebase project `idynify-staging`, separate from production | Present. `PRODUCTION_FIREBASE_PROJECT_ID` and the staging allowlist are set in the shell, so the staging tools can refuse production. | No |
+| Staging credential | `GOOGLE_APPLICATION_CREDENTIALS` is a short-lived impersonation of a service account in `idynify-staging`. Whether that account may write Firestore and deploy rules is **not yet tested**. | Check first (R0) |
+| Staging env file | Outside the repo; Firebase variables only; no Stripe or other integration keys. | No |
+| Checkout not linked to a Netlify site | Confirmed — `netlify dev --offline` would not inherit production variables. | No |
+| Staging Firestore rules | **Pre-#769** (byte-identical to `e87691d`'s). Do not match `main`. | **Yes** — needs a rules deploy to staging (R1), a write to staging that needs approval |
+| Hosted staging site | **None.** The Netlify account has one site for this repo, and it is production. Deploy previews of that site use production Firebase. | **Yes, for one part** — see below |
+| Stripe test mode | No test-mode key, webhook secret or price ids on this machine; Stripe CLI not installed. `stagingPreflight.mjs` (I5) deliberately refuses an env file holding Stripe keys, and `stagingDev.mjs` strips them. | Not for the plan below, which uses signed fixtures |
+| Firestore emulator locally | **Not runnable**: no Java runtime, `scripts/rules-check` dependencies not installed. Runs in CI (green on `68c02dd7`). | No — CI is the evidence |
+| Rehearsal driver | **Does not exist.** The existing harness (`src/test/stripeWebhook*.test.js`) targets the emulator only. Running the same handler against `idynify-staging` needs a small new script. | **Yes** — to be written and reviewed before R2 |
+
+What cannot be rehearsed in staging with the current setup: the Netlify half of activation —
+`scripts/billingLedgerCutover.mjs --apply`, the rebuild, and the `RUNTIME-VERIFIED ACTIVE`
+verdict. Those read and write one specific Netlify site, and the only site is production.
+Rehearsing them needs a second Netlify site wired to `idynify-staging`, which is new
+infrastructure and a separate decision. Without it, that half stays covered by unit tests and
+the read path already exercised against the real API, and the first live run of `--apply` is
+at Gate D. This is a risk to accept explicitly or close by creating the site.
+
+### 0B.5 Proposed staging rehearsal — AWAITING APPROVAL, NOT RUN
+
+Target: `idynify-staging` only. Every step refuses to run if the resolved project id is
+`idynify-scout-dev` or is not on the staging allowlist. No Stripe account is contacted in any
+mode: events are fixtures signed locally with a throwaway secret (`stripe.webhooks
+.generateTestHeaderString`), and the Stripe client's `customers.retrieve` and
+`subscriptions.retrieve` return fixture objects, exactly as the emulator suite does. All data
+is written under synthetic ids prefixed `rehearsal-` and removed at the end.
+
+| Step | Action | Pass | Fail |
+|---|---|---|---|
+| R0 | Credential check: `stagingRulesDeploy.mjs --validate` (deploys nothing) and one read of a `rehearsal-` document | Project resolves to `idynify-staging`; rules compile; read succeeds | Any 403, or any other project id → stop |
+| R1 | Deploy `main`'s `firestore.rules` (`68c02dd7`) to staging with `stagingRulesDeploy.mjs --apply`, then read the deployed rules back | Deployed rules byte-identical to `main`'s file | Any difference → stop |
+| R2 | Rules behaviour on staging, as a signed-in synthetic user: signup with numeric `credits`, signup with object `credits`, and a client write to each of the five ledger collections | Both signups accepted; all five ledger writes denied | Any signup denied or any ledger write accepted |
+| R3 | **Epoch disabled.** Handler run with `BILLING_LEDGER_EPOCH_UNIX` unset; deliver a signed `checkout.session.completed` for a new synthetic user | HTTP 200; one `billingAmbiguousAccounts` record, `reason: epoch_unset`, `status: pending`; no `billingAllocations` record; user's `hasCompletedPayment` and credits unchanged; one `stripeWebhookEvents` entry | Any grant, or no pending record |
+| R4 | **Activation.** Set the epoch to the current time in the handler's environment; deliver a checkout whose `created` is after it, for a second synthetic user | HTTP 200; `hasCompletedPayment: true`; the plan's initial credits; exactly one `billingAllocations` marker | No grant, or wrong credit amount, or no marker |
+| R5 | **Pre-epoch boundary.** Deliver a checkout whose `created` is before the epoch, for a third user | Flagged `pre_epoch_no_marker`, pending; no grant | Any grant |
+| R6 | **Replay / idempotency.** Redeliver R4's exact event, then deliver a second event with a new event id for the same session, then `customer.subscription.created` for the same subscription in both orders | Credits and marker count unchanged after every replay; still exactly one allocation | Any credit change or second marker |
+| R7 | **Rollback replay.** Seed a fourth user as the pre-ledger handler would leave them (granted, no marker); deliver that checkout with the epoch active | Flagged `already_shows_completed_payment_no_marker`; credits unchanged | Any second grant |
+| R8 | **Signature and failure paths.** Bad signature; then a forced Firestore failure mid-transaction; then redelivery of the failed event | 400 with no writes; 500 with no writes and the event not marked applied; redelivery applies it exactly once | 200 on a failed write, or a partial write |
+| R9 | **Identity mismatch.** Session whose `client_reference_id` and `metadata.firebaseUID` disagree | One pending record with `reason: identity_mismatch`; neither user touched | Either user modified |
+| R10 | **Recovery.** `manualCreditRecovery.mjs --dry-run` against R3's flagged user, then for real, then run it a second time | Dry run writes nothing; real run grants once, writes the marker and resolves the pending record; second run changes nothing | A second grant, or no marker |
+| R11 | **Reconcile and clean up.** `reconcileBillingSubscriptions.mjs` (read-only by design) over the rehearsal users; then delete every `rehearsal-` document | Report matches the state above with no unexplained drift; no `rehearsal-` documents remain | Unexplained drift, or leftovers |
+
+Overall pass: every step passes on one uninterrupted run from a clean state, with the commit
+sha, the resolved project id and each step's observed result recorded. Any failure stops the
+run; the rehearsal is repeated from R3 after the cause is understood.
+
+What a pass would and would not show. It shows `main`'s handler, rules and recovery script
+behave as specified against real Firestore in a separate project, including transactions and
+rules the emulator approximates. It does not show Stripe's real event payloads (fixtures are
+modelled on them), Netlify's function runtime, or the Netlify activation steps.
+
+### 0B.6 Blockers before the rehearsal can start
+
+1. **Approval to write to `idynify-staging`**: one rules deploy (R1) and the `rehearsal-`
+   documents.
+2. **The rehearsal driver must be written** (a script plus fixtures, no change to any
+   function) and reviewed. It adds files to the repo, so it needs its own branch and PR.
+3. **R10 and R11 need a decision**: `manualCreditRecovery.mjs` validates evidence against
+   Stripe, and `reconcileBillingSubscriptions.mjs` reads subscriptions from Stripe. Run both
+   against fixtures through the driver, or supply a Stripe **test-mode** restricted key on the
+   operator machine for those two steps only. The owner enters any key; it is never typed or
+   printed by the tooling.
+4. **Staging credential permissions are untested** until R0.
+5. **Decision on the Netlify half of activation**: accept it as unrehearsed, or create a
+   staging Netlify site first.
+
 ## 1. Roles
 
 **Confirmed by the account owner.** This assignment confirms ownership only — it does **not**

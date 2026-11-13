@@ -29,8 +29,13 @@ What that changes about following this document now:
   **false** for any build made after that write — such a build has allocation on from the moment
   it is published. Either clear the variable first to get §2–§4's sequence back, or accept that
   publishing arms it and go straight to §4's verification.
-- **§1 (production rules deploy) is unconfirmed.** Verify it in the Firebase Console before
-  publishing; `main`'s signup writes a `credits` shape the old rules reject.
+- **§1 (production rules): inspected in the Firebase Console on 2026-11-13.** The published
+  version contains `signupBillingLegacyNumber()`, `signupBillingObjectShape()` and
+  `signupBilling()` (both numeric and object `credits` accepted at signup) and the server-only
+  blocks for the billing ledger collections, so `main`'s signup is not rejected by production
+  rules. This was a check for those elements, not a full diff against `main`'s `firestore.rules`,
+  and it covers rules only — it is not a statement that the billing workflow is safe to publish.
+  Re-check if rules are deployed again before release.
 - **`scripts/billingLedgerCutover.mjs` could not have produced any result on 2026-11-12** — its
   env-var read used an API call that returns Not Found. It is fixed now (§0.2); treat any
   activation claim from before the fix as unverified.

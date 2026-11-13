@@ -32,20 +32,26 @@ Read from Netlify's own deploy and environment-variable records and from git. Ti
   published runtime** — the published code never reads it. Any production build made after
   18:26:07 on 2026-11-12 (including the existing unpublished `2b0c0053` build) carries the value,
   so publishing such a build turns automatic allocation on immediately, with no separate arming step.
-- **Firestore rules (production, `idynify-scout-dev`):** **not verified.** Whether step 5 was run
-  has not been confirmed from the Firebase Console. This matters: `main`'s `Signup.jsx` writes
-  `credits` as an object, which only this PR's rules accept — publishing `main` over the old rules
-  would reject every new signup.
+- **Firestore rules (production, `idynify-scout-dev`):** **inspected by the account owner in the
+  Firebase Console on 2026-11-13.** The published rules version contains
+  `signupBillingLegacyNumber()`, `signupBillingObjectShape()` and `signupBilling()` — so signup
+  accepts `credits` as either the legacy number or the object `main`'s `Signup.jsx` writes — and
+  the server-only blocks for the billing ledger collections. That removes the specific risk that
+  publishing `main` would reject every new signup. **What this does and does not establish:** it
+  is a visual inspection for those elements, not a byte-for-byte comparison with `main`'s
+  `firestore.rules`, and it says nothing about the webhook, the epoch, or the unreconciled
+  purchases below. It is not evidence that the production billing workflow as a whole is safe.
 - **The "RUNTIME-VERIFIED ACTIVE" confirmation was never produced by the script.**
   `scripts/billingLedgerCutover.mjs` called `netlify api getSiteEnvVars`, which returns
   `JSONHTTPError: Not Found` for this site, so it could only ever exit at "Failed to query
   Netlify". The script now uses the account-scoped `getEnvVars`. Any earlier report of step 10
   passing rests on something other than this script's output.
 
-**Open before `main` can be published** (none of these are done):
+**Open before `main` can be published** (item 1 is checked; items 2–4 are not done):
 
-1. Confirm in the Firebase Console that production rules are `main`'s `firestore.rules`, or
-   deploy them (step 5) first.
+1. ~~Confirm production Firestore rules.~~ Inspected 2026-11-13 (see above): the signup and
+   ledger-collection rules this PR needs are published. Re-check if rules are deployed again
+   before release; a full diff against `main`'s `firestore.rules` has not been done.
 2. Review `billingAmbiguousAccounts` for records created 18:16–19:11 on 2026-11-12 — purchases in
    the two epoch-less windows (18:16–18:28, 18:57–19:11) were flagged, not granted.
 3. Purchases since 19:11:44 were handled by pre-ledger code: granted with no

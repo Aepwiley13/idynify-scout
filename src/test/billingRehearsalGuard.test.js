@@ -11,7 +11,7 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   STAGING_PROJECT, FIXTURE_STRIPE_KEY, FIXTURE_WEBHOOK_SECRET, FIXTURE_PRICES, CONFIRM_VARIABLE, MODE_VARIABLE, RUN_ID_VARIABLE,
-  RehearsalRefusal, resolveTarget, isLoopbackHost, assertStripeFixturesOnly, assertRunId, newRunId,
+  RehearsalRefusal, resolveTarget, assertClientProject, readClientProject, isLoopbackHost, assertStripeFixturesOnly, assertRunId, newRunId,
   assertRehearsalDocPath, isRehearsalUid, isRehearsalStripeId,
 } from '../../scripts/staging/billingRehearsal/guard.mjs';
 import {
@@ -92,6 +92,49 @@ describe('billing rehearsal — target: the emulator or the pinned staging proje
     for (const host of ['', undefined, '10.0.0.5:8080', 'localhost.evil.example:8080', 'example.com', '127.0.0.1.example.com:80', 'http://localhost:8080']) {
       expect(isLoopbackHost(host)).toBe(false);
     }
+  });
+});
+
+describe('billing rehearsal — the live Admin SDK must name the checked project, or the run refuses', () => {
+  const staging = { mode: 'staging', projectId: STAGING_PROJECT };
+  const DEMO = 'demo-billing-tests';
+  const emulator = { mode: 'emulator', projectId: DEMO };
+  const both = (id) => ({ appProjectId: id, firestoreProjectId: id });
+
+  it('accepts the staging project in staging mode, and a demo- namespace only against the emulator', () => {
+    expect(assertClientProject(staging, both(STAGING_PROJECT))).toBe(STAGING_PROJECT);
+    expect(assertClientProject(emulator, both('demo-billing-tests'))).toBe('demo-billing-tests');
+    expect(assertClientProject(emulator, both(STAGING_PROJECT))).toBe(STAGING_PROJECT);
+    expect(refusal(() => assertClientProject(staging, both('demo-billing-tests')))).toMatch(/different project/);
+  });
+
+  it('fails closed when either project id cannot be resolved', () => {
+    for (const target of [staging, emulator]) {
+      for (const missing of [undefined, null, '']) {
+        expect(refusal(() => assertClientProject(target, { appProjectId: missing, firestoreProjectId: STAGING_PROJECT }))).toMatch(/could not be resolved/);
+        expect(refusal(() => assertClientProject(target, { appProjectId: STAGING_PROJECT, firestoreProjectId: missing }))).toMatch(/could not be resolved/);
+        expect(refusal(() => assertClientProject(target, both(missing)))).toMatch(/could not be resolved/);
+      }
+    }
+  });
+
+  it('refuses any other project, a disagreement between the two, or no checked target', () => {
+    for (const target of [staging, emulator]) {
+      expect(refusal(() => assertClientProject(target, both(PROD)))).toMatch(/different project/);
+      expect(refusal(() => assertClientProject(target, both(OTHER)))).toMatch(/different project/);
+    }
+    expect(refusal(() => assertClientProject(emulator, { appProjectId: 'demo-a', firestoreProjectId: 'demo-b' }))).toMatch(/name different projects/);
+    expect(refusal(() => assertClientProject(null, both(STAGING_PROJECT)))).toMatch(/No checked target/);
+    expect(refusal(() => assertClientProject({ mode: 'production', projectId: PROD }, both(PROD)))).toMatch(/No checked target/);
+  });
+
+  it('an SDK object that throws or lacks the value reads as unresolved, and is therefore refused', () => {
+    const throwing = { get projectId() { throw new Error('INTERNAL ERROR: Client is not yet ready to issue requests.'); } };
+    const read = readClientProject(throwing, { options: {} });
+    expect(read).toEqual({ appProjectId: null, firestoreProjectId: null });
+    expect(refusal(() => assertClientProject(staging, read))).toMatch(/could not be resolved/);
+    expect(readClientProject({ projectId: STAGING_PROJECT }, { options: { projectId: STAGING_PROJECT } })).toEqual(both(STAGING_PROJECT));
+    expect(readClientProject({ projectId: STAGING_PROJECT }, undefined).appProjectId).toBeNull();
   });
 });
 
@@ -376,6 +419,10 @@ describe('billing rehearsal — it changes no billing function', () => {
     const importAt = spec.indexOf("await import('../../netlify/functions/firebase-admin.js')");
     expect(guardAt).toBeGreaterThan(0);
     expect(importAt).toBeGreaterThan(guardAt);
+    // …and checks the live SDK's project before the first step can read or write.
+    const clientCheckAt = spec.indexOf('assertClientProject(target, readClientProject(');
+    expect(clientCheckAt).toBeGreaterThan(importAt);
+    expect(spec.indexOf('ctx = {')).toBeGreaterThan(clientCheckAt);
     expect(spec).not.toMatch(/import .* from '\.\.\/\.\.\/netlify\/functions/);
     expect(spec).not.toMatch(/billingTestUtils|wipeBillingCollections/);
   });

@@ -13,8 +13,8 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import { writeFileSync } from 'node:fs';
 import process from 'node:process';
 import {
-  resolveTarget, assertStripeFixturesOnly, assertRunId, newRunId, RehearsalRefusal,
-  FIXTURE_STRIPE_KEY, FIXTURE_WEBHOOK_SECRET, FIXTURE_PRICES, EMULATOR_PROJECT, STAGING_PROJECT,
+  resolveTarget, assertClientProject, readClientProject, assertStripeFixturesOnly, assertRunId, newRunId, RehearsalRefusal,
+  FIXTURE_STRIPE_KEY, FIXTURE_WEBHOOK_SECRET, FIXTURE_PRICES, EMULATOR_PROJECT,
   MODE_VARIABLE, RUN_ID_VARIABLE, KEEP_VARIABLE, REPORT_VARIABLE,
 } from '../../scripts/staging/billingRehearsal/guard.mjs';
 import { store, resetStore, idsFor, makeFixtureStripeClass } from '../../scripts/staging/billingRehearsal/fixtures.mjs';
@@ -59,19 +59,10 @@ describe.skipIf(!EMULATOR && !STAGING)(
 
       // 3. Only now: the real Firestore client, the real handler, the real recovery transaction.
       const { db } = await import('../../netlify/functions/firebase-admin.js');
-      // The client's own idea of its project, checked again now that it exists. Against the
-      // emulator any "demo-" namespace is acceptable; against staging only the pinned project.
-      // (The getter throws until the client knows its project; the environment check above
-      // has already pinned it, so "not known yet" is not a refusal.)
-      let clientProject = null;
-      try {
-        clientProject = db.projectId;
-      } catch {
-        clientProject = null;
-      }
-      const clientOk = !clientProject || clientProject === STAGING_PROJECT
-        || (target.mode === 'emulator' && clientProject.startsWith('demo-'));
-      if (!clientOk) throw new RehearsalRefusal('The Firestore client resolved a different project than the one that was checked.');
+      // The SDK's own idea of its project, checked before the first read or write. Fail
+      // closed: an id that cannot be resolved is a refusal (guard.mjs: assertClientProject).
+      const { getApp } = await import('firebase-admin/app');
+      assertClientProject(target, readClientProject(db, getApp()));
       const { handler } = await import('../../netlify/functions/stripe-webhook.js');
       const recovery = await import('../../scripts/manualCreditRecovery.mjs');
       const { default: RealStripe } = await vi.importActual('stripe');

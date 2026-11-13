@@ -46,7 +46,7 @@ import { readStagingCredential, describe, CredentialRefusal, KEY_VARIABLE, FILE_
 import {
   STAGING_PROJECT, FIXTURE_STRIPE_KEY, FIXTURE_WEBHOOK_SECRET, FIXTURE_PRICES, PROJECT_VARIABLES, REHEARSAL_COLLECTIONS,
   MODE_VARIABLE, CONFIRM_VARIABLE, RUN_ID_VARIABLE, KEEP_VARIABLE, REPORT_VARIABLE,
-  RehearsalRefusal, resolveTarget, assertStripeFixturesOnly, assertRunId, newRunId,
+  RehearsalRefusal, resolveTarget, assertClientProject, readClientProject, assertStripeFixturesOnly, assertRunId, newRunId,
 } from './billingRehearsal/guard.mjs';
 import { SLOTS, EVENT_LABELS, idsFor } from './billingRehearsal/fixtures.mjs';
 import { STEPS } from './billingRehearsal/steps.mjs';
@@ -194,7 +194,12 @@ async function cleanup(plan) {
   for (const name of Object.keys(process.env)) {
     if (!(name in plan.env)) delete process.env[name];
   }
+  // The same two checks a run makes, in the same order: the environment, then the live SDK.
+  const target = resolveTarget(process.env, { credential: readStagingCredential(process.env) });
+  if (target.mode !== 'staging') throw new RehearsalRefusal('Clean-up did not resolve to the staging project.');
   const { db } = await import('../../netlify/functions/firebase-admin.js');
+  const { getApp } = await import('firebase-admin/app');
+  assertClientProject(target, readClientProject(db, getApp()));
   const { deleteRunDocs } = await import('./billingRehearsal/cleanup.mjs');
   const done = await deleteRunDocs(db, plan.runId);
   console.log(`Removed ${done.deleted.length} documents for run ${plan.runId}; ${done.remaining} remain.`);

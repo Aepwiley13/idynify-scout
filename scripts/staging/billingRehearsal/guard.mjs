@@ -158,6 +158,38 @@ export function resolveTarget(env, { credential = null } = {}) {
   return { mode: 'staging', projectId };
 }
 
+/**
+ * The second check, made once the Admin SDK exists and before the first read or write: what
+ * project do the SDK's own objects say they are bound to? `appProjectId` is the initialized
+ * app's option, `firestoreProjectId` the Firestore client's. FAIL CLOSED: a value that is
+ * missing or could not be read is a refusal, not a pass, and the two must agree.
+ */
+export function assertClientProject(target, { appProjectId, firestoreProjectId }) {
+  const acceptable = (id) => id === STAGING_PROJECT || (target?.mode === 'emulator' && typeof id === 'string' && id.startsWith('demo-'));
+  if (target?.mode !== 'staging' && target?.mode !== 'emulator') throw new RehearsalRefusal('No checked target to compare the client against.');
+  for (const [label, id] of [['Admin app', appProjectId], ['Firestore client', firestoreProjectId]]) {
+    if (!set(id)) throw new RehearsalRefusal(`The ${label}'s project id could not be resolved. Refusing rather than assuming it is the checked one.`);
+    if (!acceptable(id)) throw new RehearsalRefusal(`The ${label} is bound to a different project than the one that was checked.`);
+  }
+  if (appProjectId !== firestoreProjectId) throw new RehearsalRefusal('The Admin app and the Firestore client name different projects.');
+  if (target.mode === 'staging' && firestoreProjectId !== target.projectId) {
+    throw new RehearsalRefusal('The Firestore client is bound to a different project than the one that was checked.');
+  }
+  return firestoreProjectId;
+}
+
+/** Reads both ids from the live SDK objects; anything unreadable comes back null (and is then refused). */
+export function readClientProject(db, app) {
+  const safe = (fn) => {
+    try {
+      return fn() ?? null;
+    } catch {
+      return null;
+    }
+  };
+  return { appProjectId: safe(() => app.options.projectId), firestoreProjectId: safe(() => db.projectId) };
+}
+
 // ── Rehearsal data: what a rehearsal may create, and therefore what it may delete ────────────
 
 /** The only collections a rehearsal document may live in. */

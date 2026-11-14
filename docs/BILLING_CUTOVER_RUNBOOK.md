@@ -10,35 +10,45 @@ protects against a double grant is `decideAllocationEligibility`'s own consisten
 followed. This document governs the one thing those guards don't: whether automatic allocation
 is active at all.
 
-## Current state (recorded 2026-11-13) — read this first
+## Current state (recorded 2026-11-14) — read this first
 
-This checklist was written for a first deployment of PR #769. That deployment was **attempted on
-2026-11-12 and rolled back the same day**; the release is **not complete**. The timeline and the
-open items are in [BILLING_RELEASE_APPROVAL_PACKET.md §0](BILLING_RELEASE_APPROVAL_PACKET.md).
+**The hardened billing release is live and automatic allocation is active.** The full record,
+with times and evidence, is in
+[BILLING_RELEASE_APPROVAL_PACKET.md §0D](BILLING_RELEASE_APPROVAL_PACKET.md).
+
+| Item | Value |
+|---|---|
+| Published deploy | `6af7eb63f100baecacae5dab`, commit `1d76b4b6704db96454719b8dd9cc51c408b81933`, published 2026-11-14 05:11:55 UTC |
+| `BILLING_LEDGER_EPOCH_UNIX` | `1794632515` (2026-11-14T05:01:55Z), production context, written 05:02:04 UTC |
+| Activation | `RUNTIME-VERIFIED ACTIVE` from `scripts/billingLedgerCutover.mjs` at 05:13:30 UTC |
+| Netlify auto-publishing | **Locked.** A merge to `main` is built and not published |
+| Rollback deploy, allocation off | `6af7ded643254da55bd6aaa4` — the same commit, built while the epoch was absent. Keep it |
+| Production Firestore rules | Ruleset `004fb6b9-8c1a-449c-b4b0-c775673bb4b8`, byte-identical to `main`'s `firestore.rules` |
+| Site | `idynify`, id `071d2992-0d26-4f8a-a84e-5022a3e2fd8d` |
+
 What that changes about following this document now:
 
-- **Production serves `e87691d`, pre-#769 code, with Netlify auto-publishing locked.** The live
-  webhook is the unhardened handler. §5's "never roll back below the ledger commit" was violated
-  by that rollback, so §6's inventory applies to every purchase since 2026-11-12 19:11:44 UTC —
-  the unhardened handler granted them with no `billingAllocations` marker.
-- **PR #769 is already merged** (`2f53861f`); `main` is `2b0c0053`. §0.1's "check out the PR
-  branch, never `main`" is obsolete — `main` now contains this code and these rules. §2's merge
-  is done; what remains is *publishing*, which is blocked by the lock and by the open items.
-- **`BILLING_LEDGER_EPOCH_UNIX` is already set** (`1794507945`, written 2026-11-12 18:26:07 UTC).
-  §0.2's "must be unset" no longer holds, and §2's "allocation is OFF during the deploy" is
-  **false** for any build made after that write — such a build has allocation on from the moment
-  it is published. Either clear the variable first to get §2–§4's sequence back, or accept that
-  publishing arms it and go straight to §4's verification.
-- **§1 (production rules): inspected in the Firebase Console on 2026-11-13.** The published
-  version contains `signupBillingLegacyNumber()`, `signupBillingObjectShape()` and
-  `signupBilling()` (both numeric and object `credits` accepted at signup) and the server-only
-  blocks for the billing ledger collections, so `main`'s signup is not rejected by production
-  rules. This was a check for those elements, not a full diff against `main`'s `firestore.rules`,
-  and it covers rules only — it is not a statement that the billing workflow is safe to publish.
-  Re-check if rules are deployed again before release.
-- **`scripts/billingLedgerCutover.mjs` could not have produced any result on 2026-11-12** — its
-  env-var read used an API call that returns Not Found. It is fixed now (§0.2); treat any
-  activation claim from before the fix as unverified.
+- **§0–§4 describe a first deployment and are done.** They are kept as the record of the
+  procedure. Do not run them again as written: §0.2's "epoch must be unset" and §2's "allocation
+  is off during the deploy" no longer describe production.
+- **Every production build made from now on carries the epoch.** Publishing one keeps automatic
+  allocation on; there is no separate arming step, and §3–§4 do not need repeating. To confirm
+  after a publish:
+  `node scripts/billingLedgerCutover.mjs --expect-commit <published sha> --site 071d2992-0d26-4f8a-a84e-5022a3e2fd8d`
+  and expect `RUNTIME-VERIFIED ACTIVE`.
+- **While the lock is on, publishing is a manual step** in the Netlify UI, on the specific
+  deploy, after checking its id. Unlocking is a separate, explicit decision (packet §0D.5).
+- **The epoch value is a fixed boundary. Do not change it.** A checkout session created before
+  it and never granted is flagged `pre_epoch_no_marker` and is recovered by hand (§8). The old
+  value `1794507945` is never reused.
+- **Rollback, if automatic allocation misbehaves:** publish `6af7ded643254da55bd6aaa4` in the
+  Netlify UI. It is the hardened code with allocation off: purchases are flagged `epoch_unset`
+  and granted by hand. Removing the epoch variable is a follow-up, not the first move.
+- **Never publish `6af501a01bf9092b54673393` (`e87691d8`) or any other pre-ledger build** (§5).
+  That deploy still exists in Netlify's list. It was the live deploy until 2026-11-14 04:36:36
+  UTC.
+- **Monitoring after activation is §9.** No real purchase had reached the hardened handler when
+  this was written.
 
 ## 0. Preconditions — all of this before any production deployment
 
@@ -538,3 +548,118 @@ own, separately approved actions; no tool in this repository performs them.
 - Reuse another customer's evidence, or run without evidence.
 - Put a Stripe key or a service-account key in the repository, a file under it, a ticket or a chat.
 - Leave the Stripe key or a key file in place after the sitting.
+
+## 9. After activation: read-only monitoring
+
+For the monitoring owner (packet §1). Every step here is a read: the Stripe Dashboard in Live
+mode, and the Firebase Console for `idynify-scout-dev`, database `(default)`. Nothing in this
+section creates a purchase, grants credits or edits a record. If a check fails, the response is
+§8 (manual recovery) or the rollback in "Current state", each with its own approval.
+
+Open a Firestore collection by typing its path (for example `/billingAllocations`). The root
+list hides empty collections. Parked events live at `/stripeWebhookPendingEvents/{cus_…}/events`
+and the parent document is never written, so open that full path, or look for the customer id
+shown in italics under `/stripeWebhookPendingEvents`.
+
+### 9.1 The first real purchase (Starter or Pro)
+
+Do this for the first paid checkout after 2026-11-14 05:11:55 UTC, and record the result in the
+packet (§0D.5, criterion 1).
+
+**In Stripe, collect the identifiers.** Workbench → Events → the `checkout.session.completed`
+event. Note:
+
+| Identifier | Where | Used for |
+|---|---|---|
+| Event id `evt_…` | The event itself | `stripeWebhookEvents` |
+| Session id `cs_…` and `created` time | Event payload, `data.object.id` / `created` | Epoch boundary, review queue |
+| `client_reference_id` | Event payload | The Firebase uid for a Payment Link purchase |
+| Customer id `cus_…` | `data.object.customer` | Account mapping |
+| Subscription id `sub_…` | `data.object.subscription` | `billingAllocations` |
+| Price id | The subscription's item | Starter or Pro |
+| `payment_status` | Event payload | Must be `paid` |
+
+**Then check, in this order:**
+
+| # | Check | Where | Pass |
+|---|---|---|---|
+| 1 | Webhook delivery | Stripe → Webhooks → `https://idynify.com/.netlify/functions/stripe-webhook` → Event deliveries, for this `evt_…` | HTTP 200. A 500 followed by a 200 on Stripe's retry is acceptable; a delivery still failing is not |
+| 2 | Event recorded | `/stripeWebhookEvents/{evt_…}` | Exists, `type: checkout.session.completed` |
+| 3 | Account mapping | `/users/{client_reference_id}` | The document exists; its email is the Stripe customer's email; `stripeCustomerId` is this `cus_…`; `stripeSubscriptionId` is this `sub_…` |
+| 4 | Exactly one marker | `/billingAllocations/{sub_…}` | Exists, with `uid` equal to the uid in check 3, `priceId` equal to the purchased price, and a `grantedAt` time. The document id is the subscription id, so there cannot be two for one subscription. Confirm no other `billingAllocations` document has this `uid` unless the account has genuinely held another subscription |
+| 5 | Credits | `/users/{uid}` → `credits` | Starter: `total: 400, used: 0, remaining: 400`. Pro: `total: 1250, used: 0, remaining: 1250`. `tierLimits.creditsPerMonth` matches. `subscriptionTier` is `starter` or `pro` |
+| 6 | Access | `/users/{uid}` | `hasCompletedPayment: true`, `subscriptionStatus: active`, `paymentCompletedAt` set, `billingLock: null` |
+| 7 | Customer view | The customer's own account, or their confirmation | They can use the product and see the plan's balance |
+| 8 | Review queue | `/billingAmbiguousAccounts`, filter `status == pending` | No record for this uid or session |
+| 9 | Nothing left parked | `/stripeWebhookPendingEvents/{cus_…}/events` | Empty once check 2 passes |
+
+**Reading the result.**
+
+- All nine pass: the first purchase is verified. Record the event id, subscription id, uid, tier
+  and the time checked.
+- **Check 9, during the first seconds.** Stripe may deliver `customer.subscription.created`
+  before `checkout.session.completed`. A Payment Link customer cannot be matched to an account
+  until the checkout event binds them, so that event is parked and then drained. A parked
+  event that is still there after check 2 passes is a finding.
+- **A pending review record is the system working, not a loss.** Read its `reason`:
+
+  | `reason` | Meaning | Response |
+  |---|---|---|
+  | `pre_epoch_no_marker` | The session was created before 2026-11-14T05:01:55Z | §8, with approval |
+  | `epoch_unset` | The published build has no epoch. Not expected now | Stop: check which deploy is published |
+  | `identity_mismatch` | The session and customer name different accounts | Resolve with the customer; not a grant |
+  | `not_paid` | Session not paid at the time | Check the invoice; §8 only once paid |
+  | `unknown_price` | A price that is not one of the three configured | Check the Payment Link and the price variables |
+  | `customer_mismatch`, `replacement_not_authorized` | The account already has a different customer or subscription | Review both subscriptions before anything else |
+  | `already_shows_completed_payment_no_marker`, `subscription_dead_no_marker` | The consistency guards refused a possible double grant | Review; do not resend the event |
+
+- **Credits granted but no marker, or two grants:** stop and treat as an incident (rollback in
+  "Current state"). Neither is an expected outcome.
+- **A $0 Scout Starter Free checkout** grants nothing and flags nothing by design: checks 1–3
+  and 8 apply, checks 4–6 do not.
+
+### 9.2 The next genuine renewal or cancellation
+
+These arrive as `customer.subscription.updated` and `customer.subscription.deleted`. They never
+grant or remove credits; they keep the account's subscription fields in step with Stripe. The
+first one after activation is also the first time the hardened handler's lifecycle path runs
+against a real, pre-existing subscriber.
+
+**In Stripe:** note the event id, the subscription id, the customer id, and the subscription's
+`status`, current period start and end, and `cancel_at_period_end`.
+
+| # | Check | Where | Pass |
+|---|---|---|---|
+| 1 | Webhook delivery | Stripe → the endpoint → Event deliveries | HTTP 200 |
+| 2 | Event recorded | `/stripeWebhookEvents/{evt_…}` | Exists, with the event's type |
+| 3 | Right account | `/users` filtered by `stripeCustomerId == cus_…` | Exactly one account, and it is the right customer |
+| 4 | Fields in step with Stripe | That user document | `subscriptionStatus` equals Stripe's status; `currentPeriodStart` and `currentPeriodEnd` equal Stripe's period; `cancelAtPeriodEnd` matches; `stripeSubscriptionId` is this subscription |
+| 5 | Credits untouched | Same document | `credits` unchanged by this event. No new `billingAllocations` document |
+| 6 | Cancellation only | Same document | On `customer.subscription.deleted`, or a status of `canceled` or `incomplete_expired`: `subscriptionStatus: canceled` and `hasCompletedPayment: false`. A cancellation scheduled for period end shows `cancelAtPeriodEnd: true` and leaves access in place until the period ends |
+| 7 | Review queue | `/billingAmbiguousAccounts`, `status == pending` | No record naming this subscription (`details.subscriptionId` or `details.incomingSubscription`) |
+| 8 | Not parked | `/stripeWebhookPendingEvents/{cus_…}/events` | Empty |
+
+**Reading the result.**
+
+- **Parked and not recorded (check 8 fails, check 2 fails):** no account has this
+  `stripeCustomerId`. The delivery still answers 200. For an existing subscriber this means their
+  account was never linked to the Stripe customer; it is a data finding to review, and the
+  account's access is unchanged by it.
+- **Flagged `replacement_not_authorized` or `customer_mismatch`:** the account has a different
+  subscription or customer on file than the one Stripe reported. The fields were not applied.
+  Review both before changing anything.
+- **Several events for one subscription:** a renewal emits more than one update. Compare the
+  account against the latest event, not each one.
+- `currentPeriodStart`, `currentPeriodEnd`, `cancelAtPeriodEnd` and `pauseCollection` are new
+  with this release. An existing subscriber's account gains them on their first lifecycle event.
+
+`scripts/reconcileBillingSubscriptions.mjs` reports the same comparison for every paying account
+at once. It is read-only, and it needs a read-only Firestore credential and a Stripe key in the
+operator's shell (see its header).
+
+### 9.3 What to watch routinely
+
+- `billingAmbiguousAccounts` with `status == pending`: every record is a customer waiting or a
+  question to answer.
+- Stripe's failed-deliveries view for the production endpoint.
+- The `stripe-webhook` function's errors in Netlify's function logs.

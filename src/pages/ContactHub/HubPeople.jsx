@@ -25,7 +25,7 @@ import ManualContactForm from '../../components/scout/ManualContactForm';
 import StickerChipRow from './StickerChipRow';
 import {
   HUB_STATUS, listMyPeople, visiblePeople, personName, personSubtitle, emailOf, phoneOf, addedLabel,
-} from './hubPeople';
+} from './peopleRules';
 
 /** The add form's wording here: no pipeline, no enrichment, no Scout+. */
 const ADD_COPY = Object.freeze({

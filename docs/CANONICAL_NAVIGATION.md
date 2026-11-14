@@ -25,6 +25,59 @@ in their tree imports it.
 
 ---
 
+## Contact Hub (Phase 1A) — a destination behind a switch
+
+**Code:** `src/constants/contactHub.js`, `src/pages/ContactHub/` · **Tests:** `src/test/contactHubSwitch.test.js`, `src/test/contactHubRoutes.test.jsx`, `src/test/contactHubPage.test.jsx`
+
+```
+/contact-hub                      ContactHubMain → HubPeople   (My People)
+/contact-hub/person/:contactId    ContactHubMain → HubPerson   (simple profile)
+```
+
+A simple home for the people a user knows. Phase 1A is My People only; Connect
+and My Card are not built and have no routes, tabs or placeholders.
+
+**Off by default.** The Contact Hub exists only in a build made with
+`VITE_CONTACT_HUB=on` (`true` and `1` are also accepted; anything else,
+including unset, is off). The one constant, `CONTACT_HUB.enabled`, decides three
+things together, so they cannot disagree:
+
+| Surface | Switch off | Switch on |
+|---|---|---|
+| Sidebar (`SIDEBAR_ORDER`) | Unchanged | **Contact Hub** directly under Mission Control |
+| Mobile drawer (`mobileDrawerSections`) | Unchanged | Contact Hub with Mission Control in the top run |
+| Routes (`contactHubRoutes()` in `App.jsx`) | Not registered: both URLs reach the catch-all | Both registered, inside the shell route group |
+
+It is a build-time switch for the whole app, not a per-account rollout. The
+existing paid-access check on the shell route group applies to it unchanged.
+
+**Where it sits in the model.** `CONTACT_HUB_DESTINATION` is ungrouped, like
+Command Center: the three locked groups describe the sales pipeline, and this
+is not part of it. Its mobile bottom bar has one cell, My People.
+
+**It is not a canonical record route and does not replace one.**
+`/contact/:contactId` remains the one full profile for a person, reached from
+every module through `openContact`. `/contact-hub/person/:contactId` is a
+separate, deliberately smaller view of the same contact record: the existing
+card in its `variant="simple"` form, plus notes. Contact Hub does not link to
+the full profile, does not call `openContact`, and declares no arrival, so the
+breadcrumb there is always Contact Hub.
+
+**Same data, no new store.** My People reads `users/{uid}/contacts`, the
+collection People reads, with the same exclusions (archived, company archived,
+deferred). It writes only through code that already existed: the manual add
+form, the sticker components and the contact card's inline edits. People in
+Command Center is untouched.
+
+**Staging QA.** Put `VITE_CONTACT_HUB=on` in the staging env file that
+`scripts/staging/stagingDev.mjs` is started with. That runner drops every
+`VITE_*` variable from the shell, so the env file is the only source.
+
+**Rollback.** Build without the variable. Nothing is written by turning it on
+or off, so there is no data to roll back.
+
+---
+
 ## The helpers
 
 **No module calls `navigate('/scout/contact/…')` directly.** Every entry point

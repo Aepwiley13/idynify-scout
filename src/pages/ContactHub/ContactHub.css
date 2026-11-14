@@ -4,7 +4,10 @@
 
    Mobile first: every control a thumb is meant to hit is at least 44px. */
 
-.hub { width: 100%; }
+/* On a phone the shell gives module content no padding of its own
+   (MainLayout.css: .page-content { padding: 0 } under 768px), so the gutter is
+   ours. Above that the shell pads the page and this adds nothing. */
+.hub { width: 100%; box-sizing: border-box; padding: 16px 16px 24px; }
 .hub-inner { max-width: 960px; margin: 0 auto; }
 
 /* ── Heading ── */
@@ -30,6 +33,7 @@
 }
 .hub-search:focus-within { outline: 2px solid #4f46e5; outline-offset: 1px; }
 
+.hub-toolbar > .hub-primary-btn { flex: 1 1 100%; }
 .hub-primary-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   min-height: 48px; padding: 0 18px; border: none; border-radius: 14px;
@@ -53,7 +57,7 @@
 .hub-chips::-webkit-scrollbar { display: none; }
 .hub-chip {
   display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
-  min-height: 40px; padding: 0 14px; border-radius: 20px;
+  min-height: 44px; padding: 0 14px; border-radius: 22px;
   font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
 }
 .hub-chip-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
@@ -73,9 +77,11 @@
 .hub-row {
   position: relative; display: grid; align-items: center; column-gap: 12px; row-gap: 4px;
   grid-template-columns: 48px minmax(0, 1fr) auto;
+  /* Stickers take the full width under the name, so they are not squeezed by
+     the call and email buttons. */
   grid-template-areas:
-    "avatar main    actions"
-    "avatar stickers actions";
+    "avatar main     actions"
+    "avatar stickers stickers";
   padding: 12px 4px; border-top: 1px solid;
 }
 .hub-row:first-child { border-top: none; }
@@ -111,9 +117,11 @@
 .hub .stk-add-btn--compact { min-width: 28px; min-height: 28px; }
 
 /* ── Add Person dialog: full screen on a phone ── */
-.hub-dialog-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 80; }
+/* Above the shell's sidebar (100) and mobile bottom bar (200): on a phone the
+   dialog is the whole screen, and the bar must not sit on its last buttons. */
+.hub-dialog-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.5); z-index: 400; }
 .hub-dialog {
-  position: fixed; z-index: 81; inset: 0; overflow-y: auto; box-sizing: border-box;
+  position: fixed; z-index: 401; inset: 0; overflow-y: auto; box-sizing: border-box;
   padding: 16px 16px calc(24px + env(safe-area-inset-bottom)); border: 0 solid;
 }
 .hub-dialog-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
@@ -128,6 +136,8 @@
 
 /* ── Wider screens ── */
 @media (min-width: 769px) {
+  .hub { padding: 0; }
+  .hub-toolbar > .hub-primary-btn { flex: 0 0 auto; }
   .hub-card { padding: 22px 24px; }
   .hub-title { font-size: 32px; }
   .hub-section-title { flex: 0 0 auto; margin-right: auto; }
@@ -152,3 +162,6 @@
 @media (prefers-reduced-motion: no-preference) {
   .hub-row { transition: background 0.12s ease; }
 }
+
+/* The existing Stickers view, given room under the chips. */
+.hub .stk-wall { margin-top: 16px; }

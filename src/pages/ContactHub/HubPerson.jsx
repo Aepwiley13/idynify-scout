@@ -16,7 +16,7 @@ import { useT } from '../../theme/ThemeContext';
 import { CONTACT_HUB_PATH } from '../../constants/contactHub';
 import IdentityCard from '../../components/contacts/IdentityCard';
 import StickyNotes from '../../components/contacts/StickyNotes';
-import { HUB_STATUS, isListedInMyPeople } from './hubPeople';
+import { HUB_STATUS, isListedInMyPeople } from './peopleRules';
 
 function BackLink() {
   const T = useT();

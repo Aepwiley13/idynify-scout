@@ -26,7 +26,7 @@ import { useActiveUserId } from '../../context/ImpersonationContext';
 import { useT } from '../../theme/ThemeContext';
 import { StickersProvider } from '../../components/stickers/StickersContext';
 import { withMembershipChange } from '../../services/stickers/stickerCore';
-import { HUB_STATUS } from './hubPeople';
+import { HUB_STATUS } from './peopleRules';
 import './ContactHub.css';
 
 export default function ContactHubMain() {

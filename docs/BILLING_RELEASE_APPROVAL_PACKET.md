@@ -1,14 +1,16 @@
 # Billing ledger — release approval packet
 
-**Status: ATTEMPTED, THEN ROLLED BACK — NOT COMPLETE.** PR #769 was merged and a cutover was
-attempted on 2026-11-12. Production was then rolled back to a commit that predates this PR. The
-hardened billing code is **not** what production currently serves, and the release's completion
-criterion (§3 step 10, on the currently published deploy) is **not** met. See §0 for the record
-and §0A for the reconciliation checklist and the proposed (not approved) cutover plan.
-Everything from §1 onward is the original approval text, kept for reference; where it says
-"unmerged" or describes a step as not yet run, §0 is the correction.
+**Status: RELEASED AND ACTIVE (2026-11-14).** The hardened billing code is published as deploy
+`6af7eb63f100baecacae5dab` at `main` `1d76b4b6`, and automatic allocation is active with epoch
+`1794632515`. The record is §0D. Closeout is still open: no real purchase or renewal has passed
+through the hardened handler yet, and Netlify auto-publishing remains locked (§0D.5).
 
-## 0. What actually happened, and the current state (recorded 2026-11-13)
+This packet is kept in the order it was written. §0 to §0C record the first attempt on
+2026-11-12, its rollback, and the preparation that followed; where they say the release is not
+complete, NO-GO or not approved, §0D is the later statement. §1 onward is the original approval
+text, kept for reference.
+
+## 0. What happened on 2026-11-12, and the state on 2026-11-13 (superseded by §0D)
 
 Read from Netlify's own deploy and environment-variable records and from git. Times are UTC.
 
@@ -491,6 +493,105 @@ credits by editing Firestore directly.
 Not blockers, already done: the Netlify env-var fix, the review-queue fix, CI on `main`, the
 staging rules deploy and the staging rehearsal.
 
+## 0D. Production cutover completed (recorded 2026-11-14)
+
+**The hardened billing code is published and automatic allocation is active.** This section is
+the record of how. It supersedes the "not complete" status in §0 and the plans in §0A.4 and
+§0C.3, which are kept as written. Times are UTC. Each production action below was approved
+separately by the account owner at the time it was taken.
+
+Where the evidence came from:
+
+- **Verified** — read during the cutover from Netlify's API, the Firebase Rules API, production
+  Firestore (read-only) or git.
+- **Owner-reported** — observed by the account owner in the Stripe Dashboard or the Netlify UI
+  and relayed. There was no Stripe access from the operator machine.
+- **Handed over** — stated by the owner as completed in an earlier working session. Not checked
+  again here.
+
+### 0D.1 Result
+
+| Item | Value | Source |
+|---|---|---|
+| Published deploy | `6af7eb63f100baecacae5dab` | Verified |
+| Commit | `1d76b4b6704db96454719b8dd9cc51c408b81933` (`main`) | Verified |
+| Published | 2026-11-14 05:11:55 | Verified |
+| `BILLING_LEDGER_EPOCH_UNIX` | `1794632515` (2026-11-14T05:01:55Z), production context only, scopes include `functions`, written 05:02:04 | Verified |
+| Activation | `RUNTIME-VERIFIED ACTIVE` from `scripts/billingLedgerCutover.mjs`, 05:13:30 | Verified |
+| Netlify auto-publishing | Locked before, during and after | Verified at every step |
+| Rollback deploy, allocation off | `6af7ded643254da55bd6aaa4`, same commit, built while the epoch was absent | Verified |
+| Production Firestore rules | Ruleset `004fb6b9-8c1a-449c-b4b0-c775673bb4b8`, 24,263 bytes, byte-identical to `main`'s `firestore.rules` (SHA-256 `5d0b87b5…1aad5e1`), read 04:14:43 | Verified |
+| Ledger collections after activation | `billingAmbiguousAccounts`, `billingAllocations`, `stripeWebhookEvents`, `stripeWebhookPendingEvents`, `billingCheckoutOperations`: each returned no documents by direct path, 05:13:49 | Verified |
+
+### 0D.2 Sequence (2026-11-14)
+
+| Time | Step | What happened |
+|---|---|---|
+| 04:00 | Start state | Published `6af501a01bf9092b54673393` (`e87691d8`), locked. Epoch `1794507945` set. No other production-context deploy among the 25 newest, which reach back before that epoch was written |
+| 04:07 | C2 | Old epoch `1794507945` removed from the production context (`netlify env:unset`). Read back absent. No build triggered. Never reused |
+| 04:08:54 | D2 | Build of `main` triggered once (`netlify api createSiteBuild`). Deploy `6af7ded643254da55bd6aaa4`, `ready`, not published |
+| 04:14 | D1 | Production rules read back, byte-identical to `main`. Recovery credential read production Firestore; the five ledger collections were empty |
+| 04:36:36 | D3 | **Owner published `6af7ded643254da55bd6aaa4` in the Netlify UI.** Hardened code live, allocation off |
+| 04:38:11 | D4 | Verifier: `epoch_env_var_not_set`, `deploy.ready: true` |
+| — | D5 | Owner signed in to production; dashboard and People page loaded |
+| 05:02:04 | E1 | Fresh epoch `1794632515` written by `billingLedgerCutover.mjs --apply`. First run of that write path against the live site; it worked |
+| 05:02:27 | E2 | Build of `main` triggered once. Deploy `6af7eb63f100baecacae5dab`, `ready`, not published, created 23 seconds after the epoch was recorded |
+| 05:11:55 | E3 | **Owner published `6af7eb63f100baecacae5dab` in the Netlify UI.** Lock stayed on |
+| 05:13:30 | E4 | Verifier: `RUNTIME-VERIFIED ACTIVE`, epoch `1794632515` |
+| 05:13:49 | — | Site and `/login` returned 200. Ledger collections still empty |
+
+Between D3 and E3 (04:36:36–05:11:55) a purchase would have been flagged `epoch_unset` for a
+manual grant. None occurred: `billingAmbiguousAccounts` and `stripeWebhookEvents` were empty
+throughout.
+
+### 0D.3 Evidence the precheck rested on
+
+| Evidence | Source |
+|---|---|
+| Staging rehearsal passed 11 of 11 (§0C.1) | Verified, earlier session |
+| Stripe Live, 2026-11-12 onward: no new checkout sessions, no new subscriptions, one paid renewal on 2026-11-13 | Owner-reported, checked three times: before C2, before D3 and before E3 |
+| Webhook endpoint Active; the 2026-11-13 renewal deliveries answered HTTP 200; failed and pending delivery filters empty; no delivery during the 2026-11-12 windows | Owner-reported, before D3 and before E3 |
+| The 2026-11-13 renewal was handled by the pre-ledger handler (`e87691d8`). For `customer.subscription.updated` that handler writes `subscriptionStatus` only; it ignores invoice events. No credits were granted and nothing needs recovery | Verified from the code at `e87691d8`; the account's document was not read |
+| Starter and Pro Payment Links; all 20 active subscriptions on recognised prices; nine stale production deploys deleted | Handed over |
+| Recovery access (packet §0C.4 item 1): the short-lived credential for `billing-recovery@idynify-scout-dev` minted a token and read production Firestore at each step | Verified for reading. Its write access has never been exercised |
+
+This closes §0A.2 as **"no customer event in the period except one renewal, which granted
+nothing; no customer requires recovery"**. The Stripe half is owner-reported.
+
+### 0D.4 What was not verified
+
+- **No real purchase has been processed by the hardened handler.** `RUNTIME-VERIFIED ACTIVE` is
+  advisory: it shows the published build was made after the epoch was set. The first purchase
+  is the first end-to-end proof (runbook §9.1).
+- **No real lifecycle event has been processed either.** The next renewal or cancellation is
+  the first (runbook §9.2).
+- **The Netlify build logs were not read**; the API did not return them. Each build reported
+  done with no error. The Firebase key in each published bundle was checked directly against
+  Google with the repository's own check and belongs to `idynify-scout-dev`.
+- **The recovery tool has not been run against production**, in dry-run or otherwise. No Stripe
+  key was present on the operator machine.
+- **The release also published the 34 commits merged since `e87691d8`**, including the Contact
+  Hub changes (PR #789). The owner checked sign-in, the dashboard and the People page. Nothing
+  else in those commits was tested as part of this cutover.
+
+### 0D.5 Closeout criteria — open
+
+The cutover is done. The release is closed when all of these are recorded here:
+
+| # | Criterion | Status |
+|---|---|---|
+| 1 | First real Starter or Pro purchase passes runbook §9.1: delivery 200, correct account, one `billingAllocations` marker, 400 or 1,250 credits, access, no unexpected review record | Open — waits for a customer |
+| 2 | First genuine renewal or cancellation passes runbook §9.2 | Open — waits for a customer |
+| 3 | `billingAmbiguousAccounts` has no unexplained pending record | Empty at 05:13:49 on 2026-11-14; re-read with 1 and 2 |
+| 4 | Decision on Netlify auto-publishing (§0C.3 F2). Stays locked until the owner decides, and not before criterion 1 | Open — locked |
+| 5 | Rollback deploy `6af7ded643254da55bd6aaa4` kept until criteria 1 and 2 pass | Kept |
+| 6 | Recovery credential and any Stripe key from the sitting retired, or kept by explicit decision while criteria 1 and 2 are open (runbook §8.1) | Open — owner's action |
+| 7 | This record merged to `main`. With the lock on, the merge is built and not published | Open |
+
+Standing rules, unchanged: never publish `e87691d8` or any pre-ledger build; never reuse
+`1794507945`; never resend a pre-epoch Stripe event expecting a grant; grant credits only
+through `scripts/manualCreditRecovery.mjs`.
+
 ## 1. Roles
 
 **Confirmed by the account owner.** This assignment confirms ownership only — it does **not**
@@ -588,7 +689,7 @@ there is the same owner named in §1.
       configuration validation
 - [ ] Approved to execute
 
-**Status: ATTEMPTED, THEN ROLLED BACK — NOT COMPLETE.** The checklist above was never fully
-checked, yet PR #769 was merged and a cutover attempted on 2026-11-12; production was rolled back
-the same day and is serving pre-#769 code (§0). Nothing in this packet should be read as approval
-to publish `main`. Re-execution needs the open items in §0 closed and a fresh, explicit approval.
+**Status: RELEASED AND ACTIVE (2026-11-14) — see §0D.** The checklist above belongs to the first
+attempt on 2026-11-12 and was never fully checked; that attempt was rolled back the same day
+(§0). The release that is live was carried out on 2026-11-14 under separate, step-by-step
+approvals from the account owner, recorded in §0D.2. Closeout criteria are in §0D.5.

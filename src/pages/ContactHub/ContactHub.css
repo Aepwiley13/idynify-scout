@@ -165,3 +165,20 @@
 
 /* The existing Stickers view, given room under the chips. */
 .hub .stk-wall { margin-top: 16px; }
+
+/* ── First run: no one in My People yet ── */
+.hub-empty--first { padding: 28px 12px 36px; gap: 12px; }
+.hub-empty--first .hub-empty-title { font-size: 20px; }
+.hub-empty--first .hub-empty-text { max-width: 320px; margin-bottom: 10px; }
+.hub-empty-art { display: flex; align-items: center; justify-content: center; width: 72px; height: 72px; border-radius: 50%; margin-bottom: 4px; }
+.hub-primary-btn--wide { width: 100%; max-width: 320px; }
+
+/* ── Read-only sticker chips on a phone's list ──
+   The shared compact chip is 9px, sized for a dense desktop table. Here it is
+   a label to read at arm's length, not a control, so it is larger and has no
+   touch-target padding. */
+.hub-row-stickers--readonly .stk-chip--compact { font-size: 12px; padding: 3px 9px 3px 8px; gap: 5px; }
+.hub-row-stickers--readonly .stk-chip--compact .stk-dot { width: 7px; height: 7px; }
+.hub-row-stickers--readonly .stk-chip--compact .stk-name { max-width: 110px; }
+.hub-row-stickers--readonly .stk-card-row { gap: 6px; flex-wrap: nowrap; }
+.hub-row-stickers--readonly .stk-card-more { font-size: 12px; }

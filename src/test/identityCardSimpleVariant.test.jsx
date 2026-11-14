@@ -35,6 +35,10 @@ vi.mock('../services/contactStickers', () => ({
 import IdentityCard from '../components/contacts/IdentityCard';
 import { StickersProvider } from '../components/stickers/StickersContext';
 
+// These render whole screens and type into them. On a loaded machine that can
+// pass the 5s default without anything being wrong (the suite's other
+// full-page tests allow 20s for the same reason).
+vi.setConfig({ testTimeout: 20000 });
 const BOARD = sticker('Board');
 const contact = {
   id: 'c1',

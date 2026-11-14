@@ -53,7 +53,10 @@ existing paid-access check on the shell route group applies to it unchanged.
 
 **Where it sits in the model.** `CONTACT_HUB_DESTINATION` is ungrouped, like
 Command Center: the three locked groups describe the sales pipeline, and this
-is not part of it. Its mobile bottom bar has one cell, My People.
+is not part of it. It declares **no mobile bottom bar** in Phase 1A
+(`MODULE_BOTTOM_NAV['contact-hub'].hidden`): with one view there is nothing to
+switch between, and the global fallback would list Scout and Hunter under it.
+The three-cell bar arrives with Connect and My Card.
 
 **It is not a canonical record route and does not replace one.**
 `/contact/:contactId` remains the one full profile for a person, reached from

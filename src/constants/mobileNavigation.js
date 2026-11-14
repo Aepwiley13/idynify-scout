@@ -166,14 +166,19 @@ export const MODULE_BOTTOM_NAV = {
   },
 
   /**
-   * Contact Hub. One view in Phase 1A; Connect and My Card take the next two
-   * cells when they exist. The entry is inert while the Contact Hub switch is
-   * off: nothing resolves to the 'contact-hub' module, so this is never read.
+   * Contact Hub has NO bottom bar in Phase 1A (`hidden`). It has one view, My
+   * People, and a bar with one cell is navigation with nowhere to go. The
+   * three-cell bar (My People · Connect · My Card) arrives with the views it
+   * would switch between: drop `hidden` and fill in `primary` then.
+   *
+   * `hidden` rather than no entry at all: with no entry the bar falls back to
+   * the global list of modules (Scout, Hunter, …), which is the opposite of
+   * what a Contact Hub screen should offer. The hamburger still moves between
+   * workspaces. Inert while the Contact Hub switch is off.
    */
   'contact-hub': {
-    primary: [
-      { id: 'people', label: 'My People', Icon: Users, to: '/contact-hub' },
-    ],
+    hidden: true,
+    primary: [],
   },
 
   'command-center': {

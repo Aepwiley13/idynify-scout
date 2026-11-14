@@ -14,6 +14,7 @@ import { render, screen, within, waitFor, configure } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { createFakeStickers, sticker, config } from './helpers/stickersUi';
+import { setViewportWidth } from './helpers/matchMedia';
 
 const contactsData = vi.hoisted(() => ({ list: [], fail: false, loads: 0, paths: [] }));
 const fake = vi.hoisted(() => ({ current: null }));
@@ -79,10 +80,15 @@ import ContactHubMain from '../pages/ContactHub/ContactHubMain';
 import HubPeople from '../pages/ContactHub/HubPeople';
 import HubPerson from '../pages/ContactHub/HubPerson';
 
+// These render whole screens and type into them. On a loaded machine that can
+// pass the 5s default without anything being wrong (the suite's other
+// full-page tests allow 20s for the same reason).
+vi.setConfig({ testTimeout: 20000 });
 configure({ asyncUtilTimeout: 5000 });
 
 const VIP = sticker('VIP', { color: 'amber' });
 const PARTNER = sticker('Partner', { color: 'purple' });
+const FRIEND = sticker('Friend', { color: 'green' });
 const person = (id, name, extra = {}) => ({ id, name, addedAt: '2026-11-01T12:00:00Z', ...extra });
 
 beforeEach(() => {
@@ -102,7 +108,7 @@ beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
-afterEach(() => { vi.restoreAllMocks(); });
+afterEach(() => { setViewportWidth(1024); vi.restoreAllMocks(); });
 
 function renderHub(url = '/contact-hub') {
   return render(
@@ -265,6 +271,8 @@ describe('Add Person', () => {
     expect(within(dialog).getByTestId('manual-form')).toBeInTheDocument();
     expect(seen.form.copy.submit).toBe('Add Person');
     expect(seen.form.copy.showReferral).toBe(false);
+    // Name, Email and Phone first; everything else behind "More details".
+    expect(seen.form.copy.moreDetails).toBe(true);
     const words = `${seen.form.copy.hint} ${seen.form.copy.duplicate('Ana')} ${seen.form.copy.submit}`;
     expect(words).not.toMatch(/enrich|pipeline|scout|credit/i);
     expect(seen.form.copy.duplicate('Ana')).toContain('Ana is already in My People');
@@ -297,14 +305,109 @@ describe('Add Person', () => {
     expect(names()).toHaveLength(4);
   });
 
-  it('an empty My People invites the first person', async () => {
-    contactsData.list = [];
+});
+
+describe('no one in My People yet', () => {
+  beforeEach(() => { contactsData.list = []; });
+
+  it('shows a friendly message and exactly one action', async () => {
+    renderHub();
+    expect(await screen.findByText('Start with one person')).toBeInTheDocument();
+    expect(screen.getByText(/All you need is their name\./)).toBeInTheDocument();
+    expect(screen.getAllByRole('button').map((b) => b.textContent.trim())).toEqual(['Add Your First Person']);
+  });
+
+  it('draws nothing to search, filter, count or manage', async () => {
+    renderHub();
+    await screen.findByText('Start with one person');
+    await waitFor(() => expect(fake.current.state.subscriptions).toBe(1));
+    expect(screen.queryByRole('searchbox')).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Filter by sticker' })).toBeNull();
+    expect(screen.queryByRole('list', { name: 'My People' })).toBeNull();
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent(/^My People$/);
+    expect(screen.queryByText('No one matches.')).toBeNull();
+  });
+
+  it('archived people do not count: someone with only archived contacts sees the same invitation', async () => {
+    contactsData.list = [person('p4', 'Old Archived', { is_archived: true })];
+    renderHub();
+    expect(await screen.findByText('Start with one person')).toBeInTheDocument();
+  });
+
+  it('the action opens Add Person, and the first person replaces the invitation with the list', async () => {
     const user = userEvent.setup();
     renderHub();
-    expect(await screen.findByText('No one here yet.')).toBeInTheDocument();
-    const buttons = screen.getAllByRole('button', { name: 'Add Person' });
-    await user.click(buttons[buttons.length - 1]);
+    await user.click(await screen.findByRole('button', { name: 'Add Your First Person' }));
     expect(screen.getByRole('dialog', { name: 'Add Person' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'save' }));
+    expect(screen.queryByText('Start with one person')).toBeNull();
+    expect(names()).toEqual(['Nova Added']);
+    expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('My People (1)');
+    expect(screen.getByRole('searchbox', { name: 'Search people' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add Person' })).toBeInTheDocument();
+  });
+
+  it('is not shown while loading, or when the load failed', async () => {
+    contactsData.fail = true;
+    renderHub();
+    expect(await screen.findByText('Your people could not be loaded.')).toBeInTheDocument();
+    expect(screen.queryByText('Start with one person')).toBeNull();
+  });
+});
+
+describe('stickers on a phone-sized list', () => {
+  beforeEach(() => {
+    contactsData.list = [
+      person('m1', 'Three Stickers', { sticker_ids: [VIP.id, PARTNER.id, FRIEND.id] }),
+      person('m2', 'Two Stickers', { addedAt: '2026-10-30T12:00:00Z', sticker_ids: [VIP.id, PARTNER.id] }),
+      person('m3', 'No Stickers', { addedAt: '2026-10-29T12:00:00Z' }),
+    ];
+    fake.current.state.registry = [VIP, PARTNER, FRIEND];
+    setViewportWidth(390);
+  });
+
+  const row = (name) => screen.getByRole('link', { name }).closest('li');
+
+  it('shows at most two compact chips, then +N', async () => {
+    renderHub();
+    await screen.findByRole('group', { name: 'Filter by sticker' });
+    const three = row('Three Stickers');
+    expect(three.querySelectorAll('.hub-row-stickers .stk-chip')).toHaveLength(2);
+    expect(three.querySelectorAll('.hub-row-stickers .stk-chip--compact')).toHaveLength(2);
+    expect(within(three).getByLabelText('1 more sticker')).toHaveTextContent('+1');
+    const two = row('Two Stickers');
+    expect(two.querySelectorAll('.hub-row-stickers .stk-chip')).toHaveLength(2);
+    expect(two.querySelector('.stk-card-more')).toBeNull();
+    expect(row('No Stickers').querySelectorAll('.stk-chip')).toHaveLength(0);
+  });
+
+  it('the chips are labels, not controls: no add and no remove on the list', async () => {
+    renderHub();
+    await screen.findByRole('group', { name: 'Filter by sticker' });
+    const list = screen.getByRole('list', { name: 'My People' });
+    expect(within(list).queryByRole('button')).toBeNull();
+    expect(screen.queryByRole('button', { name: /Remove sticker|Add sticker/ })).toBeNull();
+    expect(fake.current.callsOf('addSticker')).toEqual([]);
+    expect(fake.current.callsOf('removeSticker')).toEqual([]);
+  });
+
+  it('the sticker filter chips above the list still work', async () => {
+    const user = userEvent.setup();
+    renderHub();
+    const group = await screen.findByRole('group', { name: 'Filter by sticker' });
+    await user.click(within(group).getByRole('button', { name: 'Friend, 1 person' }));
+    expect(names()).toEqual(['Three Stickers']);
+  });
+
+  it('a wide screen keeps in-place add and remove, with the same two-chip limit', async () => {
+    setViewportWidth(1280);
+    renderHub();
+    await screen.findByRole('group', { name: 'Filter by sticker' });
+    const three = row('Three Stickers');
+    expect(three.querySelectorAll('.hub-row-stickers .stk-chip')).toHaveLength(2);
+    expect(within(three).getByLabelText('1 more sticker')).toBeInTheDocument();
+    expect(within(three).getByRole('button', { name: 'Add sticker to Three Stickers' })).toBeInTheDocument();
+    expect(within(three).getAllByRole('button', { name: /^Remove sticker/ })).toHaveLength(2);
   });
 });
 

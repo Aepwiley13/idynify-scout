@@ -109,12 +109,18 @@ describe('switch ON', () => {
     expect(nav.resolveBarryModule('/contact-hub')).toBe('default');
   });
 
-  it('the mobile bar shows one view, My People, and no overflow', async () => {
+  it('declares no mobile bottom bar in Phase 1A: hidden, with no cells and no overflow', async () => {
     const { mobile } = await loadWith('on');
     const bar = mobile.bottomNavFor('contact-hub');
-    expect(bar.primary.map((i) => i.label)).toEqual(['My People']);
-    expect(bar.primary[0].to).toBe('/contact-hub');
+    expect(bar.hidden).toBe(true);
+    expect(bar.primary).toEqual([]);
     expect(bar.overflow).toBeUndefined();
+  });
+
+  it('is the only module that hides its bar', async () => {
+    const { mobile } = await loadWith('on');
+    const hidden = Object.entries(mobile.MODULE_BOTTOM_NAV).filter(([, config]) => config.hidden).map(([id]) => id);
+    expect(hidden).toEqual(['contact-hub']);
   });
 });
 

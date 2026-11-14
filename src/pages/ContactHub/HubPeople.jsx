@@ -7,12 +7,15 @@
  * or change.
  *
  * Reused as they are: the contacts ContactHubMain loaded, the sticker
- * registry, the interactive sticker chips People's rows use, the Stickers
- * wall, and the manual add form.
+ * registry, People's sticker chips (interactive on a wide screen, read-only
+ * on a phone), the Stickers wall, and the manual add form.
+ *
+ * With no one in My People yet there is nothing to search, filter or sort, so
+ * none of that is drawn: one friendly message and one action.
  */
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
-import { Mail, Phone, Search, UserPlus, X } from 'lucide-react';
+import { Mail, Phone, Search, UserPlus, Users, X } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { contactHubPersonPath } from '../../constants/contactHub';
@@ -20,6 +23,7 @@ import { hasRealContactPhoto, resolveContactPhotoSources, getInitials } from '..
 import { useStickers } from '../../components/stickers/stickersRegistry';
 import { resolveStickerFilter } from '../../components/stickers/peopleStickers';
 import ContactCardStickersInteractive from '../../components/stickers/ContactCardStickersInteractive';
+import ContactCardStickers from '../../components/stickers/ContactCardStickers';
 import StickersWall from '../../components/stickers/StickersWall';
 import ManualContactForm from '../../components/scout/ManualContactForm';
 import StickerChipRow from './StickerChipRow';
@@ -27,12 +31,20 @@ import {
   HUB_STATUS, listMyPeople, visiblePeople, personName, personSubtitle, emailOf, phoneOf, addedLabel,
 } from './peopleRules';
 
-/** The add form's wording here: no pipeline, no enrichment, no Scout+. */
+/** How many sticker chips a row shows before "+N". */
+export const ROW_STICKER_MAX = 2;
+
+/**
+ * The add form here: no pipeline, no enrichment, no Scout+, and only Name,
+ * Email and Phone to begin with. The rest is one tap away under "More
+ * details".
+ */
 const ADD_COPY = Object.freeze({
   hint: 'Only a name is needed. You can add the rest any time.',
   duplicate: (name) => `${name} is already in My People. Any new details you entered were added to them.`,
   submit: 'Add Person',
   showReferral: false,
+  moreDetails: true,
 });
 
 function Avatar({ contact, name }) {
@@ -48,7 +60,7 @@ function Avatar({ contact, name }) {
   );
 }
 
-function PersonRow({ contact, onStickerChange, stickerMax }) {
+function PersonRow({ contact, onStickerChange, readOnlyStickers }) {
   const T = useT();
   const name = personName(contact);
   const subtitle = personSubtitle(contact);
@@ -67,8 +79,13 @@ function PersonRow({ contact, onStickerChange, stickerMax }) {
         </Link>
         {subtitle ? <span className="hub-row-sub" style={{ color: T.textMuted }}>{subtitle}</span> : null}
       </div>
-      <div className="hub-row-stickers">
-        <ContactCardStickersInteractive contact={contact} max={stickerMax} onUpdate={onStickerChange} />
+      {/* On a phone the list stays quiet: up to two chips and "+N", nothing to
+          tap. Stickers are added and removed on the person's own page. A wide
+          screen keeps People's in-place add and remove. */}
+      <div className={`hub-row-stickers${readOnlyStickers ? ' hub-row-stickers--readonly' : ''}`}>
+        {readOnlyStickers
+          ? <ContactCardStickers contact={contact} max={ROW_STICKER_MAX} />
+          : <ContactCardStickersInteractive contact={contact} max={ROW_STICKER_MAX} onUpdate={onStickerChange} />}
       </div>
       {added ? <span className="hub-row-added" style={{ color: T.textFaint }}>{added}</span> : null}
       <div className="hub-row-actions">
@@ -170,6 +187,8 @@ export default function HubPeople() {
   }
 
   const filtering = Boolean(searchTerm.trim()) || Boolean(activeSticker);
+  // No one yet: the page is the invitation, with nothing else competing.
+  const firstRun = status === HUB_STATUS.READY && people.length === 0;
 
   return (
     <>
@@ -184,8 +203,10 @@ export default function HubPeople() {
         <div className="hub-toolbar">
           <h2 id="hub-people-heading" className="hub-section-title">
             My People
-            {status === HUB_STATUS.READY ? <span className="hub-count" style={{ color: T.textFaint }}> ({people.length})</span> : null}
+            {status === HUB_STATUS.READY && !firstRun ? <span className="hub-count" style={{ color: T.textFaint }}> ({people.length})</span> : null}
           </h2>
+          {!firstRun && (
+          <>
           <label className="hub-search" style={{ background: T.input ?? T.surface, borderColor: T.border }}>
             <Search size={18} aria-hidden="true" style={{ color: T.textFaint, flexShrink: 0 }} />
             <input
@@ -201,8 +222,11 @@ export default function HubPeople() {
             <UserPlus size={18} aria-hidden="true" />
             Add Person
           </button>
+          </>
+          )}
         </div>
 
+        {!firstRun && (
         <StickerChipRow
           people={people}
           selectedId={activeSticker?.id ?? null}
@@ -210,6 +234,7 @@ export default function HubPeople() {
           managing={showWall}
           onToggleManage={() => setManaging((on) => !on)}
         />
+        )}
 
         <p className="hub-status" role="status" aria-live="polite" style={{ color: T.textMuted }}>
           {justAdded ? `${justAdded} was added to My People.` : ''}
@@ -226,17 +251,22 @@ export default function HubPeople() {
           </div>
         )}
 
-        {status === HUB_STATUS.READY && showWall && (
+        {status === HUB_STATUS.READY && !firstRun && showWall && (
           <StickersWall contacts={people} onOpenSticker={(id) => selectSticker(id)} />
         )}
 
-        {status === HUB_STATUS.READY && !showWall && people.length === 0 && (
-          <div className="hub-empty">
-            <p className="hub-empty-title">No one here yet.</p>
-            <p className="hub-empty-text" style={{ color: T.textMuted }}>Add the first person you want to keep in touch with.</p>
-            <button type="button" className="hub-primary-btn" style={{ background: T.accent }} onClick={() => setAdding(true)}>
+        {firstRun && (
+          <div className="hub-empty hub-empty--first">
+            <span className="hub-empty-art" style={{ background: T.accentBg, color: T.accent }} aria-hidden="true">
+              <Users size={32} />
+            </span>
+            <p className="hub-empty-title">Start with one person</p>
+            <p className="hub-empty-text" style={{ color: T.textMuted }}>
+              Add someone you want to stay in touch with. All you need is their name.
+            </p>
+            <button type="button" className="hub-primary-btn hub-primary-btn--wide" style={{ background: T.accent }} onClick={() => setAdding(true)}>
               <UserPlus size={18} aria-hidden="true" />
-              Add Person
+              Add Your First Person
             </button>
           </div>
         )}
@@ -264,7 +294,7 @@ export default function HubPeople() {
                 key={contact.id}
                 contact={contact}
                 onStickerChange={applyStickerChange}
-                stickerMax={isMobile ? 1 : 2}
+                readOnlyStickers={isMobile}
               />
             ))}
           </ul>

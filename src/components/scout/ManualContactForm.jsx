@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useId, Fragment } from 'react';
 import { auth, db } from '../../firebase/config';
 import { collection, addDoc, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { UserPlus, Search, X, Loader } from 'lucide-react';
@@ -18,8 +18,12 @@ import { useT } from '../../theme/ThemeContext';
  *   copy.showReferral  false hides the optional "Referred By" field; the
  *                      contact is then saved exactly as one added with that
  *                      field left empty
- * Contact Hub passes all four. Every other caller passes nothing and gets the
- * original wording and fields.
+ *   copy.moreDetails   true starts the form with Name, Email and Phone only;
+ *                      every other field sits behind a "More details" button.
+ *                      Nothing is removed: the fields, their validation and
+ *                      what is saved are the same, opened or not
+ * Contact Hub passes all five. Every other caller passes nothing and gets the
+ * original wording and every field shown.
  */
 export default function ManualContactForm({ onContactAdded, onCancel, copy = null }) {
   const T = useT();
@@ -36,6 +40,11 @@ export default function ManualContactForm({ onContactAdded, onCancel, copy = nul
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
   const [referredBy, setReferredBy] = useState(null);
+  // Only meaningful with copy.moreDetails. A problem in a field behind the
+  // button (the LinkedIn URL is the one that is validated) keeps it open, so
+  // an error message is never hidden.
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const detailsId = useId();
 
   const validateForm = () => {
     const newErrors = {};
@@ -174,6 +183,14 @@ export default function ManualContactForm({ onContactAdded, onCancel, copy = nul
 
   const user = getEffectiveUser();
 
+  const collapsible = copy?.moreDetails === true;
+  const detailsOpen = !collapsible || detailsExpanded || Boolean(errors.linkedin_url);
+  // The wrapper exists only in the collapsible form, where the button needs
+  // something to point at. Otherwise the fields are the form's own children,
+  // exactly as they were before this option existed.
+  const DetailsWrap = collapsible ? 'div' : Fragment;
+  const detailsWrapProps = collapsible ? { id: detailsId, className: 'space-y-6' } : {};
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="rounded-xl p-4 border" style={{ background: T.isDark ? `${T.accent}10` : '#eff6ff', borderColor: T.isDark ? `${T.accent}30` : '#bfdbfe' }}>
@@ -236,6 +253,22 @@ export default function ManualContactForm({ onContactAdded, onCancel, copy = nul
         />
       </div>
 
+      {collapsible && (
+        <button
+          type="button"
+          className="w-full px-4 py-3 rounded-lg border text-sm font-semibold text-left"
+          style={{ background: 'transparent', borderColor: T.border, color: T.textMuted, minHeight: 48 }}
+          aria-expanded={detailsOpen ? 'true' : 'false'}
+          aria-controls={detailsId}
+          disabled={saving}
+          onClick={() => setDetailsExpanded((open) => !open)}
+        >
+          {detailsOpen ? '− Fewer details' : '+ More details'}
+        </button>
+      )}
+
+      {detailsOpen && (
+      <DetailsWrap {...detailsWrapProps}>
       {/* Company (Optional) */}
       <div>
         <label className="block text-sm font-semibold mb-2" style={{ color: T.accent }}>
@@ -330,6 +363,8 @@ export default function ManualContactForm({ onContactAdded, onCancel, copy = nul
           Optional — tag who referred this person to track referral attribution.
         </p>
       </div>
+      )}
+      </DetailsWrap>
       )}
 
       {/* Action Buttons */}

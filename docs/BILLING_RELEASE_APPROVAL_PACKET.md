@@ -521,7 +521,7 @@ Where the evidence came from:
 | Netlify auto-publishing | Locked before, during and after | Verified at every step |
 | Rollback deploy, allocation off | `6af7ded643254da55bd6aaa4`, same commit, built while the epoch was absent | Verified |
 | Production Firestore rules | Ruleset `004fb6b9-8c1a-449c-b4b0-c775673bb4b8`, 24,263 bytes, byte-identical to `main`'s `firestore.rules` (SHA-256 `5d0b87b5…1aad5e1`), read 04:14:43 | Verified |
-| Ledger collections after activation | `billingAmbiguousAccounts`, `billingAllocations`, `stripeWebhookEvents`, `stripeWebhookPendingEvents`, `billingCheckoutOperations`: each returned no documents by direct path, 05:13:49 | Verified |
+| Ledger collections after activation | `billingAmbiguousAccounts`, `billingAllocations`, `stripeWebhookEvents`, `stripeWebhookPendingEvents`, `billingCheckoutOperations`: each returned no documents by direct path, 05:13:49. Re-read at 05:23:15 including parent paths that exist only through a subcollection, which is how parked events are stored: still none | Verified |
 
 ### 0D.2 Sequence (2026-11-14)
 
@@ -549,11 +549,13 @@ throughout.
 | Evidence | Source |
 |---|---|
 | Staging rehearsal passed 11 of 11 (§0C.1) | Verified, earlier session |
-| Stripe Live, 2026-11-12 onward: no new checkout sessions, no new subscriptions, one paid renewal on 2026-11-13 | Owner-reported, checked three times: before C2, before D3 and before E3 |
+| Stripe Live, 2026-11-12 onward: no new checkout sessions and no new subscriptions. Two items of subscription activity on 2026-11-13 (Mountain time): one paid renewal, and one further `customer.subscription.updated` at about 9:10 PM Mountain (about 04:10 UTC on 2026-11-14) | Owner-reported, checked three times: before C2, before D3 and before E3 |
 | Webhook endpoint Active; the 2026-11-13 renewal deliveries answered HTTP 200; failed and pending delivery filters empty; no delivery during the 2026-11-12 windows | Owner-reported, before D3 and before E3 |
-| The 2026-11-13 renewal was handled by the pre-ledger handler (`e87691d8`). For `customer.subscription.updated` that handler writes `subscriptionStatus` only; it ignores invoice events. No credits were granted and nothing needs recovery | Verified from the code at `e87691d8`; the account's document was not read |
+| Both were delivered while `e87691d8` was the published deploy: the owner reported each as delivered with HTTP 200 before D3, and D3 was at 04:36:36 UTC. For `customer.subscription.updated` that pre-ledger handler writes `subscriptionStatus` only, and it ignores invoice events. So neither granted credits, neither left a ledger record, and nothing needs recovery | The handler's behaviour is verified from the code at `e87691d8`. That these two deliveries reached it is inferred from the owner's times, and is consistent with `stripeWebhookEvents` being empty afterwards: the hardened handler would have recorded them |
+| What the 9:10 PM event was | **Not established.** Its subscription, its customer and what changed were not recorded, and no account document was read. It may be a further event of the same renewal or a separate change. If it was a change the pre-ledger handler does not mirror, such as a cancellation scheduled for period end, the account's new fields (`cancelAtPeriodEnd`, period dates) stay unset until that subscription's next lifecycle event. That affects no credits and no access. Closeout criterion 8 |
 | Starter and Pro Payment Links; all 20 active subscriptions on recognised prices; nine stale production deploys deleted | Handed over |
 | Recovery access (packet §0C.4 item 1): the short-lived credential for `billing-recovery@idynify-scout-dev` minted a token and read production Firestore at each step | Verified for reading. Its write access has never been exercised |
+| `scripts/manualCreditRecovery.mjs` run against production in `--dry-run` mode before the cutover, with a Stripe key entered by the owner: it refused a user that does not exist, and it refused on its Stripe-backed ownership check. Neither run wrote anything | Handed over. The runs, their output and the times were not captured in this record |
 
 This closes §0A.2 as **"no customer event in the period except one renewal, which granted
 nothing; no customer requires recovery"**. The Stripe half is owner-reported.
@@ -568,8 +570,11 @@ nothing; no customer requires recovery"**. The Stripe half is owner-reported.
 - **The Netlify build logs were not read**; the API did not return them. Each build reported
   done with no error. The Firebase key in each published bundle was checked directly against
   Google with the repository's own check and belongs to `idynify-scout-dev`.
-- **The recovery tool has not been run against production**, in dry-run or otherwise. No Stripe
-  key was present on the operator machine.
+- **The recovery tool has never written to production.** It was run there in `--dry-run` mode
+  only (§0D.3), and both runs ended in a refusal, so no run has reached the point of a grant.
+  Production recovery write capability is untested: the first real recovery is the first
+  write. During the cutover sitting itself no Stripe key was present on the operator machine,
+  so a recovery at short notice would have needed the owner to enter one first.
 - **The release also published the 34 commits merged since `e87691d8`**, including the Contact
   Hub changes (PR #789). The owner checked sign-in, the dashboard and the People page. Nothing
   else in those commits was tested as part of this cutover.
@@ -587,6 +592,7 @@ The cutover is done. The release is closed when all of these are recorded here:
 | 5 | Rollback deploy `6af7ded643254da55bd6aaa4` kept until criteria 1 and 2 pass | Kept |
 | 6 | Recovery credential and any Stripe key from the sitting retired, or kept by explicit decision while criteria 1 and 2 are open (runbook §8.1) | Open — owner's action |
 | 7 | This record merged to `main`. With the lock on, the merge is built and not published | Open |
+| 8 | The `customer.subscription.updated` of about 9:10 PM Mountain on 2026-11-13 identified in Stripe (subscription, customer, what changed), and that account's `subscriptionStatus` compared with Stripe. Read-only. Does not block criteria 1 to 7 | Open — owner's read in Stripe |
 
 Standing rules, unchanged: never publish `e87691d8` or any pre-ledger build; never reuse
 `1794507945`; never resend a pre-epoch Stripe event expecting a grant; grant credits only

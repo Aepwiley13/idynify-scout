@@ -557,7 +557,9 @@ section creates a purchase, grants credits or edits a record. If a check fails, 
 §8 (manual recovery) or the rollback in "Current state", each with its own approval.
 
 Open a Firestore collection by typing its path (for example `/billingAllocations`). The root
-list hides empty collections.
+list hides empty collections. Parked events live at `/stripeWebhookPendingEvents/{cus_…}/events`
+and the parent document is never written, so open that full path, or look for the customer id
+shown in italics under `/stripeWebhookPendingEvents`.
 
 ### 9.1 The first real purchase (Starter or Pro)
 

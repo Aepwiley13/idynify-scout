@@ -35,6 +35,10 @@ import UnifiedDashboard from './pages/UnifiedDashboard';
 import ScoutDashboardPage from './pages/ScoutDashboardPage';
 import ScoutMain from './pages/Scout/ScoutMain';
 import PeopleMain from './pages/Scout/PeopleMain';
+import ContactHubMain from './pages/ContactHub/ContactHubMain';
+import HubPeople from './pages/ContactHub/HubPeople';
+import HubPerson from './pages/ContactHub/HubPerson';
+import { CONTACT_HUB, CONTACT_HUB_PATH } from './constants/contactHub';
 import AllLeads from './pages/Scout/AllLeads';
 import CompanyDetail from './pages/Scout/CompanyDetail';
 import CompanyLeads from './pages/Scout/CompanyLeads';
@@ -462,6 +466,20 @@ function App() {
             {/* Command Center — the last module in. /people still redirects
                 here; that redirect stays outside the group, being a redirect. */}
             <Route path="/command-center" element={<PeopleMain />} />
+
+            {/* Contact Hub (Phase 1A: My People). Registered ONLY when its
+                switch is on — off by default, see constants/contactHub.js.
+                When it is off these routes do not exist, so /contact-hub
+                falls through to the catch-all like any unknown URL, and the
+                sidebar has no entry for it either (navigationModel reads the
+                same switch). Inside ShellRoute, so the standard payment gate
+                applies unchanged. */}
+            {CONTACT_HUB.enabled && (
+              <Route path={CONTACT_HUB_PATH} element={<ContactHubMain />}>
+                <Route index element={<HubPeople />} />
+                <Route path="person/:contactId" element={<HubPerson />} />
+              </Route>
+            )}
 
             {/* Settings. Not a module and not in the sidebar — reached from
                 the top bar's user menu — but it is a full screen, and it was

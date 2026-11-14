@@ -39,7 +39,7 @@ import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Home, Radar, Crosshair, Target, Tent, Shield, Archive, Eye, Users,
-  ChevronRight, ChevronLeft, Settings, LifeBuoy, LogOut, X,
+  ChevronRight, ChevronLeft, Settings, LifeBuoy, LogOut, X, Contact,
 } from 'lucide-react';
 import {
   MISSION_CONTROL,
@@ -57,6 +57,7 @@ import './Sidebar.css';
 /** Icons live in the view layer; navigationModel stays presentation-free. */
 const MODULE_ICONS = {
   'mission-control': Home,
+  'contact-hub': Contact,
   scout: Radar,
   hunter: Crosshair,
   sniper: Target,

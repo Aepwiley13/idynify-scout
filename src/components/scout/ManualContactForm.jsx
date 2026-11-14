@@ -9,7 +9,19 @@ import { prepareContactWrite, applyContactMerge } from '../../services/contactWr
 import { ensureCompanyForContact, NAME_SOURCE } from '../../services/companyIdentityService';
 import { useT } from '../../theme/ThemeContext';
 
-export default function ManualContactForm({ onContactAdded, onCancel }) {
+/**
+ * `copy` lets a caller reword the two sentences that speak the sales
+ * product's language, without changing what the form does:
+ *   copy.hint          the note under "Quick add:" (default mentions enriching)
+ *   copy.duplicate     (name) => the message when this person already exists
+ *   copy.submit        the save button's label (default "Scout+")
+ *   copy.showReferral  false hides the optional "Referred By" field; the
+ *                      contact is then saved exactly as one added with that
+ *                      field left empty
+ * Contact Hub passes all four. Every other caller passes nothing and gets the
+ * original wording and fields.
+ */
+export default function ManualContactForm({ onContactAdded, onCancel, copy = null }) {
   const T = useT();
   const [formData, setFormData] = useState({
     name: '',
@@ -98,7 +110,9 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
         await applyContactMerge(user.uid, resolution);
         setSaving(false);
         setErrors({
-          email: `${formData.name.trim()} is already in your pipeline. Any new details you entered have been added to the existing record.`,
+          email: copy?.duplicate
+            ? copy.duplicate(formData.name.trim())
+            : `${formData.name.trim()} is already in your pipeline. Any new details you entered have been added to the existing record.`,
         });
         return;
       }
@@ -164,7 +178,7 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="rounded-xl p-4 border" style={{ background: T.isDark ? `${T.accent}10` : '#eff6ff', borderColor: T.isDark ? `${T.accent}30` : '#bfdbfe' }}>
         <p className="text-sm" style={{ color: T.textMuted }}>
-          <strong>Quick add:</strong> Only name is required. Add more details now or enrich later.
+          <strong>Quick add:</strong> {copy?.hint ?? 'Only name is required. Add more details now or enrich later.'}
         </p>
       </div>
 
@@ -306,6 +320,7 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
       </div>
 
       {/* Referred By (Optional) */}
+      {copy?.showReferral !== false && (
       <div>
         <label className="block text-sm font-semibold mb-2" style={{ color: T.accent }}>
           Referred By
@@ -315,6 +330,7 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
           Optional — tag who referred this person to track referral attribution.
         </p>
       </div>
+      )}
 
       {/* Action Buttons */}
       <div className="flex gap-3 pt-4">
@@ -341,7 +357,7 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
           ) : (
             <>
               <UserPlus className="w-5 h-5" />
-              Scout+
+              {copy?.submit ?? 'Scout+'}
             </>
           )}
         </button>

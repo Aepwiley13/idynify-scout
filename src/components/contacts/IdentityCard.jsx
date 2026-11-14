@@ -15,6 +15,12 @@
  *
  * All four classification chips live in one row.
  * Each chip opens its own inline popover on click.
+ *
+ * variant="simple" (Contact Hub) is the same card without the sales layer:
+ * no stage badge, no classification chips, no tags, no "Search LinkedIn"
+ * photo lookup, and the company shown as plain editable text instead of a
+ * link into the company record. Everything else, and the default, is
+ * unchanged.
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -369,8 +375,10 @@ export default function IdentityCard({
   photoRefreshLoading,
   photoRefreshError,
   onUpdate,
+  variant = 'full',
 }) {
   const T = useT();
+  const simple = variant === 'simple';
   const [imgBroken, setImgBroken] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(false);
   const photoButtonRef = useRef(null);
@@ -765,7 +773,7 @@ export default function IdentityCard({
           <img src={contact.photo_url} alt="" className="idc-banner-blur" />
         )}
         {/* Stage badge — top-right of banner */}
-        {currentStage && (
+        {currentStage && !simple && (
           <div
             className="idc-stage-badge"
             style={{
@@ -874,7 +882,7 @@ export default function IdentityCard({
                 </div>
               ) : (
                 <>
-                  {canSearch && (
+                  {canSearch && !simple && (
                     <button
                       className="idc-photo-menu-item"
                       style={{ color: T.textMuted }}
@@ -993,7 +1001,7 @@ export default function IdentityCard({
           />
         ) : (
           <div className="idc-field-row" style={{ cursor: 'default' }}>
-            {contact.company_id ? (
+            {contact.company_id && !simple ? (
               /* Linked company — opens rich detail modal inline */
               <button
                 className="idc-company-link"
@@ -1032,6 +1040,7 @@ export default function IdentityCard({
         )}
 
         {/* ── Classification chips row ── */}
+        {!simple && (
         <div className="idc-chips-row">
 
           {/* Stage */}
@@ -1136,11 +1145,13 @@ export default function IdentityCard({
             T={T}
           />
         </div>
+        )}
 
         {/* ── Stickers (ADR-007): renders nothing unless available ── */}
         <ContactStickersRow contact={contact} onUpdate={onUpdate} />
 
         {/* ── Tags section ── */}
+        {!simple && (
         <div className="idc-tags-section" ref={tagWrapRef}>
           <div className="idc-tags-row">
             {/* Existing tags */}
@@ -1212,6 +1223,7 @@ export default function IdentityCard({
             )}
           </div>
         </div>
+        )}
 
         {/* ── Divider ── */}
         <div className="idc-divider" style={{ background: T.border }} />

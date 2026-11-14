@@ -57,6 +57,7 @@ export const MODULE_COLORS = {
   fallback: '#f97316',
   recon: '#6366f1',
   'command-center': '#3b82f6',
+  'contact-hub': BRAND.indigo,
   settings: '#faaa20',
 };
 
@@ -161,6 +162,17 @@ export const MODULE_BOTTOM_NAV = {
       { id: 'objections',        label: 'Objections',       Icon: Shield,   to: '/recon/objections' },
       { id: 'competitive-intel', label: 'Competitive Intel', Icon: Swords,  to: '/recon/competitive-intel' },
       { id: 'buying-signals',    label: 'Buying Signals',   Icon: Zap,      to: '/recon/buying-signals' },
+    ],
+  },
+
+  /**
+   * Contact Hub. One view in Phase 1A; Connect and My Card take the next two
+   * cells when they exist. The entry is inert while the Contact Hub switch is
+   * off: nothing resolves to the 'contact-hub' module, so this is never read.
+   */
+  'contact-hub': {
+    primary: [
+      { id: 'people', label: 'My People', Icon: Users, to: '/contact-hub' },
     ],
   },
 

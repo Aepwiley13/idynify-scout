@@ -1,0 +1,31 @@
+/**
+ * Contact Hub — the on/off switch (Phase 1A).
+ *
+ * OFF BY DEFAULT. The Contact Hub appears only in a build made with
+ * `VITE_CONTACT_HUB=on` (also accepted: `true`, `1`). In any other build —
+ * including production, where the variable is not set — there is no sidebar
+ * item, no mobile drawer item and no route: /contact-hub falls through to the
+ * app's catch-all like any unknown URL.
+ *
+ * It is a build-time switch, the same shape as SHELL_MIGRATION, so the answer
+ * is one constant for the whole app and cannot differ between the sidebar and
+ * the router. It is not a per-account rollout; that is a later decision.
+ *
+ * Staging QA: put `VITE_CONTACT_HUB=on` in the staging env file that
+ * scripts/staging/stagingDev.mjs is started with. That runner drops every
+ * VITE_* variable from the shell, so the env file is the only place it can
+ * come from.
+ */
+
+/** Pure: is this raw variable value an explicit "on"? Anything else is off. */
+export function contactHubEnabledFrom(value) {
+  return value === 'on' || value === 'true' || value === '1';
+}
+
+export const CONTACT_HUB = Object.freeze({
+  enabled: contactHubEnabledFrom(import.meta.env?.VITE_CONTACT_HUB),
+});
+
+/** Where the Contact Hub lives. One place, so links and routes cannot drift. */
+export const CONTACT_HUB_PATH = '/contact-hub';
+export const contactHubPersonPath = (contactId) => `${CONTACT_HUB_PATH}/person/${encodeURIComponent(contactId)}`;

@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useParams, useLocation } from 'react-router-dom';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth, db } from './firebase/config';
 import { doc, getDoc } from 'firebase/firestore';
 import { ImpersonationProvider } from './context/ImpersonationContext';
 import { useVersionCheck } from './hooks/useVersionCheck';
-import { hasActiveAccess } from './utils/billingEntitlement';
+import { useAccountVerification } from './utils/accountVerification';
+import { AccountGate } from './components/AccountUnverified';
 
 // Pages
 import Homepage from './pages/Homepage';
@@ -129,29 +130,34 @@ import WithTheForce from './components/WithTheForce';
  * Authorization semantics are identical to ProtectedRoute: same auth check,
  * same payment gate, same redirects. Only presentation moved.
  */
-function ShellRoute({ loading, user, userData, requirePayment = true }) {
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <p className="text-cyan-400 text-xl font-mono">Loading...</p>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/login" />;
-  }
-
-  if (requirePayment && !hasActiveAccess(userData)) {
-    return <Navigate to="/checkout" />;
-  }
-
+function ShellRoute({ loading, user, userData, account, recovery, requirePayment = true }) {
   return (
-    <MainLayout user={user} userData={userData}>
-      <Outlet />
-    </MainLayout>
+    <AccountGate
+      loading={loading}
+      user={user}
+      account={account}
+      requirePayment={requirePayment}
+      recovery={recovery}
+      loadingScreen={<LoadingScreen />}
+    >
+      <MainLayout user={user} userData={userData}>
+        <Outlet />
+      </MainLayout>
+    </AccountGate>
   );
 }
+
+function LoadingScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-black">
+      <p className="text-cyan-400 text-xl font-mono">Loading...</p>
+    </div>
+  );
+}
+
+// Stable identities: the account hook subscribes once and reads through these.
+const watchSignIn = (callback) => onAuthStateChanged(auth, callback);
+const readAccountSnapshot = (uid) => getDoc(doc(db, 'users', uid));
 
 /**
  * /scout/company/:companyId → /company/:companyId
@@ -169,48 +175,27 @@ function RedirectToCanonicalCompany() {
 }
 
 function App() {
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [userData, setUserData] = useState(null);
+  // A failed, slow or cache-only account read is its own state, never
+  // "unpaid". See utils/accountVerification.js.
+  const { authLoading, authUser, account, retry, retrying } = useAccountVerification({
+    onAuthChange: watchSignIn,
+    readSnapshot: readAccountSnapshot,
+  });
+  const userData = account.data ?? null;
+  const user = useMemo(
+    () => (authUser ? { id: authUser.uid, email: authUser.email, ...(userData ?? {}) } : null),
+    [authUser, userData],
+  );
+  const loading = authLoading;
+  const handleSignOut = useCallback(() => {
+    signOut(auth).catch((error) => console.error('[account] Sign out failed:', error));
+  }, []);
+  const recovery = useMemo(
+    () => ({ onRetry: retry, onSignOut: handleSignOut, retrying }),
+    [retry, handleSignOut, retrying],
+  );
   const [impersonationSession, setImpersonationSession] = useState(null);
   const updateAvailable = useVersionCheck();
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        // Fetch user data from Firestore
-        try {
-          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-          if (userDoc.exists()) {
-            const data = userDoc.data();
-            setUserData(data);
-            setUser({
-              id: currentUser.uid,
-              email: currentUser.email,
-              ...data
-            });
-          } else {
-            setUser({
-              id: currentUser.uid,
-              email: currentUser.email
-            });
-          }
-        } catch (error) {
-          console.error('Error fetching user data:', error);
-          setUser({
-            id: currentUser.uid,
-            email: currentUser.email
-          });
-        }
-      } else {
-        setUser(null);
-        setUserData(null);
-      }
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, []);
 
   // Check for active impersonation session
   useEffect(() => {
@@ -267,68 +252,50 @@ function App() {
   };
 
   // Protected Route Component - Requires both auth AND payment
-  const ProtectedRoute = ({ children, requirePayment = true, withLayout = false }) => {
-    if (loading) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-black">
-          <p className="text-cyan-400 text-xl font-mono">Loading...</p>
-        </div>
-      );
-    }
-
-    if (!user) {
-      return <Navigate to="/login" />;
-    }
-
-    // Check if user has completed payment (unless explicitly disabled)
-    if (requirePayment && !hasActiveAccess(userData)) {
-      return <Navigate to="/checkout" />;
-    }
-
-    // Wrap with MainLayout if requested.
-    // Legacy path — retained for rollback layer 1 (see PHASE0_MIGRATION_SAFETY).
-    // Migrated routes go through ShellRoute below instead.
-    if (withLayout) {
-      return <MainLayout user={user} userData={userData}>{children}</MainLayout>;
-    }
-
-    return children;
+  // `purchase` marks the checkout routes: they need the server's answer about
+  // the account, so a failed or cache-only read shows the verification screen
+  // there instead of a purchase page.
+  const ProtectedRoute = ({ children, requirePayment = true, withLayout = false, purchase = false }) => {
+    return (
+      <AccountGate
+        loading={loading}
+        user={user}
+        account={account}
+        requirePayment={requirePayment}
+        purchase={purchase}
+        recovery={recovery}
+        loadingScreen={<LoadingScreen />}
+      >
+        {/* Wrap with MainLayout if requested.
+            Legacy path — retained for rollback layer 1 (see PHASE0_MIGRATION_SAFETY).
+            Migrated routes go through ShellRoute below instead. */}
+        {withLayout ? <MainLayout user={user} userData={userData}>{children}</MainLayout> : children}
+      </AccountGate>
+    );
   };
 
 
   // Smart redirect after login - NEW FLOW
   const SmartRedirect = () => {
-    if (loading) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-black">
-          <p className="text-cyan-400 text-xl font-mono">Loading...</p>
-        </div>
-      );
-    }
-
-    if (!user) {
-      return <Navigate to="/login" />;
-    }
-
-    // ✅ NEW FLOW: Check payment status first
-    if (!hasActiveAccess(userData)) {
-      // User hasn't paid yet - send to checkout
-      return <Navigate to="/checkout" />;
-    }
-
     // Return users skip onboarding; new users go through Barry Workspace
-    if (userData?.onboardingComplete || userData?.onboarding?.completed) {
-      return <Navigate to="/mission-control-v2" />;
-    }
-    return <Navigate to="/barry" />;
+    const destination = () => {
+      if (userData?.onboardingComplete || userData?.onboarding?.completed) {
+        return <Navigate to="/mission-control-v2" />;
+      }
+      return <Navigate to="/barry" />;
+    };
+
+    // Payment first: a server-confirmed unpaid account goes to checkout, and
+    // an account that could not be checked goes nowhere.
+    return (
+      <AccountGate loading={loading} user={user} account={account} recovery={recovery} loadingScreen={<LoadingScreen />}>
+        {destination()}
+      </AccountGate>
+    );
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-black">
-        <p className="text-cyan-400 text-xl font-mono">Loading...</p>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   return (
@@ -355,9 +322,9 @@ function App() {
         <Route path="/getting-started" element={<ProtectedRoute><GettingStarted /></ProtectedRoute>} />
 
         {/* Payment Routes - Auth required but payment NOT required (to avoid redirect loop) */}
-        <Route path="/checkout" element={<ProtectedRoute requirePayment={false}><CheckoutPage /></ProtectedRoute>} />
-        <Route path="/checkout/success" element={<ProtectedRoute requirePayment={false}><CheckoutSuccessPage /></ProtectedRoute>} />
-        <Route path="/checkout/cancel" element={<ProtectedRoute requirePayment={false}><CheckoutCancelPage /></ProtectedRoute>} />
+        <Route path="/checkout" element={<ProtectedRoute requirePayment={false} purchase><CheckoutPage /></ProtectedRoute>} />
+        <Route path="/checkout/success" element={<ProtectedRoute requirePayment={false} purchase><CheckoutSuccessPage /></ProtectedRoute>} />
+        <Route path="/checkout/cancel" element={<ProtectedRoute requirePayment={false} purchase><CheckoutCancelPage /></ProtectedRoute>} />
 
         {/* ── Legacy onboarding routes → /barry ─────────────────────────────
             First Experience now lives inside the Barry Workspace at /barry,
@@ -390,7 +357,7 @@ function App() {
             per-route <ProtectedRoute withLayout> wrapping in the else branch.
             ══════════════════════════════════════════════════════════════════ */}
         {SHELL_MIGRATION.enabled ? (
-          <Route element={<ShellRoute loading={loading} user={user} userData={userData} />}>
+          <Route element={<ShellRoute loading={loading} user={user} userData={userData} account={account} recovery={recovery} />}>
             <Route path="/mission-control-v2" element={<MissionControlDashboardV2 />} />
 
             {/* ══ CANONICAL RECORD ROUTES ══════════════════════════════════

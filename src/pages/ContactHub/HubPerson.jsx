@@ -21,7 +21,7 @@ import { HUB_STATUS, isListedInMyPeople } from './peopleRules';
 function BackLink() {
   const T = useT();
   return (
-    <Link className="hub-back" to={CONTACT_HUB_PATH} style={{ color: T.textMuted }}>
+    <Link className="hub-back" to={CONTACT_HUB_PATH} style={{ color: T.text }}>
       <ArrowLeft size={18} aria-hidden="true" />
       My People
     </Link>

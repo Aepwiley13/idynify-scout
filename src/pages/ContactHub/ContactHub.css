@@ -1,6 +1,8 @@
 /* Contact Hub (Phase 1A).
-   Layout and sizing only. Colours come from the theme (useT) inline, the way
-   the rest of the shell does it, so both themes work without a second sheet.
+   Layout and sizing. Colours come from the theme (useT), inline or as --hub-*
+   variables set by the component, so every theme works without a second sheet.
+   The visual direction is the approved Contact Hub design: pink for the one
+   primary action, stickers in their own colours, soft filled controls.
 
    Mobile first: every control a thumb is meant to hit is at least 44px. */
 
@@ -19,6 +21,29 @@
 }
 .hub-inner { max-width: 960px; margin: 0 auto; }
 
+@media (max-width: 768px) {
+  /* The shell paints a phone's content area in the card colour. Here the page
+     is the app background and the list is the card on it. */
+  .hub {
+    background: var(--bg-primary);
+    /* The shell keeps 56px (plus the home-indicator inset) free at the bottom
+       of every module for its bottom bar (MainLayout.css). Contact Hub has no
+       bottom bar in Phase 1A (mobileNavigation.js: hidden), so that room was
+       an empty strip under the page. Take it back, and keep the inset as
+       padding so the last row clears the home indicator.
+       REMOVE THIS when Contact Hub gets a bottom bar: contactHubStyling.test.js
+       fails if the two fall out of step. */
+    margin-bottom: calc(-56px - env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+  /* The shell's top bar already says "Contact Hub". The page heading stays
+     for screen readers and the document outline, without repeating it. */
+  .hub-header {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+}
+
 /* ── Heading ── */
 .hub-header { margin-bottom: 20px; }
 .hub-title { font-size: 28px; font-weight: 800; line-height: 1.15; margin: 0; letter-spacing: -0.01em; }
@@ -26,27 +51,33 @@
 
 /* ── Card ── */
 .hub-card { border: 1px solid; border-radius: 18px; padding: 16px; }
+/* My People. On a phone the heading, search and chips sit on the page and the
+   list alone is the card; from 769px the whole section is the card. */
+.hub-people { background: transparent; border: none; border-radius: 0; padding: 0; }
 
 /* ── Toolbar: title, search, Add Person ── */
 .hub-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.hub-section-title { font-size: 20px; font-weight: 700; margin: 0; flex: 1 1 100%; }
+.hub-section-title { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; margin: 0; flex: 1 1 0; min-width: 0; }
 .hub-count { font-weight: 600; }
 
 .hub-search {
-  flex: 1 1 200px; display: flex; align-items: center; gap: 10px;
-  min-height: 48px; padding: 0 14px; border: 1px solid; border-radius: 14px; box-sizing: border-box;
+  flex: 1 1 100%; display: flex; align-items: center; gap: 10px;
+  min-height: 52px; padding: 0 14px; border: 1px solid; border-radius: 14px; box-sizing: border-box;
 }
 .hub-search input {
   flex: 1; min-width: 0; border: none; outline: none; background: transparent;
   font: inherit; font-size: 16px; /* 16px: iOS does not zoom the page on focus */
 }
+.hub-search input::placeholder { color: var(--hub-muted); opacity: 1; }
 .hub-search:focus-within { outline: 2px solid #4f46e5; outline-offset: 1px; }
 
-.hub-toolbar > .hub-primary-btn { flex: 1 1 100%; }
+.hub-toolbar > .hub-add-btn { flex: 0 0 auto; }
 .hub-primary-btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   min-height: 48px; padding: 0 18px; border: none; border-radius: 14px;
-  color: #fff; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer; white-space: nowrap;
+  /* 19px bold: white on the brand pink is 4:1, which is enough for large
+     text and not for small. Do not make this label smaller. */
+  color: #fff; font: inherit; font-size: 19px; font-weight: 700; cursor: pointer; white-space: nowrap;
 }
 .hub-secondary-btn {
   display: inline-flex; align-items: center; justify-content: center;
@@ -60,15 +91,19 @@
 
 /* ── Sticker chips ── */
 .hub-chips {
-  display: flex; gap: 8px; margin-top: 14px; padding-bottom: 2px;
+  display: flex; gap: 8px; margin-top: 12px; padding: 2px 2px 4px;
   overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none;
 }
 .hub-chips::-webkit-scrollbar { display: none; }
 .hub-chip {
-  display: inline-flex; align-items: center; gap: 6px; flex-shrink: 0;
-  min-height: 44px; padding: 0 14px; border-radius: 22px;
+  display: inline-flex; align-items: center; gap: 7px; flex-shrink: 0;
+  min-height: 44px; padding: 0 14px; border-radius: 22px; border: 1.5px solid;
   font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; white-space: nowrap;
 }
+.hub-chip[aria-pressed="true"] { font-weight: 700; }
+.hub-chip--all { padding: 0 16px; }
+.hub-chip--all[aria-pressed="true"] { border-width: 2px; }
+.hub-chip--manage[aria-pressed="false"] { border-style: dashed; }
 .hub-chip-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
 .hub-chip-name { max-width: 160px; overflow: hidden; text-overflow: ellipsis; }
 .hub-chip-count { font-weight: 600; }
@@ -82,7 +117,10 @@
 .hub-empty-text { font-size: 15px; margin: 0 0 6px; }
 
 /* ── The list ── */
-.hub-list { list-style: none; margin: 12px 0 0; padding: 0; }
+.hub-list {
+  list-style: none; margin: 10px 0 0; padding: 2px 14px;
+  background: var(--hub-card); border: 1px solid var(--hub-border); border-radius: 18px;
+}
 .hub-row {
   position: relative; display: grid; align-items: center; column-gap: 12px; row-gap: 4px;
   grid-template-columns: 48px minmax(0, 1fr) auto;
@@ -91,7 +129,7 @@
   grid-template-areas:
     "avatar main     actions"
     "avatar stickers stickers";
-  padding: 12px 4px; border-top: 1px solid;
+  padding: 13px 0; border-top: 1px solid;
 }
 .hub-row:first-child { border-top: none; }
 
@@ -105,6 +143,7 @@
 }
 /* The whole row opens the person: the name's hit area is stretched over it. */
 .hub-row-link::after { content: ""; position: absolute; inset: 0; border-radius: 12px; }
+.hub-row-main { gap: 3px; }
 .hub-row-sub { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Controls on the row sit above the stretched link. */
@@ -121,10 +160,9 @@
 
 .hub-icon-btn {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 44px; height: 44px; border: 1px solid; border-radius: 12px;
+  width: 44px; height: 44px; border: none; border-radius: 12px;
   background: transparent; cursor: pointer; text-decoration: none; box-sizing: border-box;
 }
-.hub-icon-btn--plain { border: none; }
 
 /* The shared sticker "+" is a 10px glyph in a small ring: give it a real
    touch target here without changing how it looks anywhere else. */
@@ -142,34 +180,67 @@
 .hub-dialog-title { font-size: 20px; font-weight: 800; margin: 0; }
 
 /* ── One person ── */
-.hub-person { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+.hub-person { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+.hub-person .hub-back { margin-bottom: -8px; }
 .hub-back {
   display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
-  min-height: 44px; padding: 0 6px 0 0; font-size: 15px; font-weight: 600; text-decoration: none;
+  min-height: 44px; padding: 0 6px 0 0; font-size: 16px; font-weight: 600; text-decoration: none;
 }
 
 /* ── Wider screens ── */
 @media (min-width: 769px) {
-  .hub { padding: 0; }
-  .hub-toolbar > .hub-primary-btn { flex: 0 0 auto; }
+  /* The shell gives a full-height module no padding at any width
+     (MainLayout.css: .page-content-full), so the gutter is ours here too. */
+  .hub { padding: 24px 24px 32px; }
   .hub-card { padding: 22px 24px; }
+  .hub-people {
+    background: var(--hub-card); border: 1px solid var(--hub-border); border-radius: 18px;
+    padding: 22px 24px 10px;
+  }
   .hub-title { font-size: 32px; }
-  .hub-section-title { flex: 0 0 auto; margin-right: auto; }
-  .hub-search { flex: 0 1 300px; }
-  .hub-chips { flex-wrap: wrap; overflow-x: visible; }
+  .hub-toolbar { gap: 14px; }
+  .hub-section-title { flex: 0 0 auto; margin-right: auto; font-size: 20px; font-weight: 700; letter-spacing: 0; }
+  .hub-search { flex: 1 1 160px; max-width: 280px; min-height: 48px; }
+  .hub-search input { font-size: 15px; }
+  .hub-add-btn { padding: 0 20px; }
+  .hub-chips { flex-wrap: wrap; overflow-x: visible; margin-top: 16px; }
+  .hub-chip--all[aria-pressed="true"] { border-width: 1.5px; }
+
+  /* The section is the card here, so the list needs no card of its own. */
+  .hub-list { margin: 14px 0 0; padding: 0; background: transparent; border: none; border-radius: 0; }
+  .hub-row-main { gap: 2px; }
+
+  /* The shared compact sticker chip is 9px, sized for a dense table. In My
+     People it is a label to read: 12px, with the remove control unchanged. */
+  .hub-row-stickers .stk-card-row--interactive .stk-chip--compact { font-size: 12px; padding: 3px 4px 3px 9px; gap: 6px; }
+  .hub-row-stickers .stk-card-row--interactive .stk-chip--compact .stk-dot { width: 7px; height: 7px; }
 
   .hub-row {
-    grid-template-columns: 48px minmax(0, 1.4fr) minmax(0, 1fr) auto auto;
+    /* Two 12px stickers and the add control fit on one line at 1280 and up. */
+    grid-template-columns: 48px minmax(0, 1fr) minmax(0, 1.3fr) auto auto;
     grid-template-areas: "avatar main stickers added actions";
-    column-gap: 16px; padding: 12px 8px;
+    column-gap: 16px; padding: 12px 0;
   }
-  .hub-row:hover { background: rgba(127, 127, 127, 0.06); border-radius: 12px; }
+  .hub-row:hover { background: rgba(127, 127, 127, 0.06); }
   .hub-row-added { display: block; grid-area: added; }
 
   .hub-dialog {
     inset: auto; left: 50%; top: 50%; transform: translate(-50%, -50%);
     width: min(560px, calc(100vw - 48px)); max-height: calc(100vh - 48px);
     border-width: 1px; border-radius: 18px; padding: 22px 24px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
+  }
+}
+
+/* Beside the sidebar a tablet or a small window leaves about 550 to 850px:
+   too narrow for five columns without cutting names short. Stickers go under
+   the name, as on a phone, and stay editable. */
+@media (min-width: 769px) and (max-width: 1100px) {
+  .hub-row {
+    grid-template-columns: 48px minmax(0, 1fr) auto auto;
+    grid-template-areas:
+      "avatar main     added    actions"
+      "avatar stickers stickers stickers";
+    row-gap: 6px;
   }
 }
 

@@ -411,6 +411,42 @@ describe('stickers on a phone-sized list', () => {
   });
 });
 
+describe('the add button and search at each width', () => {
+  beforeEach(() => { contactsData.list = [person('w1', 'Someone Here')]; });
+
+  it('a phone shows "Add", still named Add Person, before search; it opens the same dialog', async () => {
+    setViewportWidth(390);
+    const user = userEvent.setup();
+    renderHub();
+    const add = await screen.findByRole('button', { name: 'Add Person' });
+    expect(add).toHaveTextContent(/^Add$/);
+    const search = screen.getByRole('searchbox', { name: 'Search people' });
+    expect(add.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await user.click(add);
+    expect(screen.getByRole('dialog', { name: 'Add Person' })).toBeInTheDocument();
+  });
+
+  it('a wide screen shows "Add Person", after search', async () => {
+    setViewportWidth(1280);
+    renderHub();
+    const add = await screen.findByRole('button', { name: 'Add Person' });
+    expect(add).toHaveTextContent(/^Add Person$/);
+    const search = screen.getByRole('searchbox', { name: 'Search people' });
+    expect(search.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('what is typed in search survives the layout changing width', async () => {
+    setViewportWidth(1280);
+    const user = userEvent.setup();
+    renderHub();
+    const search = await screen.findByRole('searchbox', { name: 'Search people' });
+    await user.type(search, 'some');
+    setViewportWidth(390);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Add Person' })).toHaveTextContent(/^Add$/));
+    expect(screen.getByRole('searchbox', { name: 'Search people' })).toHaveValue('some');
+  });
+});
+
 describe('loading and failure', () => {
   it('a failed load says so and Try again loads again', async () => {
     contactsData.fail = true;

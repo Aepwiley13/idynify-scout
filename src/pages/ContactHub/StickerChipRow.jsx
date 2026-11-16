@@ -24,15 +24,18 @@ export default function StickerChipRow({ people, selectedId, onSelect, managing,
 
   if (!ready) return null;
 
-  const plain = { color: T.textMuted, background: T.cardBg, border: `1.5px solid ${T.border}` };
-  const chosen = { color: T.text, background: T.accentBg, border: `1.5px solid ${T.accent}` };
+  // Border widths live in the stylesheet (the selected "All" is heavier on a phone).
+  const plain = { color: T.textMuted, background: T.cardBg, borderColor: T.border };
+  const chosen = { color: T.text, background: T.accentBg, borderColor: T.accent };
+  // The way into the Stickers view: an outline only, so it does not read as a filter.
+  const manage = { color: T.textMuted, background: 'transparent', borderColor: T.textMuted };
 
   return (
     <div className="hub-chips" role="group" aria-label="Filter by sticker">
       {active.length > 0 && (
         <button
           type="button"
-          className="hub-chip"
+          className="hub-chip hub-chip--all"
           aria-pressed={!selectedId && !managing ? 'true' : 'false'}
           style={!selectedId && !managing ? chosen : plain}
           onClick={() => onSelect(null)}
@@ -64,7 +67,7 @@ export default function StickerChipRow({ people, selectedId, onSelect, managing,
         type="button"
         className="hub-chip hub-chip--manage"
         aria-pressed={managing ? 'true' : 'false'}
-        style={managing ? chosen : { ...plain, borderStyle: 'dashed' }}
+        style={managing ? chosen : manage}
         onClick={onToggleManage}
       >
         <Plus size={14} aria-hidden="true" />

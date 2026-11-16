@@ -54,6 +54,13 @@ const ADD_COPY = Object.freeze({
   describeError: describeAddPersonError,
 });
 
+/**
+ * The soft fill behind initials and the call and email buttons. The light
+ * themes have a surface made for this. The dark themes' surfaces are nearly
+ * invisible on a card (4 to 6% white), so those use the next step up.
+ */
+const softFill = (T) => (T.isDark ? T.border2 ?? T.surface2 ?? T.surface : T.surface);
+
 function Avatar({ contact, name }) {
   const [broken, setBroken] = useState(false);
   const T = useT();
@@ -61,7 +68,7 @@ function Avatar({ contact, name }) {
   return src ? (
     <img className="hub-avatar" src={src} alt="" loading="lazy" onError={() => setBroken(true)} />
   ) : (
-    <span className="hub-avatar hub-avatar--initials" style={{ background: T.surface2 ?? T.surface, color: T.textMuted }} aria-hidden="true">
+    <span className="hub-avatar hub-avatar--initials" style={{ background: softFill(T), color: T.text }} aria-hidden="true">
       {getInitials(name)}
     </span>
   );
@@ -94,15 +101,15 @@ function PersonRow({ contact, onStickerChange, readOnlyStickers }) {
           ? <ContactCardStickers contact={contact} max={ROW_STICKER_MAX} />
           : <ContactCardStickersInteractive contact={contact} max={ROW_STICKER_MAX} onUpdate={onStickerChange} />}
       </div>
-      {added ? <span className="hub-row-added" style={{ color: T.textFaint }}>{added}</span> : null}
+      {added ? <span className="hub-row-added" style={{ color: T.textMuted }}>{added}</span> : null}
       <div className="hub-row-actions">
         {phone ? (
-          <a className="hub-icon-btn" href={`tel:${phone}`} aria-label={`Call ${name}`} style={{ color: T.textMuted, borderColor: T.border }}>
+          <a className="hub-icon-btn" href={`tel:${phone}`} aria-label={`Call ${name}`} style={{ color: T.text, background: softFill(T) }}>
             <Phone size={18} aria-hidden="true" />
           </a>
         ) : null}
         {email ? (
-          <a className="hub-icon-btn" href={`mailto:${email}`} aria-label={`Email ${name}`} style={{ color: T.textMuted, borderColor: T.border }}>
+          <a className="hub-icon-btn" href={`mailto:${email}`} aria-label={`Email ${name}`} style={{ color: T.text, background: softFill(T) }}>
             <Mail size={18} aria-hidden="true" />
           </a>
         ) : null}
@@ -197,6 +204,30 @@ export default function HubPeople() {
   // No one yet: the page is the invitation, with nothing else competing.
   const firstRun = status === HUB_STATUS.READY && people.length === 0;
 
+  // On a phone, Add sits beside the heading and search runs the full width
+  // below; on a wide screen search comes first. The order on screen is the
+  // order in the page, so the keyboard and screen readers follow what is seen.
+  const searchField = (
+    <label key="search" className="hub-search" style={{ background: T.input ?? T.surface, borderColor: isMobile ? T.textMuted : T.border }}>
+      <Search size={isMobile ? 20 : 18} aria-hidden="true" style={{ color: T.textMuted, flexShrink: 0 }} />
+      <input
+        type="search"
+        value={searchTerm}
+        onChange={(e) => setSearchTerm(e.target.value)}
+        placeholder="Search people…"
+        aria-label="Search people"
+        style={{ color: T.text }}
+      />
+    </label>
+  );
+  // A phone has room for one word beside the heading; the name read out stays
+  // "Add Person" at every width.
+  const addButton = (
+    <button key="add" type="button" className="hub-primary-btn hub-add-btn" aria-label="Add Person" style={{ background: T.accent }} onClick={() => setAdding(true)}>
+      {isMobile ? 'Add' : 'Add Person'}
+    </button>
+  );
+
   return (
     <>
       <header className="hub-header">
@@ -206,31 +237,19 @@ export default function HubPeople() {
         </div>
       </header>
 
-      <section aria-labelledby="hub-people-heading" className="hub-card" style={{ background: T.cardBg, borderColor: T.border }}>
+      {/* Colours reach the stylesheet as variables: on a phone the card is the list
+          alone, and the heading, search and chips sit on the page above it. */}
+      <section
+        aria-labelledby="hub-people-heading"
+        className="hub-card hub-people"
+        style={{ '--hub-card': T.cardBg, '--hub-border': T.border, '--hub-muted': T.textMuted }}
+      >
         <div className="hub-toolbar">
           <h2 id="hub-people-heading" className="hub-section-title">
             My People
-            {status === HUB_STATUS.READY && !firstRun ? <span className="hub-count" style={{ color: T.textFaint }}> ({people.length})</span> : null}
+            {status === HUB_STATUS.READY && !firstRun ? <span className="hub-count" style={{ color: T.textMuted }}> ({people.length})</span> : null}
           </h2>
-          {!firstRun && (
-          <>
-          <label className="hub-search" style={{ background: T.input ?? T.surface, borderColor: T.border }}>
-            <Search size={18} aria-hidden="true" style={{ color: T.textFaint, flexShrink: 0 }} />
-            <input
-              type="search"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search people…"
-              aria-label="Search people"
-              style={{ color: T.text }}
-            />
-          </label>
-          <button type="button" className="hub-primary-btn" style={{ background: T.accent }} onClick={() => setAdding(true)}>
-            <UserPlus size={18} aria-hidden="true" />
-            Add Person
-          </button>
-          </>
-          )}
+          {!firstRun && (isMobile ? [addButton, searchField] : [searchField, addButton])}
         </div>
 
         {!firstRun && (

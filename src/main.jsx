@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
 import { ThemeProvider } from './theme/ThemeContext'
+import AppErrorBoundary from './components/AppErrorBoundary'
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
@@ -12,8 +13,12 @@ if ('serviceWorker' in navigator) {
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <ThemeProvider>
-      <App />
-    </ThemeProvider>
+    {/* Outside the theme provider on purpose: it must still render if the
+        provider is what failed. */}
+    <AppErrorBoundary>
+      <ThemeProvider>
+        <App />
+      </ThemeProvider>
+    </AppErrorBoundary>
   </StrictMode>,
 )

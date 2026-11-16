@@ -222,11 +222,11 @@ describe('sticker filters', () => {
     expect(names()).toHaveLength(4);
   });
 
-  it('the Stickers button opens the existing Stickers view, and a tile returns to the list filtered by it', async () => {
+  it('the Sticker Wall chip opens the existing Stickers view, and a tile returns to the list filtered by it', async () => {
     const user = userEvent.setup();
     renderHub();
     const group = await screen.findByRole('group', { name: 'Filter by sticker' });
-    await user.click(within(group).getByRole('button', { name: 'Stickers' }));
+    await user.click(within(group).getByRole('button', { name: 'Sticker Wall' }));
     expect(screen.queryByRole('list', { name: 'My People' })).toBeNull();
     const wall = await screen.findByTestId('stickers-wall');
     await user.click(within(wall).getByRole('button', { name: 'Partner, 1 person' }));
@@ -253,11 +253,11 @@ describe('sticker filters', () => {
     expect(names()).toHaveLength(4);
   });
 
-  it('stickers are optional: with none yet there is only the quiet Stickers button', async () => {
+  it('stickers are optional: with none yet there is only the quiet Sticker Wall chip', async () => {
     fake.current.state.registry = [];
     renderHub();
     const group = await screen.findByRole('group', { name: 'Filter by sticker' });
-    expect(within(group).getAllByRole('button').map((b) => b.textContent)).toEqual(['Stickers']);
+    expect(within(group).getAllByRole('button').map((b) => b.textContent)).toEqual(['Sticker Wall']);
   });
 });
 
@@ -426,13 +426,15 @@ describe('the add button and search at each width', () => {
     expect(screen.getByRole('dialog', { name: 'Add Person' })).toBeInTheDocument();
   });
 
-  it('a wide screen shows "Add Person", after search', async () => {
+  it('a wide screen shows "Add Person" beside the heading, with search across the row below', async () => {
     setViewportWidth(1280);
     renderHub();
     const add = await screen.findByRole('button', { name: 'Add Person' });
     expect(add).toHaveTextContent(/^Add Person$/);
     const search = screen.getByRole('searchbox', { name: 'Search people' });
-    expect(search.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The same order at every width: heading, Add Person, then search.
+    expect(add.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(search.closest('.hub-tools')).not.toBeNull();
   });
 
   it('what is typed in search survives the layout changing width', async () => {

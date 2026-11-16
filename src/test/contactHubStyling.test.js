@@ -128,3 +128,40 @@ describe('controls stay big enough to tap', () => {
     expect(declarations(hubCss, '.hub-search input')).toMatch(/font-size:\s*16px/);
   });
 });
+
+describe('the desktop workspace', () => {
+  it('the table and its rows set no overflow, so the sticker picker is never clipped', () => {
+    for (const selector of ['.hub-table', '.hub-tr', '.hub-td']) {
+      expect(declarations(hubCss, selector)).not.toMatch(/overflow(-x|-y)?\s*:/);
+    }
+  });
+
+  it('a table row is positioned, so the name link can cover it and the picker can layer over later rows', () => {
+    expect(declarations(hubCss, '.hub-tr')).toMatch(/position:\s*relative/);
+    expect(hubCss).toMatch(/\.hub-row-stickers:has\(\.stk-picker--popover\)\s*\{\s*z-index:\s*2/);
+  });
+
+  it('the sticker column keeps its place in the table when a row has no sticker controls', () => {
+    expect(declarations(hubCss, '.hub-table .hub-row-stickers:empty')).toMatch(/display:\s*block/);
+    expect(declarations(hubCss, '.hub-table .hub-row-stickers')).toMatch(/grid-area:\s*auto/);
+  });
+
+  it('email and phone links sit above the row link, and long values wrap instead of being cut', () => {
+    const link = declarations(hubCss, '.hub-td-link');
+    expect(link).toMatch(/z-index:\s*1/);
+    expect(link).toMatch(/overflow-wrap:\s*break-word/);
+    expect(link).not.toMatch(/text-overflow|white-space:\s*nowrap/);
+    expect(declarations(hubCss, '.hub-panel-name')).toMatch(/overflow-wrap:\s*break-word/);
+  });
+
+  it('panel rows and the view buttons are comfortable targets', () => {
+    expect(declarations(hubCss, '.hub-panel-item')).toMatch(/min-height:\s*40px/);
+    expect(declarations(hubCss, '.hub-view-btn')).toMatch(/min-height:\s*44px/);
+  });
+
+  it('the panel is part of the page, not fixed to the window like the shell', () => {
+    const rule = declarations(hubCss, '.hub-panel');
+    expect(rule).toMatch(/position:\s*sticky/);
+    expect(rule).not.toMatch(/position:\s*fixed/);
+  });
+});

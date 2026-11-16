@@ -20,6 +20,10 @@
   overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
 }
 .hub-inner { max-width: 960px; margin: 0 auto; }
+/* My People uses the room it is given: a table and an inner panel need more
+   than a reading column. A person's page keeps its own narrower measure. */
+.hub-inner:has(> .hub-workspace) { max-width: 1360px; }
+.hub-workspace { min-width: 0; }
 
 @media (max-width: 768px) {
   /* The shell paints a phone's content area in the card colour. Here the page
@@ -57,11 +61,15 @@
 
 /* ── Toolbar: title, search, Add Person ── */
 .hub-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.hub-section-title { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; margin: 0; flex: 1 1 0; min-width: 0; }
+.hub-heading { flex: 1 1 0; min-width: 0; }
+.hub-section-title { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; margin: 0; }
+.hub-subtitle { margin: 4px 0 0; font-size: 14px; }
+/* Search, and on a desktop the List / Table choice, on a row of their own. */
+.hub-tools { flex: 1 1 100%; display: flex; align-items: center; gap: 10px; min-width: 0; }
 .hub-count { font-weight: 600; }
 
 .hub-search {
-  flex: 1 1 100%; display: flex; align-items: center; gap: 10px;
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 10px;
   min-height: 52px; padding: 0 14px; border: 1px solid; border-radius: 14px; box-sizing: border-box;
 }
 .hub-search input {
@@ -85,7 +93,8 @@
   background: transparent; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
 }
 .hub-primary-btn:focus-visible, .hub-secondary-btn:focus-visible, .hub-chip:focus-visible,
-.hub-icon-btn:focus-visible, .hub-back:focus-visible, .hub-row-link:focus-visible {
+.hub-icon-btn:focus-visible, .hub-back:focus-visible, .hub-row-link:focus-visible,
+.hub-panel-item:focus-visible, .hub-view-btn:focus-visible, .hub-td-link:focus-visible, .hub-link-btn:focus-visible {
   outline: 2px solid #4f46e5; outline-offset: 2px;
 }
 
@@ -199,8 +208,9 @@
   }
   .hub-title { font-size: 32px; }
   .hub-toolbar { gap: 14px; }
-  .hub-section-title { flex: 0 0 auto; margin-right: auto; font-size: 20px; font-weight: 700; letter-spacing: 0; }
-  .hub-search { flex: 1 1 160px; max-width: 280px; min-height: 48px; }
+  .hub-section-title { font-size: 22px; letter-spacing: 0; }
+  /* Full width: the most used control on the page gets the most room. */
+  .hub-search { min-height: 44px; }
   .hub-search input { font-size: 15px; }
   .hub-add-btn { padding: 0 20px; }
   .hub-chips { flex-wrap: wrap; overflow-x: visible; margin-top: 16px; }
@@ -267,3 +277,99 @@
 .hub-row-stickers--readonly .stk-chip--compact .stk-name { max-width: 110px; }
 .hub-row-stickers--readonly .stk-card-row { gap: 6px; flex-wrap: nowrap; }
 .hub-row-stickers--readonly .stk-card-more { font-size: 12px; }
+
+/* ══ Desktop workspace: inner panel, List / Table, Show more ══════════════
+   None of this is the application shell. It all sits inside Contact Hub's
+   own content area, and HubPeople decides what to draw from the width that
+   area really has beside the sidebar, not from the size of the window. */
+
+/* ── Inner panel ── */
+.hub-workspace--panel { display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 24px; align-items: start; }
+.hub-panel {
+  border: 1px solid; border-radius: 18px; padding: 18px 10px 12px; box-sizing: border-box;
+  /* Stays in view while the people scroll; scrolls itself when one account's
+     stickers are taller than the screen. */
+  position: sticky; top: 0; max-height: calc(100vh - 128px); overflow-y: auto;
+}
+.hub-panel .hub-header { margin: 0 10px 14px; }
+.hub-panel .hub-title { font-size: 20px; }
+.hub-panel .hub-tagline { font-size: 13px; margin-top: 4px; }
+.hub-panel-nav { display: flex; flex-direction: column; gap: 2px; }
+.hub-panel-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.hub-panel-label { margin: 14px 10px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.hub-panel-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box;
+  min-height: 40px; padding: 6px 10px; border: none; border-radius: 10px;
+  font: inherit; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer;
+}
+/* The fill is set inline (it is a theme colour), so hover is drawn over it. */
+.hub-panel-item:hover { box-shadow: inset 0 0 0 999px rgba(127, 127, 127, 0.09); }
+.hub-panel-item[aria-current="page"], .hub-panel-item[aria-pressed="true"] { font-weight: 700; }
+.hub-panel-item--new { margin-top: 4px; }
+/* A long sticker name wraps: it is never cut off behind a hover. */
+.hub-panel-name { flex: 1 1 auto; min-width: 0; overflow-wrap: break-word; }
+.hub-panel-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+.hub-panel-count { flex-shrink: 0; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; font-variant-numeric: tabular-nums; }
+
+/* ── Stickers could not be loaded ── */
+.hub-stickers-error {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+  margin-top: 12px; padding: 10px 12px; border: 1px dashed; border-radius: 12px; font-size: 13px;
+}
+.hub-stickers-error--panel { margin: 8px 0 4px; flex-direction: column; align-items: flex-start; }
+.hub-link-btn {
+  min-height: 32px; padding: 0; border: none; background: none; cursor: pointer;
+  font: inherit; font-weight: 700; text-decoration: underline;
+}
+
+/* ── List / Table ── */
+.hub-view { display: inline-flex; flex: none; border: 1px solid; border-radius: 12px; overflow: hidden; }
+.hub-view-btn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border: none;
+  font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.hub-view-btn[aria-pressed="true"] { font-weight: 700; }
+
+/* ── Compact table ──
+   No overflow is set on the table or its rows: the sticker picker opens over
+   the rows below and must not be clipped. */
+.hub-table { margin-top: 14px; font-size: 14px; }
+.hub-tr {
+  position: relative; display: grid; align-items: center; column-gap: 14px;
+  /* Stickers get the widest share: two chips and the add control on one line
+     keep every row one line tall. */
+  grid-template-columns: minmax(130px, 1.5fr) minmax(150px, 1.8fr) minmax(104px, 1fr) minmax(140px, 2.2fr) 64px;
+  min-height: 48px; padding: 6px 6px; border-top: 1px solid;
+}
+.hub-table--no-stickers .hub-tr { grid-template-columns: minmax(130px, 1.6fr) minmax(150px, 2.2fr) minmax(104px, 1.2fr) 64px; }
+.hub-table--tight .hub-tr { grid-template-columns: minmax(120px, 1.4fr) minmax(140px, 1.7fr) minmax(100px, 1fr) minmax(130px, 2fr); }
+.hub-table--tight.hub-table--no-stickers .hub-tr { grid-template-columns: minmax(120px, 1.5fr) minmax(140px, 2.2fr) minmax(100px, 1.2fr); }
+.hub-tr--head { min-height: 34px; border-top: none; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.hub-tr:not(.hub-tr--head):hover { background: rgba(127, 127, 127, 0.06); }
+.hub-td { min-width: 0; }
+.hub-td--name { display: flex; align-items: center; gap: 10px; }
+.hub-td--name .hub-avatar { width: 32px; height: 32px; font-size: 12px; flex: none; }
+/* In the table a long name wraps rather than being shortened: at spaces
+   first, and inside a word only when one word is wider than the column. */
+.hub-td--name .hub-row-link { flex: 1 1 auto; min-width: 0; font-size: 14px; white-space: normal; overflow-wrap: break-word; }
+.hub-td--wrap { overflow-wrap: break-word; }
+/* Above the stretched name link, so these are their own targets. */
+/* max-width: an inline block is otherwise as wide as its longest unbroken run,
+   which pushes a long address out of its column instead of wrapping it. */
+.hub-td-link { position: relative; z-index: 1; display: inline-block; max-width: 100%; padding: 6px 0; text-decoration: none; overflow-wrap: break-word; }
+.hub-td-link:hover { text-decoration: underline; }
+.hub-td--added { white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* The list's sticker cell rules assume the list's named grid areas, and hide
+   an empty cell. In the table the cell is a column and must keep its place. */
+.hub-table .hub-row-stickers { grid-area: auto; }
+.hub-table .hub-row-stickers:empty { display: block; }
+.hub-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* ── Show more (display paging only; see peopleRules.js) ── */
+.hub-more {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px;
+  margin-top: 12px; padding: 4px 2px 8px; font-size: 14px;
+}
+@media (min-width: 769px) {
+  .hub-more { margin-top: 0; padding: 14px 0 12px; border-top: 1px solid; }
+}

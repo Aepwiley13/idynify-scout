@@ -1,17 +1,21 @@
 /**
  * StickerChipRow — My People's sticker filter: "All", then one chip per
  * active sticker with how many of the listed people have it, then a way into
- * the Stickers view (create, edit, archive).
+ * the Sticker Wall (create, edit, archive).
+ *
+ * This is the sticker navigation on a phone and wherever Contact Hub's content
+ * area is too narrow for its inner panel (HubSidePanel). Where the panel is
+ * shown, HubPeople does not render this row.
  *
  * It reads the page's one sticker registry (StickersProvider) and counts from
  * the people already loaded, exactly as People's filter does. One sticker at a
  * time; pressing the selected one clears it.
  *
  * Renders nothing unless stickers are available for this account. Stickers are
- * optional: with none yet, the row is just the quiet "Stickers" button.
+ * optional: with none yet, the row is just the quiet "Sticker Wall" button.
  */
 import { useMemo } from 'react';
-import { Plus } from 'lucide-react';
+import { LayoutGrid } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { useStickers } from '../../components/stickers/stickersRegistry';
 import { countStickers } from '../../components/stickers/peopleStickers';
@@ -70,8 +74,8 @@ export default function StickerChipRow({ people, selectedId, onSelect, managing,
         style={managing ? chosen : manage}
         onClick={onToggleManage}
       >
-        <Plus size={14} aria-hidden="true" />
-        Stickers
+        <LayoutGrid size={14} aria-hidden="true" />
+        Sticker Wall
       </button>
     </div>
   );

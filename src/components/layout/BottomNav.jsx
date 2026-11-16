@@ -77,6 +77,10 @@ export default function BottomNav({ onOpenMore, moreButtonRef }) {
   const module = resolveModule(location.pathname);
   const config = bottomNavFor(module.id);
 
+  // A module may declare that it has no bar (mobileNavigation.js: `hidden`).
+  // Nothing is drawn, rather than a bar with one cell or the global fallback.
+  if (config?.hidden) return null;
+
   const items = config ? config.primary : GLOBAL_BOTTOM_NAV;
   const hasOverflow = Boolean(config?.overflow?.length);
   const accent = moduleColorFor(module.id);

@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useId, Fragment } from 'react';
 import { auth, db } from '../../firebase/config';
 import { collection, addDoc, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
 import { UserPlus, Search, X, Loader } from 'lucide-react';
@@ -9,7 +9,38 @@ import { prepareContactWrite, applyContactMerge } from '../../services/contactWr
 import { ensureCompanyForContact, NAME_SOURCE } from '../../services/companyIdentityService';
 import { useT } from '../../theme/ThemeContext';
 
-export default function ManualContactForm({ onContactAdded, onCancel }) {
+/**
+ * `copy` lets a caller reword the two sentences that speak the sales
+ * product's language, without changing what the form does:
+ *   copy.hint          the note under "Quick add:" (default mentions enriching)
+ *   copy.duplicate     (name) => the message when this person already exists
+ *   copy.submit        the save button's label (default "Scout+")
+ *   copy.showReferral  false hides the optional "Referred By" field; the
+ *                      contact is then saved exactly as one added with that
+ *                      field left empty
+ *   copy.moreDetails   true starts the form with Name, Email and Phone only;
+ *                      every other field sits behind a "More details" button.
+ *                      Nothing is removed: the fields, their validation and
+ *                      what is saved are the same, opened or not
+ *   copy.companyFromEmail  false means a company is only looked up or
+ *                      created when the user typed one in the Company field.
+ *                      An email address (or a website) alone then never
+ *                      creates a company, and so never starts the background
+ *                      name correction that calls company enrichment. A typed
+ *                      company is handled exactly as it always was
+ *   copy.autofill      false asks the browser not to offer or insert saved
+ *                      personal details. This form is for somebody else's
+ *                      details, and the browser's saved ones are the signed-in
+ *                      user's own
+ *   copy.describeError (error) => the sentence shown when saving fails. It is
+ *                      shown in the form instead of the default alert box
+ * Contact Hub passes all eight. Every other caller passes nothing and gets the
+ * original wording, every field shown, and the original behaviour.
+ */
+// Deliberately not one of the standard autocomplete values. See `noAutofill`.
+const NOT_THE_USERS_OWN_DETAILS = 'someone-else';
+
+export default function ManualContactForm({ onContactAdded, onCancel, copy = null }) {
   const T = useT();
   const [formData, setFormData] = useState({
     name: '',
@@ -24,6 +55,11 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
   const [referredBy, setReferredBy] = useState(null);
+  // Only meaningful with copy.moreDetails. A problem in a field behind the
+  // button (the LinkedIn URL is the one that is validated) keeps it open, so
+  // an error message is never hidden.
+  const [detailsExpanded, setDetailsExpanded] = useState(false);
+  const detailsId = useId();
 
   const validateForm = () => {
     const newErrors = {};
@@ -69,7 +105,11 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
       // count it under and People excludes engaged contacts by design. Resolve
       // it to an existing company where one matches (on name, or on the email
       // domain the user just typed) and create one where none does.
-      const { companyId } = await ensureCompanyForContact(user.uid, {
+      //
+      // With copy.companyFromEmail === false the step runs only for a company
+      // the user actually typed. Nothing is inferred from the email address.
+      const wantsCompany = copy?.companyFromEmail !== false || formData.company.trim() !== '';
+      const { companyId } = !wantsCompany ? { companyId: null } : await ensureCompanyForContact(user.uid, {
         name: formData.company,
         email: formData.email,
         domain: formData.website || null,
@@ -98,7 +138,9 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
         await applyContactMerge(user.uid, resolution);
         setSaving(false);
         setErrors({
-          email: `${formData.name.trim()} is already in your pipeline. Any new details you entered have been added to the existing record.`,
+          email: copy?.duplicate
+            ? copy.duplicate(formData.name.trim())
+            : `${formData.name.trim()} is already in your pipeline. Any new details you entered have been added to the existing record.`,
         });
         return;
       }
@@ -140,7 +182,11 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
 
     } catch (error) {
       console.error('Error adding manual contact:', error);
-      alert('Failed to add contact. Please try again.');
+      if (copy?.describeError) {
+        setErrors({ form: copy.describeError(error) });
+      } else {
+        alert('Failed to add contact. Please try again.');
+      }
       setSaving(false);
     }
   };
@@ -160,11 +206,31 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
 
   const user = getEffectiveUser();
 
+  // Spread onto the form and every field, so with the option unset no
+  // attribute is added and the markup is what it always was.
+  //
+  // Two values on purpose. Chrome (checked in 150) ignores "off" on name,
+  // email and phone fields and fills them anyway, but does not fill a field
+  // whose autocomplete value it does not recognise. Browsers that follow the
+  // standard treat an unrecognised value as "no value here" and fall back to
+  // the form's own setting, which is "off".
+  const noAutofill = copy?.autofill === false;
+  const formAutofill = noAutofill ? { autoComplete: 'off' } : {};
+  const fieldAutofill = noAutofill ? { autoComplete: NOT_THE_USERS_OWN_DETAILS } : {};
+
+  const collapsible = copy?.moreDetails === true;
+  const detailsOpen = !collapsible || detailsExpanded || Boolean(errors.linkedin_url);
+  // The wrapper exists only in the collapsible form, where the button needs
+  // something to point at. Otherwise the fields are the form's own children,
+  // exactly as they were before this option existed.
+  const DetailsWrap = collapsible ? 'div' : Fragment;
+  const detailsWrapProps = collapsible ? { id: detailsId, className: 'space-y-6' } : {};
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6" {...formAutofill}>
       <div className="rounded-xl p-4 border" style={{ background: T.isDark ? `${T.accent}10` : '#eff6ff', borderColor: T.isDark ? `${T.accent}30` : '#bfdbfe' }}>
         <p className="text-sm" style={{ color: T.textMuted }}>
-          <strong>Quick add:</strong> Only name is required. Add more details now or enrich later.
+          <strong>Quick add:</strong> {copy?.hint ?? 'Only name is required. Add more details now or enrich later.'}
         </p>
       </div>
 
@@ -181,6 +247,7 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
           style={{ background: T.input || T.surface, borderColor: errors.name ? '#dc2626' : T.border, color: T.text }}
           placeholder="John Doe"
           disabled={saving}
+          {...fieldAutofill}
         />
         {errors.name && (
           <p className="text-xs mt-1" style={{ color: '#dc2626' }}>⚠️ {errors.name}</p>
@@ -200,6 +267,7 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
           style={{ background: T.input || T.surface, borderColor: errors.email ? '#dc2626' : T.border, color: T.text }}
           placeholder="john.doe@company.com"
           disabled={saving}
+          {...fieldAutofill}
         />
         {errors.email && (
           <p className="text-xs mt-1" style={{ color: '#dc2626' }}>⚠️ {errors.email}</p>
@@ -219,9 +287,26 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
           style={{ background: T.input || T.surface, borderColor: T.border, color: T.text }}
           placeholder="+1 (555) 123-4567"
           disabled={saving}
+          {...fieldAutofill}
         />
       </div>
 
+      {collapsible && (
+        <button
+          type="button"
+          className="w-full px-4 py-3 rounded-lg border text-sm font-semibold text-left"
+          style={{ background: 'transparent', borderColor: T.border, color: T.textMuted, minHeight: 48 }}
+          aria-expanded={detailsOpen ? 'true' : 'false'}
+          aria-controls={detailsId}
+          disabled={saving}
+          onClick={() => setDetailsExpanded((open) => !open)}
+        >
+          {detailsOpen ? '− Fewer details' : '+ More details'}
+        </button>
+      )}
+
+      {detailsOpen && (
+      <DetailsWrap {...detailsWrapProps}>
       {/* Company (Optional) */}
       <div>
         <label className="block text-sm font-semibold mb-2" style={{ color: T.accent }}>
@@ -235,6 +320,7 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
           style={{ background: T.input || T.surface, borderColor: T.border, color: T.text }}
           placeholder="Acme Corporation"
           disabled={saving}
+          {...fieldAutofill}
         />
       </div>
 
@@ -251,6 +337,7 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
           style={{ background: T.input || T.surface, borderColor: T.border, color: T.text }}
           placeholder="VP of Sales"
           disabled={saving}
+          {...fieldAutofill}
         />
       </div>
 
@@ -267,6 +354,7 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
           style={{ background: T.input || T.surface, borderColor: errors.linkedin_url ? '#dc2626' : T.border, color: T.text }}
           placeholder="https://linkedin.com/in/johndoe"
           disabled={saving}
+          {...fieldAutofill}
         />
         {errors.linkedin_url && (
           <p className="text-xs mt-1" style={{ color: '#dc2626' }}>⚠️ {errors.linkedin_url}</p>
@@ -286,6 +374,7 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
           style={{ background: T.input || T.surface, borderColor: T.border, color: T.text }}
           placeholder="123 Main St, City, State"
           disabled={saving}
+          {...fieldAutofill}
         />
       </div>
 
@@ -302,10 +391,12 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
           style={{ background: T.input || T.surface, borderColor: T.border, color: T.text }}
           placeholder="https://example.com"
           disabled={saving}
+          {...fieldAutofill}
         />
       </div>
 
       {/* Referred By (Optional) */}
+      {copy?.showReferral !== false && (
       <div>
         <label className="block text-sm font-semibold mb-2" style={{ color: T.accent }}>
           Referred By
@@ -315,6 +406,13 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
           Optional — tag who referred this person to track referral attribution.
         </p>
       </div>
+      )}
+      </DetailsWrap>
+      )}
+
+      {errors.form && (
+        <p role="alert" className="text-sm" style={{ color: '#dc2626' }}>{errors.form}</p>
+      )}
 
       {/* Action Buttons */}
       <div className="flex gap-3 pt-4">
@@ -341,7 +439,7 @@ export default function ManualContactForm({ onContactAdded, onCancel }) {
           ) : (
             <>
               <UserPlus className="w-5 h-5" />
-              Scout+
+              {copy?.submit ?? 'Scout+'}
             </>
           )}
         </button>

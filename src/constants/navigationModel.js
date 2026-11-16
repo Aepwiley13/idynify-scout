@@ -28,6 +28,8 @@
  * for a destination — sidebar, breadcrumb, page title, Barry, or copy.
  */
 
+import { CONTACT_HUB, CONTACT_HUB_PATH } from './contactHub.js';
+
 /** Group identifiers — visual grouping only, not navigable destinations. */
 export const NAV_GROUPS = {
   PIPELINE: 'PIPELINE',
@@ -206,7 +208,31 @@ export const BARRY = {
   barryModule: 'default',
 };
 
-export const UNGROUPED_DESTINATIONS = [COMMAND_CENTER, SETTINGS, BARRY];
+/**
+ * Contact Hub. A simple home for the people a user knows: My People now, and
+ * Connect and My Card as they are built.
+ *
+ * REGISTERED ONLY WHEN THE SWITCH IS ON (constants/contactHub.js, off by
+ * default). When it is off this object is in none of the lists below, so the
+ * sidebar, the mobile drawer, resolveModule and the breadcrumb all behave
+ * exactly as they did before it existed.
+ *
+ * Ungrouped, like Command Center: the locked IA's three groups describe the
+ * sales pipeline, and this is not part of it.
+ */
+export const CONTACT_HUB_DESTINATION = {
+  id: 'contact-hub',
+  label: 'Contact Hub',
+  railLabel: 'HUB',
+  path: CONTACT_HUB_PATH,
+  barryModule: 'default',
+  description: 'The people in your world',
+};
+
+export const UNGROUPED_DESTINATIONS = [
+  ...(CONTACT_HUB.enabled ? [CONTACT_HUB_DESTINATION] : []),
+  COMMAND_CENTER, SETTINGS, BARRY,
+];
 
 const ALL_DESTINATIONS = [MISSION_CONTROL, ...MODULES, ...UNGROUPED_DESTINATIONS];
 
@@ -225,6 +251,8 @@ const ALL_DESTINATIONS = [MISSION_CONTROL, ...MODULES, ...UNGROUPED_DESTINATIONS
  */
 export const SIDEBAR_ORDER = [
   'mission-control',
+  // Directly under Mission Control, and only when its switch is on.
+  ...(CONTACT_HUB.enabled ? [CONTACT_HUB_DESTINATION.id] : []),
   'scout',
   'hunter',
   'sniper',
@@ -268,12 +296,19 @@ export function mobileDrawerSections() {
   // Anything in the sidebar that belongs to no group and is not Mission
   // Control. Derived rather than hard-coded, so a new ungrouped destination
   // appears here instead of silently vanishing from mobile.
+  // Contact Hub rides with Mission Control at the top of the drawer, the same
+  // place the desktop sidebar draws it, rather than in the trailing ungrouped
+  // run with Command Center.
+  const lead = SIDEBAR_ORDER
+    .map(byId)
+    .filter(d => d && d.id === CONTACT_HUB_DESTINATION.id);
+
   const ungrouped = SIDEBAR_ORDER
     .map(byId)
-    .filter(d => d && d.id !== MISSION_CONTROL.id && !grouped.has(d.id));
+    .filter(d => d && d.id !== MISSION_CONTROL.id && !grouped.has(d.id) && !lead.includes(d));
 
   return [
-    { label: null, destinations: [MISSION_CONTROL] },
+    { label: null, destinations: [MISSION_CONTROL, ...lead] },
     ...GROUP_ORDER.map(g => ({ label: g, destinations: inGroup(g) })),
     ...(ungrouped.length ? [{ label: null, destinations: ungrouped }] : []),
   ].filter(s => s.destinations.length > 0);

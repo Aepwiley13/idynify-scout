@@ -57,6 +57,7 @@ export const MODULE_COLORS = {
   fallback: '#f97316',
   recon: '#6366f1',
   'command-center': '#3b82f6',
+  'contact-hub': BRAND.indigo,
   settings: '#faaa20',
 };
 
@@ -162,6 +163,22 @@ export const MODULE_BOTTOM_NAV = {
       { id: 'competitive-intel', label: 'Competitive Intel', Icon: Swords,  to: '/recon/competitive-intel' },
       { id: 'buying-signals',    label: 'Buying Signals',   Icon: Zap,      to: '/recon/buying-signals' },
     ],
+  },
+
+  /**
+   * Contact Hub has NO bottom bar in Phase 1A (`hidden`). It has one view, My
+   * People, and a bar with one cell is navigation with nowhere to go. The
+   * three-cell bar (My People · Connect · My Card) arrives with the views it
+   * would switch between: drop `hidden` and fill in `primary` then.
+   *
+   * `hidden` rather than no entry at all: with no entry the bar falls back to
+   * the global list of modules (Scout, Hunter, …), which is the opposite of
+   * what a Contact Hub screen should offer. The hamburger still moves between
+   * workspaces. Inert while the Contact Hub switch is off.
+   */
+  'contact-hub': {
+    hidden: true,
+    primary: [],
   },
 
   'command-center': {

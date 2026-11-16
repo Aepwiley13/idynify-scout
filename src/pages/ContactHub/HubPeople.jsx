@@ -27,6 +27,7 @@ import ContactCardStickers from '../../components/stickers/ContactCardStickers';
 import StickersWall from '../../components/stickers/StickersWall';
 import ManualContactForm from '../../components/scout/ManualContactForm';
 import StickerChipRow from './StickerChipRow';
+import { describeAddPersonError } from './addPersonErrors';
 import {
   HUB_STATUS, listMyPeople, visiblePeople, personName, personSubtitle, emailOf, phoneOf, addedLabel,
 } from './peopleRules';
@@ -45,6 +46,12 @@ const ADD_COPY = Object.freeze({
   submit: 'Add Person',
   showReferral: false,
   moreDetails: true,
+  // A person here needs no company. One is only looked up or created when the
+  // user types it; an email address alone creates nothing and enriches nothing.
+  companyFromEmail: false,
+  // The details being typed are someone else's, not the signed-in user's.
+  autofill: false,
+  describeError: describeAddPersonError,
 });
 
 function Avatar({ contact, name }) {

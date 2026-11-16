@@ -11,12 +11,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-const calls = vi.hoisted(() => ({ addDoc: [], ensureCompany: [], prepare: [], merge: [], referral: [], resolution: null }));
+const calls = vi.hoisted(() => ({ addDoc: [], ensureCompany: [], prepare: [], merge: [], referral: [], resolution: null, ensureError: null, addError: null }));
 
 vi.mock('firebase/firestore', async (importOriginal) => ({
   ...(await importOriginal()),
   collection: (_db, ...path) => ({ path: path.join('/') }),
-  addDoc: async (ref, data) => { calls.addDoc.push([ref.path, data]); return { id: 'new1' }; },
+  addDoc: async (ref, data) => {
+    calls.addDoc.push([ref.path, data]);
+    if (calls.addError) throw calls.addError;
+    return { id: 'new1' };
+  },
   getDocs: async () => ({ docs: [] }),
   query: (...a) => a,
   where: (...a) => a,
@@ -28,7 +32,13 @@ vi.mock('../context/ImpersonationContext', () => ({ getEffectiveUser: () => ({ u
 vi.mock('../theme/ThemeContext', () => ({ useT: () => new Proxy({}, { get: () => '#888' }) }));
 vi.mock('../services/companyIdentityService', () => ({
   NAME_SOURCE: { USER: 'user' },
-  ensureCompanyForContact: async (...a) => { calls.ensureCompany.push(a); return { companyId: 'co1' }; },
+  // Like the real one: no company name, email or website means no company.
+  ensureCompanyForContact: async (...a) => {
+    calls.ensureCompany.push(a);
+    if (calls.ensureError) throw calls.ensureError;
+    const c = a[1] ?? {};
+    return { companyId: c.name || c.email || c.domain ? 'co1' : null };
+  },
 }));
 vi.mock('../services/contactWriteGuard', () => ({
   prepareContactWrite: async (...a) => { calls.prepare.push(a); return calls.resolution; },
@@ -37,6 +47,7 @@ vi.mock('../services/contactWriteGuard', () => ({
 vi.mock('../services/referralIntelligenceService', () => ({ recordReferralReceived: async (...a) => { calls.referral.push(a); } }));
 
 import ManualContactForm from '../components/scout/ManualContactForm';
+import { describeAddPersonError } from '../pages/ContactHub/addPersonErrors';
 
 // Typing into a real form, keystroke by keystroke, can pass the 5s default on a
 // loaded machine without anything being wrong.
@@ -48,6 +59,9 @@ const HUB_COPY = {
   submit: 'Add Person',
   showReferral: false,
   moreDetails: true,
+  companyFromEmail: false,
+  autofill: false,
+  describeError: describeAddPersonError,
 };
 
 const FIRST = ['John Doe', 'john.doe@company.com', '+1 (555) 123-4567'];
@@ -56,6 +70,8 @@ const MORE = ['Acme Corporation', 'VP of Sales', 'https://linkedin.com/in/johndo
 beforeEach(() => {
   for (const key of ['addDoc', 'ensureCompany', 'prepare', 'merge', 'referral']) calls[key] = [];
   calls.resolution = { action: 'create', fields: { email_normalized: 'ana@x.test' } };
+  calls.ensureError = null;
+  calls.addError = null;
 });
 
 async function fillAndSubmit(user, submitName) {
@@ -233,5 +249,158 @@ describe('what is saved is the same either way', () => {
     expect(stable(hub.added)).toEqual(stable(original.added));
     expect(hubCalls.addDoc[0][1].source).toBe('manual');
     expect(hubCalls.addDoc[0][1].addedFrom).toBe('manual');
+  });
+});
+
+describe('Contact Hub: no company from an email address alone', () => {
+  it('a name and a work email save one person, with no company step at all', async () => {
+    const user = userEvent.setup();
+    const added = [];
+    render(<ManualContactForm onContactAdded={(c) => added.push(c)} onCancel={() => {}} copy={HUB_COPY} />);
+    await user.type(screen.getByPlaceholderText('John Doe'), 'QA Hub Synthetic');
+    await user.type(screen.getByPlaceholderText('john.doe@company.com'), 'qa-hub-synthetic@example.test');
+    await user.click(screen.getByRole('button', { name: 'Add Person' }));
+    await waitFor(() => expect(added).toHaveLength(1));
+    expect(calls.ensureCompany).toHaveLength(0);
+    expect(calls.addDoc).toHaveLength(1);
+    expect(calls.addDoc[0][0]).toBe('users/u1/contacts');
+    expect(calls.addDoc[0][1].company_id).toBeNull();
+    expect(calls.prepare[0][1].company_id).toBeNull();
+  });
+
+  it('a website alone does not create a company either', async () => {
+    const user = userEvent.setup();
+    const added = [];
+    render(<ManualContactForm onContactAdded={(c) => added.push(c)} onCancel={() => {}} copy={HUB_COPY} />);
+    await user.type(screen.getByPlaceholderText('John Doe'), 'Ana Lopez');
+    await user.click(screen.getByRole('button', { name: '+ More details' }));
+    await user.type(screen.getByPlaceholderText('https://example.com'), 'https://acme.test');
+    await user.click(screen.getByRole('button', { name: 'Add Person' }));
+    await waitFor(() => expect(added).toHaveLength(1));
+    expect(calls.ensureCompany).toHaveLength(0);
+    expect(calls.addDoc[0][1].company_id).toBeNull();
+  });
+
+  it('a company the user typed is handled exactly as it is everywhere else', async () => {
+    const user = userEvent.setup();
+    const hub = [];
+    render(<ManualContactForm onContactAdded={(c) => hub.push(c)} onCancel={() => {}} copy={HUB_COPY} />);
+    await fillAndSubmit(user, 'Add Person');
+    await waitFor(() => expect(hub).toHaveLength(1));
+    const hubCall = calls.ensureCompany[0];
+    const hubDoc = calls.addDoc[0][1];
+    expect(hubDoc.company_id).toBe('co1');
+
+    calls.ensureCompany = [];
+    calls.addDoc = [];
+    document.body.innerHTML = '';
+    const plain = [];
+    render(<ManualContactForm onContactAdded={(c) => plain.push(c)} onCancel={() => {}} />);
+    await fillAndSubmit(user, 'Scout+');
+    await waitFor(() => expect(plain).toHaveLength(1));
+    expect(hubCall).toEqual(calls.ensureCompany[0]);
+  });
+
+  it('every other caller still resolves a company from the email address', async () => {
+    const user = userEvent.setup();
+    const added = [];
+    render(<ManualContactForm onContactAdded={(c) => added.push(c)} onCancel={() => {}} />);
+    await user.type(screen.getByPlaceholderText('John Doe'), 'Ana Lopez');
+    await user.type(screen.getByPlaceholderText('john.doe@company.com'), 'ana@x.test');
+    await user.click(screen.getByRole('button', { name: 'Scout+' }));
+    await waitFor(() => expect(added).toHaveLength(1));
+    expect(calls.ensureCompany).toHaveLength(1);
+    expect(calls.ensureCompany[0][1]).toEqual({ name: '', email: 'ana@x.test', domain: null });
+    expect(calls.addDoc[0][1].company_id).toBe('co1');
+  });
+
+  it('the form never calls the network itself', async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    const user = userEvent.setup();
+    const added = [];
+    render(<ManualContactForm onContactAdded={(c) => added.push(c)} onCancel={() => {}} copy={HUB_COPY} />);
+    await user.type(screen.getByPlaceholderText('John Doe'), 'QA Hub Synthetic');
+    await user.type(screen.getByPlaceholderText('john.doe@company.com'), 'qa-hub-synthetic@example.test');
+    await user.click(screen.getByRole('button', { name: 'Add Person' }));
+    await waitFor(() => expect(added).toHaveLength(1));
+    expect(fetchSpy).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('Contact Hub: browser autofill', () => {
+  it('asks the browser not to fill the form or any of its fields', async () => {
+    const user = userEvent.setup();
+    const { container } = render(<ManualContactForm onContactAdded={() => {}} onCancel={() => {}} copy={HUB_COPY} />);
+    await user.click(screen.getByRole('button', { name: '+ More details' }));
+    expect(container.querySelector('form')).toHaveAttribute('autocomplete', 'off');
+    const inputs = [...container.querySelectorAll('input')];
+    expect(inputs).toHaveLength(8);
+    // Not "off": Chrome ignores "off" on name, email and phone fields. It
+    // leaves alone a field whose value it does not recognise (checked in a
+    // real Chrome 150 with a saved address).
+    for (const input of inputs) expect(input).toHaveAttribute('autocomplete', 'someone-else');
+  });
+
+  it('every other caller gets no autocomplete attribute anywhere', () => {
+    const { container } = render(<ManualContactForm onContactAdded={() => {}} onCancel={() => {}} />);
+    expect(container.querySelectorAll('[autocomplete]')).toHaveLength(0);
+  });
+});
+
+describe('Contact Hub: when saving fails', () => {
+  const b815 = () => new Error('FIRESTORE (12.6.0) INTERNAL ASSERTION FAILED: Unexpected state (ID: b815) CONTEXT: {"Pc":"secret users/u1/contacts"}');
+
+  async function failWith(error) {
+    calls.addError = error;
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const user = userEvent.setup();
+    render(<ManualContactForm onContactAdded={() => {}} onCancel={() => {}} copy={HUB_COPY} />);
+    await user.type(screen.getByPlaceholderText('John Doe'), 'Ana Lopez');
+    await user.click(screen.getByRole('button', { name: 'Add Person' }));
+    const shown = await screen.findByRole('alert');
+    return { shown, alertSpy, logSpy, user };
+  }
+
+  it('an unhealthy database client says to reload, in the form, with no alert box', async () => {
+    const error = b815();
+    const { shown, alertSpy, logSpy } = await failWith(error);
+    expect(shown).toHaveTextContent('Reload the page and try again.');
+    expect(shown.textContent).not.toMatch(/FIRESTORE|b815|secret|users\//);
+    expect(alertSpy).not.toHaveBeenCalled();
+    // The developer log keeps the real error.
+    expect(logSpy).toHaveBeenCalledWith('Error adding manual contact:', error);
+    expect(screen.getByRole('button', { name: 'Add Person' })).not.toBeDisabled();
+    alertSpy.mockRestore(); logSpy.mockRestore();
+  });
+
+  it('a permission error does not say to reload', async () => {
+    const { shown, alertSpy, logSpy } = await failWith(Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' }));
+    expect(shown).toHaveTextContent("isn't allowed to add people");
+    expect(shown.textContent).not.toMatch(/reload/i);
+    alertSpy.mockRestore(); logSpy.mockRestore();
+  });
+
+  it('the message goes away when the next attempt starts', async () => {
+    const { alertSpy, logSpy, user } = await failWith(b815());
+    calls.addError = null;
+    await user.click(screen.getByRole('button', { name: 'Add Person' }));
+    await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+    alertSpy.mockRestore(); logSpy.mockRestore();
+  });
+
+  it('every other caller still gets the original alert box and no message in the form', async () => {
+    calls.ensureError = b815();
+    const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+    const logSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const user = userEvent.setup();
+    render(<ManualContactForm onContactAdded={() => {}} onCancel={() => {}} />);
+    await user.type(screen.getByPlaceholderText('John Doe'), 'Ana Lopez');
+    await user.click(screen.getByRole('button', { name: 'Scout+' }));
+    await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('Failed to add contact. Please try again.'));
+    expect(screen.queryByRole('alert')).toBeNull();
+    alertSpy.mockRestore(); logSpy.mockRestore();
   });
 });

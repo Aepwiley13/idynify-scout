@@ -22,9 +22,24 @@ import { useT } from '../../theme/ThemeContext';
  *                      every other field sits behind a "More details" button.
  *                      Nothing is removed: the fields, their validation and
  *                      what is saved are the same, opened or not
- * Contact Hub passes all five. Every other caller passes nothing and gets the
- * original wording and every field shown.
+ *   copy.companyFromEmail  false means a company is only looked up or
+ *                      created when the user typed one in the Company field.
+ *                      An email address (or a website) alone then never
+ *                      creates a company, and so never starts the background
+ *                      name correction that calls company enrichment. A typed
+ *                      company is handled exactly as it always was
+ *   copy.autofill      false asks the browser not to offer or insert saved
+ *                      personal details. This form is for somebody else's
+ *                      details, and the browser's saved ones are the signed-in
+ *                      user's own
+ *   copy.describeError (error) => the sentence shown when saving fails. It is
+ *                      shown in the form instead of the default alert box
+ * Contact Hub passes all eight. Every other caller passes nothing and gets the
+ * original wording, every field shown, and the original behaviour.
  */
+// Deliberately not one of the standard autocomplete values. See `noAutofill`.
+const NOT_THE_USERS_OWN_DETAILS = 'someone-else';
+
 export default function ManualContactForm({ onContactAdded, onCancel, copy = null }) {
   const T = useT();
   const [formData, setFormData] = useState({
@@ -90,7 +105,11 @@ export default function ManualContactForm({ onContactAdded, onCancel, copy = nul
       // count it under and People excludes engaged contacts by design. Resolve
       // it to an existing company where one matches (on name, or on the email
       // domain the user just typed) and create one where none does.
-      const { companyId } = await ensureCompanyForContact(user.uid, {
+      //
+      // With copy.companyFromEmail === false the step runs only for a company
+      // the user actually typed. Nothing is inferred from the email address.
+      const wantsCompany = copy?.companyFromEmail !== false || formData.company.trim() !== '';
+      const { companyId } = !wantsCompany ? { companyId: null } : await ensureCompanyForContact(user.uid, {
         name: formData.company,
         email: formData.email,
         domain: formData.website || null,
@@ -163,7 +182,11 @@ export default function ManualContactForm({ onContactAdded, onCancel, copy = nul
 
     } catch (error) {
       console.error('Error adding manual contact:', error);
-      alert('Failed to add contact. Please try again.');
+      if (copy?.describeError) {
+        setErrors({ form: copy.describeError(error) });
+      } else {
+        alert('Failed to add contact. Please try again.');
+      }
       setSaving(false);
     }
   };
@@ -183,6 +206,18 @@ export default function ManualContactForm({ onContactAdded, onCancel, copy = nul
 
   const user = getEffectiveUser();
 
+  // Spread onto the form and every field, so with the option unset no
+  // attribute is added and the markup is what it always was.
+  //
+  // Two values on purpose. Chrome (checked in 150) ignores "off" on name,
+  // email and phone fields and fills them anyway, but does not fill a field
+  // whose autocomplete value it does not recognise. Browsers that follow the
+  // standard treat an unrecognised value as "no value here" and fall back to
+  // the form's own setting, which is "off".
+  const noAutofill = copy?.autofill === false;
+  const formAutofill = noAutofill ? { autoComplete: 'off' } : {};
+  const fieldAutofill = noAutofill ? { autoComplete: NOT_THE_USERS_OWN_DETAILS } : {};
+
   const collapsible = copy?.moreDetails === true;
   const detailsOpen = !collapsible || detailsExpanded || Boolean(errors.linkedin_url);
   // The wrapper exists only in the collapsible form, where the button needs
@@ -192,7 +227,7 @@ export default function ManualContactForm({ onContactAdded, onCancel, copy = nul
   const detailsWrapProps = collapsible ? { id: detailsId, className: 'space-y-6' } : {};
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-6" {...formAutofill}>
       <div className="rounded-xl p-4 border" style={{ background: T.isDark ? `${T.accent}10` : '#eff6ff', borderColor: T.isDark ? `${T.accent}30` : '#bfdbfe' }}>
         <p className="text-sm" style={{ color: T.textMuted }}>
           <strong>Quick add:</strong> {copy?.hint ?? 'Only name is required. Add more details now or enrich later.'}
@@ -212,6 +247,7 @@ export default function ManualContactForm({ onContactAdded, onCancel, copy = nul
           style={{ background: T.input || T.surface, borderColor: errors.name ? '#dc2626' : T.border, color: T.text }}
           placeholder="John Doe"
           disabled={saving}
+          {...fieldAutofill}
         />
         {errors.name && (
           <p className="text-xs mt-1" style={{ color: '#dc2626' }}>⚠️ {errors.name}</p>
@@ -231,6 +267,7 @@ export default function ManualContactForm({ onContactAdded, onCancel, copy = nul
           style={{ background: T.input || T.surface, borderColor: errors.email ? '#dc2626' : T.border, color: T.text }}
           placeholder="john.doe@company.com"
           disabled={saving}
+          {...fieldAutofill}
         />
         {errors.email && (
           <p className="text-xs mt-1" style={{ color: '#dc2626' }}>⚠️ {errors.email}</p>
@@ -250,6 +287,7 @@ export default function ManualContactForm({ onContactAdded, onCancel, copy = nul
           style={{ background: T.input || T.surface, borderColor: T.border, color: T.text }}
           placeholder="+1 (555) 123-4567"
           disabled={saving}
+          {...fieldAutofill}
         />
       </div>
 
@@ -282,6 +320,7 @@ export default function ManualContactForm({ onContactAdded, onCancel, copy = nul
           style={{ background: T.input || T.surface, borderColor: T.border, color: T.text }}
           placeholder="Acme Corporation"
           disabled={saving}
+          {...fieldAutofill}
         />
       </div>
 
@@ -298,6 +337,7 @@ export default function ManualContactForm({ onContactAdded, onCancel, copy = nul
           style={{ background: T.input || T.surface, borderColor: T.border, color: T.text }}
           placeholder="VP of Sales"
           disabled={saving}
+          {...fieldAutofill}
         />
       </div>
 
@@ -314,6 +354,7 @@ export default function ManualContactForm({ onContactAdded, onCancel, copy = nul
           style={{ background: T.input || T.surface, borderColor: errors.linkedin_url ? '#dc2626' : T.border, color: T.text }}
           placeholder="https://linkedin.com/in/johndoe"
           disabled={saving}
+          {...fieldAutofill}
         />
         {errors.linkedin_url && (
           <p className="text-xs mt-1" style={{ color: '#dc2626' }}>⚠️ {errors.linkedin_url}</p>
@@ -333,6 +374,7 @@ export default function ManualContactForm({ onContactAdded, onCancel, copy = nul
           style={{ background: T.input || T.surface, borderColor: T.border, color: T.text }}
           placeholder="123 Main St, City, State"
           disabled={saving}
+          {...fieldAutofill}
         />
       </div>
 
@@ -349,6 +391,7 @@ export default function ManualContactForm({ onContactAdded, onCancel, copy = nul
           style={{ background: T.input || T.surface, borderColor: T.border, color: T.text }}
           placeholder="https://example.com"
           disabled={saving}
+          {...fieldAutofill}
         />
       </div>
 
@@ -365,6 +408,10 @@ export default function ManualContactForm({ onContactAdded, onCancel, copy = nul
       </div>
       )}
       </DetailsWrap>
+      )}
+
+      {errors.form && (
+        <p role="alert" className="text-sm" style={{ color: '#dc2626' }}>{errors.form}</p>
       )}
 
       {/* Action Buttons */}

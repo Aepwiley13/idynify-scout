@@ -19,13 +19,16 @@
  * Mounted only when the Contact Hub switch is on (constants/contactHub.js).
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useActiveUserId } from '../../context/ImpersonationContext';
 import { useT } from '../../theme/ThemeContext';
 import { StickersProvider } from '../../components/stickers/StickersContext';
 import { withMembershipChange } from '../../services/stickers/stickerCore';
+import {
+  CONTACT_HUB_PATH, CONTACT_HUB_STICKER_PARAM, contactHubStickerPath, isContactHubListPath,
+} from '../../constants/contactHub';
 import { HUB_STATUS } from './peopleRules';
 import './ContactHub.css';
 
@@ -43,7 +46,21 @@ export default function ContactHubMain() {
 
   // What the list was showing, kept here so it survives opening a person.
   const [searchTerm, setSearchTerm] = useState('');
-  const [stickerId, setStickerId] = useState(null);
+
+  // The sticker filter is part of My People's address (/contact-hub?sticker=<id>),
+  // so it can be bookmarked and Back and Forward step through it. Choosing a
+  // sticker is therefore a navigation.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const onList = isContactHubListPath(location.pathname);
+  const stickerId = onList ? (new URLSearchParams(location.search).get(CONTACT_HUB_STICKER_PARAM) || null) : null;
+  const setStickerId = useCallback((id) => navigate(contactHubStickerPath(id)), [navigate]);
+
+  // Where My People last was, filter included: the way back from a person and
+  // from the Sticker Wall. Adjusted while rendering, so it is never a step behind.
+  const here = `${CONTACT_HUB_PATH}${location.search}`;
+  const [listPath, setListPath] = useState(CONTACT_HUB_PATH);
+  if (onList && listPath !== here) setListPath(here);
 
   useEffect(() => {
     if (!uid) return undefined;
@@ -87,8 +104,8 @@ export default function ContactHubMain() {
 
   const context = useMemo(() => ({
     uid, status, contacts, reload, updateContact, addContacts, applyStickerChange,
-    searchTerm, setSearchTerm, stickerId, setStickerId,
-  }), [uid, status, contacts, reload, updateContact, addContacts, applyStickerChange, searchTerm, stickerId]);
+    searchTerm, setSearchTerm, stickerId, setStickerId, listPath,
+  }), [uid, status, contacts, reload, updateContact, addContacts, applyStickerChange, searchTerm, stickerId, setStickerId, listPath]);
 
   return (
     <StickersProvider uid={uid}>

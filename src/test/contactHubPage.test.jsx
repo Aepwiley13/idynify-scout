@@ -10,9 +10,11 @@
  * them.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, within, waitFor, configure } from '@testing-library/react';
+import { useEffect } from 'react';
+import { render, screen, within, waitFor, configure, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { CONTACT_HUB_STICKERS_PATH, contactHubStickerPath } from '../constants/contactHub';
 import { createFakeStickers, sticker, config } from './helpers/stickersUi';
 import { setViewportWidth } from './helpers/matchMedia';
 
@@ -110,12 +112,28 @@ beforeEach(() => {
 });
 afterEach(() => { setViewportWidth(1024); vi.restoreAllMocks(); });
 
+// The address the app is at, and its history, as a test can see and drive them.
+const router = { at: '', navigate: null };
+function RouterProbe() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    router.at = location.pathname + location.search;
+    router.navigate = navigate;
+  }, [location, navigate]);
+  return null;
+}
+const goBack = () => act(() => { router.navigate(-1); });
+const goForward = () => act(() => { router.navigate(1); });
+
 function renderHub(url = '/contact-hub') {
   return render(
     <MemoryRouter initialEntries={[url]}>
+      <RouterProbe />
       <Routes>
         <Route path="/contact-hub" element={<ContactHubMain />}>
           <Route index element={<HubPeople />} />
+          <Route path="stickers" element={<HubPeople />} />
           <Route path="person/:contactId" element={<HubPerson />} />
         </Route>
         <Route path="/contact/:contactId" element={<div data-testid="full-profile" />} />
@@ -511,5 +529,155 @@ describe('the simple profile', () => {
   it('an unknown id gets the same answer', async () => {
     renderHub('/contact-hub/person/nope');
     expect(await screen.findByText('This person is not in My People.')).toBeInTheDocument();
+  });
+});
+
+describe('addresses: the Sticker Wall and a sticker filter each have one', () => {
+  const chips = () => screen.findByRole('group', { name: 'Filter by sticker' });
+
+  it('the helpers build the addresses the routes answer to', () => {
+    expect(CONTACT_HUB_STICKERS_PATH).toBe('/contact-hub/stickers');
+    expect(contactHubStickerPath(null)).toBe('/contact-hub');
+    expect(contactHubStickerPath('abc')).toBe('/contact-hub?sticker=abc');
+    expect(contactHubStickerPath('a b&c')).toBe('/contact-hub?sticker=a%20b%26c');
+  });
+
+  it('choosing a sticker puts it in the address; Back and Forward step through it', async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await user.click(within(await chips()).getByRole('button', { name: 'Partner, 1 person' }));
+    expect(router.at).toBe(`/contact-hub?sticker=${PARTNER.id}`);
+    expect(names()).toEqual(['Wes Clark']);
+    await user.click(within(await chips()).getByRole('button', { name: 'VIP, 1 person' }));
+    expect(router.at).toBe(`/contact-hub?sticker=${VIP.id}`);
+    expect(names()).toEqual(['Nakaiya Wiley']);
+
+    await goBack();
+    expect(router.at).toBe(`/contact-hub?sticker=${PARTNER.id}`);
+    expect(names()).toEqual(['Wes Clark']);
+    await goBack();
+    expect(router.at).toBe('/contact-hub');
+    expect(names()).toHaveLength(4);
+    await goForward();
+    expect(names()).toEqual(['Wes Clark']);
+    expect(within(await chips()).getByRole('button', { name: 'Partner, 1 person' })).toHaveAttribute('aria-pressed', 'true');
+    // Everyone was loaded once: a filter reads nothing.
+    expect(contactsData.loads).toBe(1);
+  });
+
+  it('pressing the chosen sticker again, or All, clears it from the address', async () => {
+    const user = userEvent.setup();
+    renderHub(`/contact-hub?sticker=${PARTNER.id}`);
+    await user.click(within(await chips()).getByRole('button', { name: 'Partner, 1 person' }));
+    expect(router.at).toBe('/contact-hub');
+    expect(names()).toHaveLength(4);
+  });
+
+  it('an address with a sticker opens My People already filtered', async () => {
+    renderHub(`/contact-hub?sticker=${VIP.id}`);
+    expect(within(await chips()).getByRole('button', { name: 'VIP, 1 person' })).toHaveAttribute('aria-pressed', 'true');
+    expect(names()).toEqual(['Nakaiya Wiley']);
+  });
+
+  it('an address naming a sticker that does not exist shows everyone', async () => {
+    renderHub('/contact-hub?sticker=NoSuchSticker00000000');
+    await chips();
+    expect(names()).toHaveLength(4);
+  });
+
+  it('/contact-hub/stickers opens the Sticker Wall directly', async () => {
+    renderHub('/contact-hub/stickers');
+    expect(await screen.findByTestId('stickers-wall')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'My People' })).toBeNull();
+    expect(within(await chips()).getByRole('button', { name: 'Sticker Wall' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('opening the wall is a step in history: Back returns to My People', async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await user.click(within(await chips()).getByRole('button', { name: 'Sticker Wall' }));
+    expect(router.at).toBe('/contact-hub/stickers');
+    await screen.findByTestId('stickers-wall');
+    await goBack();
+    expect(router.at).toBe('/contact-hub');
+    expect(screen.queryByTestId('stickers-wall')).toBeNull();
+    expect(names()).toHaveLength(4);
+  });
+
+  it('closing the wall returns to My People as it was, sticker filter included', async () => {
+    const user = userEvent.setup();
+    renderHub(`/contact-hub?sticker=${PARTNER.id}`);
+    await user.click(within(await chips()).getByRole('button', { name: 'Sticker Wall' }));
+    await screen.findByTestId('stickers-wall');
+    await user.click(within(await chips()).getByRole('button', { name: 'Sticker Wall' }));
+    expect(router.at).toBe(`/contact-hub?sticker=${PARTNER.id}`);
+    expect(names()).toEqual(['Wes Clark']);
+  });
+
+  it('a tile on the wall goes to My People filtered by that sticker', async () => {
+    const user = userEvent.setup();
+    renderHub('/contact-hub/stickers');
+    const wall = await screen.findByTestId('stickers-wall');
+    await user.click(within(wall).getByRole('button', { name: 'Partner, 1 person' }));
+    expect(router.at).toBe(`/contact-hub?sticker=${PARTNER.id}`);
+    expect(names()).toEqual(['Wes Clark']);
+  });
+
+  it('what is typed in search is kept across the wall and a filter, and is never in the address', async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await screen.findByRole('list', { name: 'My People' });
+    await user.type(screen.getByRole('searchbox', { name: 'Search people' }), 'e');
+    await user.click(within(await chips()).getByRole('button', { name: 'Sticker Wall' }));
+    await screen.findByTestId('stickers-wall');
+    expect(screen.getByRole('searchbox', { name: 'Search people' })).toHaveValue('e');
+    await user.click(within(await chips()).getByRole('button', { name: 'Partner, 1 person' }));
+    expect(screen.getByRole('searchbox', { name: 'Search people' })).toHaveValue('e');
+    expect(router.at).toBe(`/contact-hub?sticker=${PARTNER.id}`);
+    expect(names()).toEqual(['Wes Clark']);
+    expect(contactsData.loads).toBe(1);
+  });
+
+  it('the way back from a person is My People as it was left, filter and search included', async () => {
+    const user = userEvent.setup();
+    renderHub(`/contact-hub?sticker=${PARTNER.id}`);
+    await chips();
+    await user.type(screen.getByRole('searchbox', { name: 'Search people' }), 'wes');
+    await user.click(screen.getByRole('link', { name: 'Wes Clark' }));
+    expect(router.at).toBe('/contact-hub/person/p2');
+    await user.click(screen.getByRole('link', { name: 'My People' }));
+    expect(router.at).toBe(`/contact-hub?sticker=${PARTNER.id}`);
+    expect(screen.getByRole('searchbox', { name: 'Search people' })).toHaveValue('wes');
+    expect(names()).toEqual(['Wes Clark']);
+  });
+
+  it('a person opened cold still has a way back to My People', async () => {
+    const user = userEvent.setup();
+    renderHub('/contact-hub/person/p2');
+    // Once the person has loaded: the link shown while loading is replaced.
+    await screen.findByTestId('notes');
+    await user.click(screen.getByRole('link', { name: 'My People' }));
+    expect(router.at).toBe('/contact-hub');
+    expect(names()).toHaveLength(4);
+  });
+
+  it('with stickers unavailable, the wall address shows My People and nothing about stickers', async () => {
+    fake.current.state.config = config({ enabled: false, mode: 'off', readOnly: false });
+    renderHub('/contact-hub/stickers');
+    await screen.findByRole('list', { name: 'My People' });
+    expect(screen.queryByTestId('stickers-wall')).toBeNull();
+    expect(screen.queryByRole('button', { name: /sticker/i })).toBeNull();
+    expect(names()).toHaveLength(4);
+  });
+
+  it('on a phone the same addresses work', async () => {
+    setViewportWidth(375);
+    const user = userEvent.setup();
+    renderHub(`/contact-hub?sticker=${VIP.id}`);
+    expect(within(await chips()).getByRole('button', { name: 'VIP, 1 person' })).toHaveAttribute('aria-pressed', 'true');
+    expect(names()).toEqual(['Nakaiya Wiley']);
+    await user.click(within(await chips()).getByRole('button', { name: 'Sticker Wall' }));
+    expect(router.at).toBe('/contact-hub/stickers');
+    expect(await screen.findByTestId('stickers-wall')).toBeInTheDocument();
   });
 });

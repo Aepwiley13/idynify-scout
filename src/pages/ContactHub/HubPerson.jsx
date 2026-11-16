@@ -20,8 +20,10 @@ import { HUB_STATUS, isListedInMyPeople } from './peopleRules';
 
 function BackLink() {
   const T = useT();
+  // Back to My People as it was left, sticker filter included.
+  const { listPath } = useOutletContext();
   return (
-    <Link className="hub-back" to={CONTACT_HUB_PATH} style={{ color: T.text }}>
+    <Link className="hub-back" to={listPath || CONTACT_HUB_PATH} style={{ color: T.text }}>
       <ArrowLeft size={18} aria-hidden="true" />
       My People
     </Link>

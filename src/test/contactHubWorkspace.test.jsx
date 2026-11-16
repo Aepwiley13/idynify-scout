@@ -125,6 +125,7 @@ function renderHub(url = '/contact-hub') {
       <Routes>
         <Route path="/contact-hub" element={<ContactHubMain />}>
           <Route index element={<HubPeople />} />
+          <Route path="stickers" element={<HubPeople />} />
           <Route path="person/:contactId" element={<HubPerson />} />
         </Route>
         <Route path="/contact/:contactId" element={<div data-testid="full-profile" />} />

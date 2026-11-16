@@ -23,11 +23,13 @@
  * none of that is drawn: one friendly message and one action.
  */
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, useOutletContext } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { List, Mail, Phone, Search, Table2, UserPlus, Users, X } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { useIsMobile } from '../../hooks/useIsMobile';
-import { contactHubPersonPath } from '../../constants/contactHub';
+import {
+  CONTACT_HUB_PATH, CONTACT_HUB_STICKERS_PATH, contactHubPersonPath, isContactHubStickersPath,
+} from '../../constants/contactHub';
 import { hasRealContactPhoto, resolveContactPhotoSources, getInitials } from '../../utils/contactPhoto';
 import { useStickers } from '../../components/stickers/stickersRegistry';
 import { resolveStickerFilter } from '../../components/stickers/peopleStickers';
@@ -226,11 +228,16 @@ export default function HubPeople() {
   const isMobile = useIsMobile();
   const {
     status, contacts, reload, addContacts, applyStickerChange,
-    searchTerm, setSearchTerm, stickerId, setStickerId,
+    searchTerm, setSearchTerm, stickerId, setStickerId, listPath,
   } = useOutletContext();
   const stickers = useStickers();
   const [adding, setAdding] = useState(false);
-  const [managing, setManaging] = useState(false);
+  // The Sticker Wall is this screen at its own address (/contact-hub/stickers).
+  const navigate = useNavigate();
+  const managing = isContactHubStickersPath(useLocation().pathname);
+  const openWall = () => navigate(CONTACT_HUB_STICKERS_PATH);
+  // Leaving the wall returns to My People as it was, sticker filter included.
+  const closeWall = () => navigate(listPath || CONTACT_HUB_PATH);
   const [justAdded, setJustAdded] = useState(null);
   const [view, setView] = useState(readStoredView);
   const workspaceRef = useRef(null);
@@ -277,8 +284,8 @@ export default function HubPeople() {
     setJustAdded(added?.[0] ? personName(added[0]) : null);
   }
 
+  // Navigates to My People with that filter (or none), which also leaves the wall.
   function selectSticker(id) {
-    setManaging(false);
     setStickerId(id);
   }
 
@@ -368,7 +375,7 @@ export default function HubPeople() {
           selectedId={activeSticker?.id ?? null}
           onSelect={selectSticker}
           wallOpen={showWall}
-          onOpenWall={() => setManaging(true)}
+          onOpenWall={openWall}
         />
       ) : null}
 
@@ -402,7 +409,7 @@ export default function HubPeople() {
           selectedId={activeSticker?.id ?? null}
           onSelect={selectSticker}
           managing={showWall}
-          onToggleManage={() => setManaging((on) => !on)}
+          onToggleManage={() => (managing ? closeWall() : openWall())}
         />
         )}
         {!firstRun && !showPanel && stickersBroken ? <StickersLoadError /> : null}

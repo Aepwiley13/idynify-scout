@@ -31,6 +31,11 @@ import {
 } from '../../services/notificationService';
 
 const ACCENT = '#00c4d4';
+const UNAVAILABLE_TEXT = 'Notifications are temporarily unavailable';
+const VISUALLY_HIDDEN = {
+  position: 'absolute', width: 1, height: 1, margin: -1, padding: 0,
+  overflow: 'hidden', clipPath: 'inset(50%)', whiteSpace: 'nowrap', border: 0,
+};
 const TABS = [
   { id: 'all', label: 'All' },
   { id: 'relationship', label: 'Relationship' },
@@ -44,12 +49,36 @@ export default function NotificationCenter({ userId, T }) {
   const [unreadNotifications, setUnreadNotifications] = useState([]);
   const [allNotifications, setAllNotifications] = useState([]);
   const [activeTab, setActiveTab] = useState('all');
+  // True when the live list could not be loaded. That is a different state
+  // from "no notifications", and the bell and the drawer say so.
+  const [unavailable, setUnavailable] = useState(false);
 
-  // Subscribe to unread notifications for badge count
+  // Subscribe to unread notifications for badge count.
+  // The bell sits in the shell's top bar, outside every module error
+  // boundary: anything thrown from this effect unmounts the whole app. The
+  // service already turns its failures into `onUnavailable`; the try/catch
+  // here is a second guard so this stays true if the service changes.
   useEffect(() => {
-    if (!userId) return;
-    const unsub = subscribeToNotifications(userId, setUnreadNotifications);
-    return unsub;
+    if (!userId) return undefined;
+    let live = true;
+    let unsub = () => {};
+    try {
+      unsub = subscribeToNotifications(
+        userId,
+        (list) => { if (live) { setUnavailable(false); setUnreadNotifications(list); } },
+        () => { if (live) setUnavailable(true); },
+      ) || unsub;
+    } catch (error) {
+      console.error('[NotificationCenter] Could not start notifications:', error);
+      setUnreadNotifications([]);
+      setUnavailable(true);
+    }
+    return () => {
+      live = false;
+      try { unsub(); } catch (error) {
+        console.error('[NotificationCenter] Could not stop notifications:', error);
+      }
+    };
   }, [userId]);
 
   // Load all recent notifications when panel opens
@@ -139,7 +168,7 @@ export default function NotificationCenter({ userId, T }) {
       {/* Bell icon trigger */}
       <div
         onClick={() => setOpen(o => !o)}
-        title="Notifications"
+        title={unavailable ? UNAVAILABLE_TEXT : 'Notifications'}
         style={{
           width: 34, height: 34, borderRadius: 9,
           background: open ? `${ACCENT}18` : T.accentBg,
@@ -161,6 +190,22 @@ export default function NotificationCenter({ userId, T }) {
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
+        {/* Quiet marker, not a banner: a small grey dot where the badge would
+            be, with the reason announced to screen readers. */}
+        {unavailable && (
+          <span
+            data-testid="notifications-unavailable-dot"
+            aria-hidden="true"
+            style={{
+              position: 'absolute', top: -3, right: -3,
+              width: 10, height: 10, borderRadius: '50%',
+              background: T.textMuted, border: `2px solid ${T.navBg || T.cardBg || '#fff'}`,
+            }}
+          />
+        )}
+        <span role="status" style={VISUALLY_HIDDEN}>
+          {unavailable ? UNAVAILABLE_TEXT : ''}
+        </span>
       </div>
 
       {/* Notification drawer */}
@@ -183,7 +228,7 @@ export default function NotificationCenter({ userId, T }) {
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: T.text }}>Notifications</div>
               <div style={{ fontSize: 11, color: T.textMuted }}>
-                {unreadCount} unread
+                {unavailable ? 'Temporarily unavailable' : `${unreadCount} unread`}
               </div>
             </div>
             {unreadCount > 0 && (
@@ -248,9 +293,17 @@ export default function NotificationCenter({ userId, T }) {
                 justifyContent: 'center', padding: '60px 20px', gap: 12,
               }}>
                 <Bell size={32} color={T.textFaint} style={{ opacity: 0.3 }} />
-                <div style={{ fontSize: 13, color: T.textFaint, textAlign: 'center' }}>
-                  {activeTab === 'all' ? 'No notifications yet' : `No ${activeTab} notifications`}
-                </div>
+                {unavailable ? (
+                  <div style={{ fontSize: 13, color: T.textMuted, textAlign: 'center', lineHeight: 1.5 }}>
+                    {UNAVAILABLE_TEXT}.
+                    <br />
+                    The rest of Idynify is working. Reload the page to try again.
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 13, color: T.textFaint, textAlign: 'center' }}>
+                    {activeTab === 'all' ? 'No notifications yet' : `No ${activeTab} notifications`}
+                  </div>
+                )}
               </div>
             ) : (
               filtered.map(notification => {

@@ -63,28 +63,54 @@ const TYPE_TO_CATEGORY = {
  * Subscribe to unread notifications in real-time.
  * Returns an unsubscribe function.
  */
-export function subscribeToNotifications(userId, callback) {
-  const q = query(
-    collection(db, 'users', userId, 'notifications'),
-    where('read', '==', false),
-    orderBy('createdAt', 'desc'),
-    limit(50)
-  );
+export function subscribeToNotifications(userId, callback, onUnavailable = () => {}) {
+  // Three ways this can fail, and none of them may reach the caller as a
+  // throw. The bell lives in the shell's top bar, outside every module error
+  // boundary, so an error thrown from here used to unmount the whole app.
+  //   1. Starting the listener throws at once (a Firestore client that has
+  //      already failed internally throws on every new call).
+  //   2. The listener reports an error later (permissions, network).
+  //   3. Reading a snapshot throws (an unexpected document shape).
+  // Each is logged in full, the list is emptied, and `onUnavailable` tells
+  // the caller this is "could not load", not "nothing to show". The order is
+  // fixed: `callback([])` first, then `onUnavailable(error)`.
+  const unavailable = (label, error) => {
+    console.error(`[NotificationService] ${label}:`, error);
+    try {
+      callback([]);
+      onUnavailable(error);
+    } catch (handlerError) {
+      console.error('[NotificationService] Failure handler threw:', handlerError);
+    }
+  };
 
-  return onSnapshot(q, (snap) => {
-    const notifications = snap.docs.map(d => {
-      const data = d.data();
-      return {
-        id: d.id,
-        ...data,
-        category: TYPE_TO_CATEGORY[data.type] || NOTIFICATION_CATEGORIES.TASK
-      };
-    });
-    callback(notifications);
-  }, (error) => {
-    console.error('[NotificationService] Subscription error:', error);
-    callback([]);
-  });
+  try {
+    const q = query(
+      collection(db, 'users', userId, 'notifications'),
+      where('read', '==', false),
+      orderBy('createdAt', 'desc'),
+      limit(50)
+    );
+
+    return onSnapshot(q, (snap) => {
+      try {
+        const notifications = snap.docs.map(d => {
+          const data = d.data();
+          return {
+            id: d.id,
+            ...data,
+            category: TYPE_TO_CATEGORY[data.type] || NOTIFICATION_CATEGORIES.TASK
+          };
+        });
+        callback(notifications);
+      } catch (error) {
+        unavailable('Could not read a notifications update', error);
+      }
+    }, (error) => unavailable('Subscription error', error));
+  } catch (error) {
+    unavailable('Could not start the notifications listener', error);
+    return () => {};
+  }
 }
 
 /**

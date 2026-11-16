@@ -7,7 +7,16 @@
 /* On a phone the shell gives module content no padding of its own
    (MainLayout.css: .page-content { padding: 0 } under 768px), so the gutter is
    ours. Above that the shell pads the page and this adds nothing. */
-.hub { width: 100%; box-sizing: border-box; padding: 16px 16px 24px; }
+.hub {
+  width: 100%; box-sizing: border-box; padding: 16px 16px 24px;
+  /* The shell fixes the content area to the height of the screen and does not
+     scroll it (MainLayout.css: .page-content-full is a flex column with
+     overflow hidden); each module scrolls inside that. Without this, anything
+     below the first screen (most of a long list, a person's notes) was cut
+     off and could not be reached. */
+  flex: 1 1 auto; min-height: 0;
+  overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
+}
 .hub-inner { max-width: 960px; margin: 0 auto; }
 
 /* ── Heading ── */

@@ -100,6 +100,11 @@
 
 /* Controls on the row sit above the stretched link. */
 .hub-row-stickers, .hub-row-actions { position: relative; z-index: 1; }
+/* Each of those cells is its own layer, and rows further down the list are
+   painted later, so their cells would sit on top of a sticker picker opened
+   from a row above them: its options showed through and took its clicks.
+   While a row's picker is open, that row's sticker cell is the top one. */
+.hub-row-stickers:has(.stk-picker--popover) { z-index: 2; }
 .hub-row-stickers { grid-area: stickers; min-width: 0; }
 .hub-row-stickers:empty { display: none; }
 .hub-row-added { display: none; font-size: 13px; white-space: nowrap; }

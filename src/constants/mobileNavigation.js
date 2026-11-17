@@ -39,10 +39,10 @@ import {
   AlertTriangle, CalendarCheck, Inbox, Sparkles, Target, Activity, BookOpen,
   BarChart3, HeartPulse, LayoutDashboard, Lightbulb, Award, PenLine, Heart,
   FileText, MessageSquare, Shield, Swords, Brain, Mail, Crosshair, Archive,
-  CreditCard, Plug, Briefcase, Palette, LayoutGrid,
+  CreditCard, Plug, Briefcase, Palette, LayoutGrid, IdCard,
 } from 'lucide-react';
 import { BRAND, STATUS } from '../theme/tokens';
-import { CONTACT_HUB_PATH, CONTACT_HUB_STICKERS_PATH } from './contactHub.js';
+import { CONTACT_HUB_MY_CARD_PATH, CONTACT_HUB_PATH, CONTACT_HUB_STICKERS_PATH } from './contactHub.js';
 
 /**
  * The colour the active bottom-bar item takes, so the user always knows which
@@ -167,9 +167,11 @@ export const MODULE_BOTTOM_NAV = {
   },
 
   /**
-   * Contact Hub: My People · Sticker Wall.
+   * Contact Hub: My Card · My People · Sticker Wall.
    *
-   * Path-based, not `?tab=`: the two are addresses of their own. A person's
+   * Path-based, not `?tab=`: the three are addresses of their own. My Card's
+   * path (/contact-hub/my-card) is longer than My People's, so BottomNav's
+   * longest-match rule lights My Card there and not My People. A person's
    * page (/contact-hub/person/:id) and a filtered list (?sticker=) are both
    * inside My People, so My People stays lit there; the Sticker Wall's longer
    * path wins on the wall (BottomNav's longest-match rule).
@@ -184,6 +186,7 @@ export const MODULE_BOTTOM_NAV = {
    */
   'contact-hub': {
     primary: [
+      { id: 'my-card',  label: 'My Card',      Icon: IdCard,     to: CONTACT_HUB_MY_CARD_PATH },
       { id: 'people',   label: 'My People',    Icon: Users,      to: CONTACT_HUB_PATH },
       { id: 'stickers', label: 'Sticker Wall', Icon: LayoutGrid, to: CONTACT_HUB_STICKERS_PATH },
     ],

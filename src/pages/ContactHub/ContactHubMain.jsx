@@ -27,7 +27,7 @@ import { useT } from '../../theme/ThemeContext';
 import { StickersProvider } from '../../components/stickers/StickersContext';
 import { withMembershipChange } from '../../services/stickers/stickerCore';
 import {
-  CONTACT_HUB_PATH, CONTACT_HUB_STICKERS_PATH, CONTACT_HUB_STICKER_PARAM, contactHubStickerPath,
+  CONTACT_HUB_PATH, CONTACT_HUB_MY_CARD_PATH, CONTACT_HUB_STICKERS_PATH, CONTACT_HUB_STICKER_PARAM, contactHubStickerPath,
   isContactHubListPath, isContactHubStickersPath,
 } from '../../constants/contactHub';
 import { HUB_STATUS, listMyPeople } from './peopleRules';
@@ -108,6 +108,7 @@ export default function ContactHubMain() {
   const people = useMemo(() => listMyPeople(contacts), [contacts]);
   const section = onList ? 'people' : (isContactHubStickersPath(location.pathname) ? 'wall' : 'person');
   const openWall = useCallback(() => navigate(CONTACT_HUB_STICKERS_PATH), [navigate]);
+  const openCard = useCallback(() => navigate(CONTACT_HUB_MY_CARD_PATH), [navigate]);
 
   const context = useMemo(() => ({
     uid, status, contacts, reload, updateContact, addContacts, applyStickerChange,
@@ -123,6 +124,7 @@ export default function ContactHubMain() {
         selectedId={stickerId}
         onSelect={setStickerId}
         onOpenWall={openWall}
+        onOpenCard={openCard}
       />
       <div className="hub" style={{ color: T.text }}>
         <div className="hub-inner">

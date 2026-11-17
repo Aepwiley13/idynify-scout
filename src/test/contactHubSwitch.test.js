@@ -109,11 +109,12 @@ describe('switch ON', () => {
     expect(nav.resolveBarryModule('/contact-hub')).toBe('default');
   });
 
-  it('declares a mobile bottom bar of My People and Sticker Wall, with no overflow', async () => {
+  it('declares a mobile bottom bar of My Card, My People and Sticker Wall, with no overflow', async () => {
     const { mobile } = await loadWith('on');
     const bar = mobile.bottomNavFor('contact-hub');
     expect(bar.hidden).toBeUndefined();
     expect(bar.primary.map(({ id, label, to }) => ({ id, label, to }))).toEqual([
+      { id: 'my-card', label: 'My Card', to: '/contact-hub/my-card' },
       { id: 'people', label: 'My People', to: '/contact-hub' },
       { id: 'stickers', label: 'Sticker Wall', to: '/contact-hub/stickers' },
     ]);
@@ -124,7 +125,7 @@ describe('switch ON', () => {
   it('has no Import cell until the Import screen exists', async () => {
     const { mobile } = await loadWith('on');
     const cells = mobile.bottomNavFor('contact-hub').primary;
-    expect(cells).toHaveLength(2);
+    expect(cells).toHaveLength(3);
     expect(cells.some((c) => /import/i.test(`${c.id} ${c.label} ${c.to}`))).toBe(false);
   });
 

@@ -180,7 +180,7 @@ describe('under Contact Hub, while it is the active module', () => {
     renderApp();
     const nav = await hubNav();
     await within(nav).findByRole('button', { name: 'New sticker' });
-    expect(said(nav)).toEqual(['My People', 'Sticker Wall', 'Partner, 1 person', 'VIP, 1 person', 'New sticker']);
+    expect(said(nav)).toEqual(['My Card', 'My People', 'Sticker Wall', 'Partner, 1 person', 'VIP, 1 person', 'New sticker']);
     expect(within(nav).getByLabelText('4 people')).toHaveTextContent('4');
     expect(within(nav).getByRole('button', { name: /My People/ })).toHaveAttribute('aria-current', 'page');
     // It sits directly under the Contact Hub item, inside the global navigation.
@@ -323,7 +323,7 @@ describe('sticker permissions and states', () => {
     await screen.findByRole('list', { name: 'My People' });
     await waitFor(() => expect(fake.current.state.configFetches).toBe(1));
     const nav = await hubNav();
-    expect(said(nav)).toEqual(['My People']);
+    expect(said(nav)).toEqual(['My Card', 'My People']);
     expect(within(nav).getByLabelText('4 people')).toHaveTextContent('4');
     expect(within(nav).getByRole('button', { name: /My People/ })).toHaveAttribute('aria-current', 'page');
     expect(within(globalNav()).queryByRole('button', { name: /sticker/i })).toBeNull();
@@ -339,7 +339,7 @@ describe('sticker permissions and states', () => {
     fake.current.services.fetchStickersConfig = () => new Promise((resolve) => { answer = resolve; });
     renderApp();
     const nav = await hubNav();
-    expect(said(nav)).toEqual(['My People']);
+    expect(said(nav)).toEqual(['My Card', 'My People']);
     answer(config());
     expect(await within(nav).findByRole('button', { name: 'New sticker' })).toBeInTheDocument();
   });
@@ -359,7 +359,7 @@ describe('sticker permissions and states', () => {
     renderApp();
     const nav = await hubNav();
     await within(nav).findByRole('button', { name: 'New sticker' });
-    expect(said(nav)).toEqual(['My People', 'Sticker Wall', 'New sticker']);
+    expect(said(nav)).toEqual(['My Card', 'My People', 'Sticker Wall', 'New sticker']);
     expect(within(nav).queryByRole('list')).toBeNull();
   });
 
@@ -371,7 +371,7 @@ describe('sticker permissions and states', () => {
     const nav = await hubNav();
     // Stickers are on and loaded, but there is nobody for them to act on yet.
     await waitFor(() => expect(fake.current.state.subscriptions).toBe(1));
-    expect(said(nav)).toEqual(['My People']);
+    expect(said(nav)).toEqual(['My Card', 'My People']);
     expect(within(nav).getByLabelText('0 people')).toHaveTextContent('0');
     expect(within(nav).getByRole('button', { name: /My People/ })).toHaveAttribute('aria-current', 'page');
     expect(screen.queryByRole('group', { name: 'Filter by sticker' })).toBeNull();
@@ -383,7 +383,7 @@ describe('sticker permissions and states', () => {
     getDocs.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
     renderApp();
     const nav = await hubNav();
-    expect(said(nav)).toEqual(['My People']);
+    expect(said(nav)).toEqual(['My Card', 'My People']);
     expect(within(nav).queryByLabelText(/people|person/)).toBeNull();
     finish({ docs: contactsData.list.map((d) => ({ id: d.id, data: () => d })) });
     expect(await within(nav).findByLabelText('4 people')).toBeInTheDocument();
@@ -396,7 +396,7 @@ describe('sticker permissions and states', () => {
     renderApp('/contact-hub/stickers');
     await screen.findByText('Your people could not be loaded.');
     const nav = await hubNav();
-    expect(said(nav)).toEqual(['My People']);
+    expect(said(nav)).toEqual(['My Card', 'My People']);
     expect(within(nav).queryByLabelText(/people|person/)).toBeNull();
     await user.click(within(nav).getByRole('button', { name: /My People/ }));
     expect(router.at).toBe('/contact-hub');
@@ -496,7 +496,7 @@ describe('a phone: the shell\'s bottom bar is My People · Sticker Wall', () => 
   it('has two cells and nothing else: no More, no Import, no modules', async () => {
     renderPhone();
     await screen.findByRole('list', { name: 'My People' });
-    expect(within(bar()).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['My People', 'Sticker Wall']);
+    expect(within(bar()).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['My Card', 'My People', 'Sticker Wall']);
     expect(lit()).toEqual(['My People']);
     expect(within(bar()).queryByText(/import|more|scout|hunter/i)).toBeNull();
   });

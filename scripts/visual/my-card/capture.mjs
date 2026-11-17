@@ -21,9 +21,10 @@ import { join } from 'node:path';
 
 const OUT = process.argv[2];
 // 'editor' (the default): the editor and preview components. 'page': the whole My Card page, with sample data.
+// 'shell': the page inside the application's real Sidebar and mobile bottom bar (Commit 5).
 const MODE = process.argv[3] ?? 'editor';
-if (!OUT || !['editor', 'page'].includes(MODE)) { console.error('usage: capture.mjs <output folder> [editor|page]'); process.exit(2); }
-const BASE = `http://127.0.0.1:5199/scripts/visual/my-card/${MODE === 'page' ? 'page.html' : 'index.html'}`;
+if (!OUT || !['editor', 'page', 'shell'].includes(MODE)) { console.error('usage: capture.mjs <output folder> [editor|page|shell]'); process.exit(2); }
+const BASE = `http://127.0.0.1:5199/scripts/visual/my-card/${{ page: 'page.html', shell: 'shell.html', editor: 'index.html' }[MODE]}`;
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const PORT = 9333;
 const ALLOWED = [/^http:\/\/127\.0\.0\.1:5199\//, /^https:\/\/fonts\.googleapis\.com\//, /^https:\/\/fonts\.gstatic\.com\//];
@@ -121,10 +122,12 @@ await send('Runtime.enable');
 await send('Log.enable');
 await send('Fetch.enable', { patterns: [{ urlPattern: '*' }] });
 
-async function open({ theme, scenario, view, width, height, dpr, mobile, state, steps }) {
+async function open({ theme, scenario, view, width, height, dpr, mobile, state, steps, at }) {
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: dpr, mobile });
   await send('Emulation.setTouchEmulationEnabled', { enabled: mobile });
-  const query = MODE === 'page'
+  const query = MODE === 'shell'
+    ? `theme=${theme}&at=${at}`
+    : MODE === 'page'
     ? `theme=${theme}&state=${state}${steps ? `&do=${encodeURIComponent(steps)}` : ''}`
     : `theme=${theme}&scenario=${scenario}${view ? `&view=${view}` : ''}`;
   await send('Page.navigate', { url: `${BASE}?${query}&t=${Date.now()}` });
@@ -133,7 +136,7 @@ async function open({ theme, scenario, view, width, height, dpr, mobile, state, 
     if (ready) break;
     await wait(250);
   }
-  if (MODE === 'page') {
+  if (MODE === 'page' || MODE === 'shell') {
     // The page's own scripted steps (typing, pressing buttons) have to have finished.
     for (let i = 0; i < 120; i += 1) {
       if (await evaluate('document.documentElement.dataset.ready === "1"').catch(() => false)) break;
@@ -230,7 +233,18 @@ const PAGE_SHOTS = [
   ['p10-phone-could-not-load', { ...PHONE, state: 'loaderror' }],
   ['p11-phone-viewing-as-someone-else', { ...PHONE, state: 'impersonating' }],
 ];
-const SHOT_LIST = MODE === 'page' ? PAGE_SHOTS : SHOTS;
+// My Card inside the real navigation: the sidebar on desktop and tablet, the bottom bar on a phone.
+const SHELL_SHOTS = [
+  ['d01-sidebar-my-card-lit', { ...DESKTOP, at: 'my-card' }],
+  ['t01-tablet-my-card-lit', { ...TABLET, at: 'my-card' }],
+  ['p01-phone-bottom-bar-my-card-lit', { ...PHONE, at: 'my-card' }],
+  ['p02-phone-preview-above-bottom-bar', { ...PHONE, at: 'my-card' }, async () => {
+    await evaluate('[...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Preview").click()');
+    await wait(300);
+  }],
+  ['p03-phone-bottom-bar-my-people-lit', { ...PHONE, at: 'people' }],
+];
+const SHOT_LIST = { page: PAGE_SHOTS, shell: SHELL_SHOTS, editor: SHOTS }[MODE];
 const THEMES = [['light', 'workspace'], ['dark', 'mission']];
 
 const written = [];

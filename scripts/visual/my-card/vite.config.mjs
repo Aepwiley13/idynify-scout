@@ -14,6 +14,9 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 
+// Contact Hub's switch is on for the fixture (the shell's navigation only lists it then).
+process.env.VITE_CONTACT_HUB = 'on';
+
 // Where the stand-ins live, and what they stand in for (the page imports these by relative path).
 const stub = (name) => fileURLToPath(new URL(`./stubs/${name}`, import.meta.url));
 

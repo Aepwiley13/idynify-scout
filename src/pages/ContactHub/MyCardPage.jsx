@@ -19,15 +19,20 @@
  * WHAT IS DOWNLOADED: the draft as it is now, and only what the preview shows.
  * Downloading saves nothing and calls nothing.
  *
- * Reachable by address only until navigation links it.
+ * Contact Hub's entries in the application sidebar are drawn here too (My Card
+ * is lit). The people are NOT loaded for it, so My People shows without a count.
+ * A draft not yet saved is kept as the page is left and comes back on return
+ * (useMyCard, unmount flush).
  */
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { auth } from '../../firebase/config';
 import { useImpersonation } from '../../context/ImpersonationContext';
 import { myCardService } from '../../services/myCardService';
-import { CONTACT_HUB_PATH } from '../../constants/contactHub';
+import { CONTACT_HUB_MY_CARD_PATH, CONTACT_HUB_PATH, CONTACT_HUB_STICKERS_PATH } from '../../constants/contactHub';
+import HubSidebarNav from './HubSidebarNav';
+import { HUB_STATUS } from './peopleRules';
 import MyCardLayout from './myCard/MyCardLayout';
 import MyCardEditor from './myCard/MyCardEditor';
 import MyCardPreview from './myCard/MyCardPreview';
@@ -37,6 +42,8 @@ import { MyCardBlocked, MyCardNotices } from './myCard/MyCardNotices';
 import { contactDownloadState, downloadContact } from './myCard/downloadContact';
 import { useMyCard } from './myCard/state/useMyCard';
 import { describeChanges } from './myCard/state/myCardDiff';
+
+const NO_PEOPLE = Object.freeze([]);
 
 /** The uid signed in right now, from the one place that knows. */
 const currentUid = () => auth.currentUser?.uid ?? null;
@@ -72,6 +79,19 @@ export default function MyCardPage() {
   const handleDownload = () => setDownloaded({ forCard: draft.card, result: downloadContact(draft.card) });
   const feedback = downloaded && downloaded.forCard === draft.card ? downloaded.result : null;
 
+  const navigate = useNavigate();
+  const sidebar = (
+    <HubSidebarNav
+      status={HUB_STATUS.LOADING}
+      people={NO_PEOPLE}
+      section="card"
+      selectedId={null}
+      onSelect={() => navigate(CONTACT_HUB_PATH)}
+      onOpenWall={() => navigate(CONTACT_HUB_STICKERS_PATH)}
+      onOpenCard={() => navigate(CONTACT_HUB_MY_CARD_PATH)}
+    />
+  );
+
   const back = (
     <Link className="mycard-back" to={CONTACT_HUB_PATH}>
       <ArrowLeft size={16} aria-hidden="true" />
@@ -81,13 +101,15 @@ export default function MyCardPage() {
 
   // No card to show: loading, could not load, impersonating, signed out.
   if (state.load !== 'ready') {
-    return <MyCardLayout back={back} editor={<MyCardBlocked state={state} onRetryLoad={actions.retryLoad} />} />;
+    return <>{sidebar}<MyCardLayout back={back} editor={<MyCardBlocked state={state} onRetryLoad={actions.retryLoad} />} /></>;
   }
 
   const download = contactDownloadState(draft.card);
   const changeLabels = state.conflict ? describeChanges(state.conflict.changes) : [];
 
   return (
+    <>
+    {sidebar}
     <MyCardLayout
       back={back}
       notice={(
@@ -131,5 +153,6 @@ export default function MyCardPage() {
         />
       )}
     />
+    </>
   );
 }

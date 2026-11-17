@@ -2,7 +2,7 @@
  * HubSidebarNav — Contact Hub's own entries, drawn under "Contact Hub" in the
  * application sidebar.
  *
- * My People with how many there are, the Sticker Wall, one entry per active
+ * My Card, My People with how many there are, the Sticker Wall, one entry per active
  * sticker with how many of the listed people have it, and New sticker.
  *
  * The sidebar offers an empty place for this only while Contact Hub is the
@@ -24,12 +24,17 @@
  *   stickers still checking or loading                      My People
  *   the sticker list failed to load                         My People, and a message
  *   ready, with people                                      all of it
+ * My Card is first and always here. It is drawn by ContactHubMain (beside My
+ * People) and by the My Card page, which is not inside ContactHubMain so that
+ * opening it loads none of the user's people: there the people are never
+ * loaded, so My People has no count and the sticker entries are not offered.
+ *
  * New sticker is offered exactly when the page's own sticker controls are:
  * when stickers are available to this user and their list has loaded.
  */
 import { useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { LayoutGrid, Plus, Users } from 'lucide-react';
+import { IdCard, LayoutGrid, Plus, Users } from 'lucide-react';
 import { useSidebarSlot } from '../../components/layout/sidebarSlots';
 import { CONTACT_HUB_SIDEBAR_SLOT } from '../../constants/contactHub';
 import { useStickers } from '../../components/stickers/stickersRegistry';
@@ -40,16 +45,19 @@ import { createSticker } from '../../services/stickerService';
 import StickerDialog from '../../components/stickers/StickerDialog';
 import { HUB_STATUS, stickersFailedToLoad } from './peopleRules';
 import StickersLoadError from './StickersLoadError';
+// Its own styles: it is also drawn by the My Card page, which is not inside ContactHubMain.
+import './ContactHub.css';
 
 /**
  * @param status      ContactHubMain's load of the people (HUB_STATUS)
  * @param people      everyone listed in My People
- * @param section     'people' | 'wall' | 'person': where in Contact Hub this is
+ * @param section     'card' | 'people' | 'wall' | 'person': where in Contact Hub this is
+ * @param onOpenCard  () => go to My Card
  * @param selectedId  the sticker My People is filtered by, or null
  * @param onSelect    (stickerId | null) => go to My People with that filter
  * @param onOpenWall  () => go to the Sticker Wall
  */
-export default function HubSidebarNav({ status, people, section, selectedId, onSelect, onOpenWall }) {
+export default function HubSidebarNav({ status, people, section, selectedId, onSelect, onOpenWall, onOpenCard }) {
   const slot = useSidebarSlot(CONTACT_HUB_SIDEBAR_SLOT);
   const stickers = useStickers();
   const { ready, active, uid, notify } = stickers;
@@ -76,6 +84,16 @@ export default function HubSidebarNav({ status, people, section, selectedId, onS
     <>
       {createPortal(
         <nav className="hub-sidenav" aria-label="Contact Hub sections">
+          <button
+            type="button"
+            className="hub-sidenav-item"
+            aria-current={section === 'card' ? 'page' : undefined}
+            onClick={onOpenCard}
+          >
+            <IdCard size={15} aria-hidden="true" />
+            <span className="hub-sidenav-name">My Card</span>
+          </button>
+
           <button
             type="button"
             className="hub-sidenav-item"

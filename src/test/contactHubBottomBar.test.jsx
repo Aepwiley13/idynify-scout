@@ -1,5 +1,5 @@
 /**
- * Contact Hub's mobile bottom bar: My People · Sticker Wall.
+ * Contact Hub's mobile bottom bar: My Card · My People · Sticker Wall.
  *
  * The shell's own BottomNav, driven by Contact Hub's entry in the mobile
  * navigation table, so Contact Hub has no bar of its own making. The real
@@ -33,17 +33,19 @@ describe('switch ON', () => {
   const current = (screen) => screen.getAllByRole('button').filter((b) => b.getAttribute('aria-current') === 'page').map((b) => b.getAttribute('aria-label'));
 
   it.each([
+    ['/contact-hub/my-card', 'My Card'],
+    ['/contact-hub/my-card/', 'My Card'],
     ['/contact-hub', 'My People'],
     // A filtered list and a person are both inside My People.
     ['/contact-hub?sticker=abc', 'My People'],
     ['/contact-hub/person/c1', 'My People'],
     ['/contact-hub/stickers', 'Sticker Wall'],
     ['/contact-hub/stickers/', 'Sticker Wall'],
-  ])('%s: the bar is My People and Sticker Wall, with %s lit and nothing else', async (url, lit) => {
+  ])('%s: the bar is My Card, My People and Sticker Wall, with %s lit and nothing else', async (url, lit) => {
     const { screen, cleanup } = await renderBarAt(url);
     cleanupLast = cleanup;
     expect(screen.getByRole('navigation', { name: 'Contact Hub sections' })).toBeInTheDocument();
-    expect(labels(screen)).toEqual(['My People', 'Sticker Wall']);
+    expect(labels(screen)).toEqual(['My Card', 'My People', 'Sticker Wall']);
     expect(current(screen)).toEqual([lit]);
   });
 
@@ -63,6 +65,18 @@ describe('switch ON', () => {
     fireEvent.click(screen.getByRole('button', { name: 'My People' }));
     expect(screen.getByTestId('at').textContent).toBe('/contact-hub');
     expect(current(screen)).toEqual(['My People']);
+  });
+
+  it('My Card is lit on My Card and My People is not; going to My People and back moves the light', async () => {
+    const { screen, cleanup, fireEvent } = await renderBarAt('/contact-hub/my-card');
+    cleanupLast = cleanup;
+    expect(current(screen)).toEqual(['My Card']);
+    fireEvent.click(screen.getByRole('button', { name: 'My People' }));
+    expect(screen.getByTestId('at').textContent).toBe('/contact-hub');
+    expect(current(screen)).toEqual(['My People']);
+    fireEvent.click(screen.getByRole('button', { name: 'My Card' }));
+    expect(screen.getByTestId('at').textContent).toBe('/contact-hub/my-card');
+    expect(current(screen)).toEqual(['My Card']);
   });
 
   it('never offers Scout or Hunter under a Contact Hub screen', async () => {

@@ -239,6 +239,55 @@ describe('layout', () => {
   });
 });
 
+describe('the state modules stand alone', () => {
+  // The pure logic behind the page: a reducer, a diff, and the one module that keeps a draft in the tab.
+  const stateDir = resolve(dir, 'state');
+  const stateFiles = readdirSync(stateDir).filter((name) => /\.js$/.test(name));
+  const stateImports = (name) => [...readFileSync(resolve(stateDir, name), 'utf8').matchAll(/(?:^|\n)\s*import\b[^'"]*['"]([^'"]+)['"]/g)].map((m) => m[1]);
+  const stateSource = (name) => strip(readFileSync(resolve(stateDir, name), 'utf8'));
+
+  it('is the three modules this step adds', () => {
+    expect([...stateFiles].sort()).toEqual(['myCardDiff.js', 'myCardDraftStorage.js', 'myCardState.js']);
+  });
+
+  it('imports no React, Firebase, router, service or context: it is plain logic', () => {
+    for (const name of stateFiles) {
+      for (const from of stateImports(name)) {
+        expect(from, `${name} imports ${from}`).not.toMatch(/react|firebase|react-router|\/services\/|\/context\/|ImpersonationContext|axios|lucide/);
+        expect(from, `${name} imports ${from}`).toMatch(/^(?:\.\/my[A-Za-z]+|\.\.\/cardDraft|\.\.\/\.\.\/\.\.\/\.\.\/utils\/myCardRules)$/);
+      }
+    }
+  });
+
+  it('never calls the network or writes to a database', () => {
+    for (const name of stateFiles) {
+      expect(stateSource(name), name).not.toMatch(/\bfetch\(|XMLHttpRequest|navigator\.sendBeacon|indexedDB|setDoc|addDoc|updateDoc|deleteDoc|runTransaction|getDoc/);
+    }
+  });
+
+  it('lets exactly one module touch browser storage, and only the tab\'s sessionStorage', () => {
+    const touching = stateFiles.filter((name) => /sessionStorage|localStorage/.test(stateSource(name)));
+    expect(touching).toEqual(['myCardDraftStorage.js']);
+    expect(stateSource('myCardDraftStorage.js')).toMatch(/globalThis\.sessionStorage/);
+    expect(stateSource('myCardDraftStorage.js')).not.toMatch(/localStorage/);
+  });
+
+  it('keeps the components, which draw the screen, away from storage altogether', () => {
+    for (const name of sources.filter((file) => /\.jsx?$/.test(file))) {
+      expect(strip(readFileSync(resolve(dir, name), 'utf8')), name).not.toMatch(/sessionStorage|localStorage|myCardDraftStorage/);
+    }
+  });
+
+  it('never stores or tracks the sharing setting: wherever it is named, it is the literal false', () => {
+    for (const name of stateFiles) {
+      // Assigned, it is only ever `false` (the draft's own shape says sharing is off), never true and never copied.
+      expect(stateSource(name), name).not.toMatch(/sharingEnabled\s*[:=]\s*(?!\s|false\b)/);
+    }
+    // The storage module names it only to say it is not kept.
+    expect(readFileSync(resolve(stateDir, 'myCardDraftStorage.js'), 'utf8')).toMatch(/no sharing setting|no sharing/i);
+  });
+});
+
 describe('the components stand alone', () => {
   const code = sources.filter((name) => /\.jsx?$/.test(name));
   const imports = (name) => [...readFileSync(resolve(dir, name), 'utf8').matchAll(/(?:^|\n)\s*import\b[^'"]*['"]([^'"]+)['"]/g)].map((m) => m[1]);

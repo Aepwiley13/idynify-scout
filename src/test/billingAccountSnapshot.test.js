@@ -7,6 +7,10 @@ import { describe, it, expect } from 'vitest';
 import {
   summarizeAccount, assertTestMode, parseArgs, planSnapshot, SnapshotRefusal,
 } from '../../scripts/staging/billingAccountSnapshot.mjs';
+import { STAGING_PROJECT } from '../../scripts/staging/billingRehearsal/guard.mjs';
+
+// Project ids come from the tool's own constant, never a literal (scripts/checkNoHardcodedProjectId.mjs).
+const OTHER_PROJECT = 'acme-prod';
 
 const failing = (summary) => summary.checks.filter((c) => !c.ok).map((c) => c.id);
 const sub = (id, status, price = 'price_starter') => ({ id, status, livemode: false, items: { data: [{ price: { id: price } }] } });
@@ -88,12 +92,12 @@ describe('test mode only', () => {
 });
 
 describe('staging only', () => {
-  const credential = { kind: 'key', projectId: 'idynify-staging', clientEmail: 'qa@idynify-staging.iam.gserviceaccount.com', privateKey: 'x' };
+  const credential = { kind: 'key', projectId: STAGING_PROJECT, clientEmail: `qa@${STAGING_PROJECT}.iam.gserviceaccount.com`, privateKey: 'x' };
 
   it('resolves to the staging project with a staging credential', () => {
-    const plan = planSnapshot({ PRODUCTION_FIREBASE_PROJECT_ID: 'prod-project' }, credential);
-    expect(plan.target).toEqual({ mode: 'staging', projectId: 'idynify-staging' });
-    expect(plan.env.FIREBASE_PROJECT_ID).toBe('idynify-staging');
+    const plan = planSnapshot({ PRODUCTION_FIREBASE_PROJECT_ID: OTHER_PROJECT }, credential);
+    expect(plan.target).toEqual({ mode: 'staging', projectId: STAGING_PROJECT });
+    expect(plan.env.FIREBASE_PROJECT_ID).toBe(STAGING_PROJECT);
   });
 
   it('refuses without the production id to rule out', () => {
@@ -101,15 +105,15 @@ describe('staging only', () => {
   });
 
   it('refuses a credential from another project', () => {
-    expect(() => planSnapshot({ PRODUCTION_FIREBASE_PROJECT_ID: 'prod-project' }, { ...credential, projectId: 'prod-project' })).toThrow();
+    expect(() => planSnapshot({ PRODUCTION_FIREBASE_PROJECT_ID: OTHER_PROJECT }, { ...credential, projectId: OTHER_PROJECT })).toThrow();
   });
 
   it('refuses with no credential', () => {
-    expect(() => planSnapshot({ PRODUCTION_FIREBASE_PROJECT_ID: 'prod-project' }, null)).toThrow(/credential/);
+    expect(() => planSnapshot({ PRODUCTION_FIREBASE_PROJECT_ID: OTHER_PROJECT }, null)).toThrow(/credential/);
   });
 
   it('refuses the emulator', () => {
-    expect(() => planSnapshot({ PRODUCTION_FIREBASE_PROJECT_ID: 'prod-project', FIRESTORE_EMULATOR_HOST: 'localhost:8080' }, credential)).toThrow(/staging project/);
+    expect(() => planSnapshot({ PRODUCTION_FIREBASE_PROJECT_ID: OTHER_PROJECT, FIRESTORE_EMULATOR_HOST: 'localhost:8080' }, credential)).toThrow(/staging project/);
   });
 });
 

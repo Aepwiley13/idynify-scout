@@ -102,7 +102,7 @@ async function renderSignup(search = '') {
 beforeEach(() => {
   vi.clearAllMocks();
   setDocMock.mockResolvedValue(undefined);
-  createUser.mockResolvedValue({ user: { uid: 'uid-1' } });
+  createUser.mockResolvedValue({ user: { uid: 'uid-1', getIdToken: async () => 'good-token' } });
   validatePasswordMock.mockResolvedValue(POLICY());
   globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true }));
 });

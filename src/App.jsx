@@ -7,6 +7,9 @@ import { ImpersonationProvider } from './context/ImpersonationContext';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useAccountVerification } from './utils/accountVerification';
 import { AccountGate } from './components/AccountUnverified';
+import { planOf, PLAN } from './utils/accountPlan';
+import { FREE_PLAN, FREE_PLAN_HOME, isFreePlanPath, signupPlanFor, signupLandingPath } from './constants/freePlan';
+import UpgradeRequired from './components/billing/UpgradeRequired';
 
 // Pages
 import Homepage from './pages/Homepage';
@@ -129,22 +132,50 @@ import WithTheForce from './components/WithTheForce';
  *
  * Authorization semantics are identical to ProtectedRoute: same auth check,
  * same payment gate, same redirects. Only presentation moved.
+ *
+ * THE FREE PLAN (constants/freePlan.js), when its switch is on: the free routes
+ * (Contact Hub, Settings) open for a server-verified account with no paid
+ * access, and on a paid route that account sees UpgradeRequired inside the
+ * shell instead of a redirect out of the app. Both use the same MainLayout at
+ * the same position, so the shell stays mounted either way. A failed or
+ * cache-only read still shows the verification screen everywhere. Switch off:
+ * exactly the behaviour above.
  */
 function ShellRoute({ loading, user, userData, account, recovery, requirePayment = true }) {
+  const { pathname } = useLocation();
+  const freeRoute = isFreePlanPath(pathname);
   return (
     <AccountGate
       loading={loading}
       user={user}
       account={account}
-      requirePayment={requirePayment}
+      requirePayment={requirePayment && !freeRoute}
       recovery={recovery}
       loadingScreen={<LoadingScreen />}
+      upgrade={FREE_PLAN.enabled ? (
+        <MainLayout user={user} userData={userData}>
+          <UpgradeRequired />
+        </MainLayout>
+      ) : null}
     >
       <MainLayout user={user} userData={userData}>
         <Outlet />
       </MainLayout>
     </AccountGate>
   );
+}
+
+/**
+ * The signed-in visitor to /signup. Free plan off: /checkout, as before. On: a
+ * paid tier in the link still goes to that tier's checkout; otherwise the
+ * Contact Hub. Either way the destination is a guarded route, so an account
+ * that cannot be verified sees the verification screen there.
+ */
+function SignedInSignupRedirect() {
+  const { search } = useLocation();
+  if (!FREE_PLAN.enabled) return <Navigate to="/checkout" />;
+  const plan = signupPlanFor(new URLSearchParams(search).get('tier'));
+  return <Navigate to={signupLandingPath(plan)} />;
 }
 
 function LoadingScreen() {
@@ -279,16 +310,22 @@ function App() {
   const SmartRedirect = () => {
     // Return users skip onboarding; new users go through Barry Workspace
     const destination = () => {
+      // Free plan on: a server-verified account with no paid access starts in
+      // its Contact Hub. planOf never says "free" for an unverified account.
+      if (FREE_PLAN.enabled && planOf(account) === PLAN.FREE) {
+        return <Navigate to={FREE_PLAN_HOME} />;
+      }
       if (userData?.onboardingComplete || userData?.onboarding?.completed) {
         return <Navigate to="/mission-control-v2" />;
       }
       return <Navigate to="/barry" />;
     };
 
-    // Payment first: a server-confirmed unpaid account goes to checkout, and
-    // an account that could not be checked goes nowhere.
+    // Payment first: a server-confirmed unpaid account goes to checkout (or,
+    // with the Free plan on, to its Contact Hub), and an account that could
+    // not be checked goes nowhere.
     return (
-      <AccountGate loading={loading} user={user} account={account} recovery={recovery} loadingScreen={<LoadingScreen />}>
+      <AccountGate loading={loading} user={user} account={account} requirePayment={!FREE_PLAN.enabled} recovery={recovery} loadingScreen={<LoadingScreen />}>
         {destination()}
       </AccountGate>
     );
@@ -315,7 +352,7 @@ function App() {
         {/* Public Routes */}
         <Route path="/" element={!user ? <Homepage /> : <SmartRedirect />} />
         <Route path="/login" element={!user ? <Login /> : <SmartRedirect />} />
-        <Route path="/signup" element={!user ? <Signup /> : <Navigate to="/checkout" />} />
+        <Route path="/signup" element={!user ? <Signup /> : <SignedInSignupRedirect />} />
         <Route path="/forgot-password" element={!user ? <ForgotPassword /> : <SmartRedirect />} />
 
         {/* Getting Started (Auth Required) */}

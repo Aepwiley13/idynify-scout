@@ -190,6 +190,13 @@ const USER_DOC_CASES = [
   ['new  signup with status active', 'DENY', create({ ...signup('starter'), status: 'active' })],
   ['new  signup tier differs from selected tier', 'DENY', create({ ...signup('starter'), subscriptionTier: 'pro' })],
   ['new  only some signup billing fields', 'DENY', create({ email: 'x@example.test', credits: 400 })],
+  // The Free plan's signup (Signup.jsx, no tier, VITE_FREE_PLAN on): no billing fields at all.
+  // Allowed by the existing rules; these pin that, and that a free signup still cannot grant itself
+  // paid access or credits.
+  ['new  free signup, no billing fields', 'ALLOW', create({ email: 'new@example.test', createdAt: new Date(0) })],
+  ['new  free signup claiming paid access', 'DENY', create({ email: 'new@example.test', createdAt: new Date(0), hasCompletedPayment: true })],
+  ['new  free signup claiming credits', 'DENY', create({ email: 'new@example.test', createdAt: new Date(0), credits: { total: 400, used: 0, remaining: 400, resetDate: null } })],
+  ['new  free signup claiming a Stripe customer', 'DENY', create({ email: 'new@example.test', createdAt: new Date(0), stripeCustomerId: 'cus_x' })],
   ['new  signup plus role admin', 'DENY', create({ ...signup('starter'), role: 'admin' })],
   ['new  signup plus role super_admin', 'DENY', create({ ...signup('starter'), role: 'super_admin' })],
   ['new  role user, nothing else', 'DENY', create({ role: 'user' })],

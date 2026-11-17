@@ -406,7 +406,17 @@ describe('App.jsx uses this gate everywhere', () => {
   it('the only bare redirect to checkout left is the signed-in /signup route, which lands on a guarded route', () => {
     const redirects = app.match(/<Navigate to="\/checkout" \/>/g) ?? [];
     expect(redirects).toHaveLength(1);
-    expect(app).toMatch(/path="\/signup" element=\{!user \? <Signup \/> : <Navigate to="\/checkout" \/>\}/);
+    // The Free plan moved it into SignedInSignupRedirect: /checkout when the Free plan is off,
+    // exactly as before; otherwise checkout for a paid tier or the Contact Hub. All guarded.
+    expect(app).toMatch(/path="\/signup" element=\{!user \? <Signup \/> : <SignedInSignupRedirect \/>\}/);
+    expect(app).toMatch(/if \(!FREE_PLAN\.enabled\) return <Navigate to="\/checkout" \/>;/);
+  });
+
+  it('the shell lets a free route skip the paid check, and never skips the verification check', () => {
+    // requirePayment may be relaxed for a free route; nothing else about the decision changes, so
+    // a failed or cache-only read still reaches the verification screen (accessDecision).
+    expect(app).toMatch(/requirePayment=\{requirePayment && !freeRoute\}/);
+    expect(app).toMatch(/upgrade=\{FREE_PLAN\.enabled \? \(/);
   });
 
   it('all three checkout routes need the server\'s answer', () => {

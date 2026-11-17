@@ -9,6 +9,7 @@ import AuthField from '../components/auth/AuthField';
 import PasswordField from '../components/auth/PasswordField';
 import PasswordRequirements from '../components/auth/PasswordRequirements';
 import BrandMark from '../components/auth/BrandMark';
+import { signupPlanFor, signupLandingPath } from '../constants/freePlan';
 import {
   SIGNUP_EVENTS,
   beginSignupSession,
@@ -52,8 +53,13 @@ export default function Signup() {
    * This is the single most important thing not to lose in a visual rewrite:
    * nothing on screen would look wrong if it stopped flowing, and a customer
    * who chose Pro would quietly become Starter. Tests 10 and 11 pin it.
+   *
+   * With the Free plan on (constants/freePlan.js), no tier means a Free
+   * account: no card, no billing fields, straight to Contact Hub. A tier in
+   * the link still creates that paid tier's account and goes to its checkout.
+   * With it off, no tier still means Starter, exactly as before.
    */
-  const tier = searchParams.get('tier') || 'starter';
+  const tier = signupPlanFor(searchParams.get('tier'));
 
   useEffect(() => {
     beginSignupSession();
@@ -108,23 +114,33 @@ export default function Signup() {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
 
-      // Billing hardening PR 1: `credits` now matches the object shape stripe-webhook.js writes
-      // after checkout, instead of the bare number this used to write (which later got
-      // overwritten by an incompatible object shape — a real inconsistency, not a cosmetic one;
-      // see firestore.rules signupBilling(), which still accepts the old numeric shape too, for
-      // any already-open tab still running the previous bundle).
-      const initialCredits = tier === 'pro' ? 1250 : 400;
+      if (tier === 'free') {
+        // A Free account carries no billing fields at all: the server alone
+        // writes them, when a payment is confirmed. firestore.rules accepts a
+        // signup without them (signupBillingFields are all-or-nothing).
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          email: email,
+          createdAt: new Date(),
+        });
+      } else {
+        // Billing hardening PR 1: `credits` now matches the object shape stripe-webhook.js writes
+        // after checkout, instead of the bare number this used to write (which later got
+        // overwritten by an incompatible object shape — a real inconsistency, not a cosmetic one;
+        // see firestore.rules signupBilling(), which still accepts the old numeric shape too, for
+        // any already-open tab still running the previous bundle).
+        const initialCredits = tier === 'pro' ? 1250 : 400;
 
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
-        email: email,
-        createdAt: new Date(),
-        selectedTier: tier,
-        subscriptionTier: tier,
-        status: 'pending_payment',
-        hasCompletedPayment: false,
-        credits: { total: initialCredits, used: 0, remaining: initialCredits, resetDate: null },
-        monthlyCredits: initialCredits
-      });
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          email: email,
+          createdAt: new Date(),
+          selectedTier: tier,
+          subscriptionTier: tier,
+          status: 'pending_payment',
+          hasCompletedPayment: false,
+          credits: { total: initialCredits, used: 0, remaining: initialCredits, resetDate: null },
+          monthlyCredits: initialCredits
+        });
+      }
 
       // Genuinely fire-and-forget now. The previous code awaited this despite
       // a comment promising it did not, so a slow Resend call sat between the
@@ -141,7 +157,7 @@ export default function Signup() {
       // A uid exists from here on, so the buffered funnel can be written.
       flushSignupEvents(SIGNUP_EVENTS.SUCCEEDED, { tier });
 
-      navigate(`/checkout?tier=${tier}`);
+      navigate(signupLandingPath(tier));
     } catch (error) {
       // Error type only — never the email, never the password.
       bufferSignupEvent(SIGNUP_EVENTS.FAILED, { code: error?.code || 'unknown' });

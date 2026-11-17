@@ -105,16 +105,21 @@ export default function AccountUnverified({ onRetry, onReload, onSignOut, retryi
  *   loading     the caller's loading screen
  *   login       not signed in
  *   unverified  the screen above: no access, no purchase, no redirect
- *   checkout    the server confirmed the account is unpaid
+ *   checkout    the server confirmed the account is unpaid: `upgrade` when the
+ *               caller gives one (the Free plan's in-app screen), otherwise a
+ *               redirect to /checkout
  *   allow       the children
  *
  * @param recovery { onRetry, onSignOut, retrying?, onReload? } for the unverified screen
+ * @param upgrade  optional element shown instead of the /checkout redirect. Only
+ *                 ever reached on the server's own "unpaid" answer, never on a
+ *                 failed or cache-only read.
  */
-export function AccountGate({ loading, user, account, requirePayment = true, purchase = false, recovery, loadingScreen = null, children }) {
+export function AccountGate({ loading, user, account, requirePayment = true, purchase = false, recovery, loadingScreen = null, upgrade = null, children }) {
   switch (accessDecision({ loading, user, account, requirePayment, purchase })) {
     case DECISION.LOADING: return loadingScreen;
     case DECISION.LOGIN: return <Navigate to="/login" />;
-    case DECISION.CHECKOUT: return <Navigate to="/checkout" />;
+    case DECISION.CHECKOUT: return upgrade ?? <Navigate to="/checkout" />;
     case DECISION.ALLOW: return children;
     default: return <AccountUnverified {...recovery} />;
   }

@@ -262,6 +262,60 @@ describe('whether anything changed', () => {
   });
 });
 
+describe('starting over, and going back', () => {
+  it('reset with only a card starts from it, clean', () => {
+    const state = step(start(), edit('title', 'Typed'), { type: 'reset', card: { ...newCard(), firstName: 'Grace' } });
+    expect(state.card.firstName).toBe('Grace');
+    expect(state.card.title).toBe('');
+    expect(isDirty(state)).toBe(false);
+  });
+
+  it('reset with a current card shows that text, measured from the saved card: unsaved changes on top of what is saved', () => {
+    const saved = { ...newCard(), firstName: 'Ada', lastName: 'Lovelace' };
+    const recovered = { ...saved, title: 'Recovered title', share: { ...DEFAULT_SHARE, email: true } };
+    const state = cardDraftReducer(createDraft(null), { type: 'reset', card: saved, current: recovered });
+    expect(state.card.title).toBe('Recovered title');
+    expect(state.card.share.email).toBe(true);
+    expect(isDirty(state)).toBe(true);
+    // And it is dirty only for what differs: putting the saved text back makes it clean.
+    expect(isDirty(step(state, edit('title', ''), { type: 'share', field: 'email', value: false }))).toBe(false);
+  });
+
+  it('reset with a current card that equals the saved card is clean', () => {
+    const saved = { ...newCard(), firstName: 'Ada' };
+    expect(isDirty(cardDraftReducer(createDraft(null), { type: 'reset', card: saved, current: saved }))).toBe(false);
+  });
+
+  it('reset keeps sharing off and the fields as text, whatever the current card holds', () => {
+    const state = cardDraftReducer(createDraft(null), { type: 'reset', card: newCard(), current: { ...newCard(), sharingEnabled: true, title: 7, share: 'all' } });
+    expect(state.card.sharingEnabled).toBe(false);
+    expect(state.card.title).toBe('');
+    expect(Object.values(state.card.share).every((on) => on === false)).toBe(true);
+  });
+
+  it('discard goes back to where the draft started: text, switches, and what was touched', () => {
+    const typed = step(start(), edit('title', 'Typed'), edit('email', 'nope'), { type: 'blur', field: 'email' }, { type: 'share', field: 'phone', value: true }, { type: 'showAllErrors' });
+    expect(isDirty(typed)).toBe(true);
+    const back = step(typed, { type: 'discardChanges' });
+    expect(back.card).toEqual(start().card);
+    expect(isDirty(back)).toBe(false);
+    expect(back.touched).toEqual({});
+    expect(visibleErrors(back)).toEqual({});
+  });
+
+  it('discard on a recovered draft goes back to the saved card, not to the recovered text', () => {
+    const saved = { ...newCard(), firstName: 'Ada' };
+    const state = cardDraftReducer(createDraft(null), { type: 'reset', card: saved, current: { ...saved, title: 'Recovered' } });
+    expect(step(state, { type: 'discardChanges' }).card.title).toBe('');
+  });
+
+  it('discard returns a card that edits cannot reach back into the starting point through', () => {
+    const state = step(start(), { type: 'discardChanges' }, edit('title', 'After'));
+    expect(state.start.title).toBe('');
+    expect(state.card.title).toBe('After');
+  });
+});
+
 describe('what the preview shows', () => {
   const full = (extra = {}) => start({
     title: 'Analyst', organization: 'Analytical Engines', email: 'ada@example.com', phone: '+1 (555) 010-2000',

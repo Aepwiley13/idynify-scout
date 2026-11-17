@@ -82,7 +82,9 @@ export function createDraft(card) {
  *   share       { field, value }        a Shared / Private switch
  *   useSuggestion { field, suggestion } the person chose "use this" for an empty field
  *   showAllErrors                       the person tried to save: every message may show
- *   reset       { card }                start over from this card (after a load or a save)
+ *   reset       { card, current? }      start over from this card (after a load or a save); with `current`, the
+ *                                       text is that, and the draft is measured from `card` (a recovered draft)
+ *   discardChanges                      back to where the draft started
  */
 export function cardDraftReducer(state, action) {
   switch (action?.type) {
@@ -115,8 +117,15 @@ export function cardDraftReducer(state, action) {
     }
     case 'showAllErrors':
       return state.showAll ? state : { ...state, showAll: true };
-    case 'reset':
-      return createDraft(action.card);
+    case 'reset': {
+      // From `card`, which is where the draft is measured from (what is saved). With `current`, the
+      // text starts as that instead: a recovered draft is unsaved changes ON TOP of the saved card.
+      const next = createDraft(action.card);
+      return action.current === undefined ? next : { ...next, card: draftCard(action.current) };
+    }
+    case 'discardChanges':
+      // Back to where the draft started, as if nothing had been typed.
+      return { ...state, card: draftCard(state.start), touched: {}, showAll: false };
     default:
       return state;
   }

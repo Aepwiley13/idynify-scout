@@ -246,17 +246,36 @@ describe('the state modules stand alone', () => {
   const stateImports = (name) => [...readFileSync(resolve(stateDir, name), 'utf8').matchAll(/(?:^|\n)\s*import\b[^'"]*['"]([^'"]+)['"]/g)].map((m) => m[1]);
   const stateSource = (name) => strip(readFileSync(resolve(stateDir, name), 'utf8'));
 
-  it('is the three modules this step adds', () => {
-    expect([...stateFiles].sort()).toEqual(['myCardDiff.js', 'myCardDraftStorage.js', 'myCardState.js']);
+  it('is the modules that belong here', () => {
+    expect([...stateFiles].sort()).toEqual(['clearDraftsOnSignOut.js', 'myCardDiff.js', 'myCardDraftStorage.js', 'myCardState.js', 'useMyCard.js']);
   });
 
-  it('imports no React, Firebase, router, service or context: it is plain logic', () => {
+  it('imports no Firebase, router, service, context or icons: all of it is plain logic, or the hook that joins it', () => {
     for (const name of stateFiles) {
       for (const from of stateImports(name)) {
-        expect(from, `${name} imports ${from}`).not.toMatch(/react|firebase|react-router|\/services\/|\/context\/|ImpersonationContext|axios|lucide/);
+        expect(from, `${name} imports ${from}`).not.toMatch(/firebase|react-router|\/services\/|\/context\/|ImpersonationContext|axios|lucide/);
+      }
+    }
+  });
+
+  it('keeps React out of everything but the hook, and gives the hook only what it needs', () => {
+    for (const name of stateFiles.filter((file) => file !== 'useMyCard.js')) {
+      for (const from of stateImports(name)) {
+        expect(from, `${name} imports ${from}`).not.toMatch(/react/);
         expect(from, `${name} imports ${from}`).toMatch(/^(?:\.\/my[A-Za-z]+|\.\.\/cardDraft|\.\.\/\.\.\/\.\.\/\.\.\/utils\/myCardRules)$/);
       }
     }
+    for (const from of stateImports('useMyCard.js')) {
+      expect(from, `useMyCard.js imports ${from}`).toMatch(/^(?:react|\.\/my[A-Za-z]+|\.\.\/useCardDraft|\.\.\/\.\.\/\.\.\/\.\.\/utils\/(?:myCardRules|myCardSuggestions))$/);
+    }
+  });
+
+  it('gets the service and the tab\'s storage handed in: the hook imports neither', () => {
+    const hook = stateSource('useMyCard.js');
+    expect(stateImports('useMyCard.js').some((from) => /service|firebase/i.test(from))).toBe(false);
+    expect(hook).toMatch(/service\.loadMyCard\(\)/);
+    expect(hook).toMatch(/service\.saveMyCard\(/);
+    expect(hook).not.toMatch(/sessionStorage|localStorage|globalThis/);
   });
 
   it('never calls the network or writes to a database', () => {

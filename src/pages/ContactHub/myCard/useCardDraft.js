@@ -4,9 +4,11 @@
  * A thin hook over cardDraftReducer. It reads nothing, writes nothing and
  * knows no route; the page that uses it decides when to start the draft
  * (after the card has loaded), what a Save does, and calls `reset(card)` with
- * the saved card afterwards.
+ * the saved card afterwards. `reset(saved, current)` starts the text from `current`
+ * while measuring changes from `saved` (a recovered draft); `discard()` goes back
+ * to where the draft started.
  */
-import { useCallback, useMemo, useReducer } from 'react';
+import { useMemo, useReducer } from 'react';
 import { cardDraftReducer, createDraft, isDirty, isValid, visibleErrors } from './cardDraft';
 
 /**
@@ -22,15 +24,14 @@ export function useCardDraft(initialCard) {
     setShare: (field, value) => dispatch({ type: 'share', field, value }),
     useSuggestion: (field, suggestion) => dispatch({ type: 'useSuggestion', field, suggestion }),
     showAllErrors: () => dispatch({ type: 'showAllErrors' }),
-    reset: (card) => dispatch({ type: 'reset', card }),
+    reset: (card, current) => dispatch({ type: 'reset', card, current }),
+    discard: () => dispatch({ type: 'discardChanges' }),
   }), []);
 
   const errors = useMemo(() => visibleErrors(state), [state]);
   const dirty = useMemo(() => isDirty(state), [state]);
   const valid = useMemo(() => isValid(state), [state]);
-  const reset = useCallback((card) => actions.reset(card), [actions]);
-
-  return { card: state.card, errors, dirty, valid, ...actions, reset };
+  return { card: state.card, errors, dirty, valid, ...actions };
 }
 
 export default useCardDraft;

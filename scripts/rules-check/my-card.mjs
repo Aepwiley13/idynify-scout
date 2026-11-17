@@ -259,6 +259,83 @@ check('service: a new card pre-filled from suggestions is not saved until the ow
   assert(JSON.stringify(newCard()) === JSON.stringify(loaded.card), 'the missing card is a blank new card');
 });
 
+// ── Revision enforcement: what actually holds, against the real transaction and rules ──
+
+check('revision: an overwrite after a conflict is made against the revision just seen, and lands only if nothing moved', async () => {
+  await wipeCard(U);
+  const a = tab();
+  const b = tab();
+  const first = await a.saveMyCard(goodCard({ title: 'Original' }), { expectedRevision: null });
+  const loadedByB = await b.loadMyCard();
+  await a.saveMyCard(goodCard({ title: 'A edit' }), { expectedRevision: first.revision });
+  const conflict = await b.saveMyCard(goodCard({ title: 'B edit' }), { expectedRevision: loadedByB.revision });
+  assert(conflict.status === S.CONFLICT && conflict.current.revision === 2, `expected a conflict at revision 2, got ${JSON.stringify(conflict).slice(0, 120)}`);
+  assert((await read(CARD(U))).title === 'A edit', 'the conflict wrote nothing');
+  // The person confirms "save mine over it": against revision 2, the one just seen, not the revision 1 they started from.
+  const over = await b.saveMyCard(goodCard({ title: 'B edit' }), { expectedRevision: conflict.current.revision });
+  assert(over.status === S.SAVED && over.revision === 3, `overwrite: ${JSON.stringify(over).slice(0, 120)}`);
+  assert((await read(CARD(U))).title === 'B edit', 'the overwrite landed');
+});
+
+check('revision: if the card changes again before the overwrite lands, the overwrite stops and the newer card survives', async () => {
+  await wipeCard(U);
+  const a = tab();
+  const b = tab();
+  const first = await a.saveMyCard(goodCard({ title: 'Original' }), { expectedRevision: null });
+  const loadedByB = await b.loadMyCard();
+  await a.saveMyCard(goodCard({ title: 'A edit' }), { expectedRevision: first.revision });
+  const conflict = await b.saveMyCard(goodCard({ title: 'B edit' }), { expectedRevision: loadedByB.revision });
+  // Before B confirms, A saves again: the card is now at revision 3.
+  await a.saveMyCard(goodCard({ title: 'A edit, again' }), { expectedRevision: conflict.current.revision });
+  const over = await b.saveMyCard(goodCard({ title: 'B edit' }), { expectedRevision: conflict.current.revision });
+  assert(over.status === S.CONFLICT && over.current.revision === 3, `expected a second conflict at revision 3, got ${JSON.stringify(over).slice(0, 120)}`);
+  assert(over.current.card.title === 'A edit, again', 'the second conflict carries the newer card');
+  const stored = await read(CARD(U));
+  assert(stored.title === 'A edit, again' && stored.revision === 3, 'nothing was overwritten');
+});
+
+check('revision: Firestore itself refuses a transaction whose read moved underneath it (the server, not our code)', async () => {
+  await wipeCard(U);
+  await seed(CARD(U), { firstName: 'Ada', title: 'Seeded', revision: 1 });
+  const db = owner();
+  const ref = doc(db, CARD(U));
+  let attempts = 0;
+  await runTransaction(db, async (tx) => {
+    attempts += 1;
+    const snap = await tx.get(ref);
+    // On the first attempt only, somebody else saves between this read and this write.
+    if (attempts === 1) await seed(CARD(U), { ...snap.data(), title: 'Moved underneath', revision: 2 });
+    tx.set(ref, { ...snap.data(), title: 'From the transaction', revision: snap.data().revision + 1 });
+  });
+  assert(attempts >= 2, `the server accepted a write based on a stale read (attempts: ${attempts})`);
+  const stored = await read(CARD(U));
+  // The first attempt, based on revision 1, was not allowed to land over revision 2: the retry read 2 and wrote 3.
+  assert(stored.revision === 3 && stored.title === 'From the transaction', `stored ${JSON.stringify(stored)}`);
+});
+
+check('revision: sixteen saves racing on one revision: exactly one lands, the other fifteen are conflicts', async () => {
+  await wipeCard(U);
+  const base = await tab().saveMyCard(goodCard(), { expectedRevision: null });
+  const results = await Promise.all(Array.from({ length: 16 }, (_, i) => tab().saveMyCard(goodCard({ title: `racer ${i}` }), { expectedRevision: base.revision })));
+  const saved = results.filter((r) => r.status === S.SAVED);
+  assert(saved.length === 1 && results.filter((r) => r.status === S.CONFLICT).length === 15, `saved ${saved.length}: ${results.map((r) => r.status).join(',')}`);
+  const stored = await read(CARD(U));
+  assert(stored.revision === 2 && stored.title === saved[0].card.title, 'one write, the winner\'s');
+});
+
+check('revision: KNOWN GAP, the rules do not check the revision, so a write that skips the service can lower it', async () => {
+  // Documented, not endorsed. firestore.rules has no revision logic and no card rule: every write through the
+  // app goes through saveMyCard's transaction, which does check it. A direct write by the card's own owner is
+  // allowed, and can set any revision. Closing it would be a change to firestore.rules (a deliberate, separate decision).
+  await wipeCard(U);
+  await seed(CARD(U), { firstName: 'Ada', title: 'Newer', revision: 5 });
+  await expectCode(setDoc(doc(owner(), CARD(U)), { firstName: 'Ada', title: 'Stale write', revision: 1 }), 'ok', 'direct stale write by the owner');
+  assert((await read(CARD(U))).revision === 1, 'the rules did not stop it');
+  // ...but only the owner can do it: another user and an anonymous visitor still cannot.
+  await expectCode(setDoc(doc(other(), CARD(U)), { title: 'x', revision: 9 }), 'permission-denied', 'other user');
+  await expectCode(setDoc(doc(anon(), CARD(U)), { title: 'x', revision: 9 }), 'permission-denied', 'anonymous');
+});
+
 // ── Run ─────────────────────────────────────────────────────────────────────
 
 let pass = 0;

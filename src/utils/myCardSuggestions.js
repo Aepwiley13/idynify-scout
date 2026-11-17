@@ -33,7 +33,7 @@
  */
 import {
   CARD_FIELDS, normalizeCardField, newCard,
-} from './myCardRules';
+} from './myCardRules.js';
 
 export const SUGGESTION_SOURCES = Object.freeze({
   SETTINGS: 'settings',

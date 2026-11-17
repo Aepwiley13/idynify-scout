@@ -257,6 +257,12 @@ describe('under Contact Hub, while it is the active module', () => {
     expect(await screen.findByTestId('stickers-wall')).toBeInTheDocument();
     expect(within(nav).getByRole('button', { name: 'Sticker Wall' })).toHaveAttribute('aria-current', 'page');
     expect(within(nav).getByRole('button', { name: /My People/ })).not.toHaveAttribute('aria-current');
+    // The page is named for where you are, with its own link back, and offers
+    // nothing that belongs to My People.
+    expect(screen.getByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'My People' })).toHaveAttribute('href', '/contact-hub');
+    expect(screen.queryByRole('button', { name: 'Add Person' })).toBeNull();
+    expect(screen.queryByRole('searchbox', { name: 'Search people' })).toBeNull();
 
     await user.click(within(nav).getByRole('button', { name: /My People/ }));
     expect(router.at).toBe('/contact-hub');

@@ -295,6 +295,21 @@
   font: inherit; font-weight: 700; text-decoration: underline;
 }
 
+/* ── The Sticker Wall, under its own name ── */
+.hub-back--wall { margin-bottom: 2px; }
+/* One title, the page's "Sticker Wall". The wall component is shared with
+   People and has a "Stickers" heading of its own; here it would say the same
+   thing twice, so only its New sticker button is kept, on the right. */
+.hub .stk-wall-title { display: none; }
+.hub .stk-wall-head { justify-content: flex-end; }
+
+/* ── On a phone: which sticker the list is filtered by, and how many ── */
+.hub-filter-note {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px;
+  margin: 12px 0 0; font-size: 14px;
+}
+.hub-filter-note .hub-link-btn { min-height: 44px; }
+
 /* ── List / Table ── */
 .hub-view { display: inline-flex; flex: none; border: 1px solid; border-radius: 12px; overflow: hidden; }
 .hub-view-btn {

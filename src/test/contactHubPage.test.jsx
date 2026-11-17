@@ -631,7 +631,9 @@ describe('addresses: the Sticker Wall and a sticker filter each have one', () =>
     await user.type(screen.getByRole('searchbox', { name: 'Search people' }), 'e');
     await user.click(within(await chips()).getByRole('button', { name: 'Sticker Wall' }));
     await screen.findByTestId('stickers-wall');
-    expect(screen.getByRole('searchbox', { name: 'Search people' })).toHaveValue('e');
+    // The wall has no people to search, so the box is not shown there; what
+    // was typed is still there when My People comes back.
+    expect(screen.queryByRole('searchbox', { name: 'Search people' })).toBeNull();
     await user.click(within(await chips()).getByRole('button', { name: 'Partner, 1 person' }));
     expect(screen.getByRole('searchbox', { name: 'Search people' })).toHaveValue('e');
     expect(router.at).toBe(`/contact-hub?sticker=${PARTNER.id}`);
@@ -792,5 +794,125 @@ describe('the shell is told who is open', () => {
     renderHubInShell('/contact-hub');
     await screen.findByRole('list', { name: 'My People' });
     expect(open()).toEqual(NOBODY);
+  });
+});
+
+describe('the Sticker Wall has its own name and a visible way back', () => {
+  it.each([[1024], [375]])('at %ipx it is headed "Sticker Wall", not "My People", with a link back', async (width) => {
+    setViewportWidth(width);
+    renderHub('/contact-hub/stickers');
+    await screen.findByTestId('stickers-wall');
+    expect(screen.getByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2, name: /My People/ })).toBeNull();
+    expect(screen.getByRole('link', { name: 'My People' })).toHaveAttribute('href', '/contact-hub');
+  });
+
+  it('adding and searching people are not offered on the wall, and come back with My People', async () => {
+    const user = userEvent.setup();
+    renderHub('/contact-hub/stickers');
+    await screen.findByTestId('stickers-wall');
+    expect(screen.queryByRole('button', { name: 'Add Person' })).toBeNull();
+    expect(screen.queryByRole('searchbox', { name: 'Search people' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'View' })).toBeNull();
+
+    await user.click(screen.getByRole('link', { name: 'My People' }));
+    expect(router.at).toBe('/contact-hub');
+    expect(screen.getByRole('heading', { level: 2, name: /My People/ })).toHaveTextContent('(4)');
+    expect(screen.getByRole('button', { name: 'Add Person' })).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Search people' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeNull();
+    expect(names()).toHaveLength(4);
+  });
+
+  it('the way back returns to My People as it was left, sticker filter included', async () => {
+    const user = userEvent.setup();
+    setViewportWidth(375);
+    renderHub(`/contact-hub?sticker=${PARTNER.id}`);
+    const group = await screen.findByRole('group', { name: 'Filter by sticker' });
+    await user.click(within(group).getByRole('button', { name: 'Sticker Wall' }));
+    await screen.findByTestId('stickers-wall');
+    await user.click(screen.getByRole('link', { name: 'My People' }));
+    expect(router.at).toBe(`/contact-hub?sticker=${PARTNER.id}`);
+    expect(names()).toEqual(['Wes Clark']);
+  });
+
+  it('Back and Forward step between My People and the wall, and the heading follows', async () => {
+    const user = userEvent.setup();
+    renderHub();
+    const group = await screen.findByRole('group', { name: 'Filter by sticker' });
+    await user.click(within(group).getByRole('button', { name: 'Sticker Wall' }));
+    expect(await screen.findByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeInTheDocument();
+    await goBack();
+    expect(screen.getByRole('heading', { level: 2, name: /My People/ })).toBeInTheDocument();
+    await goForward();
+    expect(screen.getByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeInTheDocument();
+  });
+
+  it('with stickers unavailable the wall address is My People, under its own name', async () => {
+    fake.current.state.config = config({ enabled: false, mode: 'off', readOnly: false });
+    renderHub('/contact-hub/stickers');
+    await screen.findByRole('list', { name: 'My People' });
+    expect(screen.getByRole('heading', { level: 2, name: /My People/ })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Add Person' })).toBeInTheDocument();
+  });
+});
+
+describe('on a phone, a filtered list says which sticker and how many', () => {
+  beforeEach(() => { setViewportWidth(375); });
+
+  it('names the sticker and the number listed, and Show everyone clears it', async () => {
+    const user = userEvent.setup();
+    renderHub(`/contact-hub?sticker=${VIP.id}`);
+    await screen.findByRole('group', { name: 'Filter by sticker' });
+    expect(screen.getByText('1 person with the VIP sticker')).toBeInTheDocument();
+    expect(names()).toEqual(['Nakaiya Wiley']);
+
+    await user.click(screen.getByRole('button', { name: 'Show everyone' }));
+    expect(router.at).toBe('/contact-hub');
+    expect(screen.queryByText(/with the VIP sticker/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Show everyone' })).toBeNull();
+    expect(names()).toHaveLength(4);
+  });
+
+  it('counts what is listed: several people, and fewer when a search narrows them', async () => {
+    const user = userEvent.setup();
+    contactsData.list.push(person('p9', 'Zed Young', { sticker_ids: [VIP.id] }));
+    renderHub(`/contact-hub?sticker=${VIP.id}`);
+    await screen.findByRole('group', { name: 'Filter by sticker' });
+    expect(screen.getByText('2 people with the VIP sticker')).toBeInTheDocument();
+    // The archived person also holds VIP and is not counted.
+    expect(names()).toHaveLength(2);
+    await user.type(screen.getByRole('searchbox', { name: 'Search people' }), 'zed');
+    expect(screen.getByText('1 person with the VIP sticker')).toBeInTheDocument();
+    // Show everyone removes the sticker and keeps what was typed.
+    await user.click(screen.getByRole('button', { name: 'Show everyone' }));
+    expect(screen.getByRole('searchbox', { name: 'Search people' })).toHaveValue('zed');
+    expect(names()).toEqual(['Zed Young']);
+  });
+
+  it('says nothing with no sticker selected, and nothing on the wall', async () => {
+    const user = userEvent.setup();
+    renderHub();
+    const group = await screen.findByRole('group', { name: 'Filter by sticker' });
+    expect(screen.queryByRole('button', { name: 'Show everyone' })).toBeNull();
+    await user.click(within(group).getByRole('button', { name: 'Sticker Wall' }));
+    await screen.findByTestId('stickers-wall');
+    expect(screen.queryByRole('button', { name: 'Show everyone' })).toBeNull();
+  });
+
+  it('a sticker in the address that does not exist filters nothing and says nothing', async () => {
+    renderHub('/contact-hub?sticker=NoSuchSticker00000000');
+    await screen.findByRole('group', { name: 'Filter by sticker' });
+    expect(screen.queryByRole('button', { name: 'Show everyone' })).toBeNull();
+    expect(names()).toHaveLength(4);
+  });
+
+  it('a desktop keeps its own line and has no second one', async () => {
+    setViewportWidth(1024);
+    renderHub(`/contact-hub?sticker=${VIP.id}`);
+    await screen.findByRole('group', { name: 'Filter by sticker' });
+    expect(screen.getByText('People with the VIP sticker')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show everyone' })).toBeNull();
   });
 });

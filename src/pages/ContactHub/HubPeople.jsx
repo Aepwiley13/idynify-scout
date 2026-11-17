@@ -25,7 +25,7 @@
  */
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
-import { List, Mail, Phone, Search, Table2, UserPlus, Users, X } from 'lucide-react';
+import { ArrowLeft, List, Mail, Phone, Search, Table2, UserPlus, Users, X } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import {
@@ -350,9 +350,17 @@ export default function HubPeople() {
       ))}
     </div>
   );
-  const subtitle = activeSticker
-    ? `People with the ${activeSticker.name} sticker`
-    : 'Everyone you know, in one place';
+  // The Sticker Wall is this screen under its own name, with its own way back.
+  const subtitle = showWall
+    ? 'Open a sticker to see its people'
+    : activeSticker
+      ? `People with the ${activeSticker.name} sticker`
+      : 'Everyone you know, in one place';
+  // On a phone the selected chip can be scrolled out of sight, so the list
+  // says which sticker it is filtered by, how many that is, and how to undo it.
+  const filteredNote = isMobile && activeSticker && !showWall && status === HUB_STATUS.READY
+    ? `${shown.length} ${shown.length === 1 ? 'person' : 'people'} with the ${activeSticker.name} sticker`
+    : null;
 
   return (
     <>
@@ -369,17 +377,24 @@ export default function HubPeople() {
       >
         <div className="hub-toolbar">
           <div className="hub-heading">
+            {showWall ? (
+              <Link className="hub-back hub-back--wall" to={listPath || CONTACT_HUB_PATH} style={{ color: T.text }}>
+                <ArrowLeft size={18} aria-hidden="true" />
+                My People
+              </Link>
+            ) : null}
             <h2 id="hub-people-heading" className="hub-section-title">
-              My People
-              {status === HUB_STATUS.READY && !firstRun ? <span className="hub-count" style={{ color: T.textMuted }}> ({people.length})</span> : null}
+              {showWall ? 'Sticker Wall' : 'My People'}
+              {status === HUB_STATUS.READY && !firstRun && !showWall ? <span className="hub-count" style={{ color: T.textMuted }}> ({people.length})</span> : null}
             </h2>
             {!firstRun && !isMobile ? <p className="hub-subtitle" style={{ color: T.textMuted }}>{subtitle}</p> : null}
           </div>
-          {!firstRun && addButton}
-          {!firstRun && (
+          {/* Adding and searching people belong to My People, not to the wall. */}
+          {!firstRun && !showWall && addButton}
+          {!firstRun && !showWall && (
             <div className="hub-tools">
               {searchField}
-              {tableFits && !showWall ? viewToggle : null}
+              {tableFits ? viewToggle : null}
             </div>
           )}
         </div>
@@ -394,6 +409,14 @@ export default function HubPeople() {
         />
         )}
         {!firstRun && !navInSidebar && stickersBroken ? <StickersLoadError /> : null}
+        {filteredNote ? (
+          <p className="hub-filter-note" style={{ color: T.textMuted }}>
+            <span>{filteredNote}</span>
+            <button type="button" className="hub-link-btn" style={{ color: T.text }} onClick={() => setStickerId(null)}>
+              Show everyone
+            </button>
+          </p>
+        ) : null}
 
         <p className="hub-status" role="status" aria-live="polite" style={{ color: T.textMuted }}>
           {justAdded ? `${justAdded} was added to My People.` : ''}

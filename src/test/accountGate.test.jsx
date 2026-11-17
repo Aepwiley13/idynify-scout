@@ -422,7 +422,9 @@ describe('App.jsx uses this gate everywhere', () => {
     // requirePayment may be relaxed for a free route; nothing else about the decision changes, so
     // a failed or cache-only read still reaches the verification screen (accessDecision).
     expect(freePlanRouting).toMatch(/requirePayment=\{requirePayment && !freeRoute\}/);
-    expect(freePlanRouting).toMatch(/upgrade=\{FREE_PLAN\.enabled \? layout\(<UpgradeRequired \/>\) : null\}/);
+    // Only on the server-confirmed "unpaid" decision: the upgrade screen, or for the logo and a
+    // contact link, the Contact Hub equivalent (freePlanRedirectFor).
+    expect(freePlanRouting).toMatch(/upgrade=\{FREE_PLAN\.enabled \? \(redirect \? <Navigate to=\{redirect\} replace \/> : layout\(<UpgradeRequired \/>\)\) : null\}/);
     expect(app).not.toMatch(/hasActiveAccess|hasCompletedPayment/);
     expect(freePlanRouting).not.toMatch(/hasActiveAccess|hasCompletedPayment/);
   });

@@ -17,7 +17,7 @@ import { useAccountVerification, ACCOUNT } from '../utils/accountVerification';
 import { planOf, PLAN, isPaidPlan } from '../utils/accountPlan';
 import {
   FREE_PLAN, FREE_PLAN_HOME, freePlanEnabledFrom, isFreePlanPath, signupPlanFor, signupLandingPath, freeSignupDocument,
-  freePlanHomeFor, SMART_REDIRECT_REQUIRES_PAYMENT,
+  freePlanHomeFor, SMART_REDIRECT_REQUIRES_PAYMENT, freePlanFrom, freePlanRedirectFor,
 } from '../constants/freePlan';
 import { CONTACT_HUB_PATH } from '../constants/contactHub';
 
@@ -37,6 +37,43 @@ describe('the switch', () => {
       expect(freePlanEnabledFrom(value)).toBe(on);
     },
   );
+});
+
+describe('the three settings, and the rollback', () => {
+  it.each([
+    ['on', 'on', true, true], ['true', 'on', true, true], ['1', 'on', true, true],
+    ['existing', 'existing', true, false],
+    [undefined, 'off', false, false], ['', 'off', false, false], ['off', 'off', false, false], ['yes', 'off', false, false],
+  ])('VITE_FREE_PLAN=%s → %s (free access %s, new Free signups %s)', (value, mode, enabled, signups) => {
+    expect(freePlanFrom(value, { contactHub: true, shell: true })).toEqual({ mode, enabled, signups });
+  });
+
+  it('never on without Contact Hub or the shell, whatever the variable says', () => {
+    expect(freePlanFrom('on', { contactHub: false, shell: true }).enabled).toBe(false);
+    expect(freePlanFrom('existing', { contactHub: true, shell: false }).enabled).toBe(false);
+  });
+
+  it('`existing` keeps every free account in, and stops new Free signups', () => {
+    const existing = freePlanFrom('existing', { contactHub: true, shell: true });
+    expect(isFreePlanPath(CONTACT_HUB_PATH, { enabled: existing.enabled })).toBe(true);
+    expect(signupPlanFor(null, { enabled: existing.signups })).toBe('starter'); // a no-tier signup pays again, as before launch
+    expect(freePlanHomeFor({ status: ACCOUNT.VERIFIED, data: FREE_SIGNUP }, { enabled: existing.enabled })).toBe(FREE_PLAN_HOME);
+  });
+});
+
+describe('free places that link to paid pages lead to Contact Hub instead', () => {
+  it.each([
+    ['/mission-control-v2', FREE_PLAN_HOME],
+    ['/contact/abc123', `${CONTACT_HUB_PATH}/person/abc123`],
+    ['/scout/contact/abc123', `${CONTACT_HUB_PATH}/person/abc123`],
+    ['/contact/a%20b', `${CONTACT_HUB_PATH}/person/a%20b`],
+  ])('%s → %s', (path, to) => {
+    expect(freePlanRedirectFor(path)).toBe(to);
+  });
+
+  it.each(['/scout', '/hunter', '/company/c1', '/contact/abc/edit', '/barry', '/recon'])('%s stays a paid page', (path) => {
+    expect(freePlanRedirectFor(path)).toBeNull();
+  });
 });
 
 describe('isFreePlanPath', () => {

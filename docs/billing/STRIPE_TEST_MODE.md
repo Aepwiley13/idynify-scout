@@ -30,14 +30,9 @@ credits in staging the way it does in production. Use the time the session start
 
 ## One-time setup
 
-1. **The owner creates a test-mode key.** In the Stripe Dashboard, switch to test mode, then
-   Developers → API keys. A standard test secret key (`sk_test_…`) is enough: test mode moves no
-   money. A restricted test key (`rk_test_…`) also works if it can write Products, Prices,
-   Customers, Checkout Sessions, Subscriptions, Customer portal and Test clocks.
-   The key is entered at a hidden prompt and never written into the repository:
-   ```bash
-   read -rs STRIPE_SECRET_KEY && export STRIPE_SECRET_KEY
-   ```
+1. **The owner creates a restricted test-mode key** (`rk_test_…`), stored outside the repository
+   and never pasted into a chat. The exact steps, permissions and storage are in
+   [CHECKOUT_TEST_MODE_VALIDATION.md](CHECKOUT_TEST_MODE_VALIDATION.md) §1.
 2. **Create the test catalog and portal configuration.** The dry run only reads. `--apply`
    creates what is missing and is safe to run again.
    ```bash

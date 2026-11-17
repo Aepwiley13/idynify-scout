@@ -16,7 +16,8 @@ import { useT } from '../../theme/ThemeContext';
 import { CONTACT_HUB_PATH } from '../../constants/contactHub';
 import IdentityCard from '../../components/contacts/IdentityCard';
 import StickyNotes from '../../components/contacts/StickyNotes';
-import { HUB_STATUS, isListedInMyPeople } from './peopleRules';
+import { useShellEntity } from '../../context/ShellContext';
+import { HUB_STATUS, isListedInMyPeople, personName } from './peopleRules';
 
 function BackLink() {
   const T = useT();
@@ -35,6 +36,17 @@ export default function HubPerson() {
   const { contactId } = useParams();
   const { status, contacts, updateContact, reload } = useOutletContext();
   const contact = contacts.find((c) => c.id === contactId);
+
+  // Tell the shell who is open, as every other profile does: the top bar then
+  // names the person, and Barry (if opened) knows who is on screen. Only for a
+  // person actually shown here, and with no pipeline stage: Contact Hub has none.
+  const shown = status === HUB_STATUS.READY && contact && isListedInMyPeople(contact) ? contact : null;
+  useShellEntity({
+    type: 'contact',
+    id: shown?.id,
+    stage: null,
+    label: shown ? personName(shown) : null,
+  });
 
   if (status === HUB_STATUS.LOADING) {
     return (

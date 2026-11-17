@@ -15,6 +15,7 @@ import { render, screen, within, waitFor, configure, act } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { CONTACT_HUB_STICKERS_PATH, contactHubStickerPath } from '../constants/contactHub';
+import { ShellProvider, useShell } from '../context/ShellContext';
 import { createFakeStickers, sticker, config } from './helpers/stickersUi';
 import { setViewportWidth } from './helpers/matchMedia';
 
@@ -679,5 +680,117 @@ describe('addresses: the Sticker Wall and a sticker filter each have one', () =>
     await user.click(within(await chips()).getByRole('button', { name: 'Sticker Wall' }));
     expect(router.at).toBe('/contact-hub/stickers');
     expect(await screen.findByTestId('stickers-wall')).toBeInTheDocument();
+  });
+});
+
+// The person page tells the shell who is open, the way every other profile
+// does, so the top bar names the person. These run inside the REAL shell
+// provider and read back what it holds, so the hook's own set and clear are
+// what is being tested, not a stand-in.
+describe('the shell is told who is open', () => {
+  const shellSeen = { context: null };
+  function ShellProbe() {
+    const { navigationContext } = useShell();
+    useEffect(() => { shellSeen.context = navigationContext; }, [navigationContext]);
+    return null;
+  }
+  /** What the shell currently holds about the open record. */
+  const open = () => ({
+    type: shellSeen.context.current_entity_type,
+    id: shellSeen.context.current_entity_id,
+    label: shellSeen.context.entity_label,
+    stage: shellSeen.context.current_pipeline_stage,
+  });
+  const NOBODY = { type: null, id: null, label: null, stage: null };
+
+  function renderHubInShell(url) {
+    shellSeen.context = null;
+    return render(
+      <MemoryRouter initialEntries={[url]}>
+        <RouterProbe />
+        <ShellProvider user={{ uid: 'u1' }} userData={{}}>
+          <ShellProbe />
+          <Routes>
+            <Route path="/contact-hub" element={<ContactHubMain />}>
+              <Route index element={<HubPeople />} />
+              <Route path="stickers" element={<HubPeople />} />
+              <Route path="person/:contactId" element={<HubPerson />} />
+            </Route>
+          </Routes>
+        </ShellProvider>
+      </MemoryRouter>,
+    );
+  }
+
+  it('opening a person reports their name and id, and no pipeline stage', async () => {
+    renderHubInShell('/contact-hub/person/p2');
+    await screen.findByTestId('notes');
+    await waitFor(() => expect(open()).toEqual({ type: 'contact', id: 'p2', label: 'Wes Clark', stage: null }));
+  });
+
+  it('a person in a sales stage is reported the same way: Contact Hub passes no stage', async () => {
+    renderHubInShell('/contact-hub/person/p5');
+    await screen.findByTestId('notes');
+    await waitFor(() => expect(open()).toEqual({ type: 'contact', id: 'p5', label: 'Hunter Stage', stage: null }));
+  });
+
+  it('nothing is reported while the people are still loading', async () => {
+    let finish;
+    const { getDocs } = await import('firebase/firestore');
+    getDocs.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    renderHubInShell('/contact-hub/person/p2');
+    await screen.findByText('Loading…');
+    expect(open()).toEqual(NOBODY);
+    finish({ docs: contactsData.list.map((d) => ({ id: d.id, data: () => d })) });
+    await waitFor(() => expect(open().id).toBe('p2'));
+  });
+
+  it('renaming the person updates what the shell holds, for the same id', async () => {
+    const user = userEvent.setup();
+    renderHubInShell('/contact-hub/person/p2');
+    await screen.findByTestId('notes');
+    await waitFor(() => expect(open().label).toBe('Wes Clark'));
+    await user.click(screen.getByRole('button', { name: 'rename' }));
+    await waitFor(() => expect(open()).toEqual({ type: 'contact', id: 'p2', label: 'Renamed Person', stage: null }));
+  });
+
+  it.each([
+    ['archived', '/contact-hub/person/p4'],
+    ['unknown', '/contact-hub/person/nobody'],
+  ])('an %s person is not reported as open', async (_label, url) => {
+    renderHubInShell(url);
+    await screen.findByText('This person is not in My People.');
+    expect(open()).toEqual(NOBODY);
+  });
+
+  it('when the people cannot be loaded, nobody is reported as open', async () => {
+    contactsData.fail = true;
+    renderHubInShell('/contact-hub/person/p2');
+    await screen.findByText('This person could not be loaded.');
+    expect(open()).toEqual(NOBODY);
+  });
+
+  it('returning to My People clears the person; opening another reports the new one', async () => {
+    const user = userEvent.setup();
+    renderHubInShell('/contact-hub/person/p2');
+    await screen.findByTestId('notes');
+    await waitFor(() => expect(open().id).toBe('p2'));
+
+    await user.click(screen.getByRole('link', { name: 'My People' }));
+    await screen.findByRole('list', { name: 'My People' });
+    await waitFor(() => expect(open()).toEqual(NOBODY));
+
+    await user.click(screen.getByRole('link', { name: 'Nakaiya Wiley' }));
+    await waitFor(() => expect(open()).toEqual({ type: 'contact', id: 'p1', label: 'Nakaiya Wiley', stage: null }));
+
+    // The browser's Back button leaves the person the same way.
+    await goBack();
+    await waitFor(() => expect(open()).toEqual(NOBODY));
+  });
+
+  it('My People and the Sticker Wall report nobody', async () => {
+    renderHubInShell('/contact-hub');
+    await screen.findByRole('list', { name: 'My People' });
+    expect(open()).toEqual(NOBODY);
   });
 });

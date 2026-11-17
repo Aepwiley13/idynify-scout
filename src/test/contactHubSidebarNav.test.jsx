@@ -31,7 +31,7 @@ vi.mock('firebase/firestore', async (importOriginal) => ({
     return { docs: contactsData.list.map((d) => ({ id: d.id, data: () => d })) };
   }),
 }));
-const shell = vi.hoisted(() => ({ mode: 'wide' }));
+const shell = vi.hoisted(() => ({ mode: 'wide', entities: [] }));
 // The switch ON, before the navigation model reads it.
 vi.mock('../constants/contactHub', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -39,6 +39,8 @@ vi.mock('../constants/contactHub', async (importOriginal) => ({
 }));
 vi.mock('../context/ShellContext', () => ({
   useShell: () => ({ openBarry() {}, sidebarMode: shell.mode, toggleSidebar() {}, isFirstExperience: false }),
+  // What a screen tells the shell about who is open (the person page does).
+  useShellEntity: (entity) => { if (entity?.id) shell.entities.push(entity); },
 }));
 vi.mock('../firebase/config', () => ({ db: {}, auth: { currentUser: { uid: 'u1' } } }));
 vi.mock('../context/ImpersonationContext', () => ({
@@ -120,7 +122,7 @@ beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => {});
   vi.spyOn(console, 'error').mockImplementation(() => {});
 });
-afterEach(() => { setViewportWidth(1024); shell.mode = 'wide'; vi.restoreAllMocks(); });
+afterEach(() => { setViewportWidth(1024); shell.mode = 'wide'; shell.entities.length = 0; vi.restoreAllMocks(); });
 
 
 // The address the app is at, and its history, as a test can see and drive them.
@@ -295,6 +297,9 @@ describe('under Contact Hub, while it is the active module', () => {
     renderApp('/contact-hub/person/p2');
     const nav = await hubNav();
     expect(within(nav).getByRole('button', { name: /My People/ })).toHaveAttribute('aria-current', 'true');
+    // The shell is told who is open (in full, against the real shell: contactHubPage.test.jsx).
+    await screen.findByTestId('notes');
+    expect(shell.entities.at(-1)).toEqual({ type: 'contact', id: 'p2', stage: null, label: 'Wes Clark' });
     await user.click(await within(nav).findByRole('button', { name: 'VIP, 1 person' }));
     expect(router.at).toBe(`/contact-hub?sticker=${VIP.id}`);
     expect(names()).toEqual(['Nakaiya Wiley']);

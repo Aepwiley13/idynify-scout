@@ -20,8 +20,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const OUT = process.argv[2];
-if (!OUT) { console.error('usage: capture.mjs <output folder>'); process.exit(2); }
-const BASE = 'http://127.0.0.1:5199/scripts/visual/my-card/index.html';
+// 'editor' (the default): the editor and preview components. 'page': the whole My Card page, with sample data.
+const MODE = process.argv[3] ?? 'editor';
+if (!OUT || !['editor', 'page'].includes(MODE)) { console.error('usage: capture.mjs <output folder> [editor|page]'); process.exit(2); }
+const BASE = `http://127.0.0.1:5199/scripts/visual/my-card/${MODE === 'page' ? 'page.html' : 'index.html'}`;
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const PORT = 9333;
 const ALLOWED = [/^http:\/\/127\.0\.0\.1:5199\//, /^https:\/\/fonts\.googleapis\.com\//, /^https:\/\/fonts\.gstatic\.com\//];
@@ -119,15 +121,26 @@ await send('Runtime.enable');
 await send('Log.enable');
 await send('Fetch.enable', { patterns: [{ urlPattern: '*' }] });
 
-async function open({ theme, scenario, view, width, height, dpr, mobile }) {
+async function open({ theme, scenario, view, width, height, dpr, mobile, state, steps }) {
   await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: dpr, mobile });
   await send('Emulation.setTouchEmulationEnabled', { enabled: mobile });
-  const query = `theme=${theme}&scenario=${scenario}${view ? `&view=${view}` : ''}`;
+  const query = MODE === 'page'
+    ? `theme=${theme}&state=${state}${steps ? `&do=${encodeURIComponent(steps)}` : ''}`
+    : `theme=${theme}&scenario=${scenario}${view ? `&view=${view}` : ''}`;
   await send('Page.navigate', { url: `${BASE}?${query}&t=${Date.now()}` });
   for (let i = 0; i < 80; i += 1) {
     const ready = await evaluate('document.readyState === "complete" && Boolean(document.querySelector(".mycard"))').catch(() => false);
     if (ready) break;
     await wait(250);
+  }
+  if (MODE === 'page') {
+    // The page's own scripted steps (typing, pressing buttons) have to have finished.
+    for (let i = 0; i < 120; i += 1) {
+      if (await evaluate('document.documentElement.dataset.ready === "1"').catch(() => false)) break;
+      await wait(250);
+    }
+    const problem = await evaluate('document.documentElement.dataset.scriptError ?? ""');
+    if (problem) console.log(`  ! scripted step failed: ${problem}`);
   }
   await evaluate('document.fonts.ready.then(() => true)');
   // Images: the sample photo, or the failure of a broken one, has to have settled.
@@ -187,13 +200,44 @@ const SHOTS = [
   ['p12-phone-no-photo-preview', { ...PHONE, scenario: 'nophoto', view: 'preview' }],
   ['p13-phone-photo-link-revealed', { ...PHONE, scenario: 'full' }, revealPhotoLink],
 ];
+// The whole My Card page, one state at a time: what a person sees, and what they do next.
+const PAGE_SHOTS = [
+  ['d01-saved-card', { ...DESKTOP, state: 'existing' }],
+  ['d02-new-card-prefilled', { ...DESKTOP, state: 'new' }],
+  ['d03-unsaved-changes', { ...DESKTOP, state: 'existing', steps: 'edit:Title=Director of Mathematics' }],
+  ['d04-just-saved', { ...DESKTOP, state: 'existing', steps: 'edit:Title=Director of Mathematics,click:Save' }],
+  ['d05-fix-before-saving', { ...DESKTOP, state: 'existing', steps: 'edit:Email=ada@,edit:Phone=call me,click:Save' }],
+  ['d06-failed-save', { ...DESKTOP, state: 'saveerror', steps: 'edit:Title=Director of Mathematics,click:Save' }],
+  ['d07-draft-restored', { ...DESKTOP, state: 'restored' }],
+  ['d08-discard-asks-first', { ...DESKTOP, state: 'restored', steps: 'click:Discard changes' }],
+  ['d09-newer-version-saved', { ...DESKTOP, state: 'saveconflict', steps: 'edit:Title=Director of Mathematics,click:Save' }],
+  ['d10-overwrite-asks-first', { ...DESKTOP, state: 'saveconflict', steps: 'edit:Title=Director of Mathematics,click:Save,click:Save my version over it' }],
+  ['d11-load-latest-asks-first', { ...DESKTOP, state: 'saveconflict', steps: 'edit:Title=Director of Mathematics,click:Save,click:Load latest saved version' }],
+  ['d12-draft-older-than-saved', { ...DESKTOP, state: 'olddraft' }],
+  ['d13-download-left-something-out', { ...DESKTOP, state: 'existing', steps: 'toggle:Email,edit:Email=ada@,click:Download contact' }],
+  ['d14-could-not-load', { ...DESKTOP, state: 'loaderror' }],
+  ['d15-viewing-as-someone-else', { ...DESKTOP, state: 'impersonating' }],
+  ['t01-tablet-newer-version-saved', { ...TABLET, state: 'saveconflict', steps: 'edit:Title=Director of Mathematics,click:Save' }],
+  ['p01-phone-saved-card', { ...PHONE, state: 'existing' }],
+  ['p02-phone-unsaved-changes', { ...PHONE, state: 'existing', steps: 'edit:Title=Director of Mathematics' }],
+  ['p03-phone-fix-before-saving', { ...PHONE, state: 'existing', steps: 'edit:Email=ada@,click:Save' }],
+  ['p04-phone-failed-save', { ...PHONE, state: 'saveerror', steps: 'edit:Title=Director of Mathematics,click:Save' }],
+  ['p05-phone-draft-restored', { ...PHONE, state: 'restored' }],
+  ['p06-phone-newer-version-saved', { ...PHONE, state: 'saveconflict', steps: 'edit:Title=Director of Mathematics,click:Save' }],
+  ['p07-phone-overwrite-asks-first', { ...PHONE, state: 'saveconflict', steps: 'edit:Title=Director of Mathematics,click:Save,click:Save my version over it' }],
+  ['p08-phone-preview-with-download', { ...PHONE, state: 'existing', steps: 'click:Preview' }],
+  ['p09-phone-download-left-something-out', { ...PHONE, state: 'existing', steps: 'toggle:Email,edit:Email=ada@,click:Preview,click:Download contact' }],
+  ['p10-phone-could-not-load', { ...PHONE, state: 'loaderror' }],
+  ['p11-phone-viewing-as-someone-else', { ...PHONE, state: 'impersonating' }],
+];
+const SHOT_LIST = MODE === 'page' ? PAGE_SHOTS : SHOTS;
 const THEMES = [['light', 'workspace'], ['dark', 'mission']];
 
 const written = [];
 try {
   for (const [folder, theme] of THEMES) {
     mkdirSync(join(OUT, folder), { recursive: true });
-    for (const [name, options, prepare] of SHOTS) {
+    for (const [name, options, prepare] of SHOT_LIST) {
       await open({ ...options, theme });
       await prepare?.();
       const { data } = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
@@ -204,10 +248,10 @@ try {
   }
 } finally {
   // A page to look at them on, light beside dark.
-  const rows = SHOTS.map(([name]) => `<section><h2>${name}</h2><div class="pair"><figure><figcaption>Light</figcaption><img src="light/${name}.png" loading="lazy"></figure><figure><figcaption>Dark</figcaption><img src="dark/${name}.png" loading="lazy"></figure></div></section>`).join('\n');
+  const rows = SHOT_LIST.map(([name]) => `<section><h2>${name}</h2><div class="pair"><figure><figcaption>Light</figcaption><img src="light/${name}.png" loading="lazy"></figure><figure><figcaption>Dark</figcaption><img src="dark/${name}.png" loading="lazy"></figure></div></section>`).join('\n');
   writeFileSync(join(OUT, 'index.html'), `<!doctype html><meta charset="utf-8"><title>My Card: visual review</title>
 <style>body{font:15px/1.4 -apple-system,system-ui,sans-serif;margin:24px;background:#f2f2f4;color:#111}h1{margin:0 0 4px}h2{margin:28px 0 8px;font-size:16px}.pair{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}figure{margin:0}figcaption{font-weight:600;margin-bottom:4px}img{max-width:min(46vw,720px);border:1px solid #bbb;border-radius:6px;background:#fff}</style>
-<h1>My Card: visual review (4A, refinement pass)</h1><p>Sample data. Light is the Workspace theme, dark is the Mission theme.</p>\n${rows}`);
+<h1>My Card: visual review (${MODE === 'page' ? '4B-4, the whole page' : '4A, refinement pass'})</h1><p>Sample data. Light is the Workspace theme, dark is the Mission theme.</p>\n${rows}`);
   const lines = [
     `screenshots: ${written.length}`,
     `photo served locally: ${[...served].join(', ') || 'none'}`,

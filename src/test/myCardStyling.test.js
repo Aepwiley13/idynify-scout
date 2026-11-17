@@ -127,6 +127,70 @@ describe('text can be read in both themes', () => {
   }
 });
 
+describe('the page\'s buttons, bar and notices can be read and hit, in both themes', () => {
+  const touchHeight = (selector) => {
+    const own = Number(rule(selector).match(/min-height:\s*(\d+)px/)?.[1]);
+    const after = rule(`${selector}::after`).match(/inset:\s*(-?\d+)px/)?.[1];
+    return own + (after === undefined ? 0 : -2 * Number(after));
+  };
+
+  it('every button and the link back are at least 44px to hit', () => {
+    for (const selector of ['.mycard-btn', '.mycard-back']) expect(touchHeight(selector), selector).toBeGreaterThanOrEqual(44);
+  });
+
+  it('keeps the primary button\'s label large and bold: it is text on the brand colour, which only reads as large text', () => {
+    const primary = rule('.mycard-btn--primary');
+    expect(Number(primary.match(/font-size:\s*(\d+)px/)[1])).toBeGreaterThanOrEqual(19);
+    expect(primary).toMatch(/font-weight:\s*(?:700|800)/);
+    expect(primary).toMatch(/color:\s*var\(--bg-card\)/);
+  });
+
+  it('has a visible focus ring on its buttons and its link', () => {
+    for (const selector of ['.mycard-btn:focus-visible', '.mycard-back:focus-visible']) expect(css).toContain(selector);
+  });
+
+  it('makes disabled buttons look disabled, and not clickable', () => {
+    expect(rule('.mycard-btn:disabled')).toMatch(/opacity:\s*0\.[3-6]/);
+    expect(rule('.mycard-btn:disabled')).toMatch(/cursor:\s*not-allowed/);
+  });
+
+  for (const [themeName, vars] of Object.entries(THEMES)) {
+    const colour = (name) => parseColour(vars[name]);
+    /** A translucent notice colour as it appears over the page, or over the card. */
+    const onPage = (name) => over(colour(name), colour('--bg-primary'));
+    const onCard = (name) => over(colour(name), colour('--bg-card'));
+
+    it(`the primary button's label on the brand colour, ${themeName}: at least 3:1 (large text)`, () => {
+      expect(contrast(colour('--bg-card'), colour('--accent'))).toBeGreaterThanOrEqual(3);
+    });
+
+    it(`the Save bar's status words on the bar, ${themeName}: at least 4.5:1`, () => {
+      for (const name of ['--text-primary', '--text-secondary', '--status-error-text', '--status-warning-text']) {
+        expect(contrast(colour(name), colour('--bg-card')), name).toBeGreaterThanOrEqual(4.5);
+      }
+    });
+
+    it(`text in a conflict and an error notice, over the page or the card, ${themeName}: at least 4.5:1`, () => {
+      for (const [notice, background] of [['--status-warning-bg', onPage], ['--status-warning-bg', onCard], ['--status-error-bg', onPage], ['--status-error-bg', onCard]]) {
+        const ground = background(notice);
+        expect(contrast(colour('--text-primary'), ground), `text on ${notice}`).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(colour('--status-error-text'), ground), `danger button on ${notice}`).toBeGreaterThanOrEqual(4.5);
+      }
+    });
+
+    it(`text and the danger button in an information notice, ${themeName}: at least 4.5:1`, () => {
+      const ground = colour('--bg-card-2');
+      expect(contrast(colour('--text-primary'), ground)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(colour('--status-error-text'), ground)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it(`the download note and the page's loading line, ${themeName}: at least 4.5:1`, () => {
+      expect(contrast(colour('--text-secondary'), colour('--bg-card'))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(colour('--text-secondary'), colour('--bg-primary'))).toBeGreaterThanOrEqual(4.5);
+    });
+  }
+});
+
 describe('the card is branded in every theme', () => {
   const white = TOKEN_THEMES.workspace.cardBg;
   const onBrand = [['navy', BRAND.navy], ['indigo', BRAND.indigo], ['purple', BRAND.purple]];
@@ -231,6 +295,12 @@ describe('layout', () => {
       expect(rule(selector), selector).toMatch(/overflow-wrap:\s*anywhere/);
     }
     expect(rule('.mycard-input')).toMatch(/min-width:\s*0/);
+  });
+
+  it('stops what is scrolled to above the Save bar, which stays in view: room for the whole bar', () => {
+    const padding = Number(rule('.mycard').match(/scroll-padding-bottom:\s*(\d+)px/)?.[1]);
+    // The bar is a 44px button plus its padding on a phone, about 68px; allow for it and a little more.
+    expect(padding).toBeGreaterThanOrEqual(80);
   });
 
   it('keeps the actions bar in view at the bottom of the scrolling page', () => {

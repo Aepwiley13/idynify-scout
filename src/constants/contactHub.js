@@ -30,6 +30,13 @@ export const CONTACT_HUB = Object.freeze({
 export const CONTACT_HUB_PATH = '/contact-hub';
 export const contactHubPersonPath = (contactId) => `${CONTACT_HUB_PATH}/person/${encodeURIComponent(contactId)}`;
 
+/**
+ * My Card: a page of its own beside My People, not a part of it. It is a
+ * sibling route, so opening it does not load the user's contacts.
+ */
+export const CONTACT_HUB_MY_CARD_SEGMENT = 'my-card';
+export const CONTACT_HUB_MY_CARD_PATH = `${CONTACT_HUB_PATH}/${CONTACT_HUB_MY_CARD_SEGMENT}`;
+
 /** The Sticker Wall. */
 export const CONTACT_HUB_STICKERS_SEGMENT = 'stickers';
 export const CONTACT_HUB_STICKERS_PATH = `${CONTACT_HUB_PATH}/${CONTACT_HUB_STICKERS_SEGMENT}`;

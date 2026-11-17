@@ -20,6 +20,9 @@
   flex: 1 1 auto; min-height: 0;
   padding: 12px 16px 0;
   overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
+  /* The Save bar stays in view at the bottom, so anything scrolled to (a field that has just been
+     focused, a notice, the download's answer) must stop above it, not slide beneath. */
+  scroll-padding-bottom: 96px;
   color: var(--text-primary);
 }
 /* The column fills the screen when the page is short, so the actions bar sits at the bottom
@@ -55,6 +58,7 @@
 /* ── Layout ── */
 .mycard-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
 .mycard-pane { min-width: 0; }
+.mycard-pane--preview { display: flex; flex-direction: column; gap: 12px; }
 @media (max-width: 899px) {
   .mycard[data-view="edit"] .mycard-pane--preview,
   .mycard[data-view="preview"] .mycard-pane--editor { display: none; }
@@ -159,7 +163,9 @@
 .mycard-share:focus-visible,
 .mycard-suggest:focus-visible,
 .mycard-linkbtn:focus-visible,
-.mycard-switch-btn:focus-visible {
+.mycard-switch-btn:focus-visible,
+.mycard-btn:focus-visible,
+.mycard-back:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
 
@@ -255,4 +261,68 @@
 .mycard-sr {
   position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
   overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+
+/* ── Back to My People ── */
+.mycard-back {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin: 0 0 2px;
+  color: var(--text-secondary); font-size: 14px; font-weight: 600; text-decoration: none;
+}
+.mycard-back:hover { color: var(--text-primary); text-decoration: underline; }
+
+/* A page with no card on it (loading, could not load, read-only) is one calm column. */
+.mycard-single { max-width: 720px; }
+.mycard-loading { margin: 8px 0; font-size: 15px; color: var(--text-secondary); }
+
+/* ── Buttons: 44px to hit, one set for the page ── */
+.mycard-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; box-sizing: border-box; padding: 0 18px;
+  border: 1px solid transparent; border-radius: 12px;
+  font: inherit; font-size: 15px; font-weight: 600; line-height: 1.2; cursor: pointer;
+}
+.mycard-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* The one primary action, in the brand pink. Its label stays large and bold: it is the
+   text on the accent, which only reads as large text. */
+.mycard-btn--primary {
+  min-width: 96px; background: var(--accent); border-color: var(--accent); color: var(--bg-card);
+  font-size: 19px; font-weight: 700;
+}
+.mycard-btn--secondary { background: transparent; border-color: var(--border-2); color: var(--text-primary); }
+.mycard-btn--danger { background: transparent; border-color: var(--status-error); color: var(--status-error-text); font-weight: 700; }
+
+/* ── Save bar ── */
+.mycard-savebar { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
+.mycard-savestatus { margin: 0; min-width: 0; font-size: 14px; font-weight: 600; line-height: 1.3; color: var(--text-secondary); }
+.mycard-savestatus--unsaved { color: var(--text-primary); }
+.mycard-savestatus--fix, .mycard-savestatus--save-error { color: var(--status-error-text); }
+.mycard-savestatus--conflict { color: var(--status-warning-text); }
+
+/* ── Download contact, under the card it downloads ── */
+.mycard-download {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card);
+}
+.mycard-download .mycard-btn { max-width: 100%; }
+.mycard-download-note { margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-secondary); }
+.mycard-download-feedback { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--text-primary); }
+.mycard-download-feedback--error { color: var(--status-error-text); }
+
+/* ── Notices: a conflict, a failed save, a restored draft ── */
+.mycard-notice {
+  display: flex; flex-direction: column; gap: 8px; box-sizing: border-box;
+  margin: 0 0 12px; padding: 14px 16px;
+  border: 1px solid var(--border-2); border-radius: 14px; background: var(--bg-card-2);
+  color: var(--text-primary);
+}
+.mycard-notice--conflict { border-color: var(--status-warning); background: var(--status-warning-bg); }
+.mycard-notice--error { border-color: var(--status-error); background: var(--status-error-bg); }
+.mycard-notice-title { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.3; }
+.mycard-notice-text { margin: 0; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.mycard-notice-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.mycard-confirm { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border-2); }
+
+@media (max-width: 480px) {
+  /* Two buttons side by side stay readable; more wrap onto their own lines. */
+  .mycard-notice-actions .mycard-btn { flex: 1 1 auto; }
 }

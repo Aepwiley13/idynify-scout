@@ -20,6 +20,7 @@
  */
 import { CONTACT_HUB, CONTACT_HUB_PATH } from './contactHub';
 import { SHELL_MIGRATION } from './shellMigration';
+import { planOf, PLAN } from '../utils/accountPlan';
 
 /** Pure: is this raw variable value an explicit "on"? Anything else is off. */
 export function freePlanEnabledFrom(value) {
@@ -57,3 +58,20 @@ export function signupPlanFor(tierParam, { enabled = FREE_PLAN.enabled } = {}) {
 export function signupLandingPath(plan) {
   return plan === 'free' ? FREE_PLAN_HOME : `/checkout?tier=${plan}`;
 }
+
+/**
+ * The user document a Free signup creates: no billing fields at all, so the
+ * browser never writes anything the server trusts. firestore.rules accepts a
+ * signup without them (the signup billing fields are all-or-nothing).
+ */
+export function freeSignupDocument(email, now = new Date()) {
+  return { email, createdAt: now };
+}
+
+/** SmartRedirect's destination for a server-verified free account; null otherwise. */
+export function freePlanHomeFor(account, { enabled = FREE_PLAN.enabled } = {}) {
+  return enabled && planOf(account) === PLAN.FREE ? FREE_PLAN_HOME : null;
+}
+
+/** Whether SmartRedirect must see paid access before it lets an account through. */
+export const SMART_REDIRECT_REQUIRES_PAYMENT = !FREE_PLAN.enabled;

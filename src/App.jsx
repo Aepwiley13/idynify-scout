@@ -7,9 +7,8 @@ import { ImpersonationProvider } from './context/ImpersonationContext';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useAccountVerification } from './utils/accountVerification';
 import { AccountGate } from './components/AccountUnverified';
-import { planOf, PLAN } from './utils/accountPlan';
-import { FREE_PLAN, FREE_PLAN_HOME, isFreePlanPath, signupPlanFor, signupLandingPath } from './constants/freePlan';
-import UpgradeRequired from './components/billing/UpgradeRequired';
+import { ShellAccountGate, SignedInSignupRedirect } from './components/billing/freePlanRouting';
+import { freePlanHomeFor, SMART_REDIRECT_REQUIRES_PAYMENT } from './constants/freePlan';
 
 // Pages
 import Homepage from './pages/Homepage';
@@ -131,51 +130,25 @@ import WithTheForce from './components/WithTheForce';
  * in-render; that is pre-existing and out of scope, but this one cannot be.
  *
  * Authorization semantics are identical to ProtectedRoute: same auth check,
- * same payment gate, same redirects. Only presentation moved.
- *
- * THE FREE PLAN (constants/freePlan.js), when its switch is on: the free routes
- * (Contact Hub, Settings) open for a server-verified account with no paid
- * access, and on a paid route that account sees UpgradeRequired inside the
- * shell instead of a redirect out of the app. Both use the same MainLayout at
- * the same position, so the shell stays mounted either way. A failed or
- * cache-only read still shows the verification screen everywhere. Switch off:
- * exactly the behaviour above.
+ * same payment gate, same redirects. Only presentation moved. The Free plan's
+ * free routes are decided in components/billing/freePlanRouting.jsx.
  */
 function ShellRoute({ loading, user, userData, account, recovery, requirePayment = true }) {
-  const { pathname } = useLocation();
-  const freeRoute = isFreePlanPath(pathname);
   return (
-    <AccountGate
+    <ShellAccountGate
+      layout={(content) => <MainLayout user={user} userData={userData}>{content}</MainLayout>}
       loading={loading}
       user={user}
       account={account}
-      requirePayment={requirePayment && !freeRoute}
+      requirePayment={requirePayment}
       recovery={recovery}
       loadingScreen={<LoadingScreen />}
-      upgrade={FREE_PLAN.enabled ? (
-        <MainLayout user={user} userData={userData}>
-          <UpgradeRequired />
-        </MainLayout>
-      ) : null}
     >
       <MainLayout user={user} userData={userData}>
         <Outlet />
       </MainLayout>
-    </AccountGate>
+    </ShellAccountGate>
   );
-}
-
-/**
- * The signed-in visitor to /signup. Free plan off: /checkout, as before. On: a
- * paid tier in the link still goes to that tier's checkout; otherwise the
- * Contact Hub. Either way the destination is a guarded route, so an account
- * that cannot be verified sees the verification screen there.
- */
-function SignedInSignupRedirect() {
-  const { search } = useLocation();
-  if (!FREE_PLAN.enabled) return <Navigate to="/checkout" />;
-  const plan = signupPlanFor(new URLSearchParams(search).get('tier'));
-  return <Navigate to={signupLandingPath(plan)} />;
 }
 
 function LoadingScreen() {
@@ -310,22 +283,18 @@ function App() {
   const SmartRedirect = () => {
     // Return users skip onboarding; new users go through Barry Workspace
     const destination = () => {
-      // Free plan on: a server-verified account with no paid access starts in
-      // its Contact Hub. planOf never says "free" for an unverified account.
-      if (FREE_PLAN.enabled && planOf(account) === PLAN.FREE) {
-        return <Navigate to={FREE_PLAN_HOME} />;
-      }
+      const freeHome = freePlanHomeFor(account);
+      if (freeHome) return <Navigate to={freeHome} />;
       if (userData?.onboardingComplete || userData?.onboarding?.completed) {
         return <Navigate to="/mission-control-v2" />;
       }
       return <Navigate to="/barry" />;
     };
 
-    // Payment first: a server-confirmed unpaid account goes to checkout (or,
-    // with the Free plan on, to its Contact Hub), and an account that could
-    // not be checked goes nowhere.
+    // Payment first: a server-confirmed unpaid account goes to checkout, and
+    // an account that could not be checked goes nowhere.
     return (
-      <AccountGate loading={loading} user={user} account={account} requirePayment={!FREE_PLAN.enabled} recovery={recovery} loadingScreen={<LoadingScreen />}>
+      <AccountGate loading={loading} user={user} account={account} requirePayment={SMART_REDIRECT_REQUIRES_PAYMENT} recovery={recovery} loadingScreen={<LoadingScreen />}>
         {destination()}
       </AccountGate>
     );

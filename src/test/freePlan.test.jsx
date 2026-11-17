@@ -7,15 +7,17 @@
  *   - an account that could not be verified is NEVER treated as Free: a failed, slow or
  *     cache-only read shows the verification screen on free routes too;
  *   - with the switch off, every gate behaves exactly as before.
+ * The switch-on gate behaviour is in freePlanShellGate.test.jsx (it mocks the switch on).
  */
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
-import { MemoryRouter, Routes, Route, Outlet, useLocation } from 'react-router-dom';
-import { AccountGate } from '../components/AccountUnverified';
-import { useAccountVerification, ACCOUNT, ACCOUNT_READ_TIMEOUT_MS } from '../utils/accountVerification';
+import { MemoryRouter, Routes, Route, Outlet } from 'react-router-dom';
+import { ShellAccountGate } from '../components/billing/freePlanRouting';
+import { useAccountVerification, ACCOUNT } from '../utils/accountVerification';
 import { planOf, PLAN, isPaidPlan } from '../utils/accountPlan';
 import {
-  FREE_PLAN, FREE_PLAN_HOME, freePlanEnabledFrom, isFreePlanPath, signupPlanFor, signupLandingPath,
+  FREE_PLAN, FREE_PLAN_HOME, freePlanEnabledFrom, isFreePlanPath, signupPlanFor, signupLandingPath, freeSignupDocument,
+  freePlanHomeFor, SMART_REDIRECT_REQUIRES_PAYMENT,
 } from '../constants/freePlan';
 import { CONTACT_HUB_PATH } from '../constants/contactHub';
 
@@ -24,7 +26,6 @@ const PAID_PRO = { hasCompletedPayment: true, subscriptionTier: 'pro' };
 const UNPAID = { hasCompletedPayment: false };
 const FREE_SIGNUP = { email: 'new@example.test' };
 const snapshot = (data, { fromCache = false } = {}) => ({ exists: () => data !== null, data: () => data, metadata: { fromCache } });
-const UNVERIFIED = 'We couldn’t verify your account right now.';
 
 describe('the switch', () => {
   it('is off in a build without VITE_FREE_PLAN', () => {
@@ -67,6 +68,19 @@ describe('signup', () => {
     expect(signupPlanFor('pro', { enabled: true })).toBe('pro');
   });
 
+  it('a Free signup writes only email and createdAt: no billing field at all', () => {
+    const now = new Date(0);
+    expect(freeSignupDocument('a@example.test', now)).toEqual({ email: 'a@example.test', createdAt: now });
+  });
+
+  it('SmartRedirect: only a server-verified free account goes to Contact Hub, and only with the switch on', () => {
+    expect(freePlanHomeFor({ status: ACCOUNT.VERIFIED, data: FREE_SIGNUP })).toBeNull(); // switch off in tests
+    expect(freePlanHomeFor({ status: ACCOUNT.VERIFIED, data: FREE_SIGNUP }, { enabled: true })).toBe(FREE_PLAN_HOME);
+    expect(freePlanHomeFor({ status: ACCOUNT.UNVERIFIED, data: null }, { enabled: true })).toBeNull();
+    expect(freePlanHomeFor({ status: ACCOUNT.VERIFIED, data: PAID_PRO }, { enabled: true })).toBeNull();
+    expect(SMART_REDIRECT_REQUIRES_PAYMENT).toBe(true); // switch off: unchanged
+  });
+
   it('Free lands in Contact Hub; a paid tier lands on its checkout', () => {
     expect(signupLandingPath('free')).toBe(FREE_PLAN_HOME);
     expect(signupLandingPath('pro')).toBe('/checkout?tier=pro');
@@ -98,129 +112,50 @@ describe('planOf', () => {
   });
 });
 
-// ── The shell's decision, end to end with the real hook and gate ────────────────────────────
-//
-// The same shape as App.jsx's ShellRoute (accountGate.test.jsx pins App.jsx to these exact
-// expressions): requirePayment is relaxed on a free route, and a verified unpaid account on a
-// paid route gets the in-app upgrade screen.
+// ── The shell's gate with the switch off (the real component; the switch is off in tests) ────
 
 let signIn;
 let readSnapshot;
 const onAuthChange = (callback) => { signIn = callback; return () => {}; };
 
-function Where() {
-  return <p data-testid="where">{useLocation().pathname}</p>;
-}
-
-function Shell({ gate, freePlanOn }) {
-  const { pathname } = useLocation();
-  const freeRoute = isFreePlanPath(pathname, { enabled: freePlanOn });
-  return (
-    <AccountGate {...gate} requirePayment={!freeRoute} upgrade={freePlanOn ? <p>Upgrade screen</p> : null}>
-      <Outlet />
-    </AccountGate>
-  );
-}
-
-function Harness({ freePlanOn }) {
+function Harness() {
   const { authLoading, authUser, account, retry, retrying } = useAccountVerification({ onAuthChange, readSnapshot });
   const gate = { loading: authLoading, user: authUser, account, recovery: { onRetry: retry, retrying, onSignOut: vi.fn(), onReload: vi.fn() }, loadingScreen: <p>Loading...</p> };
   return (
-    <>
-      <Where />
-      <Routes>
-        <Route path="/login" element={<p>Login page</p>} />
-        <Route path="/checkout" element={<p>Checkout page</p>} />
-        <Route element={<Shell gate={gate} freePlanOn={freePlanOn} />}>
-          <Route path={CONTACT_HUB_PATH} element={<p>My People</p>} />
-          <Route path="/settings" element={<p>Settings</p>} />
-          <Route path="/scout" element={<p>Scout</p>} />
-        </Route>
-      </Routes>
-    </>
+    <Routes>
+      <Route path="/checkout" element={<p>Checkout page</p>} />
+      <Route element={<ShellAccountGate {...gate} layout={(content) => <div>{content}</div>}><Outlet /></ShellAccountGate>}>
+        <Route path={CONTACT_HUB_PATH} element={<p>My People</p>} />
+        <Route path="/scout" element={<p>Scout</p>} />
+      </Route>
+    </Routes>
   );
 }
 
-async function start(path, read, { freePlanOn = true } = {}) {
+async function start(path, read) {
   readSnapshot = vi.fn(read);
-  render(<MemoryRouter initialEntries={[path]}><Harness freePlanOn={freePlanOn} /></MemoryRouter>);
+  render(<MemoryRouter initialEntries={[path]}><Harness /></MemoryRouter>);
   await act(async () => { signIn({ uid: 'u1', email: 'u1@example.test' }); });
 }
 
-afterEach(() => { vi.useRealTimers(); });
-
-describe('Free plan on: a verified free account', () => {
-  it('opens My People', async () => {
-    await start(CONTACT_HUB_PATH, async () => snapshot(FREE_SIGNUP));
-    expect(screen.getByText('My People')).toBeInTheDocument();
-  });
-
-  it('opens Settings', async () => {
-    await start('/settings', async () => snapshot(UNPAID));
-    expect(screen.getByText('Settings')).toBeInTheDocument();
-  });
-
-  it('a brand-new signup whose document is not written yet is Free too', async () => {
-    await start(CONTACT_HUB_PATH, async () => snapshot(null));
-    expect(screen.getByText('My People')).toBeInTheDocument();
-  });
-
-  it('sees the upgrade screen on a paid page, in place, with no redirect to checkout', async () => {
-    await start('/scout', async () => snapshot(UNPAID));
-    expect(screen.getByText('Upgrade screen')).toBeInTheDocument();
-    expect(screen.queryByText('Scout')).not.toBeInTheDocument();
-    expect(screen.getByTestId('where')).toHaveTextContent('/scout');
-  });
-});
-
-describe('Free plan on: a paid account is unchanged', () => {
-  it('opens paid pages and free pages', async () => {
-    await start('/scout', async () => snapshot(PAID_PRO));
-    expect(screen.getByText('Scout')).toBeInTheDocument();
-  });
-
-  it('a saved paid copy still opens the app offline', async () => {
-    await start(CONTACT_HUB_PATH, async () => snapshot(PAID_STARTER, { fromCache: true }));
-    expect(screen.getByText('My People')).toBeInTheDocument();
-  });
-});
-
-describe('Free plan on: an account that cannot be verified is never Free', () => {
-  it('a failed read shows the verification screen on My People', async () => {
-    await start(CONTACT_HUB_PATH, async () => { throw new Error('unavailable'); });
-    expect(screen.getByText(UNVERIFIED)).toBeInTheDocument();
-    expect(screen.queryByText('My People')).not.toBeInTheDocument();
-  });
-
-  it('a cache-only unpaid copy shows the verification screen, not Free', async () => {
-    await start(CONTACT_HUB_PATH, async () => snapshot(UNPAID, { fromCache: true }));
-    expect(screen.getByText(UNVERIFIED)).toBeInTheDocument();
-  });
-
-  it('a failed read on a paid page shows the verification screen, not the upgrade screen', async () => {
-    await start('/scout', async () => { throw new Error('unavailable'); });
-    expect(screen.getByText(UNVERIFIED)).toBeInTheDocument();
-    expect(screen.queryByText('Upgrade screen')).not.toBeInTheDocument();
-  });
-
-  it('a read that never answers shows the verification screen after the timeout', async () => {
-    vi.useFakeTimers();
-    await start(CONTACT_HUB_PATH, () => new Promise(() => {}));
-    expect(screen.getByText('Loading...')).toBeInTheDocument();
-    await act(async () => { vi.advanceTimersByTime(ACCOUNT_READ_TIMEOUT_MS); });
-    expect(screen.getByText(UNVERIFIED)).toBeInTheDocument();
-    expect(screen.queryByText('My People')).not.toBeInTheDocument();
-  });
-});
-
-describe('Free plan off: exactly as before', () => {
+describe('Free plan off: the shell gate is exactly as before', () => {
   it('a verified unpaid account on My People is sent to checkout', async () => {
-    await start(CONTACT_HUB_PATH, async () => snapshot(UNPAID), { freePlanOn: false });
+    await start(CONTACT_HUB_PATH, async () => snapshot(UNPAID));
     expect(screen.getByText('Checkout page')).toBeInTheDocument();
   });
 
   it('a verified unpaid account on a paid page is sent to checkout', async () => {
-    await start('/scout', async () => snapshot(UNPAID), { freePlanOn: false });
+    await start('/scout', async () => snapshot(UNPAID));
     expect(screen.getByText('Checkout page')).toBeInTheDocument();
+  });
+
+  it('a paid account opens both', async () => {
+    await start('/scout', async () => snapshot(PAID_PRO));
+    expect(screen.getByText('Scout')).toBeInTheDocument();
+  });
+
+  it('a failed read shows the verification screen', async () => {
+    await start(CONTACT_HUB_PATH, async () => { throw new Error('unavailable'); });
+    expect(screen.getByText('We couldn’t verify your account right now.')).toBeInTheDocument();
   });
 });

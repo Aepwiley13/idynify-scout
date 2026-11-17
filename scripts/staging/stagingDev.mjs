@@ -24,6 +24,11 @@
  *                       The CLI otherwise bundles all of them at start, which
  *                       can exhaust memory on a small machine; other functions
  *                       then answer 404, which sticker QA never needs.
+ *   (optional) --billing
+ *                       a billing run (docs/billing/STRIPE_TEST_MODE.md): the env
+ *                       file may hold Stripe in TEST MODE ONLY, checked by
+ *                       stripeTestMode.mjs. Stripe variables are still never
+ *                       taken from the shell, so the env file is the only source.
  *   (optional) --no-edge-functions
  *                       skip the CLI's edge-function runtime, which it downloads
  *                       (Deno) on the first request even when a project has no
@@ -42,7 +47,8 @@ import {
 } from './stagingCredentials.mjs';
 
 /** Shell variables the app must never inherit. */
-const dropFromShell = (name) => name.startsWith('VITE_') || name.startsWith('FIREBASE_')
+export const dropFromShell = (name) => name.startsWith('VITE_') || name.startsWith('FIREBASE_')
+  || name.startsWith('STRIPE_') || name.startsWith('BILLING_')
   || name === KEY_VARIABLE || name === FILE_VARIABLE || INTEGRATION_KEYS.includes(name)
   || name === 'FIRESTORE_EMULATOR_HOST' || name === 'FIREBASE_AUTH_EMULATOR_HOST';
 
@@ -123,10 +129,12 @@ function main() {
     console.error(`Refused: ${err.message}`);
     return 1;
   }
+  const billing = argv.includes('--billing');
   const checks = [
     ...checkStagingEnv(withCredential(fileEnv, credential), {
       productionProjectId: process.env.PRODUCTION_FIREBASE_PROJECT_ID ?? null,
       fileCommittable: committable(file),
+      billing,
       ...checkoutInputs(repoRoot()),
     }),
     ...checkCredential(fileEnv, credential),
@@ -142,7 +150,7 @@ function main() {
     return 1;
   }
   const functions = argv.includes('--only-sticker-functions') ? stickerFunctionsFolder(repoRoot()) : null;
-  console.log(`Preflight passed. Starting the app against ${fileEnv.VITE_FIREBASE_PROJECT_ID} (browser, functions and sign-in), credential from ${credential.source}${functions ? `, serving only: ${STICKER_QA_FUNCTIONS.join(', ')}` : ''}.`);
+  console.log(`Preflight passed. Starting the app against ${fileEnv.VITE_FIREBASE_PROJECT_ID} (browser, functions and sign-in)${billing ? ', Stripe in test mode' : ''}, credential from ${credential.source}${functions ? `, serving only: ${STICKER_QA_FUNCTIONS.join(', ')}` : ''}.`);
   const child = spawn('npx', devArgs({ noEdgeFunctions, functionsDir: functions?.path }), { cwd: repoRoot(), stdio: 'inherit', env: plan.childEnv });
   const stop = () => { functions?.remove(); };
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(signal, () => { child.kill(signal); stop(); process.exit(130); });

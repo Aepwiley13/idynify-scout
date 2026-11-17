@@ -44,6 +44,13 @@ export const contactHubStickerPath = (stickerId) => (stickerId
   ? `${CONTACT_HUB_PATH}?${CONTACT_HUB_STICKER_PARAM}=${encodeURIComponent(stickerId)}`
   : CONTACT_HUB_PATH);
 
+/**
+ * The place under Contact Hub's sidebar item that Contact Hub draws its own
+ * entries into (components/layout/sidebarSlots.js). The same id the
+ * navigation model gives the destination.
+ */
+export const CONTACT_HUB_SIDEBAR_SLOT = 'contact-hub';
+
 /** The same path with any trailing slash removed, for comparing. */
 const trimmed = (pathname) => String(pathname ?? '').replace(/\/+$/, '');
 export const isContactHubListPath = (pathname) => trimmed(pathname) === CONTACT_HUB_PATH;

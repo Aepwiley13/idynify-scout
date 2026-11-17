@@ -27,9 +27,11 @@ import { useT } from '../../theme/ThemeContext';
 import { StickersProvider } from '../../components/stickers/StickersContext';
 import { withMembershipChange } from '../../services/stickers/stickerCore';
 import {
-  CONTACT_HUB_PATH, CONTACT_HUB_STICKER_PARAM, contactHubStickerPath, isContactHubListPath,
+  CONTACT_HUB_PATH, CONTACT_HUB_STICKERS_PATH, CONTACT_HUB_STICKER_PARAM, contactHubStickerPath,
+  isContactHubListPath, isContactHubStickersPath,
 } from '../../constants/contactHub';
-import { HUB_STATUS } from './peopleRules';
+import { HUB_STATUS, listMyPeople } from './peopleRules';
+import HubSidebarNav from './HubSidebarNav';
 import './ContactHub.css';
 
 export default function ContactHubMain() {
@@ -102,6 +104,11 @@ export default function ContactHubMain() {
     setContacts((prev) => prev.map((c) => (c.id === contactId ? withMembershipChange(c, changedStickerId, op) : c)));
   }, []);
 
+  // For Contact Hub's entries in the application sidebar (HubSidebarNav).
+  const people = useMemo(() => listMyPeople(contacts), [contacts]);
+  const section = onList ? 'people' : (isContactHubStickersPath(location.pathname) ? 'wall' : 'person');
+  const openWall = useCallback(() => navigate(CONTACT_HUB_STICKERS_PATH), [navigate]);
+
   const context = useMemo(() => ({
     uid, status, contacts, reload, updateContact, addContacts, applyStickerChange,
     searchTerm, setSearchTerm, stickerId, setStickerId, listPath,
@@ -109,6 +116,14 @@ export default function ContactHubMain() {
 
   return (
     <StickersProvider uid={uid}>
+      <HubSidebarNav
+        status={status}
+        people={people}
+        section={section}
+        selectedId={stickerId}
+        onSelect={setStickerId}
+        onOpenWall={openWall}
+      />
       <div className="hub" style={{ color: T.text }}>
         <div className="hub-inner">
           <Outlet context={context} />

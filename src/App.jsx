@@ -328,8 +328,8 @@ function App() {
         <Route path="/getting-started" element={<ProtectedRoute><GettingStarted /></ProtectedRoute>} />
 
         {/* Payment Routes - Auth required but payment NOT required (to avoid redirect loop) */}
-        <Route path="/checkout" element={<ProtectedRoute requirePayment={false} purchase><CheckoutPage /></ProtectedRoute>} />
-        <Route path="/checkout/success" element={<ProtectedRoute requirePayment={false} purchase><CheckoutSuccessPage /></ProtectedRoute>} />
+        <Route path="/checkout" element={<ProtectedRoute requirePayment={false} purchase><CheckoutPage account={account} /></ProtectedRoute>} />
+        <Route path="/checkout/success" element={<ProtectedRoute requirePayment={false} purchase><CheckoutSuccessPage account={account} onRecheckAccount={retry} /></ProtectedRoute>} />
         <Route path="/checkout/cancel" element={<ProtectedRoute requirePayment={false} purchase><CheckoutCancelPage /></ProtectedRoute>} />
 
         {/* ── Legacy onboarding routes → /barry ─────────────────────────────

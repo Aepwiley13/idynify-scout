@@ -83,6 +83,75 @@ async function bindIfFenced(userRef, operationId, { opRef, opFields, userFields 
   });
 }
 
+/** Stripe Checkout Session statuses after which the session can create nothing further. */
+const FINISHED_SESSION_STATUSES = new Set(['complete', 'expired']);
+
+/**
+ * The claim transaction: reuse an open claim, recover a creating one, refuse while a prior outcome
+ * is uncertain, or mint a fresh operation. Unchanged in behaviour from the inline version; a
+ * function so a finished claim can be replaced by a fresh one (see the reuse_open branch).
+ */
+async function acquireClaim(userRef, { uid, tier, priceId, origin }) {
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(userRef);
+    const data = snap.data() ?? {};
+    const existing = data.pendingCheckout;
+
+    if (existing?.status === 'open') {
+      return { kind: 'reuse_open', operationId: existing.operationId };
+    }
+    if (existing?.status === 'creating') {
+      return { kind: 'recover', operationId: existing.operationId };
+    }
+    if (existing?.status === 'needs_reconciliation') {
+      // Round-9 fix (finding 3): an uncertain prior outcome stays blocked, permanently, until a
+      // human clears it — never silently falls through to minting a fresh operation, which is
+      // exactly what would risk creating a second Stripe customer/session alongside one that
+      // might already exist from the stuck attempt.
+      return { kind: 'blocked', operationId: existing.operationId };
+    }
+
+    const operationId = randomUUID();
+    const opRef = db.collection('billingCheckoutOperations').doc(operationId);
+    tx.set(opRef, {
+      uid, tier, priceId,
+      successUrl: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancelUrl: `${origin}/checkout/cancel`,
+      createdAt: new Date().toISOString(),
+      // Round-9 fix (finding 2): seed from the user's own already-verified Stripe customer, if
+      // one exists, instead of always starting from null. Starting from null meant customer
+      // resolution always called customers.create for a fresh claim, creating a SECOND Stripe
+      // customer for anyone who already had one — and the duplicate-subscription listing later
+      // then checked that brand-new, empty customer and never found the original's subscriptions.
+      customerId: data.stripeCustomerId ?? null,
+      sessionId: null, subscriptionId: null,
+    });
+    tx.set(userRef, { pendingCheckout: { status: 'creating', operationId, claimedAt: new Date().toISOString() } }, { merge: true });
+    return { kind: 'fresh', operationId };
+  });
+}
+
+/**
+ * Closes an 'open' claim whose session is finished, only if it is still this operation's open
+ * claim. Records how it ended ('completed' or 'expired'); either lets the next request mint a
+ * fresh operation. The operation record itself is left as it is, for provenance.
+ */
+async function closeFinishedClaim(userRef, operationId, sessionStatus) {
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(userRef);
+    const current = snap.data()?.pendingCheckout;
+    if (!current || current.operationId !== operationId || current.status !== 'open') return { fenced: true };
+    tx.set(userRef, {
+      pendingCheckout: {
+        status: sessionStatus === 'complete' ? 'completed' : 'expired',
+        operationId,
+        closedAt: new Date().toISOString(),
+      },
+    }, { merge: true });
+    return { fenced: false };
+  });
+}
+
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return respond(405, { error: 'Method not allowed' });
@@ -134,45 +203,10 @@ export const handler = async (event) => {
   }
 
   // ── Claim acquisition — a stable operationId anchors both recovery and later provenance ───
+  const origin = event.headers?.origin || 'https://idynify.com';
   let claim;
   try {
-    claim = await db.runTransaction(async (tx) => {
-      const snap = await tx.get(userRef);
-      const data = snap.data() ?? {};
-      const existing = data.pendingCheckout;
-
-      if (existing?.status === 'open') {
-        return { kind: 'reuse_open', operationId: existing.operationId };
-      }
-      if (existing?.status === 'creating') {
-        return { kind: 'recover', operationId: existing.operationId };
-      }
-      if (existing?.status === 'needs_reconciliation') {
-        // Round-9 fix (finding 3): an uncertain prior outcome stays blocked, permanently, until a
-        // human clears it — never silently falls through to minting a fresh operation, which is
-        // exactly what would risk creating a second Stripe customer/session alongside one that
-        // might already exist from the stuck attempt.
-        return { kind: 'blocked', operationId: existing.operationId };
-      }
-
-      const operationId = randomUUID();
-      const opRef = db.collection('billingCheckoutOperations').doc(operationId);
-      tx.set(opRef, {
-        uid, tier, priceId,
-        successUrl: `${event.headers?.origin || 'https://idynify.com'}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancelUrl: `${event.headers?.origin || 'https://idynify.com'}/checkout/cancel`,
-        createdAt: new Date().toISOString(),
-        // Round-9 fix (finding 2): seed from the user's own already-verified Stripe customer, if
-        // one exists, instead of always starting from null. Starting from null meant customer
-        // resolution always called customers.create for a fresh claim, creating a SECOND Stripe
-        // customer for anyone who already had one — and the duplicate-subscription listing later
-        // then checked that brand-new, empty customer and never found the original's subscriptions.
-        customerId: data.stripeCustomerId ?? null,
-        sessionId: null, subscriptionId: null,
-      });
-      tx.set(userRef, { pendingCheckout: { status: 'creating', operationId, claimedAt: new Date().toISOString() } }, { merge: true });
-      return { kind: 'fresh', operationId };
-    });
+    claim = await acquireClaim(userRef, { uid, tier, priceId, origin });
   } catch (err) {
     console.error('Checkout claim transaction failed:', err);
     return respond(500, { error: 'checkout_claim_failed' });
@@ -186,10 +220,31 @@ export const handler = async (event) => {
     const opSnap = await db.collection('billingCheckoutOperations').doc(claim.operationId).get();
     const op = opSnap.data();
     if (op?.sessionId) {
+      let existingSession = null;
       try {
-        const existingSession = await stripe.checkout.sessions.retrieve(op.sessionId);
-        if (existingSession.status === 'open') return respond(200, { url: existingSession.url });
+        existingSession = await stripe.checkout.sessions.retrieve(op.sessionId);
       } catch { /* fall through to recovery below */ }
+      if (existingSession?.status === 'open') return respond(200, { url: existingSession.url });
+
+      // Billing Phase 1b: an 'open' claim whose session Stripe reports complete (paid) or expired
+      // (abandoned) is finished — that session can never create another subscription. Before this,
+      // nothing ever moved the claim on, so the account's next checkout (a resubscribe after a
+      // cancellation, or a retry after an abandoned one) replayed the finished session forever.
+      // It is closed, fenced on its own operationId, and this request takes a fresh claim. A
+      // second subscription is still refused below, by the same checks every fresh claim passes:
+      // the account's subscriptionStatus, and the customer's live subscriptions listed from Stripe.
+      if (existingSession && FINISHED_SESSION_STATUSES.has(existingSession.status)) {
+        const closed = await closeFinishedClaim(userRef, claim.operationId, existingSession.status);
+        if (closed.fenced) return respond(409, { error: 'checkout_operation_superseded' });
+        try {
+          claim = await acquireClaim(userRef, { uid, tier, priceId, origin });
+        } catch (err) {
+          console.error('Checkout claim transaction failed:', err);
+          return respond(500, { error: 'checkout_claim_failed' });
+        }
+        if (claim.kind === 'blocked') return respond(409, { error: 'checkout_needs_manual_reconciliation' });
+        if (claim.kind !== 'fresh') return respond(409, { error: 'checkout_operation_superseded' });
+      }
     }
   }
 
@@ -337,4 +392,4 @@ export const handler = async (event) => {
 };
 
 // Exported for tests.
-export const __internal = { setPendingCheckoutIfFenced, bindIfFenced };
+export const __internal = { setPendingCheckoutIfFenced, bindIfFenced, acquireClaim, closeFinishedClaim };

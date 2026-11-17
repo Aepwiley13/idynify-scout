@@ -327,11 +327,40 @@ describe('the components stand alone', () => {
     }
   });
 
-  it('import only React, icons, the card rules and each other', () => {
+  it('import only React, icons, the card rules and each other, and for the download alone, the vCard maker', () => {
     for (const name of code) {
       for (const from of imports(name)) {
-        expect(from, `${name} imports ${from}`).toMatch(/^(?:react|lucide-react|\.\/[\w.]+|\.\.\/\.\.\/\.\.\/utils\/(?:myCardRules|myCardSuggestions)|\.\.\/\.\.\/\.\.\/theme\/tokens)$/);
+        // The one extra: the file that downloads a contact needs the vCard maker, and nothing more.
+        const allowedHere = name === 'downloadContact.js' && from === '../../../utils/vcard';
+        expect(allowedHere || /^(?:react|lucide-react|\.\/[\w.]+|\.\.\/\.\.\/\.\.\/utils\/(?:myCardRules|myCardSuggestions)|\.\.\/\.\.\/\.\.\/theme\/tokens)$/.test(from), `${name} imports ${from}`).toBe(true);
       }
     }
+  });
+});
+
+describe('Download contact can reach no database and no network', () => {
+  const vcardSource = strip(readFileSync(root('src/utils/vcard.js'), 'utf8'));
+  const downloadSource = strip(readFileSync(resolve(dir, 'downloadContact.js'), 'utf8'));
+  const importsOf = (text) => [...text.matchAll(/(?:^|\n)\s*import\b[^'"]*['"]([^'"]+)['"]/g)].map((m) => m[1]);
+  const REACHES = /firebase|\/services\/|\/context\/|ImpersonationContext|react-router|axios|myCardService|myCardCore/;
+  const CALLS = /\bfetch\(|XMLHttpRequest|sendBeacon|WebSocket|indexedDB|localStorage|sessionStorage|setDoc|addDoc|updateDoc|deleteDoc|runTransaction|getDoc|getDocs|onSnapshot|\bsaveMyCard\b|\bloadMyCard\b|\bsaveDraft\b|sharingEnabled/;
+
+  it('the download module imports only the vCard maker, the card rules and its neighbours', () => {
+    expect(importsOf(downloadSource).sort()).toEqual(['../../../utils/myCardRules', '../../../utils/vcard', './cardDraft']);
+    for (const from of importsOf(downloadSource)) expect(from).not.toMatch(REACHES);
+  });
+
+  it('the vCard maker imports only the card rules', () => {
+    expect(importsOf(vcardSource)).toEqual(['./myCardRules']);
+  });
+
+  it('neither makes a call that could read or write anything but a file on the device', () => {
+    expect(downloadSource).not.toMatch(CALLS);
+    expect(vcardSource).not.toMatch(CALLS);
+  });
+
+  it('says in words that it does not save, and never mentions turning sharing on', () => {
+    expect(downloadSource).toMatch(/does not save your changes to IDYNIFY/);
+    expect(downloadSource).not.toMatch(/sharing\w*\s*[:=]\s*true/i);
   });
 });

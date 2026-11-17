@@ -172,13 +172,79 @@ export function buildMyCardVCard(card) {
   return assemble(lines);
 }
 
-/** A safe file name for a My Card download: "Ada_Lovelace.vcf", or "contact.vcf". */
+// Names Windows will not take as a file name, with or without an extension.
+const RESERVED_FILE_NAMES = /^(?:con|prn|aux|nul|com\d|lpt\d)$/i;
+const FILE_NAME_MAX = 60;
+
+/**
+ * A safe file name for a My Card download: "Ada_Lovelace.vcf", or "contact.vcf".
+ * Only letters and digits (any script) survive, joined by underscores, so a name
+ * can never carry a path, an extension of its own or a control character. At most
+ * 60 characters, cut on a whole character, and never a name a computer reserves.
+ */
 export function myCardVCardFileName(card) {
   const view = publicCardView(card);
-  const base = view
+  let base = view
     ? view.name.replace(/[^\p{L}\p{N}]+/gu, '_').replace(/^_+|_+$/g, '')
     : '';
+  base = Array.from(base).slice(0, FILE_NAME_MAX).join('').replace(/_+$/g, '');
+  if (RESERVED_FILE_NAMES.test(base)) base = `${base}_contact`;
   return `${base || 'contact'}.vcf`;
+}
+
+/**
+ * Hands a text file to the browser as a download. The one place a .vcf is made
+ * into a file, so Scout's contacts and My Card cannot drift apart.
+ *
+ * Throws when the browser cannot do it. Whatever happens, the temporary link is
+ * removed and the temporary address is let go (at once, or after `revokeAfterMs`
+ * for browsers that need the address to outlive the click).
+ */
+function saveTextFile(fileName, content, { revokeAfterMs = 0 } = {}) {
+  let url = null;
+  let link = null;
+  try {
+    const blob = new Blob([content], { type: VCARD_MIME_TYPE });
+    url = window.URL.createObjectURL(blob);
+    link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+
+    // Trigger download
+    document.body.appendChild(link);
+    link.click();
+  } finally {
+    if (link && link.parentNode) link.parentNode.removeChild(link);
+    if (url) {
+      const release = url;
+      if (revokeAfterMs > 0) setTimeout(() => window.URL.revokeObjectURL(release), revokeAfterMs);
+      else window.URL.revokeObjectURL(release);
+    }
+  }
+}
+
+/**
+ * Downloads a person's own My Card as a contact file, from the card as it is
+ * NOW (an unsaved draft is fine), and only what the preview would show: the
+ * fields switched to Shared, valid, and the name. Reads and writes nothing
+ * else: no database, no network, no change to the card or to sharing.
+ *
+ * @param {object} card  the draft's card
+ * @param {{ revokeAfterMs?: number }} [options]
+ * @returns {{ status: 'downloaded', fileName: string }
+ *   | { status: 'no-name' }                      there is no card to give: nothing was made
+ *   | { status: 'failed', fileName: string }}    the browser could not start the download
+ */
+export function downloadMyCardVCard(card, { revokeAfterMs = 1000 } = {}) {
+  const content = buildMyCardVCard(card);
+  if (content === null) return { status: 'no-name' };
+  const fileName = myCardVCardFileName(card);
+  try {
+    saveTextFile(fileName, content, { revokeAfterMs });
+  } catch {
+    return { status: 'failed', fileName };
+  }
+  return { status: 'downloaded', fileName };
 }
 
 /**
@@ -188,25 +254,12 @@ export function myCardVCardFileName(card) {
 export function downloadVCard(contact) {
   const vCardContent = buildContactVCard(contact);
 
-  // Create blob and download
-  const blob = new Blob([vCardContent], { type: VCARD_MIME_TYPE });
-  const url = window.URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-
   // Generate filename from contact name
   const fileName = contact.name
     ? `${contact.name.replace(/\s+/g, '_')}.vcf`
     : 'contact.vcf';
-  link.download = fileName;
 
-  // Trigger download
-  document.body.appendChild(link);
-  link.click();
-
-  // Cleanup
-  document.body.removeChild(link);
-  window.URL.revokeObjectURL(url);
+  saveTextFile(fileName, vCardContent);
 
   console.log('📱 vCard downloaded:', fileName);
 }

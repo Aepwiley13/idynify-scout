@@ -28,6 +28,7 @@ import { checkSuperAdminAccess } from './utils/superAdminAuth.js';
 import { resolveCaptureConfig, isEnrolled } from './utils/captureFlags.js';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { APOLLO_ENDPOINTS, getApolloHeaders } from './utils/apolloConstants.js';
+import { checkPaidApiAccess } from './utils/paidApiAccess.js';
 import { searchLinkedInCandidates } from './utils/linkedinSearch.js';
 import { rankLinkedInCandidates, readPerson, candidateFromApolloPerson } from './utils/capture/linkedinCandidates.js';
 import { captureLog } from './utils/capture/captureLog.js';
@@ -70,6 +71,9 @@ export { readPerson };
 async function isCaptureAdmin(uid) {
   return (await checkAdminAccess(uid)) || (await checkSuperAdminAccess(uid));
 }
+
+/** What the Apollo lookup reports when it is not run for this account (no paid access). */
+const APOLLO_SKIPPED = Object.freeze({ ran: false, failed: false, found: [] });
 
 /**
  * Apollo's one best person record for this name with the email, company or
@@ -130,8 +134,11 @@ export const handler = async (event) => {
     });
     if (!config.enabled) return failure('capture_disabled');
 
+    // Billing Phase 1c: the Apollo lookup is a paid service. Without verified paid access it is
+    // skipped (never attempted), and capture carries on with the search alone.
+    const paidAccess = await checkPaidApiAccess({ userId: uid });
     const [apollo, search] = await Promise.all([
-      apolloProfile(person),
+      paidAccess.allowed ? apolloProfile(person) : Promise.resolve(APOLLO_SKIPPED),
       searchLinkedInCandidates({ name: person.name, company: person.company, title: person.title, domain: person.domain, env: process.env }),
     ]);
     const sources = [...(apollo.ran ? ['apollo'] : []), ...(search.configured ? ['search'] : [])];

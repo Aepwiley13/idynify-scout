@@ -3,6 +3,7 @@ import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apo
 import { logApolloError } from './utils/apolloErrorLogger.js';
 import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } from './utils/scoutContactContract.js';
 import { verifyAuthToken } from './utils/verifyAuthToken.js';
+import { checkPaidApiAccess, paidApiDeniedResponse } from './utils/paidApiAccess.js';
 import { db } from './firebase-admin.js';
 
 export const handler = async (event) => {
@@ -28,8 +29,12 @@ export const handler = async (event) => {
     console.log('🔄 Enriching contact:', contactId);
 
     // Verify auth token — supports admin impersonation
-    await verifyAuthToken(authToken, userId);
+    const { tokenUserId } = await verifyAuthToken(authToken, userId);
     console.log('✅ Auth token verified');
+
+    // Billing Phase 1c: paid Apollo services need paid access, checked on the server before any Apollo call.
+    const paidAccess = await checkPaidApiAccess({ userId, actorUserId: tokenUserId });
+    if (!paidAccess.allowed) return paidApiDeniedResponse(paidAccess);
 
     // Get Apollo API key (throws if not configured)
     getApolloApiKey();

@@ -30,7 +30,7 @@ vi.mock('../constants/freePlan', async (importOriginal) => {
   const real = await importOriginal();
   return {
     ...real,
-    FREE_PLAN: Object.freeze({ enabled: true }),
+    FREE_PLAN: Object.freeze({ mode: 'on', enabled: true, signups: true }),
     signupPlanFor: (tier) => real.signupPlanFor(tier, { enabled: true }),
   };
 });
@@ -72,6 +72,9 @@ describe('signup with the Free plan on', () => {
     expect(ref.__doc).toBe('users/uid-1');
     expect(Object.keys(payload).sort()).toEqual(['createdAt', 'email']);
     expect(await screen.findByText('MY PEOPLE')).toBeInTheDocument();
+    // The welcome email is told the account is Free, so it points to Contact Hub.
+    const welcome = globalThis.fetch.mock.calls.find(([url]) => String(url).includes('send-welcome-email'));
+    expect(JSON.parse(welcome[1].body).plan).toBe('free');
   });
 
   it('?tier=pro: a Pro account, then its checkout, as before', async () => {

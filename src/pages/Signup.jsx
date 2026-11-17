@@ -134,7 +134,7 @@ export default function Signup() {
       fetch('/.netlify/functions/send-welcome-email', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email, userId: userCredential.user.uid }),
+        body: JSON.stringify({ email: email, userId: userCredential.user.uid, plan: tier }),
       }).catch((emailError) => {
         console.error('[signup] welcome email failed to send', emailError);
       });

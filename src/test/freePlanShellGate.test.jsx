@@ -13,7 +13,7 @@ vi.mock('../constants/freePlan', async (importOriginal) => {
   const real = await importOriginal();
   return {
     ...real,
-    FREE_PLAN: Object.freeze({ enabled: true }),
+    FREE_PLAN: Object.freeze({ mode: 'on', enabled: true, signups: true }),
     isFreePlanPath: (pathname) => real.isFreePlanPath(pathname, { enabled: true }),
     signupPlanFor: (tier) => real.signupPlanFor(tier, { enabled: true }),
     freePlanHomeFor: (account) => real.freePlanHomeFor(account, { enabled: true }),
@@ -52,6 +52,8 @@ function Harness() {
           <Route path={`${CONTACT_HUB_PATH}/person/:id`} element={<p>A person</p>} />
           <Route path="/settings" element={<p>Settings</p>} />
           <Route path="/scout" element={<p>Scout</p>} />
+          <Route path="/mission-control-v2" element={<p>Mission Control</p>} />
+          <Route path="/contact/:id" element={<p>Paid contact page</p>} />
         </Route>
       </Routes>
     </>
@@ -85,6 +87,32 @@ describe('a verified Free account', () => {
     expect(screen.getByTestId('shell')).toContainElement(screen.getByText('Upgrade screen'));
     expect(screen.queryByText('Scout')).not.toBeInTheDocument();
     expect(screen.getByTestId('where')).toHaveTextContent('/scout');
+  });
+});
+
+describe('a free account following a link from a free place', () => {
+  it('the logo (Mission Control) leads to My People, not the upgrade screen', async () => {
+    await start('/mission-control-v2', async () => snapshot(FREE_SIGNUP));
+    expect(screen.getByTestId('where')).toHaveTextContent(CONTACT_HUB_PATH);
+    expect(screen.getByText('My People')).toBeInTheDocument();
+    expect(screen.queryByText('Upgrade screen')).not.toBeInTheDocument();
+  });
+
+  it('a contact from global search opens that person in Contact Hub', async () => {
+    await start('/contact/p1', async () => snapshot(FREE_SIGNUP));
+    expect(screen.getByTestId('where')).toHaveTextContent(`${CONTACT_HUB_PATH}/person/p1`);
+    expect(screen.getByText('A person')).toBeInTheDocument();
+  });
+
+  it('a paid account still gets the real pages', async () => {
+    await start('/contact/p1', async () => snapshot(PAID));
+    expect(screen.getByText('Paid contact page')).toBeInTheDocument();
+  });
+
+  it('an unverified account is not redirected anywhere: the verification screen', async () => {
+    await start('/mission-control-v2', async () => { throw new Error('unavailable'); });
+    expect(screen.getByText(UNVERIFIED)).toBeInTheDocument();
+    expect(screen.getByTestId('where')).toHaveTextContent('/mission-control-v2');
   });
 });
 

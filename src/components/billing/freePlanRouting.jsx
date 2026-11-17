@@ -16,21 +16,24 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { AccountGate } from '../AccountUnverified';
 import UpgradeRequired from './UpgradeRequired';
-import { FREE_PLAN, isFreePlanPath, signupPlanFor, signupLandingPath } from '../../constants/freePlan';
+import { FREE_PLAN, isFreePlanPath, signupPlanFor, signupLandingPath, freePlanRedirectFor } from '../../constants/freePlan';
 
 /**
  * AccountGate for the shell. `layout(content)` wraps content in the shell
  * (MainLayout), so the upgrade screen and the page sit in the same layout at
- * the same position and the shell stays mounted between them.
+ * the same position and the shell stays mounted between them. A paid page a
+ * free account reaches from a free place (the logo, a contact from global
+ * search) leads to its Contact Hub equivalent instead (freePlanRedirectFor).
  */
 export function ShellAccountGate({ requirePayment = true, layout, children, ...gate }) {
   const { pathname } = useLocation();
   const freeRoute = isFreePlanPath(pathname);
+  const redirect = FREE_PLAN.enabled ? freePlanRedirectFor(pathname) : null;
   return (
     <AccountGate
       {...gate}
       requirePayment={requirePayment && !freeRoute}
-      upgrade={FREE_PLAN.enabled ? layout(<UpgradeRequired />) : null}
+      upgrade={FREE_PLAN.enabled ? (redirect ? <Navigate to={redirect} replace /> : layout(<UpgradeRequired />)) : null}
     >
       {children}
     </AccountGate>
@@ -45,5 +48,7 @@ export function ShellAccountGate({ requirePayment = true, layout, children, ...g
 export function SignedInSignupRedirect() {
   const { search } = useLocation();
   if (!FREE_PLAN.enabled) return <Navigate to="/checkout" />;
-  return <Navigate to={signupLandingPath(signupPlanFor(new URLSearchParams(search).get('tier')))} />;
+  // Already signed in: a paid tier in the link goes to its checkout; otherwise the
+  // Contact Hub, whether or not new Free signups are open (`existing`).
+  return <Navigate to={signupLandingPath(signupPlanFor(new URLSearchParams(search).get('tier'), { enabled: true }))} />;
 }

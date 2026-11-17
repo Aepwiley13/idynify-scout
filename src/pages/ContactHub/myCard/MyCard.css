@@ -1,0 +1,258 @@
+/* My Card: the editor, the preview and their layout.
+
+   Colours are the shell's theme variables (src/index.css, set on
+   html[data-theme]) and nothing else, so every theme works without a second
+   sheet and this file holds no colour of its own. The one exception to
+   "follows the theme" is the card itself, which is IDYNIFY-branded in every
+   theme: its brand colours arrive as --mycard-brand-* from the design tokens
+   (MyCardPreview.jsx), not from here.
+
+   Mobile first, and compact: a control a thumb is meant to hit is 44px to hit
+   even where it is smaller to look at (a ::after grows the touch area), and
+   inputs are 16px so a phone does not zoom into them. */
+
+/* The scroll container, as for the rest of Contact Hub: the shell fixes the
+   content area to the height of the screen and does not scroll it, so the
+   page scrolls inside. */
+.mycard {
+  position: relative; width: 100%; box-sizing: border-box;
+  display: flex; flex-direction: column;
+  flex: 1 1 auto; min-height: 0;
+  padding: 12px 16px 0;
+  overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
+  color: var(--text-primary);
+}
+/* The column fills the screen when the page is short, so the actions bar sits at the bottom
+   rather than just under the content, and grows with the page when it is long. */
+.mycard-inner { display: flex; flex-direction: column; flex: 1 0 auto; width: 100%; max-width: 1100px; margin: 0 auto; }
+.mycard-body { flex: 1 0 auto; padding-bottom: 20px; }
+
+@media (max-width: 768px) {
+  /* The shell paints a phone's content area in the card colour; here the page
+     is the app background and the sections are the cards on it. */
+  .mycard { background: var(--bg-primary); }
+}
+
+.mycard-header { margin-bottom: 12px; }
+.mycard-title { margin: 0; font-size: 24px; font-weight: 800; line-height: 1.15; letter-spacing: -0.01em; }
+.mycard-tagline { margin: 4px 0 0; font-size: 14px; color: var(--text-secondary); }
+
+/* ── Edit / Preview, on a narrow screen ── */
+.mycard-switch {
+  display: flex; gap: 4px; padding: 4px; margin-bottom: 12px;
+  border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card);
+}
+.mycard-switch-btn {
+  flex: 1 1 0; min-height: 44px; border: none; border-radius: 10px;
+  background: transparent; color: var(--text-secondary);
+  font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+}
+.mycard-switch-btn[aria-pressed="true"] {
+  background: var(--accent-bg); color: var(--text-primary); font-weight: 700;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* ── Layout ── */
+.mycard-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.mycard-pane { min-width: 0; }
+@media (max-width: 899px) {
+  .mycard[data-view="edit"] .mycard-pane--preview,
+  .mycard[data-view="preview"] .mycard-pane--editor { display: none; }
+}
+@media (min-width: 900px) {
+  /* The shell gives module content no padding at any size, so the gutter is ours. */
+  .mycard { padding: 24px 32px 0; }
+  .mycard-header { margin-bottom: 16px; }
+  .mycard-title { font-size: 28px; }
+  .mycard-tagline { font-size: 15px; }
+  .mycard-switch { display: none; }
+  .mycard-grid { grid-template-columns: minmax(0, 1fr) 400px; align-items: start; gap: 24px; }
+  /* The card stays in view while the form scrolls. */
+  .mycard-pane--preview { position: sticky; top: 0; }
+}
+
+/* ── Editor ── */
+.mycard-editor { display: flex; flex-direction: column; gap: 12px; }
+.mycard-section {
+  display: flex; flex-direction: column; gap: 12px; min-width: 0;
+  padding: 14px; border: 1px solid var(--border); border-radius: 16px;
+  background: var(--bg-card); box-shadow: var(--shadow-card);
+}
+@media (min-width: 900px) {
+  .mycard-editor { gap: 16px; }
+  .mycard-section { gap: 16px; padding: 18px 20px; border-radius: 18px; }
+}
+.mycard-section-title {
+  margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.mycard-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mycard-field-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mycard-label { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+
+.mycard-input {
+  width: 100%; box-sizing: border-box; min-width: 0; min-height: 46px; padding: 0 14px;
+  border: 1px solid var(--input-border); border-radius: 12px;
+  background: var(--input-bg); color: var(--text-primary);
+  font: inherit; font-size: 16px;
+}
+.mycard-input::placeholder { color: var(--text-secondary); opacity: 1; }
+.mycard-input[aria-invalid="true"] { border-color: var(--status-error); }
+.mycard-input:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.mycard-name { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.mycard-always { margin: -4px 0 0; font-size: 13px; color: var(--text-secondary); }
+
+.mycard-message { margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-secondary); }
+.mycard-message--error { color: var(--status-error-text); font-weight: 600; }
+
+/* ── The photo ── */
+.mycard-photo-row { display: flex; align-items: flex-start; gap: 14px; }
+.mycard-photo-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.mycard-photo-main .mycard-field-head { width: 100%; }
+.mycard-field--photoUrl { gap: 10px; }
+.mycard-photo-actions { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+
+/* ── Shared / Private: compact to look at, 44px to hit ── */
+.mycard-share {
+  position: relative; display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto;
+  min-height: 32px; padding: 0 11px;
+  border: 1px solid var(--border-2); border-radius: 999px;
+  background: transparent; color: var(--text-secondary);
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.mycard-share::after { content: ""; position: absolute; inset: -6px; }
+.mycard-share--on { background: var(--accent-bg); border-color: var(--accent); color: var(--text-primary); }
+.mycard-share:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── "Use this" chips: compact to look at, 44px to hit ── */
+.mycard-suggest {
+  position: relative; display: inline-flex; align-items: center; gap: 6px;
+  align-self: flex-start; max-width: 100%; min-height: 36px; box-sizing: border-box; padding: 5px 12px;
+  border: 1px dashed var(--accent); border-radius: 999px;
+  background: transparent; color: var(--text-primary);
+  font: inherit; font-size: 13px; font-weight: 600; line-height: 1.25; text-align: left; cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.mycard-suggest::after { content: ""; position: absolute; inset: -4px 0; }
+.mycard-suggest svg { flex: 0 0 auto; }
+/* The one big, friendly button: the LinkedIn photo. */
+.mycard-suggest--primary {
+  min-height: 40px; padding: 8px 16px; border-style: solid;
+  background: var(--accent-bg); font-size: 14px; font-weight: 700;
+}
+.mycard-suggest--primary::after { inset: -2px 0; }
+.mycard-suggest:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* A quiet text button: "Paste a photo link instead", "Remove photo". */
+.mycard-linkbtn {
+  position: relative; align-self: flex-start; min-height: 32px; padding: 0;
+  border: none; background: none; color: var(--text-primary);
+  font: inherit; font-size: 13px; font-weight: 600; text-decoration: underline; cursor: pointer;
+}
+.mycard-linkbtn::after { content: ""; position: absolute; inset: -6px -8px; }
+.mycard-linkbtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Focus: one ring for every control ── */
+.mycard-input:focus-visible,
+.mycard-share:focus-visible,
+.mycard-suggest:focus-visible,
+.mycard-linkbtn:focus-visible,
+.mycard-switch-btn:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+
+/* ── Avatar ── */
+.mycard-avatar {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  border-radius: 50%; overflow: hidden;
+  background: var(--border-2); color: var(--text-primary); font-weight: 700;
+}
+.mycard-avatar--sm { width: 32px; height: 32px; font-size: 13px; }
+.mycard-avatar--md { width: 56px; height: 56px; font-size: 19px; }
+.mycard-avatar--lg { width: 80px; height: 80px; font-size: 28px; }
+.mycard-avatar--xl { width: 112px; height: 112px; font-size: 40px; }
+.mycard-avatar--brand {
+  background: linear-gradient(135deg, var(--mycard-brand-2), var(--mycard-brand-4));
+  color: var(--mycard-on-brand);
+}
+.mycard-avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mycard-avatar-initials { display: inline-flex; align-items: center; justify-content: center; letter-spacing: 0.02em; }
+
+/* ── Preview ── */
+.mycard-preview { display: flex; flex-direction: column; gap: 12px; }
+.mycard-preview-title {
+  margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* The card: an IDYNIFY identity card. Photo, name, title and organization lead. */
+.mycard-card {
+  overflow: hidden; border: 1px solid var(--border); border-radius: 24px;
+  background: var(--bg-card); box-shadow: var(--shadow-card);
+}
+.mycard-card-banner {
+  position: relative; height: 128px;
+  background:
+    radial-gradient(120% 150% at 100% 0%, var(--mycard-brand-4) 0%, transparent 58%),
+    linear-gradient(135deg, var(--mycard-brand-1) 0%, var(--mycard-brand-2) 55%, var(--mycard-brand-3) 100%);
+}
+.mycard-card-brand {
+  position: absolute; top: 16px; left: 20px;
+  font-size: 12px; font-weight: 800; letter-spacing: 0.22em; color: var(--mycard-on-brand);
+}
+.mycard-card-body {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 0 24px 24px; text-align: center;
+}
+.mycard-card-body .mycard-avatar {
+  /* Rises over the banner: the banner is positioned, so without its own layer the photo
+     would sit underneath it. */
+  position: relative; z-index: 1;
+  margin-top: -56px; margin-bottom: 14px;
+  box-shadow: 0 0 0 5px var(--bg-card), var(--shadow-card);
+}
+.mycard-card-name { margin: 0; max-width: 100%; font-size: 28px; font-weight: 800; line-height: 1.15; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.mycard-card-title { margin: 4px 0 0; max-width: 100%; font-size: 17px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.mycard-card-org { margin: 0; max-width: 100%; font-size: 15px; line-height: 1.3; color: var(--text-secondary); overflow-wrap: anywhere; }
+
+.mycard-rows {
+  display: flex; flex-direction: column; gap: 2px; width: 100%;
+  margin: 20px 0 0; padding: 14px 0 0; list-style: none; text-align: left;
+  border-top: 1px solid var(--border);
+}
+.mycard-row { display: flex; align-items: center; gap: 12px; min-height: 40px; font-size: 15px; }
+.mycard-row-icon {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--accent-bg); color: var(--accent);
+}
+.mycard-row-value { min-width: 0; overflow-wrap: anywhere; }
+.mycard-card--empty { padding: 40px 20px; text-align: center; border-style: dashed; box-shadow: none; }
+.mycard-empty { margin: 0; color: var(--text-secondary); font-size: 15px; }
+
+/* What the card is not saying: beside it, never on it. */
+.mycard-aside {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
+  border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card-2);
+}
+.mycard-aside-row { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-secondary); }
+.mycard-aside-row svg { flex: 0 0 auto; margin-top: 2px; }
+
+/* ── Actions, kept in view at the bottom of the scrolling page ── */
+.mycard-actions {
+  position: sticky; bottom: 0; z-index: 2;
+  display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+  margin: 0 -16px; padding: 10px 16px;
+  border-top: 1px solid var(--border); background: var(--bg-card);
+}
+@media (min-width: 900px) {
+  .mycard-actions { margin: 0; border: 1px solid var(--border); border-bottom: none; border-radius: 16px 16px 0 0; }
+}
+
+/* ── Text for screen readers only ── */
+.mycard-sr {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}

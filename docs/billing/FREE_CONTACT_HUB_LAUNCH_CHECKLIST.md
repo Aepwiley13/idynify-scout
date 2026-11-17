@@ -17,17 +17,17 @@ production Firebase rules. Phase 1 needs **no Firestore rules deploy**.
 
 ## B. Stripe test-mode validation (before A6 is published)
 
-Using [STRIPE_TEST_MODE.md](STRIPE_TEST_MODE.md) on `idynify-staging`, with the owner's
-**test-mode** key:
+The exact procedure, including how to create and store the restricted test-mode key without it
+ever entering a chat or the repository, is
+[CHECKOUT_TEST_MODE_VALIDATION.md](CHECKOUT_TEST_MODE_VALIDATION.md) (in #801). Scenarios S1–S7
+must all pass, each confirmed with the read-only `billingAccountSnapshot.mjs`:
 
-1. A Free account upgrades to Starter: one customer, one subscription, 400 credits, paid access.
-2. The same with Pro: 1,250 credits.
-3. A paying account opening `/checkout`: sent to Billing, nothing offered.
-4. A customer who cancelled buys again: a new subscription on the same customer, credits granted.
-5. An abandoned checkout, then a second attempt: a new session, no error.
-6. A declined card (`4000 0000 0000 0341`): no access, no credits.
-7. The success page: waits for the webhook, then continues; never shows checkout again.
-8. Every `billingAmbiguousAccounts` record created during the run explained.
+1. Successful payment, Starter, then Pro: one customer, one subscription, 400 or 1,250 credits, paid access. The success page waits for the webhook and never shows checkout again.
+2. Canceled checkout: still Free; retrying reopens the same session; once it expires, a new one.
+3. Declined card: no subscription, no credits, no review record.
+4. Resubscription after cancelling: the same customer, a second subscription, credits granted again.
+5. An existing subscriber trying to buy again: sent to Billing, nothing offered, still one subscription.
+6. A replayed webhook: no second grant.
 
 **If A6 is not ready**, the Free plan can still launch with Payment Links:
 - **New Free customers can upgrade safely.** They have no Stripe customer yet, so there is nothing to duplicate.
@@ -37,7 +37,7 @@ Using [STRIPE_TEST_MODE.md](STRIPE_TEST_MODE.md) on `idynify-staging`, with the 
 
 | # | Change | Where | Undo |
 |---|---|---|---|
-| C1 | `VITE_CONTACT_HUB=on` and `VITE_FREE_PLAN=on`, production build context | Netlify environment variables, then a new build | Remove them and rebuild: signup and the gates behave exactly as before; Free accounts keep all their data |
+| C1 | `VITE_CONTACT_HUB=on` and `VITE_FREE_PLAN=on`, production build context | Netlify environment variables, then a new build | **Set `VITE_FREE_PLAN=existing`** and rebuild (section F). Never remove either variable once free accounts exist |
 | C2 | Sticker rollout mode allows every account (`feature_flags/stickers`) | Owned by the Contact Hub team | Their documented rollback |
 
 No Stripe setting changes for this launch. `VITE_STRIPE_ENABLED` stays as it is.
@@ -62,10 +62,18 @@ No Stripe setting changes for this launch. `VITE_STRIPE_ENABLED` stays as it is.
 - **402s:** counts of `paid_plan_required` in the function logs. Many from one account means someone is calling the API directly.
 - **Signups:** Free signups and upgrades (signup analytics, Stripe).
 
-## F. Rollback
+## F. Rollback — free customers keep their contacts
 
-| Situation | Action |
-|---|---|
-| Free signup or the free gate misbehaves | Remove `VITE_FREE_PLAN`, rebuild, publish. No data changes. |
-| Anything else in the release | Publish the previous production deploy (hardened billing, allocation on). Never a pre-ledger build (runbook §5). |
-| Checkout misbehaves after A6 | Publish the deploy from before A6. Payment Links return. |
+**The rule:** once any free account exists, no rollback may send free customers to a purchase
+page or hide their contacts. Nothing in any rollback deletes data.
+
+| Situation | Action | Free customers |
+|---|---|---|
+| Stop new Free signups (a problem with Free signup, abuse, cost) | Set **`VITE_FREE_PLAN=existing`**, rebuild, publish manually | Keep Contact Hub and Settings. New visitors sign up for a paid plan, as before launch |
+| A defect in a free page | Fix forward. If urgent, `existing` while the fix is built | Unaffected |
+| Paid-API guard (#806) misbehaves for paying customers | Fix forward; it only ever refuses, so it cannot over-spend | Unaffected |
+| Checkout misbehaves after A6 | Publish the deploy from before A6; Payment Links return | Unaffected: Free access does not depend on checkout |
+| The whole release must go | Publish the previous production deploy (hardened billing, allocation on; never a pre-ledger build, runbook §5) | **Locked out until a fixed build is published:** that build has no Free plan, so it sends them to checkout. Their contacts are intact and come back with the fix. Use only if `existing` cannot help, and tell free customers |
+
+**Never** remove `VITE_FREE_PLAN` or `VITE_CONTACT_HUB` after launch: either one sends free
+accounts to checkout at sign-in.

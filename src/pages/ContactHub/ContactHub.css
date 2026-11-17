@@ -33,14 +33,11 @@
   .hub {
     background: var(--bg-primary);
     /* The shell keeps 56px (plus the home-indicator inset) free at the bottom
-       of every module for its bottom bar (MainLayout.css). Contact Hub has no
-       bottom bar in Phase 1A (mobileNavigation.js: hidden), so that room was
-       an empty strip under the page. Take it back, and keep the inset as
-       padding so the last row clears the home indicator.
-       REMOVE THIS when Contact Hub gets a bottom bar: contactHubStyling.test.js
-       fails if the two fall out of step. */
-    margin-bottom: calc(-56px - env(safe-area-inset-bottom, 0px));
-    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+       of every module for its bottom bar (MainLayout.css). Contact Hub has a
+       bottom bar now (mobileNavigation.js: My People · Sticker Wall), so that
+       room is the bar's and is left alone: the last row ends above it.
+       contactHubStyling.test.js holds the two in step. */
+    padding-bottom: 24px;
   }
   /* The shell's top bar already says "Contact Hub". The page heading stays
      for screen readers and the document outline, without repeating it. */

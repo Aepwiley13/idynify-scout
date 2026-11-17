@@ -39,6 +39,7 @@ import ContactCardStickers from '../../components/stickers/ContactCardStickers';
 import StickersWall from '../../components/stickers/StickersWall';
 import ManualContactForm from '../../components/scout/ManualContactForm';
 import StickerChipRow from './StickerChipRow';
+import { AVAILABILITY } from '../../components/stickers/stickersAvailabilityState';
 import StickersLoadError from './StickersLoadError';
 import { useSidebarSlot } from '../../components/layout/sidebarSlots';
 import HubTable from './HubTable';
@@ -258,8 +259,12 @@ export default function HubPeople() {
     [contacts, searchTerm, activeSticker, stickers.ready, stickers.byId],
   );
 
-  // The Stickers view exists only while stickers are available.
-  const showWall = managing && stickers.ready;
+  // The wall's address is always the Sticker Wall screen: its own heading and
+  // way back, never My People under another name. The wall itself is drawn
+  // once stickers are available and loaded; until then, or if they are not
+  // available for this account, the screen says so (wallNotice, below).
+  const showWall = managing;
+  const wallReady = managing && stickers.ready;
 
   // Display paging: how many of `shown` are drawn. A new search or filter
   // starts from the first page again. Everyone is loaded and searched either
@@ -288,6 +293,13 @@ export default function HubPeople() {
   const firstRun = status === HUB_STATUS.READY && people.length === 0;
 
   const stickersBroken = stickersFailedToLoad(stickers);
+  // What the Sticker Wall screen says while the wall itself cannot be drawn.
+  // A failed load has its own message (StickersLoadError), so nothing here.
+  const wallNotice = !showWall || wallReady || stickersBroken
+    ? null
+    : stickers.availability === AVAILABILITY.UNAVAILABLE
+      ? 'Stickers are not available for this account yet.'
+      : 'Loading your stickers…';
   // Contact Hub's entries are in the application sidebar wherever it offers a
   // place for them (HubSidebarNav). Only where it does not (a phone, the
   // compact sidebar, a page with no sidebar) is the chip row drawn here.
@@ -406,6 +418,8 @@ export default function HubPeople() {
           onSelect={selectSticker}
           managing={showWall}
           onToggleManage={() => (managing ? closeWall() : openWall())}
+          // A phone reaches the wall from the bottom bar; the row is filters only.
+          wallChip={!isMobile}
         />
         )}
         {!firstRun && !navInSidebar && stickersBroken ? <StickersLoadError /> : null}
@@ -433,11 +447,14 @@ export default function HubPeople() {
           </div>
         )}
 
-        {status === HUB_STATUS.READY && !firstRun && showWall && (
+        {status === HUB_STATUS.READY && wallReady && (
           <StickersWall contacts={people} onOpenSticker={(id) => selectSticker(id)} />
         )}
+        {wallNotice ? <p className="hub-note" style={{ color: T.textMuted }}>{wallNotice}</p> : null}
+        {/* With the navigation in the sidebar the message is there; the wall says it too. */}
+        {showWall && stickersBroken && navInSidebar ? <StickersLoadError /> : null}
 
-        {firstRun && (
+        {firstRun && !showWall && (
           <div className="hub-empty hub-empty--first">
             <span className="hub-empty-art" style={{ background: T.accentBg, color: T.accent }} aria-hidden="true">
               <Users size={32} />

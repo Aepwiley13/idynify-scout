@@ -92,6 +92,7 @@ import ContactHubMain from '../pages/ContactHub/ContactHubMain';
 import HubPeople from '../pages/ContactHub/HubPeople';
 import HubPerson from '../pages/ContactHub/HubPerson';
 import Sidebar from '../components/layout/Sidebar';
+import BottomNav from '../components/layout/BottomNav';
 import { sidebarDestinations } from '../constants/navigationModel';
 
 // These render whole screens and type into them. On a loaded machine that can
@@ -461,5 +462,116 @@ describe('where there is no room, or it is not Contact Hub', () => {
     await screen.findByRole('list', { name: 'My People' });
     noHubNav();
     expect(names()).toHaveLength(4);
+  });
+});
+
+// A phone: the shell's own bottom bar, the real one, beside the real Contact
+// Hub. It is the phone's way between My People and the Sticker Wall, so the
+// page's chips are filters only.
+describe('a phone: the shell\'s bottom bar is My People · Sticker Wall', () => {
+  beforeEach(() => { setViewportWidth(375); });
+
+  function renderPhone(url = '/contact-hub') {
+    return render(
+      <MemoryRouter initialEntries={[url]}>
+        <RouterProbe />
+        <main>
+          <Routes>
+            <Route path="/contact-hub" element={<ContactHubMain />}>
+              <Route index element={<HubPeople />} />
+              <Route path="stickers" element={<HubPeople />} />
+              <Route path="person/:contactId" element={<HubPerson />} />
+            </Route>
+            <Route path="*" element={<div data-testid="elsewhere" />} />
+          </Routes>
+        </main>
+        <BottomNav onOpenMore={() => {}} />
+      </MemoryRouter>,
+    );
+  }
+  const bar = () => screen.getByRole('navigation', { name: 'Contact Hub sections' });
+  const cell = (name) => within(bar()).getByRole('button', { name });
+  const lit = () => within(bar()).getAllByRole('button').filter((b) => b.getAttribute('aria-current') === 'page').map((b) => b.getAttribute('aria-label'));
+
+  it('has two cells and nothing else: no More, no Import, no modules', async () => {
+    renderPhone();
+    await screen.findByRole('list', { name: 'My People' });
+    expect(within(bar()).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['My People', 'Sticker Wall']);
+    expect(lit()).toEqual(['My People']);
+    expect(within(bar()).queryByText(/import|more|scout|hunter/i)).toBeNull();
+  });
+
+  it('Sticker Wall opens the wall under its own name; My People returns to the list', async () => {
+    const user = userEvent.setup();
+    renderPhone();
+    await screen.findByRole('list', { name: 'My People' });
+    await user.click(cell('Sticker Wall'));
+    expect(router.at).toBe('/contact-hub/stickers');
+    expect(await screen.findByTestId('stickers-wall')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeInTheDocument();
+    expect(lit()).toEqual(['Sticker Wall']);
+
+    await user.click(cell('My People'));
+    expect(router.at).toBe('/contact-hub');
+    expect(lit()).toEqual(['My People']);
+    expect(names()).toHaveLength(4);
+    expect(screen.getByRole('heading', { level: 2, name: /My People/ })).toHaveTextContent('(4)');
+  });
+
+  it('the sticker navigation is not duplicated: the chips have no Sticker Wall, and there are no sidebar entries', async () => {
+    renderPhone();
+    const chips = await screen.findByRole('group', { name: 'Filter by sticker' });
+    expect(within(chips).queryByRole('button', { name: 'Sticker Wall' })).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Sticker Wall' })).toHaveLength(1);
+    // No sidebar entries on a phone. (The bar and those entries share the name
+    // "Contact Hub sections", so this looks for the entries themselves.)
+    expect(document.querySelector('.hub-sidenav')).toBeNull();
+    expect(document.querySelector('.sidebar-subnav')).toBeNull();
+  });
+
+  it('a tile on the wall goes to My People filtered; the bar and the page both say so', async () => {
+    const user = userEvent.setup();
+    renderPhone('/contact-hub/stickers');
+    const wall = await screen.findByTestId('stickers-wall');
+    await user.click(within(wall).getByRole('button', { name: 'Partner, 1 person' }));
+    expect(router.at).toBe(`/contact-hub?sticker=${PARTNER.id}`);
+    expect(lit()).toEqual(['My People']);
+    expect(screen.getByText('1 person with the Partner sticker')).toBeInTheDocument();
+    expect(names()).toEqual(['Wes Clark']);
+    // The bar's My People is My People itself: everyone.
+    await user.click(cell('My People'));
+    expect(router.at).toBe('/contact-hub');
+    expect(names()).toHaveLength(4);
+  });
+
+  it('a person keeps My People lit, and the bar still leads to the wall and back', async () => {
+    const user = userEvent.setup();
+    renderPhone('/contact-hub/person/p2');
+    await screen.findByTestId('notes');
+    expect(lit()).toEqual(['My People']);
+    await user.click(cell('Sticker Wall'));
+    expect(await screen.findByTestId('stickers-wall')).toBeInTheDocument();
+    await goBack();
+    expect(router.at).toBe('/contact-hub/person/p2');
+    expect(lit()).toEqual(['My People']);
+  });
+
+  it('with stickers unavailable the Sticker Wall cell leads to a plain statement, not to My People', async () => {
+    const user = userEvent.setup();
+    fake.current.state.config = config({ enabled: false, mode: 'off', readOnly: false });
+    renderPhone();
+    await screen.findByRole('list', { name: 'My People' });
+    await user.click(cell('Sticker Wall'));
+    expect(await screen.findByText('Stickers are not available for this account yet.')).toBeInTheDocument();
+    expect(lit()).toEqual(['Sticker Wall']);
+    expect(screen.queryByRole('list', { name: 'My People' })).toBeNull();
+    await user.click(cell('My People'));
+    expect(names()).toHaveLength(4);
+  });
+
+  it('leaving Contact Hub, the bar is no longer Contact Hub\'s', async () => {
+    renderPhone('/somewhere-else');
+    expect(screen.getByTestId('elsewhere')).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Contact Hub sections' })).toBeNull();
   });
 });

@@ -44,24 +44,30 @@ function contrast(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-describe('the empty strip at the bottom of a phone', () => {
-  // The shell keeps room for its bottom bar under every module. Contact Hub
-  // has no bottom bar yet, so it takes that room back. The two must change
-  // together: with a bar and this rule, the bar would cover the last rows.
-  const hidden = bottomNavFor('contact-hub')?.hidden === true;
+describe('the room for the bottom bar on a phone', () => {
+  // The shell keeps room for its bottom bar under every module. While Contact
+  // Hub had no bar it took that room back with a negative margin. It has a bar
+  // now, so the room is the bar's. The two must stay in step: a bar together
+  // with that margin would cover the last rows of the list.
+  const bar = bottomNavFor('contact-hub');
+  const hasBar = Boolean(bar) && bar.hidden !== true && bar.primary.length > 0;
   const hub = declarations(phoneBlock(), '.hub');
 
   it('the shell still reserves 56px plus the home-indicator inset', () => {
     expect(shellCss).toMatch(/\.page-content\.page-content-full\s*\{\s*padding-bottom:\s*calc\(56px \+ env\(safe-area-inset-bottom, 0px\)\)/);
   });
 
-  it('Contact Hub takes that room back only while it has no bottom bar', () => {
-    const reclaims = /margin-bottom:\s*calc\(-56px - env\(safe-area-inset-bottom, 0px\)\)/.test(hub);
-    expect(reclaims).toBe(hidden);
+  it('Contact Hub has a bottom bar', () => {
+    expect(hasBar).toBe(true);
   });
 
-  it('and keeps the last row clear of the home indicator', () => {
-    if (hidden) expect(hub).toMatch(/padding-bottom:\s*calc\(24px \+ env\(safe-area-inset-bottom, 0px\)\)/);
+  it('so Contact Hub does not take that room back: no negative margin anywhere in its stylesheet', () => {
+    expect(hub).not.toMatch(/margin-bottom:\s*calc\(\s*-/);
+    expect(hubCss).not.toMatch(/margin-bottom:\s*calc\(-56px/);
+  });
+
+  it('and the last row still has breathing space above the bar', () => {
+    expect(hub).toMatch(/padding-bottom:\s*24px/);
   });
 });
 

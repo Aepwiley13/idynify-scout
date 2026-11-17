@@ -22,12 +22,19 @@ import { useStickers } from '../../components/stickers/stickersRegistry';
 import { countStickers } from '../../components/stickers/peopleStickers';
 import { hexOf, stickerStyle } from '../../components/stickers/stickerPalette';
 
-export default function StickerChipRow({ people, selectedId, onSelect, managing, onToggleManage }) {
+/**
+ * @param wallChip  false leaves out the "Sticker Wall" chip, where something
+ *                  else already leads there (a phone's bottom bar). The row is
+ *                  then filters only, and nothing at all with no stickers yet.
+ */
+export default function StickerChipRow({ people, selectedId, onSelect, managing, onToggleManage, wallChip = true }) {
   const T = useT();
   const { ready, active } = useStickers();
   const counts = useMemo(() => (ready ? countStickers(people, active) : new Map()), [ready, people, active]);
 
   if (!ready) return null;
+  // Nothing to filter by and no chip to show: no empty row.
+  if (!wallChip && active.length === 0) return null;
 
   // Border widths live in the stylesheet (the selected "All" is heavier on a phone).
   const plain = { color: T.textMuted, background: T.cardBg, borderColor: T.border };
@@ -68,16 +75,18 @@ export default function StickerChipRow({ people, selectedId, onSelect, managing,
           </button>
         );
       })}
-      <button
-        type="button"
-        className="hub-chip hub-chip--manage"
-        aria-pressed={managing ? 'true' : 'false'}
-        style={managing ? chosen : manage}
-        onClick={onToggleManage}
-      >
-        <LayoutGrid size={14} aria-hidden="true" />
-        Sticker Wall
-      </button>
+      {wallChip ? (
+        <button
+          type="button"
+          className="hub-chip hub-chip--manage"
+          aria-pressed={managing ? 'true' : 'false'}
+          style={managing ? chosen : manage}
+          onClick={onToggleManage}
+        >
+          <LayoutGrid size={14} aria-hidden="true" />
+          Sticker Wall
+        </button>
+      ) : null}
     </div>
   );
 }

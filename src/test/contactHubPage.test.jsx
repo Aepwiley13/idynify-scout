@@ -126,6 +126,8 @@ function RouterProbe() {
 }
 const goBack = () => act(() => { router.navigate(-1); });
 const goForward = () => act(() => { router.navigate(1); });
+/** Go to an address, as a tap on the shell's bottom bar does on a phone. */
+const goTo = (to) => act(() => { router.navigate(to); });
 
 function renderHub(url = '/contact-hub') {
   return render(
@@ -664,24 +666,53 @@ describe('addresses: the Sticker Wall and a sticker filter each have one', () =>
     expect(names()).toHaveLength(4);
   });
 
-  it('with stickers unavailable, the wall address shows My People and nothing about stickers', async () => {
+  it('with stickers unavailable, the wall address says so plainly and leads back to My People', async () => {
+    const user = userEvent.setup();
     fake.current.state.config = config({ enabled: false, mode: 'off', readOnly: false });
     renderHub('/contact-hub/stickers');
-    await screen.findByRole('list', { name: 'My People' });
+    expect(await screen.findByText('Stickers are not available for this account yet.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeInTheDocument();
+    // Not My People under another name, and nothing that would write a sticker.
+    expect(screen.queryByRole('list', { name: 'My People' })).toBeNull();
     expect(screen.queryByTestId('stickers-wall')).toBeNull();
     expect(screen.queryByRole('button', { name: /sticker/i })).toBeNull();
+    expect(fake.current.state.subscriptions).toBe(0);
+
+    await user.click(screen.getByRole('link', { name: 'My People' }));
+    expect(router.at).toBe('/contact-hub');
     expect(names()).toHaveLength(4);
   });
 
-  it('on a phone the same addresses work', async () => {
+  it('on a phone the same addresses work; the chips are filters only, the wall is reached from the bottom bar', async () => {
     setViewportWidth(375);
-    const user = userEvent.setup();
     renderHub(`/contact-hub?sticker=${VIP.id}`);
     expect(within(await chips()).getByRole('button', { name: 'VIP, 1 person' })).toHaveAttribute('aria-pressed', 'true');
     expect(names()).toEqual(['Nakaiya Wiley']);
-    await user.click(within(await chips()).getByRole('button', { name: 'Sticker Wall' }));
-    expect(router.at).toBe('/contact-hub/stickers');
+    // No Sticker Wall chip on a phone: the shell's bottom bar carries it.
+    expect(within(await chips()).queryByRole('button', { name: 'Sticker Wall' })).toBeNull();
+    expect(within(await chips()).getAllByRole('button').map((b) => b.textContent.replace(/\d+$/, ''))).toEqual(['All', 'Partner', 'VIP']);
+    await goTo('/contact-hub/stickers');
     expect(await screen.findByTestId('stickers-wall')).toBeInTheDocument();
+    // The filters are still there on the wall, and one still leads to its people.
+    expect(within(await chips()).queryByRole('button', { name: 'Sticker Wall' })).toBeNull();
+  });
+
+  it('a desktop without the sidebar entries keeps the Sticker Wall chip', async () => {
+    setViewportWidth(1024);
+    renderHub();
+    expect(within(await chips()).getByRole('button', { name: 'Sticker Wall' })).toBeInTheDocument();
+  });
+
+  it('on a phone with no stickers yet there is no empty chip row; the wall is where one is made', async () => {
+    setViewportWidth(375);
+    fake.current.state.registry = [];
+    renderHub();
+    await screen.findByRole('list', { name: 'My People' });
+    await waitFor(() => expect(fake.current.state.subscriptions).toBe(1));
+    expect(screen.queryByRole('group', { name: 'Filter by sticker' })).toBeNull();
+    await goTo('/contact-hub/stickers');
+    const wall = await screen.findByTestId('stickers-wall');
+    expect(within(wall).getByRole('button', { name: /New sticker/ })).toBeInTheDocument();
   });
 });
 
@@ -828,8 +859,8 @@ describe('the Sticker Wall has its own name and a visible way back', () => {
     const user = userEvent.setup();
     setViewportWidth(375);
     renderHub(`/contact-hub?sticker=${PARTNER.id}`);
-    const group = await screen.findByRole('group', { name: 'Filter by sticker' });
-    await user.click(within(group).getByRole('button', { name: 'Sticker Wall' }));
+    await screen.findByRole('group', { name: 'Filter by sticker' });
+    await goTo('/contact-hub/stickers');
     await screen.findByTestId('stickers-wall');
     await user.click(screen.getByRole('link', { name: 'My People' }));
     expect(router.at).toBe(`/contact-hub?sticker=${PARTNER.id}`);
@@ -848,13 +879,44 @@ describe('the Sticker Wall has its own name and a visible way back', () => {
     expect(screen.getByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeInTheDocument();
   });
 
-  it('with stickers unavailable the wall address is My People, under its own name', async () => {
-    fake.current.state.config = config({ enabled: false, mode: 'off', readOnly: false });
+  it('while stickers are still being checked the wall says it is loading, never My People, then draws', async () => {
+    let answer;
+    fake.current.services.fetchStickersConfig = () => new Promise((resolve) => { answer = resolve; });
     renderHub('/contact-hub/stickers');
-    await screen.findByRole('list', { name: 'My People' });
-    expect(screen.getByRole('heading', { level: 2, name: /My People/ })).toBeInTheDocument();
-    expect(screen.queryByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Add Person' })).toBeInTheDocument();
+    expect(await screen.findByText('Loading your stickers…')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'My People' })).toBeNull();
+    expect(screen.queryByText(/not available|could not be loaded/i)).toBeNull();
+    answer(config());
+    expect(await screen.findByTestId('stickers-wall')).toBeInTheDocument();
+    expect(screen.queryByText('Loading your stickers…')).toBeNull();
+  });
+
+  it('when the sticker list fails to load, the wall says that, once, and not "not available"', async () => {
+    fake.current.services.subscribeStickers = (_uid, _onNext, onError) => {
+      fake.current.state.subscriptions += 1;
+      Promise.resolve().then(() => onError(Object.assign(new Error('unavailable'), { code: 'unavailable' })));
+      return () => {};
+    };
+    renderHub('/contact-hub/stickers');
+    expect(await screen.findByText(/Your stickers could not be loaded\. They have not been changed\./)).toBeInTheDocument();
+    expect(screen.getAllByText(/Your stickers could not be loaded/)).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeInTheDocument();
+    expect(screen.queryByText(/not available|Loading your stickers/i)).toBeNull();
+    expect(screen.queryByTestId('stickers-wall')).toBeNull();
+  });
+
+  it('with nobody in My People yet the wall is still the wall, so a sticker can be made first', async () => {
+    const user = userEvent.setup();
+    contactsData.list = [];
+    renderHub('/contact-hub/stickers');
+    const wall = await screen.findByTestId('stickers-wall');
+    expect(screen.getByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeInTheDocument();
+    expect(within(wall).getByRole('button', { name: /New sticker/ })).toBeInTheDocument();
+    expect(screen.queryByText('Start with one person')).toBeNull();
+    // The invitation is My People's, and is there when you go back.
+    await user.click(screen.getByRole('link', { name: 'My People' }));
+    expect(await screen.findByText('Start with one person')).toBeInTheDocument();
   });
 });
 
@@ -892,11 +954,10 @@ describe('on a phone, a filtered list says which sticker and how many', () => {
   });
 
   it('says nothing with no sticker selected, and nothing on the wall', async () => {
-    const user = userEvent.setup();
     renderHub();
-    const group = await screen.findByRole('group', { name: 'Filter by sticker' });
+    await screen.findByRole('group', { name: 'Filter by sticker' });
     expect(screen.queryByRole('button', { name: 'Show everyone' })).toBeNull();
-    await user.click(within(group).getByRole('button', { name: 'Sticker Wall' }));
+    await goTo('/contact-hub/stickers');
     await screen.findByTestId('stickers-wall');
     expect(screen.queryByRole('button', { name: 'Show everyone' })).toBeNull();
   });

@@ -94,6 +94,11 @@ function failureFrom(err) {
 /** The stored revision: a whole number, or 0 for a card from before revisions. */
 const revisionOf = (data) => (own(data, 'revision') && Number.isInteger(data.revision) && data.revision >= 0 ? data.revision : 0);
 
+/** Whether a save based on `expectedRevision` is out of date against the stored card (null: there is none). */
+const isStale = (stored, expectedRevision) => (expectedRevision === null
+  ? stored !== null
+  : stored === null || revisionOf(stored) !== expectedRevision);
+
 /** Whether the stored card was written by a later version of this schema. */
 const isNewerVersion = (data) => own(data, 'schemaVersion') && Number.isFinite(data.schemaVersion) && data.schemaVersion > CARD_SCHEMA_VERSION;
 
@@ -214,8 +219,7 @@ export function createMyCardService({
         // Never replace a card a newer version of the app wrote: it would lose what this one cannot see.
         if (stored && isNewerVersion(stored)) return failure(MY_CARD_ERRORS.NEWER_VERSION);
 
-        const stale = expectedRevision === null ? stored !== null : stored === null || revisionOf(stored) !== expectedRevision;
-        if (stale) return { status: MY_CARD_STATUS.CONFLICT, current: interpretSnapshot(snap) };
+        if (isStale(stored, expectedRevision)) return { status: MY_CARD_STATUS.CONFLICT, current: interpretSnapshot(snap) };
 
         const revision = (stored ? revisionOf(stored) : 0) + 1;
         const createdAt = stored && typeof stored.createdAt === 'string' && stored.createdAt ? stored.createdAt : at;
@@ -225,6 +229,19 @@ export function createMyCardService({
         return { status: MY_CARD_STATUS.SAVED, card: { ...clean, sharingEnabled: false }, revision };
       });
     } catch (err) {
+      // The card rules (firestore.rules) take only the NEXT revision, so when two saves land at the
+      // same moment the loser is refused at the server, as permission-denied, before Firestore's own
+      // retry can show it the newer card. Nothing was written. Look once more: if the card has moved
+      // on, that is the conflict it is, not "no access". A refusal for any other reason stays one.
+      if (err?.code === 'permission-denied') {
+        try {
+          const snap = await getDoc(ref);
+          const stored = snap.exists() ? snap.data() : null;
+          if (!(stored && isNewerVersion(stored)) && isStale(stored, expectedRevision)) {
+            return { status: MY_CARD_STATUS.CONFLICT, current: interpretSnapshot(snap) };
+          }
+        } catch { /* cannot look again: it is reported as the refusal it was */ }
+      }
       return failureFrom(err);
     }
   }

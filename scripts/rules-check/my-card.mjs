@@ -3,8 +3,10 @@
  * file) in the Firestore emulator on a throwaway `demo-` project.
  *
  * Two things are checked:
- *   - the rules: the owner can read and write users/{uid}/card/main, and
- *     another signed-in user and an anonymous visitor can do nothing with it;
+ *   - the rules: the owner can read and write users/{uid}/card/main only as the
+ *     rules allow (known fields, each within its limit, sharing off, the next
+ *     revision, no delete, no other document, nothing nested), and another
+ *     signed-in user and an anonymous visitor can do nothing with it;
  *   - the app's own service code (src/services/myCard/myCardCore.js), given
  *     this package's copy of the web SDK, doing its work through those rules:
  *     load, save, two tabs racing, a failed read that must never look like a
@@ -19,7 +21,7 @@ import {
   doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, collection, collectionGroup, runTransaction,
 } from 'firebase/firestore';
 import { createMyCardService, MY_CARD_STATUS as S, MY_CARD_ERRORS as E } from '../../src/services/myCard/myCardCore.js';
-import { DEFAULT_SHARE, newCard } from '../../src/utils/myCardRules.js';
+import { CARD_FIELDS, CARD_LIMITS, DEFAULT_SHARE, SHAREABLE_FIELDS, newCard } from '../../src/utils/myCardRules.js';
 
 const env = await initializeTestEnvironment({
   projectId: 'demo-my-card',
@@ -67,13 +69,25 @@ const expectCode = async (promise, expected, what) => {
 
 // ── The rules ───────────────────────────────────────────────────────────────
 
-check('rules: the owner can create, read, update and delete their card', async () => {
+/** A card exactly as the service stores it: every known field, sharing off, a revision. */
+const stored = (extra = {}) => ({
+  firstName: 'Ada', lastName: 'Lovelace', photoUrl: '', title: 'Analyst', organization: '', email: 'ada@example.com',
+  phone: '', linkedinUrl: '', instagram: '', website: '', share: { ...DEFAULT_SHARE }, sharingEnabled: false,
+  schemaVersion: 1, revision: 1, createdAt: '2026-11-17T10:00:00.000Z', updatedAt: '2026-11-17T10:00:00.000Z', ...extra,
+});
+/** The same card with one key taken out. */
+const without = (card, key) => { const copy = { ...card }; delete copy[key]; return copy; };
+const put = (db, data, path = CARD(U)) => setDoc(doc(db, path), data);
+
+check('rules: the owner can create, read, list and update their card, but not delete it', async () => {
+  await wipeCard(U);
   const db = owner();
-  await expectCode(setDoc(doc(db, CARD(U)), { firstName: 'Ada', revision: 1 }), 'ok', 'owner create');
+  await expectCode(put(db, stored()), 'ok', 'owner create');
   await expectCode(getDoc(doc(db, CARD(U))), 'ok', 'owner get');
-  await expectCode(updateDoc(doc(db, CARD(U)), { firstName: 'Ada L' }), 'ok', 'owner update');
   await expectCode(getDocs(collection(db, `users/${U}/card`)), 'ok', 'owner list');
-  await expectCode(deleteDoc(doc(db, CARD(U))), 'ok', 'owner delete');
+  await expectCode(put(db, stored({ title: 'Director', revision: 2 })), 'ok', 'owner update');
+  await expectCode(deleteDoc(doc(db, CARD(U))), 'permission-denied', 'owner delete');
+  assert((await read(CARD(U))).title === 'Director', 'the card is intact');
 });
 
 check('rules: another signed-in user can do nothing with it', async () => {
@@ -116,11 +130,17 @@ check('rules: nothing under users/{uid} is readable by a stranger, so a card has
   }
 });
 
-check('rules: KNOWN GAP, the rules do not check a card\'s shape, so an owner could write sharingEnabled directly', async () => {
-  // Documented, not endorsed. Nothing reads sharingEnabled publicly yet, and the service always
-  // writes it false. A public page must read through the server and check it there, never trust
-  // these rules; a rule that validates cards is a separate, deliberate change to firestore.rules.
-  await expectCode(setDoc(doc(owner(), CARD(U)), { firstName: 'Ada', sharingEnabled: true }), 'ok', 'direct owner write');
+check('rules: sharing cannot be switched on by a direct write, on create or on update', async () => {
+  await wipeCard(U);
+  for (const value of [true, 'true', 'false', 1, 0, null]) {
+    await expectCode(put(owner(), stored({ sharingEnabled: value })), 'permission-denied', `create with sharingEnabled ${JSON.stringify(value)}`);
+  }
+  await expectCode(put(owner(), without(stored(), 'sharingEnabled')), 'permission-denied', 'create without sharingEnabled');
+  assert((await read(CARD(U))) === undefined, 'nothing was created');
+  await seed(CARD(U), stored());
+  await expectCode(put(owner(), stored({ sharingEnabled: true, revision: 2 })), 'permission-denied', 'update to sharingEnabled true');
+  await expectCode(updateDoc(doc(owner(), CARD(U)), { sharingEnabled: true, revision: 2 }), 'permission-denied', 'partial update to sharingEnabled true');
+  assert((await read(CARD(U))).sharingEnabled === false, 'sharing is still off');
 });
 
 // ── The service, through the rules ──────────────────────────────────────────
@@ -294,23 +314,24 @@ check('revision: if the card changes again before the overwrite lands, the overw
   assert(stored.title === 'A edit, again' && stored.revision === 3, 'nothing was overwritten');
 });
 
-check('revision: Firestore itself refuses a transaction whose read moved underneath it (the server, not our code)', async () => {
+check('revision: the server refuses a write that was based on a read that moved underneath it (the rules, not our code)', async () => {
   await wipeCard(U);
-  await seed(CARD(U), { firstName: 'Ada', title: 'Seeded', revision: 1 });
+  await seed(CARD(U), stored({ title: 'Seeded', revision: 1 }));
   const db = owner();
   const ref = doc(db, CARD(U));
   let attempts = 0;
-  await runTransaction(db, async (tx) => {
+  const code = await codeOf(runTransaction(db, async (tx) => {
     attempts += 1;
     const snap = await tx.get(ref);
-    // On the first attempt only, somebody else saves between this read and this write.
+    // Somebody else saves between this read and this write.
     if (attempts === 1) await seed(CARD(U), { ...snap.data(), title: 'Moved underneath', revision: 2 });
     tx.set(ref, { ...snap.data(), title: 'From the transaction', revision: snap.data().revision + 1 });
-  });
-  assert(attempts >= 2, `the server accepted a write based on a stale read (attempts: ${attempts})`);
-  const stored = await read(CARD(U));
-  // The first attempt, based on revision 1, was not allowed to land over revision 2: the retry read 2 and wrote 3.
-  assert(stored.revision === 3 && stored.title === 'From the transaction', `stored ${JSON.stringify(stored)}`);
+  }));
+  // Before the card rules, Firestore retried this transaction. Now the rules refuse the stale write at the
+  // server, so the transaction fails and the newer card is untouched: the service turns that into a conflict.
+  assert(code === 'permission-denied', `the server accepted a write based on a stale read (${code}, attempts: ${attempts})`);
+  const after = await read(CARD(U));
+  assert(after.revision === 2 && after.title === 'Moved underneath', `stored ${JSON.stringify(after)}`);
 });
 
 check('revision: sixteen saves racing on one revision: exactly one lands, the other fifteen are conflicts', async () => {
@@ -323,17 +344,209 @@ check('revision: sixteen saves racing on one revision: exactly one lands, the ot
   assert(stored.revision === 2 && stored.title === saved[0].card.title, 'one write, the winner\'s');
 });
 
-check('revision: KNOWN GAP, the rules do not check the revision, so a write that skips the service can lower it', async () => {
-  // Documented, not endorsed. firestore.rules has no revision logic and no card rule: every write through the
-  // app goes through saveMyCard's transaction, which does check it. A direct write by the card's own owner is
-  // allowed, and can set any revision. Closing it would be a change to firestore.rules (a deliberate, separate decision).
+check('revision: the rules take only the next revision, so a write that skips the service cannot lower or skip it', async () => {
   await wipeCard(U);
-  await seed(CARD(U), { firstName: 'Ada', title: 'Newer', revision: 5 });
-  await expectCode(setDoc(doc(owner(), CARD(U)), { firstName: 'Ada', title: 'Stale write', revision: 1 }), 'ok', 'direct stale write by the owner');
-  assert((await read(CARD(U))).revision === 1, 'the rules did not stop it');
-  // ...but only the owner can do it: another user and an anonymous visitor still cannot.
-  await expectCode(setDoc(doc(other(), CARD(U)), { title: 'x', revision: 9 }), 'permission-denied', 'other user');
-  await expectCode(setDoc(doc(anon(), CARD(U)), { title: 'x', revision: 9 }), 'permission-denied', 'anonymous');
+  await seed(CARD(U), stored({ title: 'Newer', revision: 5 }));
+  const attempts = [['the same revision', 5], ['a lower revision (a stale write)', 1], ['revision 0', 0], ['a skipped revision', 7], ['a negative revision', -6],
+    ['a revision as text', '6'], ['a revision as a fraction', 5.5], ['no revision at all', undefined]];
+  for (const [what, revision] of attempts) {
+    const card = revision === undefined ? without(stored({ title: 'Stale write' }), 'revision') : stored({ title: 'Stale write', revision });
+    await expectCode(put(owner(), card), 'permission-denied', what);
+  }
+  assert((await read(CARD(U))).title === 'Newer' && (await read(CARD(U))).revision === 5, 'the newer card was not touched');
+  await expectCode(put(owner(), stored({ title: 'Next', revision: 6 })), 'ok', 'the next revision');
+  await expectCode(put(owner(), stored({ title: 'Replay', revision: 6 })), 'permission-denied', 'replaying that revision');
+  await expectCode(put(other(), stored({ title: 'x', revision: 7 })), 'permission-denied', 'other user');
+  await expectCode(put(anon(), stored({ title: 'x', revision: 7 })), 'permission-denied', 'anonymous');
+});
+
+check('revision: a new card must be revision 1, and a second create at 1 cannot replace it', async () => {
+  await wipeCard(U);
+  for (const revision of [0, 2, 5, '1', 1.5, null]) {
+    await expectCode(put(owner(), stored({ revision })), 'permission-denied', `create at ${JSON.stringify(revision)}`);
+  }
+  await expectCode(put(owner(), stored({ revision: 1 })), 'ok', 'create at 1');
+  await expectCode(put(owner(), stored({ title: 'Again', revision: 1 })), 'permission-denied', 'a second create at 1');
+});
+
+check('rules: only card/main, and nothing under it', async () => {
+  await wipeCard(U);
+  for (const path of [`users/${U}/card/second`, `users/${U}/card/Main`, `users/${U}/card/main2`, `users/${U}/card/main/extra/doc`, `users/${U}/card/main/versions/v1`]) {
+    await expectCode(put(owner(), stored(), path), 'permission-denied', `create at ${path}`);
+  }
+  await seed(`users/${U}/card/second`, stored());
+  await expectCode(put(owner(), stored({ revision: 2 }), `users/${U}/card/second`), 'permission-denied', 'update of another card document');
+  await expectCode(deleteDoc(doc(owner(), `users/${U}/card/second`)), 'permission-denied', 'delete of another card document');
+  await seed(`users/${U}/card/main/notes/n1`, { text: 'x' });
+  await expectCode(updateDoc(doc(owner(), `users/${U}/card/main/notes/n1`), { text: 'y' }), 'permission-denied', 'update under card/main');
+  await expectCode(deleteDoc(doc(owner(), `users/${U}/card/main/notes/n1`)), 'permission-denied', 'delete under card/main');
+});
+
+check('rules: a card has exactly its known fields: none missing, none extra', async () => {
+  await wipeCard(U);
+  for (const key of Object.keys(stored())) {
+    await expectCode(put(owner(), without(stored(), key)), 'permission-denied', `create without ${key}`);
+  }
+  for (const extra of [{ role: 'admin' }, { uid: 'someone' }, { suggestions: {} }, { source: 'linkedin' }, { photoData: 'x' }]) {
+    await expectCode(put(owner(), stored(extra)), 'permission-denied', `create with ${Object.keys(extra)[0]}`);
+  }
+  await seed(CARD(U), stored());
+  await expectCode(put(owner(), { ...stored({ revision: 2 }), role: 'admin' }), 'permission-denied', 'update with an extra field');
+  await expectCode(updateDoc(doc(owner(), CARD(U)), { revision: 2, role: 'admin' }), 'permission-denied', 'partial update adding a field');
+  await expectCode(updateDoc(doc(owner(), CARD(U)), { revision: 2, title: 'Partial' }), 'ok', 'a partial update that leaves a valid card');
+});
+
+check('rules: every text field must be text', async () => {
+  await wipeCard(U);
+  for (const field of CARD_FIELDS) {
+    for (const value of [42, true, null, ['x'], { a: 1 }]) {
+      await expectCode(put(owner(), stored({ [field]: value })), 'permission-denied', `${field} as ${JSON.stringify(value)}`);
+    }
+  }
+  for (const field of ['schemaVersion', 'revision']) {
+    await expectCode(put(owner(), stored({ [field]: 'x' })), 'permission-denied', `${field} as text`);
+  }
+});
+
+check('rules: every field has its limit, the same as CARD_LIMITS: at the limit is fine, one over is not', async () => {
+  for (const [field, limit] of Object.entries(CARD_LIMITS)) {
+    const fill = (length) => (field === 'photoUrl' ? `https://${'a'.repeat(length - 8)}` : 'a'.repeat(length));
+    await wipeCard(U);
+    await expectCode(put(owner(), stored({ [field]: fill(limit) })), 'ok', `${field} at ${limit}`);
+    await wipeCard(U);
+    await expectCode(put(owner(), stored({ [field]: fill(limit + 1) })), 'permission-denied', `${field} at ${limit + 1}`);
+  }
+  await wipeCard(U);
+  await expectCode(put(owner(), stored({ firstName: 'a'.repeat(1_000_000) })), 'permission-denied', 'a one-megabyte name');
+  await expectCode(put(owner(), stored({ photoUrl: `https://${'a'.repeat(900_000)}` })), 'permission-denied', 'a 900 KB photo link');
+  await expectCode(put(owner(), stored({ createdAt: `2026-11-17T10:00:00.000Z${'0'.repeat(100)}` })), 'permission-denied', 'an oversized time');
+  assert((await read(CARD(U))) === undefined, 'nothing was created');
+});
+
+check('rules: the photo is an https link or nothing: no data, no script, no plain http', async () => {
+  await wipeCard(U);
+  for (const photoUrl of ['http://example.com/a.jpg', 'data:image/jpeg;base64,/9j/4AAQ', 'javascript:alert(1)', 'ftp://example.com/a.jpg', 'https:/x', ' https://example.com/a.jpg', 'blob:https://example.com/x']) {
+    await expectCode(put(owner(), stored({ photoUrl })), 'permission-denied', `photo ${photoUrl.slice(0, 24)}`);
+  }
+  await expectCode(put(owner(), stored({ photoUrl: 'https://media.example.com/ada.jpg?x=1' })), 'ok', 'an https link');
+  await expectCode(put(owner(), stored({ photoUrl: '', revision: 2 })), 'ok', 'no photo');
+});
+
+check('rules: the Shared / Private switches are exactly the eight, each true or false', async () => {
+  await wipeCard(U);
+  for (const key of SHAREABLE_FIELDS) {
+    const missing = { ...DEFAULT_SHARE };
+    delete missing[key];
+    await expectCode(put(owner(), stored({ share: missing })), 'permission-denied', `share without ${key}`);
+    for (const value of ['true', 1, null, 'yes']) {
+      await expectCode(put(owner(), stored({ share: { ...DEFAULT_SHARE, [key]: value } })), 'permission-denied', `share.${key} as ${JSON.stringify(value)}`);
+    }
+  }
+  for (const share of [{ ...DEFAULT_SHARE, firstName: true }, 'all', null, [], true, {}]) {
+    await expectCode(put(owner(), stored({ share })), 'permission-denied', `share ${JSON.stringify(share)}`);
+  }
+  const everything = Object.fromEntries(SHAREABLE_FIELDS.map((key) => [key, true]));
+  await expectCode(put(owner(), stored({ share: everything })), 'ok', 'every switch on');
+});
+
+check('rules: the schema version is exactly 1, and a card from a later version is not replaced', async () => {
+  await wipeCard(U);
+  for (const schemaVersion of [0, 2, -1, '1', 1.5, null]) {
+    await expectCode(put(owner(), stored({ schemaVersion })), 'permission-denied', `create at schemaVersion ${JSON.stringify(schemaVersion)}`);
+  }
+  await expectCode(put(owner(), without(stored(), 'schemaVersion')), 'permission-denied', 'create without a schemaVersion');
+  await seed(CARD(U), stored({ schemaVersion: 2, title: 'From the future' }));
+  await expectCode(put(owner(), stored({ revision: 2, title: 'Old build' })), 'permission-denied', 'update over a later schema');
+  assert((await read(CARD(U))).title === 'From the future', 'the later card is intact');
+});
+
+check('rules: the times are times, and createdAt is set once', async () => {
+  await wipeCard(U);
+  for (const bad of ['yesterday', '2026-11-17', '2026-11-17 10:00:00', '2026-11-17T10:00:00+02:00', '', 20261117, null, true, '2026-11-17T10:00:00.1234567Z']) {
+    await expectCode(put(owner(), stored({ createdAt: bad })), 'permission-denied', `createdAt ${JSON.stringify(bad)}`);
+    await expectCode(put(owner(), stored({ updatedAt: bad })), 'permission-denied', `updatedAt ${JSON.stringify(bad)}`);
+  }
+  await expectCode(put(owner(), stored({ createdAt: '2026-11-17T10:00:00Z', updatedAt: '2026-11-17T10:00:00.5Z' })), 'ok', 'times without milliseconds and with one digit');
+  await expectCode(put(owner(), stored({ revision: 2, createdAt: '2027-01-01T00:00:00.000Z' })), 'permission-denied', 'createdAt changed on update');
+  await expectCode(put(owner(), stored({ revision: 2, createdAt: '2026-11-17T10:00:00Z', updatedAt: '2026-11-18T09:00:00.000Z' })), 'ok', 'the same createdAt, a new updatedAt');
+});
+
+check('rules: another user and an anonymous visitor cannot write a perfectly valid card', async () => {
+  await wipeCard(U);
+  await wipeCard(OTHER);
+  for (const [who, db] of [['another signed-in user', other()], ['an anonymous visitor', anon()]]) {
+    await expectCode(put(db, stored()), 'permission-denied', `${who} create`);
+  }
+  await expectCode(put(other(), stored(), CARD(OTHER)), 'ok', 'a user\'s own card, as a control');
+  await wipeCard(OTHER);
+  await seed(CARD(U), stored());
+  for (const [who, db] of [['another signed-in user', other()], ['an anonymous visitor', anon()]]) {
+    await expectCode(put(db, stored({ revision: 2 })), 'permission-denied', `${who} update`);
+    await expectCode(deleteDoc(doc(db, CARD(U))), 'permission-denied', `${who} delete`);
+  }
+  assert((await read(CARD(U))).revision === 1, 'the card is intact');
+});
+
+check('rules: a card from before revisions can be saved, and so can one whose stored values are damaged', async () => {
+  // [what, the stored card, the revision the next save must carry]
+  const cases = [
+    ['no revision, no createdAt', without(without(stored(), 'revision'), 'createdAt'), 1],
+    ['an old partial card', { firstName: 'Ada', lastName: 'Lovelace' }, 1],
+    ['a revision stored as text', stored({ revision: 'x' }), 1],
+    ['a negative stored revision', stored({ revision: -3 }), 1],
+    ['a fractional stored revision', stored({ revision: 2.5 }), 1],
+    ['a schemaVersion stored as text', stored({ schemaVersion: 'x' }), 2],
+    ['sharingEnabled stored true (written before these rules)', stored({ sharingEnabled: true }), 2],
+    ['an empty createdAt', stored({ createdAt: '' }), 2],
+  ];
+  for (const [what, legacy, next] of cases) {
+    await wipeCard(U);
+    await seed(CARD(U), legacy);
+    // createdAt is kept whenever the stored card has one; otherwise the save sets it.
+    const createdAt = typeof legacy.createdAt === 'string' && legacy.createdAt ? legacy.createdAt : '2026-11-17T12:00:00.000Z';
+    await expectCode(put(owner(), stored({ revision: next, createdAt })), 'ok', `${what}: saved as revision ${next}`);
+    assert((await read(CARD(U))).sharingEnabled === false, `${what}: sharing is off after the save`);
+  }
+  await wipeCard(U);
+  await seed(CARD(U), stored({ revision: 4, sharingEnabled: true }));
+  await expectCode(put(owner(), stored({ revision: 1 })), 'permission-denied', 'a legacy card at revision 4 does not go back to 1');
+  await expectCode(put(owner(), stored({ revision: 5 })), 'ok', 'revision 5');
+});
+
+check('rules: the rest of users/{uid} is unchanged: other collections and the server-owned documents behave as before', async () => {
+  const db = owner();
+  await expectCode(setDoc(doc(db, `users/${U}/contacts/c1`), { name: 'Grace Hopper' }), 'ok', 'a contact');
+  await expectCode(updateDoc(doc(db, `users/${U}/contacts/c1`), { name: 'Grace H' }), 'ok', 'a contact update');
+  await expectCode(deleteDoc(doc(db, `users/${U}/contacts/c1`)), 'ok', 'a contact delete');
+  await expectCode(setDoc(doc(db, `users/${U}/companies/co1`), { name: 'Acme' }), 'ok', 'a company');
+  await expectCode(setDoc(doc(db, `users/${U}/cards/x`), { text: 'y' }), 'ok', 'a collection that only starts with "card"');
+  await expectCode(setDoc(doc(db, `users/${U}/companies/co1/notes/n1`), { text: 'y' }), 'ok', 'a note two levels deep');
+  await expectCode(setDoc(doc(db, `users/${U}/integrations/linkedin`), { status: 'connected' }), 'permission-denied', 'the server-owned LinkedIn document');
+  await expectCode(setDoc(doc(db, `users/${U}/lineageEvents/e1`), { type: 'x' }), 'ok', 'a lineage event can be created');
+  await expectCode(updateDoc(doc(db, `users/${U}/lineageEvents/e1`), { type: 'y' }), 'permission-denied', 'but not changed');
+  await expectCode(setDoc(doc(db, `users/${OTHER}/contacts/c1`), { name: 'x' }), 'permission-denied', 'another user\'s contacts');
+});
+
+check('service: a save over a card written before these rules (partial, damaged, sharing on) works and leaves sharing off', async () => {
+  await wipeCard(U);
+  await seed(CARD(U), { firstName: 'Ada', lastName: 'Lovelace', email: 'nope', sharingEnabled: true, revision: 4, schemaVersion: 1 });
+  const service = tab();
+  const loaded = await service.loadMyCard();
+  assert(loaded.status === S.REPAIRED && loaded.revision === 4, `got ${loaded.status}`);
+  const result = await service.saveMyCard(goodCard({ email: 'ada@example.com' }), { expectedRevision: loaded.revision });
+  assert(result.status === S.SAVED && result.revision === 5, `got ${JSON.stringify(result).slice(0, 160)}`);
+  const after = await read(CARD(U));
+  assert(after.sharingEnabled === false && after.revision === 5 && after.email === 'ada@example.com', 'repaired and saved');
+});
+
+check('service: a card with no revision at all is saved as revision 1, through the service', async () => {
+  await wipeCard(U);
+  await seed(CARD(U), { firstName: 'Ada', lastName: 'Lovelace', schemaVersion: 1 });
+  const service = tab();
+  const loaded = await service.loadMyCard();
+  assert(loaded.revision === 0, `legacy revision should read as 0, got ${loaded.revision}`);
+  const result = await service.saveMyCard(goodCard(), { expectedRevision: loaded.revision });
+  assert(result.status === S.SAVED && result.revision === 1, `got ${JSON.stringify(result).slice(0, 160)}`);
 });
 
 // ── Run ─────────────────────────────────────────────────────────────────────

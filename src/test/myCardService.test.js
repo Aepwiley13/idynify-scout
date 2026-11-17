@@ -407,6 +407,70 @@ describe('when a save fails', () => {
   });
 });
 
+describe('a save the card rules refuse because the card moved', () => {
+  // The rules take only the NEXT revision. When two saves land at the same moment the loser is refused at
+  // the server as permission-denied, before Firestore can retry it; nothing was written. The service looks
+  // again: if the card moved on that is a conflict, and a refusal for any other reason stays a refusal.
+  const refused = () => Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });
+
+  it('is a conflict, with the newer card, when the card has moved on', async () => {
+    const t = setup();
+    t.put(CARD_PATH('A'), stored({ revision: 4, title: 'Newer' }));
+    t.hooks.failTransaction = refused();
+    const result = await t.service.saveMyCard(goodCard({ title: 'Mine' }), { expectedRevision: 3 });
+    expect(result.status).toBe(S.CONFLICT);
+    expect(result.current).toMatchObject({ status: S.OK, revision: 4, card: { title: 'Newer' } });
+    expect(t.read(CARD_PATH('A')).title).toBe('Newer');
+  });
+
+  it('is a conflict when a first card is refused because one now exists', async () => {
+    const t = setup();
+    t.put(CARD_PATH('A'), stored({ revision: 1, title: 'Already here' }));
+    t.hooks.failTransaction = refused();
+    const result = await t.service.saveMyCard(goodCard(), { expectedRevision: null });
+    expect(result.status).toBe(S.CONFLICT);
+    expect(result.current.revision).toBe(1);
+  });
+
+  it('is a conflict when the card was removed since it was loaded', async () => {
+    const t = setup();
+    t.hooks.failTransaction = refused();
+    const result = await t.service.saveMyCard(goodCard(), { expectedRevision: 3 });
+    expect(result.status).toBe(S.CONFLICT);
+    expect(result.current.status).toBe(S.MISSING);
+  });
+
+  it('stays a refusal when the card is exactly as it was: it was not about the revision', async () => {
+    const t = setup();
+    t.put(CARD_PATH('A'), stored({ revision: 3 }));
+    t.hooks.failTransaction = refused();
+    expect(await t.service.saveMyCard(goodCard(), { expectedRevision: 3 })).toEqual(error(E.PERMISSION_DENIED, false));
+  });
+
+  it('stays a refusal when the card cannot be read again', async () => {
+    const t = setup();
+    t.put(CARD_PATH('A'), stored({ revision: 4 }));
+    t.hooks.failTransaction = refused();
+    t.hooks.failGet = { error: Object.assign(new Error('x'), { code: 'permission-denied' }) };
+    expect(await t.service.saveMyCard(goodCard(), { expectedRevision: 3 })).toEqual(error(E.PERMISSION_DENIED, false));
+  });
+
+  it('stays a refusal for a card a newer version of the app wrote', async () => {
+    const t = setup();
+    t.put(CARD_PATH('A'), stored({ revision: 4, schemaVersion: CARD_SCHEMA_VERSION + 1 }));
+    t.hooks.failTransaction = refused();
+    expect(await t.service.saveMyCard(goodCard(), { expectedRevision: 3 })).toEqual(error(E.PERMISSION_DENIED, false));
+  });
+
+  it('does not look again for any other failure', async () => {
+    const t = setup();
+    t.put(CARD_PATH('A'), stored({ revision: 4 }));
+    t.hooks.failTransaction = Object.assign(new Error('x'), { code: 'unavailable' });
+    expect(await t.service.saveMyCard(goodCard(), { expectedRevision: 3 })).toEqual(error(E.UNAVAILABLE, true));
+    expect(t.log.reads).toEqual([]);
+  });
+});
+
 describe('whose card it is', () => {
   it('always uses the signed-in account\'s uid, and takes no uid from the caller', async () => {
     const t = setup({ uid: 'A' });

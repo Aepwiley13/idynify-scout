@@ -1,10 +1,13 @@
 /**
- * Contact Hub's desktop workspace: the inner panel, the Sticker Wall and New
- * sticker entries, the List / Table choice, and Show more.
+ * Contact Hub's workspace: the page's own sticker navigation (the chip row
+ * and the Sticker Wall), the List / Table choice, and Show more.
+ *
+ * Rendered here with no application sidebar. Contact Hub's entries in the
+ * sidebar itself are in contactHubSidebarNav.test.jsx.
  *
  * Three things these tests hold in place:
- *   - the panel is decided by the room Contact Hub really has beside the
- *     application's sidebar, not by the size of the window;
+ *   - with no place in the sidebar the chip row is the sticker navigation at
+ *     every width, once, and there is no inner panel;
  *   - every sticker control follows the existing availability switch, and a
  *     failed sticker load never looks like an account with no stickers;
  *   - Show more only limits what is drawn. Everyone is loaded once and
@@ -80,7 +83,7 @@ vi.mock('../components/scout/ManualContactForm', () => ({
 }));
 
 import ContactHubMain from '../pages/ContactHub/ContactHubMain';
-import HubPeople, { PANEL_MIN_WIDTH, TABLE_MIN_WIDTH, TABLE_FULL_WIDTH, VIEW_STORAGE_KEY } from '../pages/ContactHub/HubPeople';
+import HubPeople, { TABLE_MIN_WIDTH, TABLE_FULL_WIDTH, VIEW_STORAGE_KEY } from '../pages/ContactHub/HubPeople';
 import { PAGE_SIZE } from '../pages/ContactHub/peopleRules';
 import HubPerson from '../pages/ContactHub/HubPerson';
 
@@ -138,11 +141,10 @@ function renderHub(url = '/contact-hub') {
 
 /** The width of Contact Hub's content area, as the page will measure it. */
 let contentWidth = 0;
-const WIDE = 1100;   // room for the panel
+const WIDE = 1100;   // room for every table column
 const NARROW = 700;  // a small window beside the wide sidebar
 
 const names = () => [...document.querySelectorAll('.hub-list a.hub-row-link, .hub-table a.hub-row-link')].map((a) => a.textContent);
-const panel = () => screen.findByRole('navigation', { name: 'Contact Hub' });
 /**
  * The "Showing 50 of 120 people / Show 50 more" control. Tests that draw more
  * than one page look for its button inside it: a role query over the whole
@@ -153,93 +155,104 @@ const many = (n) => Array.from({ length: n }, (_, i) => person(`m${i}`, `Person 
   email: `p${i}@x.test`, addedAt: new Date(Date.UTC(2026, 10, 12) - i * 86400000).toISOString(),
 }));
 
-describe('the inner panel', () => {
+// Contact Hub's own entries (My People, Sticker Wall, the sticker filters, New
+// sticker) are in the application sidebar where it offers a place for them:
+// contactHubSidebarNav.test.jsx. This file renders Contact Hub with no
+// sidebar, as on a phone or beside the compact sidebar, where the page's own
+// chip row is the sticker navigation. There is no inner panel at any width.
+describe('with no place in the sidebar, the chip row is the sticker navigation', () => {
   beforeEach(() => { contentWidth = WIDE; });
 
-  it('shows My People with its count, the Sticker Wall, each sticker with its count, and New sticker', async () => {
+  it('shows how many people there are, All, each sticker with its count, and the Sticker Wall', async () => {
     renderHub();
-    const nav = await panel();
-    expect(within(nav).getByRole('button', { name: /My People/ })).toHaveAttribute('aria-current', 'page');
-    expect(within(nav).getByLabelText('4 people')).toHaveTextContent('4');
-    expect(await within(nav).findByRole('button', { name: 'Sticker Wall' })).toBeInTheDocument();
-    // The archived person also holds VIP and is not counted: the chips' rule.
-    expect(within(nav).getByRole('button', { name: 'VIP, 1 person' })).toBeInTheDocument();
-    expect(within(nav).getByRole('button', { name: 'Partner, 1 person' })).toBeInTheDocument();
-    expect(within(nav).getByRole('button', { name: 'New sticker' })).toBeInTheDocument();
+    const chips = await screen.findByRole('group', { name: 'Filter by sticker' });
+    expect(screen.getByRole('heading', { level: 2, name: /My People/ })).toHaveTextContent('(4)');
+    expect(within(chips).getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
+    // The archived person also holds VIP and is not counted.
+    expect(within(chips).getByRole('button', { name: 'VIP, 1 person' })).toBeInTheDocument();
+    expect(within(chips).getByRole('button', { name: 'Partner, 1 person' })).toBeInTheDocument();
+    expect(within(chips).getByRole('button', { name: 'Sticker Wall' })).toBeInTheDocument();
   });
 
-  it('replaces the chip row: the two are never both in the page', async () => {
+  it('the sticker navigation is in the page once, and there is no inner panel at any width', async () => {
     renderHub();
-    await panel();
-    await screen.findByRole('button', { name: 'VIP, 1 person' });
-    expect(screen.queryByRole('group', { name: 'Filter by sticker' })).toBeNull();
+    await screen.findByRole('group', { name: 'Filter by sticker' });
+    expect(screen.getAllByRole('group', { name: 'Filter by sticker' })).toHaveLength(1);
     expect(screen.getAllByRole('button', { name: 'VIP, 1 person' })).toHaveLength(1);
+    expect(screen.queryByRole('navigation', { name: /Contact Hub/ })).toBeNull();
+    expect(document.querySelector('.hub-panel')).toBeNull();
   });
 
-  it('carries the page title, once', async () => {
+  it('the page title is above the people, once', async () => {
     renderHub();
-    const nav = await panel();
-    const title = screen.getByRole('heading', { level: 1, name: 'Contact Hub' });
-    expect(nav.closest('.hub-panel')).toContainElement(title);
+    await screen.findByRole('list', { name: 'My People' });
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 1, name: 'Contact Hub' })).toBeInTheDocument();
   });
 
-  it('a sticker filters the people; pressing it again, or My People, clears it', async () => {
+  it('a sticker filters the people; pressing it again, or All, clears it', async () => {
     const user = userEvent.setup();
     renderHub();
-    const nav = await panel();
-    const vip = await within(nav).findByRole('button', { name: 'VIP, 1 person' });
+    const chips = await screen.findByRole('group', { name: 'Filter by sticker' });
+    const vip = within(chips).getByRole('button', { name: 'VIP, 1 person' });
     await user.click(vip);
     expect(vip).toHaveAttribute('aria-pressed', 'true');
-    expect(within(nav).getByRole('button', { name: /My People/ })).not.toHaveAttribute('aria-current');
+    expect(within(chips).getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'false');
     expect(names()).toEqual(['Nakaiya Wiley']);
     expect(screen.getByText('People with the VIP sticker')).toBeInTheDocument();
+    // The count beside My People is everyone, not the filtered few.
+    expect(screen.getByRole('heading', { level: 2, name: /My People/ })).toHaveTextContent('(4)');
     await user.click(vip);
     expect(names()).toHaveLength(4);
-    await user.click(within(nav).getByRole('button', { name: 'Partner, 1 person' }));
+    await user.click(within(chips).getByRole('button', { name: 'Partner, 1 person' }));
     expect(names()).toEqual(['Wes Clark']);
-    await user.click(within(nav).getByRole('button', { name: /My People/ }));
+    await user.click(within(chips).getByRole('button', { name: 'All' }));
     expect(names()).toHaveLength(4);
+    expect(within(chips).getByRole('button', { name: 'All' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('Sticker Wall opens the existing wall, and a tile returns to the people filtered by it', async () => {
     const user = userEvent.setup();
     renderHub();
-    const nav = await panel();
-    const wallButton = await within(nav).findByRole('button', { name: 'Sticker Wall' });
-    await user.click(wallButton);
-    expect(wallButton).toHaveAttribute('aria-current', 'page');
+    const chips = await screen.findByRole('group', { name: 'Filter by sticker' });
+    const wallChip = within(chips).getByRole('button', { name: 'Sticker Wall' });
+    await user.click(wallChip);
+    expect(wallChip).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByRole('list', { name: 'My People' })).toBeNull();
     const wall = await screen.findByTestId('stickers-wall');
     await user.click(within(wall).getByRole('button', { name: 'Partner, 1 person' }));
     expect(names()).toEqual(['Wes Clark']);
-    expect(wallButton).not.toHaveAttribute('aria-current');
+    expect(within(chips).getByRole('button', { name: 'Sticker Wall' })).toHaveAttribute('aria-pressed', 'false');
+    expect(within(chips).getByRole('button', { name: 'Partner, 1 person' })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('New sticker opens the existing dialog and creates through the existing service', async () => {
+  it('New sticker, on the Sticker Wall, opens the existing dialog and creates through the existing service', async () => {
     const user = userEvent.setup();
     renderHub();
-    const nav = await panel();
-    await user.click(await within(nav).findByRole('button', { name: 'New sticker' }));
+    const chips = await screen.findByRole('group', { name: 'Filter by sticker' });
+    await user.click(within(chips).getByRole('button', { name: 'Sticker Wall' }));
+    const wall = await screen.findByTestId('stickers-wall');
+    await user.click(within(wall).getByRole('button', { name: /New sticker/ }));
     const dialog = screen.getByRole('dialog', { name: 'New sticker' });
     await user.type(within(dialog).getByLabelText('Name'), 'Neighbours');
     await user.click(within(dialog).getByRole('button', { name: /create|save|add/i }));
     await waitFor(() => expect(fake.current.callsOf('createSticker')).toHaveLength(1));
     expect(fake.current.callsOf('createSticker')[0][0]).toBe('u1');
     expect(fake.current.callsOf('createSticker')[0][1]).toMatchObject({ name: 'Neighbours' });
-    expect(await within(nav).findByRole('button', { name: 'Neighbours, 0 people' })).toBeInTheDocument();
+    expect(await within(chips).findByRole('button', { name: 'Neighbours, 0 people' })).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'New sticker' })).toBeNull();
   });
 
-  it('is not drawn with no one in My People yet: one message, one action', async () => {
+  it('with no one in My People yet: one message, one action, and no sticker navigation', async () => {
     contactsData.list = [];
     renderHub();
     await screen.findByText('Start with one person');
-    expect(screen.queryByRole('navigation', { name: 'Contact Hub' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Filter by sticker' })).toBeNull();
+    expect(screen.queryByRole('navigation', { name: /Contact Hub/ })).toBeNull();
   });
 });
 
-describe('the panel follows the room Contact Hub has, not the window', () => {
+describe('the chip row is the same at every width when the sidebar carries no entries', () => {
   it('a wide window with a narrow content area gets the chip row, not the panel', async () => {
     setViewportWidth(1280);
     contentWidth = NARROW;
@@ -250,30 +263,32 @@ describe('the panel follows the room Contact Hub has, not the window', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'Contact Hub' })).toBeInTheDocument();
   });
 
-  it('the same window with a wide content area (the compact sidebar) gets the panel', async () => {
+  it('the same window with a wide content area (the compact sidebar) gets the chip row too, not a panel', async () => {
     setViewportWidth(1280);
     contentWidth = WIDE;
     renderHub();
-    expect(await panel()).toBeInTheDocument();
+    expect(await screen.findByRole('group', { name: 'Filter by sticker' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: /Contact Hub/ })).toBeNull();
+    expect(screen.getByRole('heading', { level: 1, name: 'Contact Hub' })).toBeInTheDocument();
   });
 
-  it('just under the threshold folds, at it opens', async () => {
-    contentWidth = PANEL_MIN_WIDTH - 1;
-    const first = renderHub();
-    await screen.findByRole('list', { name: 'My People' });
-    expect(screen.queryByRole('navigation', { name: 'Contact Hub' })).toBeNull();
-    first.unmount();
-    contentWidth = PANEL_MIN_WIDTH;
+  // 980px is where the inner panel used to open. Nothing changes there now.
+  it.each([[979], [980], [1400]])('a content area of %ipx gets the same page: the chip row, and no panel', async (width) => {
+    contentWidth = width;
     renderHub();
-    expect(await panel()).toBeInTheDocument();
+    await screen.findByRole('list', { name: 'My People' });
+    expect(await screen.findByRole('group', { name: 'Filter by sticker' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: /Contact Hub/ })).toBeNull();
+    expect(names()).toHaveLength(4);
   });
 
-  it('a phone never gets the panel, whatever is measured', async () => {
+  it('a phone has the chip row and never a panel, whatever is measured', async () => {
     setViewportWidth(390);
     contentWidth = WIDE;
     renderHub();
     await screen.findByRole('list', { name: 'My People' });
-    expect(screen.queryByRole('navigation', { name: 'Contact Hub' })).toBeNull();
+    expect(await screen.findByRole('group', { name: 'Filter by sticker' })).toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: /Contact Hub/ })).toBeNull();
   });
 
   it('where the width cannot be measured, the page falls back to the chip row', async () => {
@@ -311,27 +326,31 @@ describe('sticker states', () => {
     expect(names()).toHaveLength(4);
   });
 
-  it('on, with none yet: My People, Sticker Wall and New sticker, with no empty Stickers heading', async () => {
+  it('on, with none yet: the way into the Sticker Wall, where New sticker is, and no empty Stickers heading', async () => {
+    const user = userEvent.setup();
     contentWidth = WIDE;
     fake.current.state.registry = [];
     renderHub();
-    const nav = await panel();
-    await within(nav).findByRole('button', { name: 'New sticker' });
-    expect(within(nav).getAllByRole('button').map((b) => b.textContent.replace(/\d+$/, ''))).toEqual(['My People', 'Sticker Wall', 'New sticker']);
-    expect(within(nav).queryByRole('heading', { name: 'Stickers' })).toBeNull();
+    const chips = await screen.findByRole('group', { name: 'Filter by sticker' });
+    expect(within(chips).getAllByRole('button').map((b) => b.textContent)).toEqual(['Sticker Wall']);
+    expect(screen.queryByRole('heading', { name: 'Stickers' })).toBeNull();
+    expect(names()).toHaveLength(4);
+    await user.click(within(chips).getByRole('button', { name: 'Sticker Wall' }));
+    const wall = await screen.findByTestId('stickers-wall');
+    expect(within(wall).getByRole('button', { name: /New sticker/ })).toBeInTheDocument();
   });
 
   it('the sticker list failed to load, wide: says so, and does not look like an account with no stickers', async () => {
     contentWidth = WIDE;
     failRegistry();
     renderHub();
-    const nav = await panel();
-    expect(await within(nav).findByText(/Your stickers could not be loaded\. They have not been changed\./)).toBeInTheDocument();
-    expect(within(nav).getByRole('button', { name: 'Reload page' })).toBeInTheDocument();
-    expect(within(nav).getByRole('button', { name: /My People/ })).toBeInTheDocument();
+    expect(await screen.findByText(/Your stickers could not be loaded\. They have not been changed\./)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Reload page' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: /My People/ })).toHaveTextContent('(4)');
     // Nothing that reads as "you have no stickers", and nothing that would write.
-    expect(within(nav).queryByRole('button', { name: 'New sticker' })).toBeNull();
-    expect(within(nav).queryByRole('button', { name: 'Sticker Wall' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'Filter by sticker' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /New sticker/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Sticker Wall' })).toBeNull();
     expect(screen.queryByText(/No stickers yet/i)).toBeNull();
     expect(names()).toHaveLength(4);
   });
@@ -345,16 +364,19 @@ describe('sticker states', () => {
     expect(names()).toHaveLength(4);
   });
 
-  it('while availability is still being checked, the panel holds its place with My People alone', async () => {
+  it('while availability is still being checked: the people, no sticker controls yet, and nothing that looks like an error', async () => {
     contentWidth = WIDE;
     let answer;
     fake.current.services.fetchStickersConfig = () => new Promise((resolve) => { answer = resolve; });
     renderHub();
-    const nav = await panel();
-    expect(within(nav).getAllByRole('button')).toHaveLength(1);
+    await screen.findByRole('list', { name: 'My People' });
+    expect(names()).toHaveLength(4);
+    expect(screen.queryByRole('group', { name: 'Filter by sticker' })).toBeNull();
+    expect(screen.queryByRole('button', { name: /sticker/i })).toBeNull();
     expect(screen.queryByText(/could not be loaded/i)).toBeNull();
     answer(config());
-    expect(await within(nav).findByRole('button', { name: 'New sticker' })).toBeInTheDocument();
+    const chips = await screen.findByRole('group', { name: 'Filter by sticker' });
+    expect(within(chips).getByRole('button', { name: 'Sticker Wall' })).toBeInTheDocument();
   });
 });
 
@@ -490,7 +512,9 @@ describe('List and Table', () => {
   it('the choice is not offered on the Sticker Wall', async () => {
     const user = userEvent.setup();
     renderHub();
-    await user.click(await within(await panel()).findByRole('button', { name: 'Sticker Wall' }));
+    const chips = await screen.findByRole('group', { name: 'Filter by sticker' });
+    expect(screen.getByRole('group', { name: 'View' })).toBeInTheDocument();
+    await user.click(within(chips).getByRole('button', { name: 'Sticker Wall' }));
     await screen.findByTestId('stickers-wall');
     expect(screen.queryByRole('group', { name: 'View' })).toBeNull();
   });
@@ -544,10 +568,11 @@ describe('Show more is display paging only', () => {
     expect(contactsData.loads).toBe(1);
   });
 
-  it('the count beside My People and the panel is everyone, not the number drawn', async () => {
+  // The same count in the application sidebar: contactHubSidebarNav.test.jsx.
+  it('the count beside My People is everyone, not the number drawn', async () => {
     renderHub();
-    const nav = await panel();
-    expect(within(nav).getByLabelText('120 people')).toBeInTheDocument();
+    await screen.findByRole('list', { name: 'My People' });
+    expect(names()).toHaveLength(PAGE_SIZE);
     expect(screen.getByRole('heading', { level: 2, name: /My People/ })).toHaveTextContent('(120)');
   });
 

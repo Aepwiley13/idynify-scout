@@ -6,14 +6,15 @@
  * pipeline stages, no engagement status, no outreach actions. Those stay in
  * People (Command Center), which this does not replace or change.
  *
- * THREE LAYOUTS, ONE PAGE
- *   phone            heading and Add, search, sticker chips, the list.
- *   desktop, narrow  the same, plus the List / Table choice.
- *   desktop, wide    Contact Hub's own panel (HubSidePanel) beside the people,
- *                    in place of the chip row.
- * "Wide" is the room Contact Hub actually has beside the application's
- * sidebar, measured here, not the size of the window: the sidebar can be 64
- * or 220px, so the same window can be either.
+ * WHERE THE STICKER NAVIGATION IS
+ *   In the application sidebar, under Contact Hub (HubSidebarNav), wherever
+ *   the sidebar offers a place for it: a desktop with the sidebar expanded.
+ *   The people then have the whole content area.
+ *   Otherwise (a phone, the compact sidebar, a page with no sidebar) it is
+ *   the chip row here. Never both.
+ * The List / Table choice follows the room the people actually have beside
+ * the sidebar, measured here, not the size of the window: the sidebar can be
+ * 64 or 220px, so the same window can be either.
  *
  * Reused as they are: the contacts ContactHubMain loaded, the sticker
  * registry, People's sticker chips (interactive on a wide screen, read-only
@@ -28,7 +29,7 @@ import { List, Mail, Phone, Search, Table2, UserPlus, Users, X } from 'lucide-re
 import { useT } from '../../theme/ThemeContext';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import {
-  CONTACT_HUB_PATH, CONTACT_HUB_STICKERS_PATH, contactHubPersonPath, isContactHubStickersPath,
+  CONTACT_HUB_PATH, CONTACT_HUB_SIDEBAR_SLOT, CONTACT_HUB_STICKERS_PATH, contactHubPersonPath, isContactHubStickersPath,
 } from '../../constants/contactHub';
 import { hasRealContactPhoto, resolveContactPhotoSources, getInitials } from '../../utils/contactPhoto';
 import { useStickers } from '../../components/stickers/stickersRegistry';
@@ -37,9 +38,9 @@ import ContactCardStickersInteractive from '../../components/stickers/ContactCar
 import ContactCardStickers from '../../components/stickers/ContactCardStickers';
 import StickersWall from '../../components/stickers/StickersWall';
 import ManualContactForm from '../../components/scout/ManualContactForm';
-import { AVAILABILITY } from '../../components/stickers/stickersAvailabilityState';
 import StickerChipRow from './StickerChipRow';
-import HubSidePanel, { StickersLoadError } from './HubSidePanel';
+import StickersLoadError from './StickersLoadError';
+import { useSidebarSlot } from '../../components/layout/sidebarSlots';
 import HubTable from './HubTable';
 import { describeAddPersonError } from './addPersonErrors';
 import {
@@ -48,13 +49,6 @@ import {
 
 /** How many sticker chips a row shows before "+N". */
 export const ROW_STICKER_MAX = 2;
-
-/**
- * The narrowest Contact Hub content area that gets the inner panel. Below it
- * the panel's choices are the chip row. 232px of panel and a 24px gap leave
- * the table about 720px, the least at which five columns stay readable.
- */
-export const PANEL_MIN_WIDTH = 980;
 
 /**
  * The table needs room for its columns. Where Contact Hub's content area is
@@ -87,7 +81,7 @@ function useElementWidth(ref) {
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return undefined;
-    // Before the first paint, so the panel does not appear a frame late.
+    // Before the first paint, so the table does not appear a frame late.
     setWidth(el.getBoundingClientRect().width);
     if (typeof ResizeObserver === 'undefined') return undefined;
     const observer = new ResizeObserver((entries) => {
@@ -293,17 +287,15 @@ export default function HubPeople() {
   // No one yet: the page is the invitation, with nothing else competing.
   const firstRun = status === HUB_STATUS.READY && people.length === 0;
 
-  // Stickers switched off for this user (or an admin viewing as them) means
-  // no sticker navigation at all, so no panel: the page is a people directory.
-  // While that is still being checked the panel holds its place with My People
-  // alone, so the layout does not jump when the answer arrives.
   const stickersBroken = stickersFailedToLoad(stickers);
-  const showPanel = !isMobile && !firstRun
-    && contentWidth >= PANEL_MIN_WIDTH
-    && stickers.availability !== AVAILABILITY.UNAVAILABLE;
-  // The room the people have: the content area, less the panel when it is open.
+  // Contact Hub's entries are in the application sidebar wherever it offers a
+  // place for them (HubSidebarNav). Only where it does not (a phone, the
+  // compact sidebar, a page with no sidebar) is the chip row drawn here.
+  const sidebarSlot = useSidebarSlot(CONTACT_HUB_SIDEBAR_SLOT);
+  const navInSidebar = Boolean(sidebarSlot) && !isMobile;
+  // The room the people have: the whole content area.
   // 0 means it could not be measured, which does not rule the table out.
-  const peopleWidth = contentWidth ? contentWidth - (showPanel ? 256 : 0) : 0;
+  const peopleWidth = contentWidth;
   const tableFits = !isMobile && (peopleWidth === 0 || peopleWidth >= TABLE_MIN_WIDTH);
   const asTable = view === VIEW.TABLE && tableFits;
   const tightTable = peopleWidth !== 0 && peopleWidth < TABLE_FULL_WIDTH;
@@ -331,8 +323,7 @@ export default function HubPeople() {
     </button>
   );
 
-  // With the panel open the page title sits at the top of it; otherwise it is
-  // above the people, as before. One element either way.
+  // The page title, above the people at every width.
   const pageHeader = (
     <header className="hub-header">
       <div>
@@ -365,19 +356,9 @@ export default function HubPeople() {
 
   return (
     <>
-      {showPanel ? null : pageHeader}
+      {pageHeader}
 
-      <div ref={workspaceRef} className={`hub-workspace${showPanel ? ' hub-workspace--panel' : ''}`}>
-      {showPanel ? (
-        <HubSidePanel
-          header={pageHeader}
-          people={people}
-          selectedId={activeSticker?.id ?? null}
-          onSelect={selectSticker}
-          wallOpen={showWall}
-          onOpenWall={openWall}
-        />
-      ) : null}
+      <div ref={workspaceRef} className="hub-workspace">
 
       {/* Colours reach the stylesheet as variables: on a phone the card is the list
           alone, and the heading, search and chips sit on the page above it. */}
@@ -403,7 +384,7 @@ export default function HubPeople() {
           )}
         </div>
 
-        {!firstRun && !showPanel && (
+        {!firstRun && !navInSidebar && (
         <StickerChipRow
           people={people}
           selectedId={activeSticker?.id ?? null}
@@ -412,7 +393,7 @@ export default function HubPeople() {
           onToggleManage={() => (managing ? closeWall() : openWall())}
         />
         )}
-        {!firstRun && !showPanel && stickersBroken ? <StickersLoadError /> : null}
+        {!firstRun && !navInSidebar && stickersBroken ? <StickersLoadError /> : null}
 
         <p className="hub-status" role="status" aria-live="polite" style={{ color: T.textMuted }}>
           {justAdded ? `${justAdded} was added to My People.` : ''}

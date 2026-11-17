@@ -3,9 +3,10 @@
  * active sticker with how many of the listed people have it, then a way into
  * the Sticker Wall (create, edit, archive).
  *
- * This is the sticker navigation on a phone and wherever Contact Hub's content
- * area is too narrow for its inner panel (HubSidePanel). Where the panel is
- * shown, HubPeople does not render this row.
+ * This is the sticker navigation wherever the application sidebar does not
+ * carry Contact Hub's entries (HubSidebarNav): on a phone, with the compact
+ * sidebar, or with no sidebar at all. Where the sidebar does carry them,
+ * HubPeople does not render this row.
  *
  * It reads the page's one sticker registry (StickersProvider) and counts from
  * the people already loaded, exactly as People's filter does. One sticker at a

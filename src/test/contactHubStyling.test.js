@@ -151,17 +151,28 @@ describe('the desktop workspace', () => {
     expect(link).toMatch(/z-index:\s*1/);
     expect(link).toMatch(/overflow-wrap:\s*break-word/);
     expect(link).not.toMatch(/text-overflow|white-space:\s*nowrap/);
-    expect(declarations(hubCss, '.hub-panel-name')).toMatch(/overflow-wrap:\s*break-word/);
+    // A long sticker name in the sidebar entries wraps too; it is not cut off.
+    const stickerName = declarations(hubCss, '.hub-sidenav-name');
+    expect(stickerName).toMatch(/overflow-wrap:\s*break-word/);
+    expect(stickerName).not.toMatch(/text-overflow|white-space:\s*nowrap/);
   });
 
-  it('panel rows and the view buttons are comfortable targets', () => {
-    expect(declarations(hubCss, '.hub-panel-item')).toMatch(/min-height:\s*40px/);
+  it('the sidebar entries and the view buttons are comfortable targets', () => {
+    // 36px, the height of the sidebar's own module items they sit under.
+    expect(declarations(hubCss, '.hub-sidenav-item')).toMatch(/min-height:\s*36px/);
     expect(declarations(hubCss, '.hub-view-btn')).toMatch(/min-height:\s*44px/);
   });
 
-  it('the panel is part of the page, not fixed to the window like the shell', () => {
-    const rule = declarations(hubCss, '.hub-panel');
-    expect(rule).toMatch(/position:\s*sticky/);
-    expect(rule).not.toMatch(/position:\s*fixed/);
+  it('there is no inner panel left in the stylesheet', () => {
+    expect(hubCss).not.toMatch(/\.hub-panel\b/);
+    expect(hubCss).not.toMatch(/\.hub-workspace--panel\b/);
+  });
+
+  it('a long list of stickers in the sidebar scrolls on its own, so the modules below stay within reach', () => {
+    const list = declarations(hubCss, '.hub-sidenav-list');
+    expect(list).toMatch(/max-height:\s*min\(\s*38vh\s*,\s*300px\s*\)/);
+    expect(list).toMatch(/overflow-y:\s*auto/);
+    // Contact Hub's entries never position themselves: they sit in the sidebar's flow.
+    expect(hubCss).not.toMatch(/\.hub-sidenav[^{]*\{[^}]*position:\s*(fixed|sticky|absolute)/);
   });
 });

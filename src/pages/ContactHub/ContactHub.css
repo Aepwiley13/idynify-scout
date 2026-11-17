@@ -20,8 +20,10 @@
   overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
 }
 .hub-inner { max-width: 960px; margin: 0 auto; }
-/* My People uses the room it is given: a table and an inner panel need more
-   than a reading column. A person's page keeps its own narrower measure. */
+/* My People uses the room it is given, now that its navigation is in the
+   application sidebar: the list and the table fill the content area, up to a
+   width that still reads comfortably on a very wide screen. A person's page
+   keeps its own narrower measure. */
 .hub-inner:has(> .hub-workspace) { max-width: 1360px; }
 .hub-workspace { min-width: 0; }
 
@@ -94,7 +96,7 @@
 }
 .hub-primary-btn:focus-visible, .hub-secondary-btn:focus-visible, .hub-chip:focus-visible,
 .hub-icon-btn:focus-visible, .hub-back:focus-visible, .hub-row-link:focus-visible,
-.hub-panel-item:focus-visible, .hub-view-btn:focus-visible, .hub-td-link:focus-visible, .hub-link-btn:focus-visible {
+.hub-view-btn:focus-visible, .hub-td-link:focus-visible, .hub-link-btn:focus-visible {
   outline: 2px solid #4f46e5; outline-offset: 2px;
 }
 
@@ -278,45 +280,16 @@
 .hub-row-stickers--readonly .stk-card-row { gap: 6px; flex-wrap: nowrap; }
 .hub-row-stickers--readonly .stk-card-more { font-size: 12px; }
 
-/* ══ Desktop workspace: inner panel, List / Table, Show more ══════════════
+/* ══ Desktop workspace: List / Table, Show more ═══════════════════════════
    None of this is the application shell. It all sits inside Contact Hub's
    own content area, and HubPeople decides what to draw from the width that
    area really has beside the sidebar, not from the size of the window. */
-
-/* ── Inner panel ── */
-.hub-workspace--panel { display: grid; grid-template-columns: 232px minmax(0, 1fr); gap: 24px; align-items: start; }
-.hub-panel {
-  border: 1px solid; border-radius: 18px; padding: 18px 10px 12px; box-sizing: border-box;
-  /* Stays in view while the people scroll; scrolls itself when one account's
-     stickers are taller than the screen. */
-  position: sticky; top: 0; max-height: calc(100vh - 128px); overflow-y: auto;
-}
-.hub-panel .hub-header { margin: 0 10px 14px; }
-.hub-panel .hub-title { font-size: 20px; }
-.hub-panel .hub-tagline { font-size: 13px; margin-top: 4px; }
-.hub-panel-nav { display: flex; flex-direction: column; gap: 2px; }
-.hub-panel-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
-.hub-panel-label { margin: 14px 10px 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
-.hub-panel-item {
-  display: flex; align-items: center; gap: 10px; width: 100%; box-sizing: border-box;
-  min-height: 40px; padding: 6px 10px; border: none; border-radius: 10px;
-  font: inherit; font-size: 14px; font-weight: 600; text-align: left; cursor: pointer;
-}
-/* The fill is set inline (it is a theme colour), so hover is drawn over it. */
-.hub-panel-item:hover { box-shadow: inset 0 0 0 999px rgba(127, 127, 127, 0.09); }
-.hub-panel-item[aria-current="page"], .hub-panel-item[aria-pressed="true"] { font-weight: 700; }
-.hub-panel-item--new { margin-top: 4px; }
-/* A long sticker name wraps: it is never cut off behind a hover. */
-.hub-panel-name { flex: 1 1 auto; min-width: 0; overflow-wrap: break-word; }
-.hub-panel-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-.hub-panel-count { flex-shrink: 0; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; font-variant-numeric: tabular-nums; }
 
 /* ── Stickers could not be loaded ── */
 .hub-stickers-error {
   display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
   margin-top: 12px; padding: 10px 12px; border: 1px dashed; border-radius: 12px; font-size: 13px;
 }
-.hub-stickers-error--panel { margin: 8px 0 4px; flex-direction: column; align-items: flex-start; }
 .hub-link-btn {
   min-height: 32px; padding: 0; border: none; background: none; cursor: pointer;
   font: inherit; font-weight: 700; text-decoration: underline;
@@ -377,9 +350,16 @@
 /* ── Contact Hub's entries in the application sidebar (HubSidebarNav) ────────
    Drawn inside the sidebar, so they use the sidebar's own colours. */
 .hub-sidenav { display: flex; flex-direction: column; gap: 1px; }
-.hub-sidenav-list { list-style: none; margin: 4px 0 0; padding: 4px 0 0; display: flex; flex-direction: column; gap: 1px; border-top: 1px solid var(--border); }
+/* One account's stickers can be many. Past this height the list scrolls on
+   its own, so the modules below Contact Hub stay within reach in a short
+   window; the sidebar's own scrolling still reaches everything. */
+.hub-sidenav-list {
+  list-style: none; margin: 4px 0 0; padding: 4px 0 0; display: flex; flex-direction: column; gap: 1px;
+  border-top: 1px solid var(--border);
+  max-height: min(38vh, 300px); overflow-y: auto; scrollbar-width: thin; overscroll-behavior: contain;
+}
 .hub-sidenav-item {
-  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 32px;
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px;
   padding: 5px 8px; border: none; border-radius: 8px; background: transparent;
   color: var(--text-secondary); font-family: inherit; font-size: 0.8125rem; font-weight: 500;
   text-align: left; cursor: pointer;
@@ -391,7 +371,8 @@
 }
 .hub-sidenav-item > svg { flex-shrink: 0; }
 .hub-sidenav-item--new { margin-top: 2px; }
-.hub-sidenav-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A long sticker name wraps: it is never cut off behind a hover. */
+.hub-sidenav-name { flex: 1 1 auto; min-width: 0; overflow-wrap: break-word; }
 .hub-sidenav-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
 .hub-sidenav-count { flex-shrink: 0; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
-.hub-stickers-error--sidenav { margin: 4px 0; padding: 6px 8px; font-size: 12px; }
+.hub-stickers-error--sidenav { margin: 4px 0; padding: 6px 8px; font-size: 12px; flex-direction: column; align-items: flex-start; }

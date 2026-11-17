@@ -185,6 +185,29 @@ describe('under Contact Hub, while it is the active module', () => {
     expect(slot()).toContainElement(nav);
   });
 
+  it('the sticker navigation is never duplicated: with the entries here, the page has no chip row and no panel', async () => {
+    renderApp();
+    const nav = await hubNav();
+    await within(nav).findByRole('button', { name: 'VIP, 1 person' });
+    await screen.findByRole('list', { name: 'My People' });
+    expect(screen.queryByRole('group', { name: 'Filter by sticker' })).toBeNull();
+    expect(document.querySelector('.hub-panel')).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'VIP, 1 person' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Sticker Wall' })).toHaveLength(1);
+    expect(screen.getAllByRole('list', { name: 'Filter by sticker' })).toHaveLength(1);
+    // The page keeps its own title and heading.
+    expect(screen.getAllByRole('heading', { level: 1, name: 'Contact Hub' })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 2, name: /My People/ })).toHaveTextContent('(4)');
+  });
+
+  it('the count is everyone, not the number drawn on the page', async () => {
+    contactsData.list = Array.from({ length: 120 }, (_, i) => person(`m${i}`, `Person ${i + 1}`));
+    renderApp();
+    const nav = await hubNav();
+    expect(await within(nav).findByLabelText('120 people')).toHaveTextContent('120');
+    expect(names()).toHaveLength(50);
+  });
+
   it('the global list of modules is exactly what it was', async () => {
     renderApp();
     await hubNav();
@@ -262,6 +285,7 @@ describe('under Contact Hub, while it is the active module', () => {
     await user.click(within(dialog).getByRole('button', { name: /create|save|add/i }));
     await waitFor(() => expect(fake.current.callsOf('createSticker')).toHaveLength(1));
     expect(fake.current.callsOf('createSticker')[0][0]).toBe('u1');
+    expect(fake.current.callsOf('createSticker')[0][1]).toMatchObject({ name: 'Neighbours' });
     expect(await within(nav).findByRole('button', { name: 'Neighbours, 0 people' })).toBeInTheDocument();
     expect(screen.queryByRole('dialog', { name: 'New sticker' })).toBeNull();
   });
@@ -278,15 +302,24 @@ describe('under Contact Hub, while it is the active module', () => {
 });
 
 describe('sticker permissions and states', () => {
-  it('stickers not available for this account: no entries at all, and nothing is subscribed', async () => {
-    fake.current.state.config = config({ enabled: false, mode: 'off', readOnly: false });
+  it.each([
+    ['switched off for the user', { enabled: false, mode: 'off', readOnly: false }],
+    ['read-only (an admin viewing as the user)', { enabled: true, mode: 'beta', readOnly: true }],
+  ])('stickers %s: My People with its count and nothing else, and nothing is subscribed', async (_label, body) => {
+    fake.current.state.config = config(body);
     renderApp();
     await screen.findByRole('list', { name: 'My People' });
     await waitFor(() => expect(fake.current.state.configFetches).toBe(1));
-    noHubNav();
+    const nav = await hubNav();
+    expect(said(nav)).toEqual(['My People']);
+    expect(within(nav).getByLabelText('4 people')).toHaveTextContent('4');
+    expect(within(nav).getByRole('button', { name: /My People/ })).toHaveAttribute('aria-current', 'page');
     expect(within(globalNav()).queryByRole('button', { name: /sticker/i })).toBeNull();
+    expect(screen.queryByText(/could not be loaded/i)).toBeNull();
     expect(fake.current.state.subscriptions).toBe(0);
     expect(moduleLabels()).toEqual(sidebarDestinations().map((d) => d.label));
+    // The page itself has no sticker controls either.
+    expect(screen.queryByRole('group', { name: 'Filter by sticker' })).toBeNull();
   });
 
   it('while availability is still being checked: My People only, nothing that would write', async () => {
@@ -318,19 +351,44 @@ describe('sticker permissions and states', () => {
     expect(within(nav).queryByRole('list')).toBeNull();
   });
 
-  it('nobody in My People yet: no entries, the page is the one invitation', async () => {
+  it('nobody in My People yet: My People (0) and nothing else; the page is the one invitation', async () => {
     contactsData.list = [];
     renderApp();
-    await screen.findByRole('button', { name: /add/i });
+    await screen.findByText('Start with one person');
     await waitFor(() => expect(fake.current.state.configFetches).toBe(1));
-    noHubNav();
+    const nav = await hubNav();
+    // Stickers are on and loaded, but there is nobody for them to act on yet.
+    await waitFor(() => expect(fake.current.state.subscriptions).toBe(1));
+    expect(said(nav)).toEqual(['My People']);
+    expect(within(nav).getByLabelText('0 people')).toHaveTextContent('0');
+    expect(within(nav).getByRole('button', { name: /My People/ })).toHaveAttribute('aria-current', 'page');
+    expect(screen.queryByRole('group', { name: 'Filter by sticker' })).toBeNull();
   });
 
-  it('the people could not be loaded: no entries', async () => {
-    contactsData.fail = true;
+  it('while the people are still loading: My People, with no count yet', async () => {
+    let finish;
+    const { getDocs } = await import('firebase/firestore');
+    getDocs.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
     renderApp();
+    const nav = await hubNav();
+    expect(said(nav)).toEqual(['My People']);
+    expect(within(nav).queryByLabelText(/people|person/)).toBeNull();
+    finish({ docs: contactsData.list.map((d) => ({ id: d.id, data: () => d })) });
+    expect(await within(nav).findByLabelText('4 people')).toBeInTheDocument();
+    expect(await within(nav).findByRole('button', { name: 'New sticker' })).toBeInTheDocument();
+  });
+
+  it('the people could not be loaded: My People with no count, and it still leads back to My People', async () => {
+    const user = userEvent.setup();
+    contactsData.fail = true;
+    renderApp('/contact-hub/stickers');
     await screen.findByText('Your people could not be loaded.');
-    noHubNav();
+    const nav = await hubNav();
+    expect(said(nav)).toEqual(['My People']);
+    expect(within(nav).queryByLabelText(/people|person/)).toBeNull();
+    await user.click(within(nav).getByRole('button', { name: /My People/ }));
+    expect(router.at).toBe('/contact-hub');
+    expect(screen.getByText('Your people could not be loaded.')).toBeInTheDocument();
   });
 });
 

@@ -14,12 +14,16 @@
  * phone, a page rendered without the shell) it draws nothing, and the page's
  * own sticker navigation is what there is.
  *
- * WHAT IT SHOWS IN EACH STATE (the same rules as the page's own panel)
- *   people still loading, failed to load, or nobody yet     nothing
- *   stickers not available for this account                 nothing
+ * WHAT IT SHOWS IN EACH STATE
+ * My People is always here, so Contact Hub always has its entry; its count
+ * appears once the people have loaded. The sticker entries are added when
+ * there is something for them to act on:
+ *   people still loading, or failed to load                 My People
+ *   nobody in My People yet                                 My People (0)
+ *   stickers not available for this account                 My People
  *   stickers still checking or loading                      My People
  *   the sticker list failed to load                         My People, and a message
- *   ready                                                   all of it
+ *   ready, with people                                      all of it
  * New sticker is offered exactly when the page's own sticker controls are:
  * when stickers are available to this user and their list has loaded.
  */
@@ -35,7 +39,7 @@ import { hexOf } from '../../components/stickers/stickerPalette';
 import { createSticker } from '../../services/stickerService';
 import StickerDialog from '../../components/stickers/StickerDialog';
 import { HUB_STATUS, stickersFailedToLoad } from './peopleRules';
-import { StickersLoadError } from './HubSidePanel';
+import StickersLoadError from './StickersLoadError';
 
 /**
  * @param status      ContactHubMain's load of the people (HUB_STATUS)
@@ -53,14 +57,18 @@ export default function HubSidebarNav({ status, people, section, selectedId, onS
   const [creating, setCreating] = useState(false);
   const newButton = useRef(null);
 
-  const shown = Boolean(slot)
-    && status === HUB_STATUS.READY && people.length > 0
-    && stickers.availability !== AVAILABILITY.UNAVAILABLE;
-  if (!shown) return null;
+  // My People is drawn whenever the sidebar offers the place, whatever the
+  // people or the stickers are doing.
+  if (!slot) return null;
 
-  // The wall exists only while stickers are ready; without it that address is My People.
-  const onWall = section === 'wall' && ready;
-  const onPeople = (section === 'people' || (section === 'wall' && !ready)) && !selectedId;
+  const loaded = status === HUB_STATUS.READY;
+  // Sticker entries need people to act on (with nobody yet the page is one
+  // invitation) and stickers that are on for this account.
+  const withPeople = loaded && people.length > 0 && stickers.availability !== AVAILABILITY.UNAVAILABLE;
+  const stickersReady = withPeople && ready;
+  // The wall exists only then; without it that address is My People.
+  const onWall = section === 'wall' && stickersReady;
+  const onPeople = (section === 'people' || (section === 'wall' && !stickersReady)) && !(stickersReady && selectedId);
   const closeDialog = () => { setCreating(false); newButton.current?.focus(); };
   const peopleLabel = `${people.length} ${people.length === 1 ? 'person' : 'people'}`;
 
@@ -77,10 +85,10 @@ export default function HubSidebarNav({ status, people, section, selectedId, onS
           >
             <Users size={15} aria-hidden="true" />
             <span className="hub-sidenav-name">My People</span>
-            <span className="hub-sidenav-count" aria-label={peopleLabel}>{people.length}</span>
+            {loaded ? <span className="hub-sidenav-count" aria-label={peopleLabel}>{people.length}</span> : null}
           </button>
 
-          {ready && (
+          {stickersReady && (
             <button
               type="button"
               className="hub-sidenav-item"
@@ -92,9 +100,9 @@ export default function HubSidebarNav({ status, people, section, selectedId, onS
             </button>
           )}
 
-          {stickersFailedToLoad(stickers) && <StickersLoadError className="hub-stickers-error--sidenav" />}
+          {withPeople && stickersFailedToLoad(stickers) && <StickersLoadError className="hub-stickers-error--sidenav" />}
 
-          {ready && active.length > 0 && (
+          {stickersReady && active.length > 0 && (
             <ul className="hub-sidenav-list" aria-label="Filter by sticker">
               {active.map((sticker) => {
                 const on = section === 'people' && selectedId === sticker.id;
@@ -119,7 +127,7 @@ export default function HubSidebarNav({ status, people, section, selectedId, onS
             </ul>
           )}
 
-          {ready && (
+          {stickersReady && (
             <button
               ref={newButton}
               type="button"

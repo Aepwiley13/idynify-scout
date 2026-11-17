@@ -1,4 +1,5 @@
 import { logApiUsage } from './utils/logApiUsage.js';
+import { checkPaidApiAccess, paidApiDeniedResponse } from './utils/paidApiAccess.js';
 import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
 import { logApolloError } from './utils/apolloErrorLogger.js';
 import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } from './utils/scoutContactContract.js';
@@ -53,6 +54,10 @@ export const handler = async (event) => {
     }
 
     console.log('✅ Auth token verified');
+
+    // Billing Phase 1c: paid Apollo services need paid access, checked on the server before any Apollo call.
+    const paidAccess = await checkPaidApiAccess({ userId });
+    if (!paidAccess.allowed) return paidApiDeniedResponse(paidAccess);
 
     // Build Apollo search query based on provided inputs
     const apolloQuery = buildApolloQuery(searchParams);

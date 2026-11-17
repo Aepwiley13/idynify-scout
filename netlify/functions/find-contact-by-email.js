@@ -9,6 +9,7 @@
  */
 
 import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
+import { checkPaidApiAccess, paidApiDeniedResponse } from './utils/paidApiAccess.js';
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -44,6 +45,10 @@ export const handler = async (event) => {
     if (!verifyRes.ok) throw new Error('Invalid authentication token');
     const verifyData = await verifyRes.json();
     if (verifyData.users[0]?.localId !== userId) throw new Error('Token does not match user ID');
+
+    // Billing Phase 1c: paid Apollo services need paid access, checked on the server before any Apollo call.
+    const paidAccess = await checkPaidApiAccess({ userId });
+    if (!paidAccess.allowed) return paidApiDeniedResponse(paidAccess, CORS_HEADERS);
 
     console.log(`[find-contact-by-email] Looking up: ${email}`);
 

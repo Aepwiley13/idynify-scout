@@ -6,7 +6,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   escapeVCardText, buildContactVCard, buildMyCardVCard, myCardVCardFileName, downloadVCard,
 } from '../utils/vcard';
-import { SHAREABLE_FIELDS } from '../pages/ContactHub/cardRules';
+import { SHAREABLE_FIELDS } from '../utils/myCardRules';
 
 const CRLF = '\r\n';
 const linesOf = (text) => text.split(CRLF);

@@ -9,7 +9,7 @@ import {
   CARD_SCHEMA_VERSION, CARD_DOC_SEGMENTS, PUBLIC_VIEW_KEYS,
   normalizeCardField, normalizeShare, normalizeCard, newCard,
   cardDisplayName, cardInitials, publicCardView, publishedCardView,
-} from '../pages/ContactHub/cardRules';
+} from '../utils/myCardRules';
 
 const ALL_ON = Object.fromEntries(SHAREABLE_FIELDS.map((field) => [field, true]));
 

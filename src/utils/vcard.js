@@ -1,4 +1,4 @@
-import { publicCardView } from '../pages/ContactHub/cardRules';
+import { publicCardView } from './myCardRules';
 
 /**
  * vCard (.vcf) text, version 3.0, which iPhone and Android contacts both read.

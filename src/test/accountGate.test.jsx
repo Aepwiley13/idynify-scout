@@ -399,24 +399,32 @@ describe('App.jsx uses this gate everywhere', () => {
     expect(app).not.toMatch(/hasActiveAccess|hasCompletedPayment/);
   });
 
-  it('ShellRoute, ProtectedRoute and SmartRedirect all render AccountGate', () => {
-    expect(app.match(/<AccountGate\b/g)).toHaveLength(3);
+  // The Free plan's routing lives in components/billing/freePlanRouting.jsx; App.jsx only hooks
+  // into it. Read with the same comment stripping as App.jsx.
+  const freePlanRouting = strip(readFileSync(resolve(process.cwd(), 'src/components/billing/freePlanRouting.jsx'), 'utf8'));
+
+  it('ProtectedRoute and SmartRedirect render AccountGate; ShellRoute renders ShellAccountGate, which renders it', () => {
+    expect(app.match(/<AccountGate\b/g)).toHaveLength(2);
+    expect(app.match(/<ShellAccountGate\b/g)).toHaveLength(1);
+    expect(freePlanRouting.match(/<AccountGate\b/g)).toHaveLength(1);
   });
 
-  it('the only bare redirect to checkout left is the signed-in /signup route, which lands on a guarded route', () => {
-    const redirects = app.match(/<Navigate to="\/checkout" \/>/g) ?? [];
-    expect(redirects).toHaveLength(1);
-    // The Free plan moved it into SignedInSignupRedirect: /checkout when the Free plan is off,
-    // exactly as before; otherwise checkout for a paid tier or the Contact Hub. All guarded.
+  it('the only bare redirect to checkout left is the signed-in /signup redirect, which lands on a guarded route', () => {
+    expect(app.match(/<Navigate to="\/checkout" \/>/g) ?? []).toHaveLength(0);
     expect(app).toMatch(/path="\/signup" element=\{!user \? <Signup \/> : <SignedInSignupRedirect \/>\}/);
-    expect(app).toMatch(/if \(!FREE_PLAN\.enabled\) return <Navigate to="\/checkout" \/>;/);
+    // /checkout when the Free plan is off, exactly as before; otherwise checkout for a paid tier or
+    // the Contact Hub. All guarded routes.
+    expect(freePlanRouting.match(/<Navigate to="\/checkout" \/>/g) ?? []).toHaveLength(1);
+    expect(freePlanRouting).toMatch(/if \(!FREE_PLAN\.enabled\) return <Navigate to="\/checkout" \/>;/);
   });
 
   it('the shell lets a free route skip the paid check, and never skips the verification check', () => {
     // requirePayment may be relaxed for a free route; nothing else about the decision changes, so
     // a failed or cache-only read still reaches the verification screen (accessDecision).
-    expect(app).toMatch(/requirePayment=\{requirePayment && !freeRoute\}/);
-    expect(app).toMatch(/upgrade=\{FREE_PLAN\.enabled \? \(/);
+    expect(freePlanRouting).toMatch(/requirePayment=\{requirePayment && !freeRoute\}/);
+    expect(freePlanRouting).toMatch(/upgrade=\{FREE_PLAN\.enabled \? layout\(<UpgradeRequired \/>\) : null\}/);
+    expect(app).not.toMatch(/hasActiveAccess|hasCompletedPayment/);
+    expect(freePlanRouting).not.toMatch(/hasActiveAccess|hasCompletedPayment/);
   });
 
   it('all three checkout routes need the server\'s answer', () => {

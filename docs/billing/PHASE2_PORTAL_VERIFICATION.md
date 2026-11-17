@@ -3,6 +3,21 @@
 **Status: verification of Stripe's API definitions done; test-mode verification not yet run.**
 Nothing here changes code, Stripe or Firebase. Phase 2 implementation is not approved.
 
+## The owner's preferences, against what Stripe handles by itself
+
+| Preference | Stripe alone? | How |
+|---|---|---|
+| Payment details, invoices, cancellation in the Customer Portal | **Yes** | The portal configuration from `stripeTestModeSetup.mjs`: payment methods, invoices, billing details, cancel at period end |
+| Simple customer-controlled pause and resume | **Not yet safely.** Portal pause exists only on the newest API in the redesigned portal (3 weeks old), and it is immediate | Stripe's own scheduled pause and resume calls, from one small function (below) |
+| Upgrades only after payment | **No.** The portal has no "apply after payment" setting | Stripe's pending updates, from the same small function |
+| Downgrades at period end | Portal yes, but turning portal plan switching on also allows unpaid upgrades | Stripe's subscription schedule, from the same function |
+| No unexpected automatic charges | Partly | Cancel and pause never charge. Resume and upgrade show the amount and date and need the customer's confirmation before the call is made |
+| Data kept when paid access ends | **Yes, already** | Paid access is one server-written flag. Ending it never touches contacts, stickers, notes or profiles; the account becomes Free |
+
+So the only custom piece is **one server function that makes four kinds of Stripe call**. Stripe
+does all the billing: proration, payment, schedules and invoices. There is no new database,
+scheduler or ledger.
+
 ## How this was verified, and what that does and does not prove
 
 `docs.stripe.com` cannot be reached from the cloud session this was written in (its host is not

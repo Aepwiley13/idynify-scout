@@ -19,13 +19,14 @@
  *   isOpen   — boolean, controls visibility
  *   onClose  — () => void
  *   isAdmin  — boolean (optional), shows Admin tile when true
+ *   barryAvailable — boolean (optional, default true), shows the Barry tile when true
  */
 import { useNavigate } from 'react-router-dom';
 import { Home, Users, Settings, LogOut, X, Brain, Shield, RotateCcw, Moon, Sun } from 'lucide-react';
 import { auth } from '../../firebase/config';
 import { useThemeToggle } from '../../theme/useThemeToggle';
 
-export default function MoreSheet({ isOpen, onClose, isAdmin = false, onOpenBarry }) {
+export default function MoreSheet({ isOpen, onClose, isAdmin = false, onOpenBarry, barryAvailable = true }) {
   const navigate = useNavigate();
   const { isDark, nextLabel, toggleTheme } = useThemeToggle();
 
@@ -46,14 +47,17 @@ export default function MoreSheet({ isOpen, onClose, isAdmin = false, onOpenBarr
         </div>
 
         <div className="more-sheet-grid">
-          {/* Barry — mobile entry point to the globally-mounted shell panel */}
-          <button
-            className="more-sheet-item"
-            onClick={() => { onOpenBarry?.(); onClose(); }}
-          >
-            <span aria-hidden="true" style={{ fontSize: 22, lineHeight: 1 }}>🐻</span>
-            <span>Barry</span>
-          </button>
+          {/* Barry — mobile entry point to the globally-mounted shell panel.
+              Not offered when the shell has no Barry for this account (billing Phase 1d). */}
+          {barryAvailable && (
+            <button
+              className="more-sheet-item"
+              onClick={() => { onOpenBarry?.(); onClose(); }}
+            >
+              <span aria-hidden="true" style={{ fontSize: 22, lineHeight: 1 }}>🐻</span>
+              <span>Barry</span>
+            </button>
+          )}
 
           {/* Modules not in the primary bottom nav */}
           <button className="more-sheet-item" onClick={() => go('/recon')}>

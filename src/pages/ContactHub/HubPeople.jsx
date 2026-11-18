@@ -15,7 +15,7 @@
  */
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
-import { Mail, Phone, Search, UserPlus, Users, X } from 'lucide-react';
+import { Mail, Phone, Search, Upload, UserPlus, Users, X } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import { contactHubPersonPath } from '../../constants/contactHub';
@@ -26,6 +26,8 @@ import ContactCardStickersInteractive from '../../components/stickers/ContactCar
 import ContactCardStickers from '../../components/stickers/ContactCardStickers';
 import StickersWall from '../../components/stickers/StickersWall';
 import ManualContactForm from '../../components/scout/ManualContactForm';
+import ImportPeopleDialog from '../../components/contactImport/ImportPeopleDialog';
+import { importSummary } from '../../components/contactImport/importPeople';
 import StickerChipRow from './StickerChipRow';
 import { describeAddPersonError } from './addPersonErrors';
 import {
@@ -167,6 +169,8 @@ export default function HubPeople() {
   } = useOutletContext();
   const stickers = useStickers();
   const [adding, setAdding] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [imported, setImported] = useState('');
   const [managing, setManaging] = useState(false);
   const [justAdded, setJustAdded] = useState(null);
 
@@ -192,7 +196,16 @@ export default function HubPeople() {
   function handleAdded(added) {
     addContacts(added);
     setAdding(false);
+    setImported('');
     setJustAdded(added?.[0] ? personName(added[0]) : null);
+  }
+
+  // An import can add people and update people already here: read the list again.
+  function handleImported(result) {
+    setImporting(false);
+    setJustAdded(null);
+    setImported(importSummary(result));
+    reload();
   }
 
   function selectSticker(id) {
@@ -227,6 +240,12 @@ export default function HubPeople() {
       {isMobile ? 'Add' : 'Add Person'}
     </button>
   );
+  const importButton = (
+    <button key="import" type="button" className="hub-secondary-btn" aria-label="Import People" style={{ color: T.text, borderColor: T.border }} onClick={() => setImporting(true)}>
+      <Upload size={16} aria-hidden="true" />
+      Import
+    </button>
+  );
 
   return (
     <>
@@ -249,7 +268,7 @@ export default function HubPeople() {
             My People
             {status === HUB_STATUS.READY && !firstRun ? <span className="hub-count" style={{ color: T.textMuted }}> ({people.length})</span> : null}
           </h2>
-          {!firstRun && (isMobile ? [addButton, searchField] : [searchField, addButton])}
+          {!firstRun && (isMobile ? [addButton, importButton, searchField] : [searchField, importButton, addButton])}
         </div>
 
         {!firstRun && (
@@ -263,7 +282,7 @@ export default function HubPeople() {
         )}
 
         <p className="hub-status" role="status" aria-live="polite" style={{ color: T.textMuted }}>
-          {justAdded ? `${justAdded} was added to My People.` : ''}
+          {justAdded ? `${justAdded} was added to My People.` : imported}
         </p>
 
         {status === HUB_STATUS.LOADING && (
@@ -328,6 +347,7 @@ export default function HubPeople() {
       </section>
 
       {adding ? <AddPersonDialog onClose={() => setAdding(false)} onAdded={handleAdded} /> : null}
+      {importing ? <ImportPeopleDialog onClose={() => setImporting(false)} onImported={handleImported} /> : null}
     </>
   );
 }

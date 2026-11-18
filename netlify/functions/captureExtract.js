@@ -43,6 +43,7 @@ import { resolveExtractor } from './utils/capture/extractors.js';
 import { runExtraction } from './utils/capture/orchestrator.js';
 import { CaptureExtractorError, EXTRACTOR_ERRORS, RESPONSE_STATUS, isRetryable } from './utils/capture/errors.js';
 import { captureLog } from './utils/capture/captureLog.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
 export const OPERATION = 'captureExtract';
 
@@ -89,7 +90,7 @@ async function transition(uid, operationId, to, patch) {
   }
 }
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   const startedAt = Date.now();
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: { ...HEADERS }, body: '' };
   if (event.httpMethod !== 'POST') return failure('method_not_allowed');
@@ -207,3 +208,6 @@ export const handler = async (event) => {
     return respond(500, { error: 'internal_error', operationId });
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'captureExtract' });

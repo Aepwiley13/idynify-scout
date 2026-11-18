@@ -28,6 +28,7 @@ import { logApiUsage } from './utils/logApiUsage.js';
 import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 import { encodeHeaderValue, formatAddress } from './utils/emailHeaders.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
 if (getApps().length === 0) {
   initializeApp({
@@ -232,7 +233,7 @@ async function executeCalendarCheck(userId, params) {
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   const startTime = Date.now();
 
   if (event.httpMethod !== 'POST') {
@@ -338,3 +339,6 @@ export const handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) };
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'barryActions' });

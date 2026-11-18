@@ -9,6 +9,8 @@
  *   firebase-admin/app|/firestore, ./firebase-admin.js
  *                              → an in-memory Firestore holding the synthetic fixtures
  *   utils/logApiUsage.js       → a no-op (it writes usage rows to Firestore)
+ *   utils/paidAiAccess.js      → the handler itself (the paid-plan check reads Firestore and
+ *                                verifies a token; it is tested on its own)
  *
  * compare.mjs itself imports the real SDK, which is not intercepted.
  *
@@ -36,6 +38,7 @@ export async function resolve(specifier, context, next) {
   if (fromFunctions(context)) {
     if (resolved.url === `${FUNCTIONS}firebase-admin.js`) return stub('firebase-admin-local.mjs');
     if (resolved.url === `${FUNCTIONS}utils/logApiUsage.js`) return stub('logApiUsage.mjs');
+    if (resolved.url === `${FUNCTIONS}utils/paidAiAccess.js`) return stub('paidAiAccess.mjs');
   }
   return resolved;
 }

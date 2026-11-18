@@ -5,6 +5,7 @@ import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
 import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
 import { OUTBOUND_COPY_RULES } from './utils/outboundCopyRules.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {
@@ -23,7 +24,7 @@ if (getApps().length === 0) {
 
 const db = getFirestore();
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   const startTime = Date.now();
 
   // Only allow POST
@@ -269,3 +270,6 @@ BODY:
     };
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'generate-campaign-messages' });

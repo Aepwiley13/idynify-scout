@@ -1,8 +1,9 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { MODEL_DEEP } from './utils/models.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   const startTime = Date.now();
 
   // Only allow POST
@@ -245,3 +246,6 @@ Return ONLY valid JSON. No markdown. No explanations. No \`\`\`json fences. Just
     };
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'generate-section-8' });

@@ -31,6 +31,7 @@ import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { MODEL_DEEP } from './utils/models.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -520,7 +521,7 @@ function respond(statusCode, body) {
   return { statusCode, headers: HEADERS, body: JSON.stringify(body) };
 }
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 204, headers: HEADERS, body: '' };
   }
@@ -656,3 +657,6 @@ export const handler = async (event) => {
     return respond(500, { success: false, message: FRIENDLY.generic });
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'analyze-website' });

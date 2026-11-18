@@ -2,8 +2,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { MODEL_DEEP } from './utils/models.js';
 import { load } from 'cheerio';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
-export async function handler(event, context) {
+async function unguardedHandler(event, context) {
   const startTime = Date.now();
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -331,3 +332,6 @@ function extractSocialLinks(html) {
   if (linkedinMatch) links.linkedin = linkedinMatch[0];
   return links;
 }
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'crawl-website-contacts' });

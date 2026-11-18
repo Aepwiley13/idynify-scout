@@ -11,6 +11,7 @@ import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
 import { OUTBOUND_COPY_RULES } from './utils/outboundCopyRules.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 import { loadCompanyFactsForBarry, formatCompanyFactsBlock, resolveDisplayCompanyFields } from './utils/barryCompanyFacts.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
 /**
  * GENERATE ENGAGEMENT MESSAGE - Barry AI Intelligence Engine
@@ -48,7 +49,7 @@ if (getApps().length === 0) {
 
 const db = getFirestore();
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   const startTime = Date.now();
 
   // CORS preflight
@@ -717,3 +718,6 @@ Generate the messages now. Respond ONLY with valid JSON.`;
     };
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'generate-engagement-message' });

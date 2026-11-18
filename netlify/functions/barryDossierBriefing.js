@@ -1,7 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { MODEL_DEEP } from './utils/models.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
@@ -115,3 +116,6 @@ Write a 3-5 sentence briefing explaining why this company is or isn't a strong t
     };
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'barryDossierBriefing' });

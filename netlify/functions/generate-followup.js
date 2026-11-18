@@ -14,6 +14,7 @@ const admin = require('firebase-admin');
 const Anthropic = require('@anthropic-ai/sdk');
 const { MODEL_BARRY_SONNET, barrySonnetOptions } = require('./utils/models.js');
 const { readClaudeText, claudeErrorCode } = require('./utils/claudeResponse.js');
+const { withPaidAiAccess } = require('./utils/paidAiAccess.js');
 
 // Initialize Firebase Admin (if not already initialized)
 if (!admin.apps.length) {
@@ -31,7 +32,7 @@ const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY
 });
 
-exports.handler = async (event) => {
+const unguardedHandler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
@@ -119,3 +120,6 @@ Generate the follow-up email body:`;
     };
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+exports.handler = withPaidAiAccess(unguardedHandler, { feature: 'generate-followup' });

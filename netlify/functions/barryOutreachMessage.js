@@ -1,7 +1,8 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { MODEL_DEEP } from './utils/models.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
@@ -125,3 +126,6 @@ Output the message only. No labels, no subject line, no preamble.`;
     };
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'barryOutreachMessage' });

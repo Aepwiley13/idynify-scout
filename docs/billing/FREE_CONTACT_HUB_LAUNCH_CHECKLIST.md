@@ -10,10 +10,13 @@ production Firebase rules. Phase 1 needs **no Firestore rules deploy**.
 |---|---|---|---|
 | A1 | Concurrent-checkout test fix (#805) | Removes a one-in-ten CI flake in `billing-emulator`; test-only | Recommended first, so every later PR's CI is trustworthy |
 | A2 | Phase 0: Stripe test mode (#801) | Lets A6 be validated in Stripe test mode | Yes, for B |
-| A3 | **Phase 1c: paid-API guard** | Free and lapsed accounts can no longer make Idynify pay for Apollo, including by calling the functions directly; the weekday refresh skips them | **Yes — before the Free plan is switched on** |
-| A4 | Phase 1a: Free accounts (#802) | No-card signup, free Contact Hub, in-app upgrade screen. Off until the build switch in C1 | Yes |
+| A3 | **Phase 1c: paid-API guard (#806)** | Free and lapsed accounts can no longer make Idynify pay for Apollo, including by calling the functions directly; the weekday refresh skips them | **Yes — before the Free plan is switched on** |
+| A3b | **Phase 1d: paid-AI guard (#809)** | The same for Claude: every Claude-powered function refuses accounts without paid access (402) before any Claude call; the Barry inbox worker skips them; the shell hides Barry from them | **Yes — before the Free plan is switched on** |
+| A4 | Phase 1a: Free accounts (#802) | No-card signup, free Contact Hub, in-app upgrade screen. Off until the build switch in C1. Its free welcome email carries the **owner's final copy** (relationships and connections) before C1 | Yes |
+| A4b | Welcome-email hardening (#807, separate workstream) | Merged by that workstream after #802; billing does not change it | That workstream's call |
 | A5 | Integration check with Contact Hub / My Card | Rebase onto `main` after the Contact Hub team's My Card merge; re-run CI and the free-route tests | Yes |
-| A6 | Phase 1b: authenticated checkout (#803) | Retires Payment Links (duplicate-subscription risk for existing and returning customers) | Strongly recommended; **only after B passes** |
+| A6 | Phase 1b: authenticated checkout (#803) | Retires Payment Links (duplicate-subscription risk for existing and returning customers) | **Only after B passes.** If B is not done in time, use A6-alt instead |
+| A6-alt | Upgrade hold (#810), **instead of** A6 | Free Contact Hub launches; no existing account is offered a Payment Link (support starts Scout for them); today's paid signup flow is unchanged | Only if A6 is not ready at launch. #803 lifts it later |
 
 ## B. Stripe test-mode validation (before A6 is published)
 
@@ -29,9 +32,14 @@ must all pass, each confirmed with the read-only `billingAccountSnapshot.mjs`:
 5. An existing subscriber trying to buy again: sent to Billing, nothing offered, still one subscription.
 6. A replayed webhook: no second grant.
 
-**If A6 is not ready**, the Free plan can still launch with Payment Links:
-- **New Free customers can upgrade safely.** They have no Stripe customer yet, so there is nothing to duplicate.
-- **The risk stays for existing and returning customers** (a second subscription they are billed for). With a small, known customer base it can be handled by hand, but that is a risk accepted, not removed.
+**If A6 is not ready**, the Free plan launches with **A6-alt (#810)** instead, and Payment Links stay
+live only for today's paid signup flow:
+- **No existing account is offered a purchase.** Settings → Billing and "This is part of Scout" show
+  "Contact us to start Scout"; `/checkout` sends a Free, lapsed or subscribed account to Settings →
+  Billing. Support starts the plan in the Stripe Dashboard on that account's own customer.
+- **A new paid signup** (a paid plan chosen at signup, not paid yet, no Stripe history) checks out by
+  Payment Link exactly as today.
+- When B passes, #803 is published with the hold lifted in the same release.
 
 ## C. Production configuration (owner, each approved separately)
 
@@ -51,15 +59,19 @@ No Stripe setting changes for this launch. `VITE_STRIPE_ENABLED` stays as it is.
    - sign up, land in Contact Hub;
    - add a person, add a sticker, write a note;
    - open Scout and see "This is part of Scout";
-   - Settings → Billing shows Free.
-5. Smoke test with a paying account: Scout works, and Settings → Billing shows the plan with no checkout link.
-6. Confirm the guard in the function logs: a direct call to an enrichment function as the Free account returns 402, and no Apollo request appears in the admin API activity page.
+   - no Barry control in the sidebar or the More sheet;
+   - Settings → Billing shows Free (with A6-alt: "Contact us to start Scout", no upgrade buttons).
+5. Smoke test with a paying account: Scout works, Barry opens and answers, and Settings → Billing shows the plan with no checkout link.
+6. Confirm both guards in the function logs: a direct call to an enrichment function and to a Barry
+   function (for example `barryMissionChat`) as the Free account each return 402, with no Apollo
+   request in the admin API activity page and a `paid_ai_access.denied` line naming the function.
 
 ## E. First week
 
 - **Daily:** `billingAmbiguousAccounts` with `status == pending` (runbook §9.3).
 - **Daily:** Apollo credits used (Apollo usage page) against the previous trend.
-- **402s:** counts of `paid_plan_required` in the function logs. Many from one account means someone is calling the API directly.
+- **402s:** counts of `paid_plan_required` (Apollo) and `paid_ai_access.denied` (Claude) in the function logs. Many from one account means someone is calling the API directly. A paying customer among them is a defect: fix forward.
+- **Inbox queue:** entries with status `skipped_not_paid` belong to accounts without paid access; they can be set back to `pending` after an upgrade if wanted.
 - **Signups:** Free signups and upgrades (signup analytics, Stripe).
 
 ## F. Rollback — free customers keep their contacts
@@ -72,6 +84,7 @@ page or hide their contacts. Nothing in any rollback deletes data.
 | Stop new Free signups (a problem with Free signup, abuse, cost) | Set **`VITE_FREE_PLAN=existing`**, rebuild, publish manually | Keep Contact Hub and Settings. New visitors sign up for a paid plan, as before launch |
 | A defect in a free page | Fix forward. If urgent, `existing` while the fix is built | Unaffected |
 | Paid-API guard (#806) misbehaves for paying customers | Fix forward; it only ever refuses, so it cannot over-spend | Unaffected |
+| Paid-AI guard (#809) refuses a paying customer | Fix forward; it only ever refuses. Reverting it re-opens Claude to Free accounts, so do that only together with `existing` | Unaffected |
 | Checkout misbehaves after A6 | Publish the deploy from before A6; Payment Links return | Unaffected: Free access does not depend on checkout |
 | The whole release must go | Publish the previous production deploy (hardened billing, allocation on; never a pre-ledger build, runbook §5) | **Locked out until a fixed build is published:** that build has no Free plan, so it sends them to checkout. Their contacts are intact and come back with the fix. Use only if `existing` cannot help, and tell free customers |
 

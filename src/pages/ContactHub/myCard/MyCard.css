@@ -312,6 +312,10 @@
   padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card);
 }
 .mycard-download .mycard-btn { max-width: 100%; }
+/* The two downloads side by side where there is room, and one under the other where there is not. */
+.mycard-download-actions { display: flex; flex-wrap: wrap; gap: 8px; max-width: 100%; }
+.mycard-download-picture { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: 100%; }
+.mycard-download-picture-img { display: block; width: 100%; max-width: 320px; height: auto; border: 1px solid var(--border); border-radius: 12px; }
 .mycard-download-note { margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-secondary); }
 .mycard-download-feedback { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--text-primary); }
 .mycard-download-feedback--error { color: var(--status-error-text); }

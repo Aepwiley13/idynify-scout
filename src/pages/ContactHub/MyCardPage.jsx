@@ -43,6 +43,8 @@ import MyCardSaveBar from './myCard/MyCardSaveBar';
 import MyCardDownload from './myCard/MyCardDownload';
 import { MyCardBlocked, MyCardNotices } from './myCard/MyCardNotices';
 import { contactDownloadState, downloadContact } from './myCard/downloadContact';
+import { imageDownloadState } from './myCard/cardImageDownload';
+import { useCardImageDownload } from './myCard/useCardImageDownload';
 import { useMyCard } from './myCard/state/useMyCard';
 import { describeChanges } from './myCard/state/myCardDiff';
 
@@ -81,6 +83,9 @@ export default function MyCardPage() {
   const [downloaded, setDownloaded] = useState(null);
   const handleDownload = () => setDownloaded({ forCard: draft.card, result: downloadContact(draft.card) });
   const feedback = downloaded && downloaded.forCard === draft.card ? downloaded.result : null;
+
+  // The card image is made from the same draft, by the card's own renderer: only what is Shared, and never saved.
+  const cardImage = useCardImageDownload(draft.card);
 
   const navigate = useNavigate();
   // The Sticker Wall is offered here too, on the server's answer alone: this page is outside ContactHubMain's
@@ -148,7 +153,19 @@ export default function MyCardPage() {
       preview={(
         <>
           <MyCardPreview card={draft.card} />
-          <MyCardDownload available={download.available} onDownload={handleDownload} feedback={feedback} />
+          <MyCardDownload
+            available={download.available}
+            onDownload={handleDownload}
+            feedback={feedback}
+            image={{
+              available: imageDownloadState(draft.card).available,
+              busy: cardImage.busy,
+              onDownload: cardImage.download,
+              feedback: cardImage.feedback,
+              pictureUrl: cardImage.pictureUrl,
+              onClosePicture: cardImage.closePicture,
+            }}
+          />
         </>
       )}
       actions={(

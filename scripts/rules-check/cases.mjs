@@ -43,6 +43,7 @@ await env.withSecurityRulesDisabled(async (ctx) => {
     [`users/${U}/notifications/n1`, { seen: false }],
     [`users/${U}/companies/c2`, { status: 'pending' }],
     ['ops_alerts/daily-leads-refresh', { lastAlertAtMs: 1, job: 'daily-leads-refresh' }],
+    [`users/${U}/creditTransactions/t1`, { action: 'enrichContact', cost: 1 }],
   ]) await setDoc(doc(db, p[0]), p[1]);
 });
 
@@ -82,6 +83,14 @@ const CASES = [
   ['22  ops_alerts create a new job doc', 'DENY',
       () => setDoc(doc(me, 'ops_alerts/gmail-sync-worker'), { lastAlertAtMs: 9e15 })],
   ['23  ops_alerts delete', 'DENY', () => deleteDoc(doc(me, 'ops_alerts/daily-leads-refresh'))],
+  // Billing W4: credit records are the server's. The owner reads; nobody writes.
+  ['24  get    creditTransactions/t1', 'ALLOW', () => getDoc(doc(me, `users/${U}/creditTransactions/t1`))],
+  ['25  create creditTransactions/t2 (a fake refund)', 'DENY', () => setDoc(doc(me, `users/${U}/creditTransactions/t2`), { action: 'refund', cost: -500 })],
+  ['26  update creditTransactions/t1', 'DENY', () => updateDoc(doc(me, `users/${U}/creditTransactions/t1`), { cost: 0 })],
+  ['27  delete creditTransactions/t1', 'DENY', () => deleteDoc(doc(me, `users/${U}/creditTransactions/t1`))],
+  ['28  create creditCharges/k1 (pretend a lookup was charged)', 'DENY', () => setDoc(doc(me, `users/${U}/creditCharges/k1`), { status: 'settled', response: '{}' })],
+  ['29  create creditUsage/2026-11-18 (reset the daily count)', 'DENY', () => setDoc(doc(me, `users/${U}/creditUsage/2026-11-18`), { searches: 0 })],
+  ['30  create creditTransactions/t1/x/y (3-deep)', 'DENY', () => setDoc(doc(me, `users/${U}/creditTransactions/t1/x/y`), { a: 1 })],
 ];
 
 // ── users/{uid}: server-controlled fields ──────────────────────────────────

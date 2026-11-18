@@ -61,8 +61,9 @@ import { searchLinkedInCandidates, searchLinkedInPhoto } from './utils/linkedinS
 import { rankLinkedInCandidates, readPerson, candidateFromApolloPerson } from './utils/capture/linkedinCandidates.js';
 import { enrichmentPatch } from '../../src/utils/contactProtection.js';
 import { load } from 'cheerio';
+import { withCreditMetering } from './utils/creditMetering.js';
 
-export const handler = async (event) => {
+const unmeteredHandler = async (event) => {
   const startTime = Date.now();
 
   if (event.httpMethod !== 'POST') {
@@ -966,3 +967,6 @@ function inferDecisionMaker(seniority, title) {
 
   return false;
 }
+
+// Billing W4: credit metering, off until CREDIT_METERING=on (utils/creditMetering.js).
+export const handler = withCreditMetering(unmeteredHandler, { action: 'barryEnrich' });

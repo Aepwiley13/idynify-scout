@@ -2,13 +2,14 @@ import { logApiUsage } from './utils/logApiUsage.js';
 import { checkPaidApiAccess, paidApiDeniedResponse } from './utils/paidApiAccess.js';
 import { APOLLO_ENDPOINTS, getApolloHeaders } from './utils/apolloConstants.js';
 import { logApolloError } from './utils/apolloErrorLogger.js';
+import { withCreditMetering } from './utils/creditMetering.js';
 
 /**
  * Manual Company Search via Apollo API
  * Searches for companies by name and returns up to 10 matches
  */
 
-export async function handler(event, context) {
+async function unmeteredHandler(event, context) {
   const headers = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization',
@@ -223,3 +224,6 @@ export async function handler(event, context) {
     };
   }
 }
+
+// Billing W4: credit metering, off until CREDIT_METERING=on (utils/creditMetering.js).
+export const handler = withCreditMetering(unmeteredHandler, { action: 'search-companies-manual' });

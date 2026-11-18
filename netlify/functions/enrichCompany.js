@@ -5,6 +5,7 @@ import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } fr
 import { verifyAuthToken } from './utils/verifyAuthToken.js';
 import { checkPaidApiAccess, paidApiDeniedResponse } from './utils/paidApiAccess.js';
 import { canonicalCompanyFields, buildBarryIntel } from './utils/companyFacts.js';
+import { withCreditMetering } from './utils/creditMetering.js';
 
 // `mode: 'company'` runs the organization lookup only: one Apollo call, no
 // decision-maker search and no person matches. Used after a user accepts a
@@ -12,7 +13,7 @@ import { canonicalCompanyFields, buildBarryIntel } from './utils/companyFacts.js
 // is the full enrichment the company detail views use.
 export const ENRICH_MODE = Object.freeze({ FULL: 'full', COMPANY: 'company' });
 
-export const handler = async (event) => {
+const unmeteredHandler = async (event) => {
   const startTime = Date.now();
 
   if (event.httpMethod !== 'POST') {
@@ -403,3 +404,6 @@ function filterTechStack(technologies) {
     uid: tech.uid
   }));
 }
+
+// Billing W4: credit metering, off until CREDIT_METERING=on (utils/creditMetering.js).
+export const handler = withCreditMetering(unmeteredHandler, { action: 'enrichCompany' });

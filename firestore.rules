@@ -171,6 +171,13 @@ service cloud.firestore {
       return coll == 'integrations' && docId == 'linkedin';
     }
 
+    // Billing W4: the credit log, per-request charge records and daily search
+    // counts are written only by the server's credit metering (Admin SDK).
+    // The owner may read them; no client may create, change or delete them.
+    function serverOwnedCredits(coll) {
+      return coll == 'creditTransactions' || coll == 'creditCharges' || coll == 'creditUsage';
+    }
+
     // ── Stickers (ADR-007) ──────────────────────────────────────────────────
 
     // The rollback switch. Returning false denies every sticker write and
@@ -324,12 +331,14 @@ service cloud.firestore {
         allow create: if owns(userId) && coll != 'capture_operations'
                       && coll != 'stickers'
                       && !serverOwnedIntegration(coll, docId)
+                      && !serverOwnedCredits(coll)
                       && contactStickersOk(coll, userId);
         allow update, delete: if owns(userId)
                               && coll != 'lineageEvents'
                               && coll != 'capture_operations'
                               && coll != 'stickers'
                               && !serverOwnedIntegration(coll, docId)
+                              && !serverOwnedCredits(coll)
                               && contactStickersOk(coll, userId);
       }
 
@@ -367,6 +376,7 @@ service cloud.firestore {
                      && coll != 'capture_operations'
                      && coll != 'stickers'
                      && !serverOwnedIntegration(coll, docId)
+                     && !serverOwnedCredits(coll)
                      && contactStickersOk(coll, userId);
       }
     }

@@ -9,10 +9,11 @@
  *
  * It runs against the local app started by
  *   node scripts/staging/stagingDev.mjs --env=<staging env file> --billing --apollo-mock
- * with, in the env file, VITE_CONTACT_HUB=on, VITE_FREE_PLAN=on, VITE_STRIPE_ENABLED=true and
- * CREDIT_METERING=on, plus `stripe listen` forwarding to the local webhook
- * (docs/billing/CHECKOUT_TEST_MODE_VALIDATION.md §2). Apollo is the local stand-in: no real
- * Apollo request is made, and the test checks that.
+ * with, in the env file, VITE_CONTACT_HUB=on, VITE_FREE_PLAN=on and VITE_STRIPE_ENABLED=true, and
+ * CREDIT_METERING NOT set (metering off: the first validation run), plus `stripe listen`
+ * forwarding to the local webhook (docs/billing/STAGING_VALIDATION_RUNBOOK.md Parts 4–5, 9).
+ * --expect-metering is for the separately approved run with CREDIT_METERING=on (Part 11).
+ * Apollo is the local stand-in: no real Apollo request is made, and the test checks that.
  *
  * Every check that reads data does so read-only, through the same staging-only guard as
  * billingAccountSnapshot.mjs (staging project, test-mode Stripe key, never production).

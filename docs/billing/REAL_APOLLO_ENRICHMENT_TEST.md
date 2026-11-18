@@ -6,7 +6,7 @@ the staging tools refuse an Apollo key (preflight I5) and only allow the local s
 
 ## Purpose
 
-The end-to-end test ([FREE_TO_SCOUT_E2E.md](FREE_TO_SCOUT_E2E.md)) uses a stand-in for Apollo. This
+The staging validation ([STAGING_VALIDATION_RUNBOOK.md](STAGING_VALIDATION_RUNBOOK.md)) uses a stand-in for Apollo. This
 one manual test confirms, with one real lookup, that:
 
 1. Apollo's real response is read the way the stand-in's is: the person is enriched, nothing the
@@ -35,7 +35,7 @@ run, with a confirmation prompt and the stand-in off. Not built.
 
 1. (B only) Store the key like the Stripe test key: hidden prompt, an env file outside the
    repository with `umask 077`, never pasted into chat or a commit
-   ([CHECKOUT_TEST_MODE_VALIDATION.md](CHECKOUT_TEST_MODE_VALIDATION.md) §1.5).
+   ([STAGING_VALIDATION_RUNBOOK.md](STAGING_VALIDATION_RUNBOOK.md) Part 2, step 5).
 2. Note the account's credits remaining and Apollo's usage counter (Apollo → Settings → Usage).
 3. Enrich one contact once.
 4. The contact shows the found details; every value that was already on the contact is unchanged;

@@ -2,7 +2,7 @@
 /**
  * STAGING + STRIPE TEST MODE ONLY, READ-ONLY: one account's billing state, checked.
  *
- * For the checkout validation in docs/billing/CHECKOUT_TEST_MODE_VALIDATION.md. After each
+ * For the staging validation in docs/billing/STAGING_VALIDATION_RUNBOOK.md. After each
  * scenario it prints what the app, the webhook and Stripe now hold for one test account, and
  * whether that is consistent: one live subscription at most, paid access matching Stripe, the
  * plan's credits, one grant per subscription, nothing waiting in the review queue, no stuck

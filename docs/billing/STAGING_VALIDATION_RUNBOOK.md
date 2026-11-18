@@ -209,10 +209,19 @@ Part 5. After Part 5 steps 1–2 it says **Preflight passed for a billing run (S
    PRODUCTION_FIREBASE_PROJECT_ID=idynify-scout-dev node scripts/staging/stagingPreflight.mjs --env=$HOME/idynify-staging/.env.billing --billing
    ```
    ```bash
-   PRODUCTION_FIREBASE_PROJECT_ID=idynify-scout-dev node scripts/staging/stagingDev.mjs --env=$HOME/idynify-staging/.env.billing --billing --apollo-mock
+   PRODUCTION_FIREBASE_PROJECT_ID=idynify-scout-dev node scripts/staging/stagingDev.mjs --env=$HOME/idynify-staging/.env.billing --billing --apollo-mock --only-billing-functions
    ```
-   **Pass:** "Preflight passed … Stripe in test mode, Apollo stand-in at http://127.0.0.1:8899". The
-   app is at http://localhost:8888.
+   **Pass:** "Preflight passed … Stripe in test mode, Apollo stand-in at http://127.0.0.1:8899 …
+   serving only: … edge runtime off", then, usually within a minute (the first start is the
+   slowest), **"✓ http://localhost:8888 answered 200 after N s; 8 of 8 functions answer. Ready."**
+   The app is at http://localhost:8888.
+
+   `--only-billing-functions` serves just the functions this runbook and the journey call (signup,
+   stickers, checkout, the webhook, plan change, the portal, Scout enrich and the Scout person page)
+   and turns off the edge-function runtime, which this project does not use. Without it, the Netlify
+   CLI holds every request on :8888 until all ~124 functions have bundled and the edge runtime has
+   downloaded: minutes, so the browser times out. A ✗ line names what did not answer; any other
+   function answers 404 in this mode, and the journey's report lists any the app asked for.
 4. **T3** — the checking shortcut (with Part 0 step 3's two exports):
    ```bash
    export PRODUCTION_FIREBASE_PROJECT_ID=idynify-scout-dev
@@ -358,4 +367,6 @@ staging. Record for each step: date and time (UTC), pass or fail, and the output
 ## When My Card arrives
 
 When the Contact Hub team's My Card branch is integrated into #808: Part 1 again, then Part 9
-without `--skip-my-card`. Step 2 must then pass too.
+without `--skip-my-card`. Step 2 must then pass too. If My Card calls a function, it is added to
+`BILLING_JOURNEY_FUNCTIONS` in `scripts/staging/stagingDev.mjs` in the same change (the journey's
+report names any function the app asked for and was not served).

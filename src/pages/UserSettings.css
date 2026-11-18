@@ -786,3 +786,10 @@ html[data-theme="lightSide"] .us-mfa-input {
 html[data-theme="workspace"] .us-mfa-input::placeholder,
 html[data-theme="sand"] .us-mfa-input::placeholder,
 html[data-theme="lightSide"] .us-mfa-input::placeholder { color: var(--text-faint); }
+
+/* W3: plan actions for paying customers (components/billing/PlanActions.jsx). */
+.us-plan-actions { display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
+.us-plan-confirm { display: flex; flex-direction: column; gap: 8px; max-width: 440px; }
+@media (max-width: 640px) {
+  .us-plan-actions { align-items: stretch; width: 100%; }
+}

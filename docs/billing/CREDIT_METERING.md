@@ -45,12 +45,40 @@ Limits: the credit balance; `CREDIT_DAILY_SEARCH_LIMIT` (default 200) searches a
 the owner can read them, no client can write them. Today a client can write its own
 `creditTransactions`. Rules cases 24–30 in `scripts/rules-check/cases.mjs`.
 
-## Turning it on (each step approved)
+## While metering is off: production spending exposure (launch blocker)
+
+Audit of every path to Apollo (`APOLLO_ENDPOINTS` is used by exactly the ten functions above and
+nothing else; the only server-side caller is the weekday refresh, through `search-companies`).
+
+| Bound | Today in production | With #806 and this PR published, metering off |
+|---|---|---|
+| Who can reach Apollo | **Any signed-in account**, paid or not, by calling the functions directly | Paying accounts and admins only (402 before Apollo for everyone else) |
+| Per request | enrichContact, barryEnrich, findContactByLinkedInUrl, find-contact-by-email, captureLinkedIn: 1 match; enrichCompany: 1 company + ≤3 people; searchPeople: up to the browser's number (default 10); search-companies: ≤5 pages; search-companies-manual, findContact: 1 page | The same, and searchPeople **≤5** (always on) |
+| Per account per day | **None** | **None** for the seven credit-bearing operations; the daily search count only applies with metering on |
+| Scheduled | Weekday refresh for every account with an ICP | Paying accounts only, ≤3 company-search pages each, once a weekday |
+
+**Launch blocker:** while `CREDIT_METERING` is off, nothing limits how many paid Apollo lookups a
+paying account (or anyone holding its sign-in) or an admin makes. Broad paid enrichment must not be
+opened until one of these is approved and in place:
+
+1. **The intended fix:** verified Apollo costs → approved `CREDIT_RATES` → metering and W4b's
+   renewal switched on together, after the staging runbook's Part 11 passes.
+2. **An interim limit, if paid enrichment must stay open before the rates are settled:** an
+   always-on daily ceiling per account on the seven credit-bearing operations, independent of
+   rates, reusing this module's daily counter. Small, but new code: only with your approval.
+
+(Claude-powered functions are likewise uncapped per paying account today; not changed by W4.)
+
+## Testing it in staging
+
+[STAGING_VALIDATION_RUNBOOK.md](STAGING_VALIDATION_RUNBOOK.md) Part 11, only once approved: metering
+on in the staging env file only, with mocked Apollo, deduction and renewal checked together.
+
+## Turning it on in production (each step approved)
 
 1. Set the rates from the measured Apollo cost (`CREDIT_RATES`).
 2. Deploy the Firestore rules above.
-3. Staging: `CREDIT_METERING=on` with the Apollo mock (W6); run the end-to-end test.
-4. Before production: every paying account has a `credits` value (an account without one is told
-   it has no credits).
-5. Production: `CREDIT_METERING=on`, with W4b's monthly renewal live at the same time, so paying
-   customers never run out permanently.
+3. The staging runbook's Part 11 passes.
+4. Every paying account has a `credits` value (an account without one is told it has no credits).
+5. `CREDIT_METERING=on`, with W4b's monthly renewal live at the same time, so paying customers never
+   run out permanently.

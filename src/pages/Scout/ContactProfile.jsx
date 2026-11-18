@@ -463,7 +463,9 @@ export default function ContactProfile({
       const result = await response.json();
 
       if (!result.success) {
-        throw new Error(result.error || 'Enrichment failed');
+        // The server's own sentence when it has one (billing W4: e.g. not enough credits,
+        // a lookup already running), never a bare error code.
+        throw new Error(result.message || result.error || 'Enrichment failed');
       }
 
       // Already written by the server, by the shared rules (fill only what is

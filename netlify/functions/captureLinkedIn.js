@@ -32,6 +32,7 @@ import { checkPaidApiAccess } from './utils/paidApiAccess.js';
 import { searchLinkedInCandidates } from './utils/linkedinSearch.js';
 import { rankLinkedInCandidates, readPerson, candidateFromApolloPerson } from './utils/capture/linkedinCandidates.js';
 import { captureLog } from './utils/capture/captureLog.js';
+import { withCreditMetering } from './utils/creditMetering.js';
 
 export const OPERATION = 'captureLinkedIn';
 
@@ -100,7 +101,7 @@ async function apolloProfile(person) {
   }
 }
 
-export const handler = async (event) => {
+const unmeteredHandler = async (event) => {
   const startedAt = Date.now();
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: { ...HEADERS }, body: '' };
   if (event.httpMethod !== 'POST') return failure('method_not_allowed');
@@ -162,4 +163,7 @@ export const handler = async (event) => {
   }
 };
 
+
+// Billing W4: credit metering, off until CREDIT_METERING=on (utils/creditMetering.js).
+export const handler = withCreditMetering(unmeteredHandler, { action: 'captureLinkedIn' });
 export default { handler };

@@ -5,8 +5,9 @@ import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } fr
 import { verifyAuthToken } from './utils/verifyAuthToken.js';
 import { checkPaidApiAccess, paidApiDeniedResponse } from './utils/paidApiAccess.js';
 import { db } from './firebase-admin.js';
+import { withCreditMetering } from './utils/creditMetering.js';
 
-export const handler = async (event) => {
+const unmeteredHandler = async (event) => {
   const startTime = Date.now();
 
   if (event.httpMethod !== 'POST') {
@@ -241,3 +242,6 @@ function inferDecisionMaker(seniority, title) {
 
   return false;
 }
+
+// Billing W4: credit metering, off until CREDIT_METERING=on (utils/creditMetering.js).
+export const handler = withCreditMetering(unmeteredHandler, { action: 'enrichContact' });

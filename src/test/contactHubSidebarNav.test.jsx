@@ -501,6 +501,38 @@ describe('the Sticker Wall in the sidebar: the same destinations as the phone, o
     expect(fake.current.state.subscriptions).toBe(0);
   });
 
+  it.each(Object.entries(states))('%s: the phone bar and the sidebar offer exactly the same destinations, on every Contact Hub page', async (_label, answer) => {
+    fake.current.state.config = answer;
+    const wall = answer === states.enabled;
+    const expected = wall ? ['My Card', 'My People', 'Sticker Wall'] : ['My Card', 'My People'];
+    for (const url of ['/contact-hub', '/contact-hub/stickers', '/contact-hub/person/p1']) {
+      const { unmount } = renderBoth(url);
+      await within(globalNav()).findByRole('navigation', { name: 'Contact Hub sections' });
+      await waitFor(() => expect(fake.current.state.configFetches).toBeGreaterThan(0));
+      if (wall) await within(barNav()).findByRole('button', { name: 'Sticker Wall' });
+      else await new Promise((resolve) => { setTimeout(resolve, 60); });
+      await waitFor(() => expect(labelsOf(barNav())).toEqual(expected));
+      expect(labelsOf(sidebarNav()).filter((l) => ['My Card', 'My People', 'Sticker Wall'].includes(l))).toEqual(expected);
+      unmount();
+    }
+    // Where stickers are not available nothing is subscribed to; where they are, the wall does subscribe.
+    if (!wall) expect(fake.current.state.subscriptions).toBe(0);
+  });
+
+  it('checking: the phone bar has no Sticker Wall until the server answers, never blocks My Card or My People, then offers it', async () => {
+    const user = userEvent.setup();
+    let answer;
+    fake.current.services.fetchStickersConfig = () => new Promise((resolve) => { answer = resolve; });
+    renderBoth('/contact-hub');
+    await screen.findByRole('list', { name: 'My People' });
+    expect(labelsOf(barNav())).toEqual(['My Card', 'My People']);
+    await user.click(within(barNav()).getByRole('button', { name: 'My Card' }));
+    await waitFor(() => expect(router.at).toBe('/contact-hub/my-card'));
+    expect(labelsOf(barNav())).toEqual(['My Card', 'My People']);
+    act(() => { answer(config()); });
+    expect(await within(barNav()).findByRole('button', { name: 'Sticker Wall' })).toBeInTheDocument();
+  });
+
   it('checking: no Sticker Wall until the server has answered, then it appears, without any reload of the people', async () => {
     let answer;
     fake.current.services.fetchStickersConfig = () => new Promise((resolve) => { answer = resolve; });
@@ -579,7 +611,7 @@ describe('where there is no room, or it is not Contact Hub', () => {
 // A phone: the shell's own bottom bar, the real one, beside the real Contact
 // Hub. It is the phone's way between My People and the Sticker Wall, so the
 // page's chips are filters only.
-describe('a phone: the shell\'s bottom bar is My People · Sticker Wall', () => {
+describe('a phone: the shell\'s bottom bar is My Card · My People · Sticker Wall, the last only where stickers are available', () => {
   beforeEach(() => { setViewportWidth(375); });
 
   function renderPhone(url = '/contact-hub') {
@@ -607,6 +639,7 @@ describe('a phone: the shell\'s bottom bar is My People · Sticker Wall', () => 
   it('has two cells and nothing else: no More, no Import, no modules', async () => {
     renderPhone();
     await screen.findByRole('list', { name: 'My People' });
+    await within(bar()).findByRole('button', { name: 'Sticker Wall' });
     expect(within(bar()).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['My Card', 'My People', 'Sticker Wall']);
     expect(lit()).toEqual(['My People']);
     expect(within(bar()).queryByText(/import|more|scout|hunter/i)).toBeNull();
@@ -667,17 +700,24 @@ describe('a phone: the shell\'s bottom bar is My People · Sticker Wall', () => 
     expect(lit()).toEqual(['My People']);
   });
 
-  it('with stickers unavailable the Sticker Wall cell leads to a plain statement, not to My People', async () => {
+  it('with stickers unavailable there is no Sticker Wall cell; the wall\'s address still says so plainly, with My People lit', async () => {
     const user = userEvent.setup();
     fake.current.state.config = config({ enabled: false, mode: 'off', readOnly: false });
-    renderPhone();
-    await screen.findByRole('list', { name: 'My People' });
-    await user.click(cell('Sticker Wall'));
+    renderPhone('/contact-hub/stickers');
     expect(await screen.findByText('Stickers are not available for this account yet.')).toBeInTheDocument();
-    expect(lit()).toEqual(['Sticker Wall']);
-    expect(screen.queryByRole('list', { name: 'My People' })).toBeNull();
+    expect(within(bar()).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['My Card', 'My People']);
+    expect(lit()).toEqual(['My People']);
     await user.click(cell('My People'));
+    expect(router.at).toBe('/contact-hub');
     expect(names()).toHaveLength(4);
+  });
+
+  it('the question is asked in Contact Hub only: another module\'s bar makes no stickers request', async () => {
+    renderPhone('/hunter');
+    expect(await screen.findByTestId('elsewhere')).toBeInTheDocument();
+    expect(screen.getByRole('navigation', { name: 'Hunter sections' })).toBeInTheDocument();
+    await new Promise((resolve) => { setTimeout(resolve, 60); });
+    expect(fake.current.state.configFetches).toBe(0);
   });
 
   it('leaving Contact Hub, the bar is no longer Contact Hub\'s', async () => {

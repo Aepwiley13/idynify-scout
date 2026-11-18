@@ -12,9 +12,15 @@
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 
-async function renderBarAt(url, switchValue = 'on') {
+/**
+ * `availability` is the server's answer as the bar sees it ('available' by default: the Sticker
+ * Wall's cell is there only for people stickers are available to; how that answer is reached is
+ * contactHubSidebarNav.test.jsx's business, with the real hook).
+ */
+async function renderBarAt(url, switchValue = 'on', availability = 'available') {
   vi.resetModules();
   vi.stubEnv('VITE_CONTACT_HUB', switchValue);
+  vi.doMock('../components/stickers/useStickersAvailability.js', () => ({ useStickersAvailability: () => availability }));
   const { render, screen, cleanup, fireEvent } = await import('@testing-library/react');
   const { MemoryRouter, useLocation } = await import('react-router-dom');
   const { default: BottomNav } = await import('../components/layout/BottomNav');
@@ -25,7 +31,7 @@ async function renderBarAt(url, switchValue = 'on') {
 }
 
 let cleanupLast = null;
-afterEach(() => { cleanupLast?.(); cleanupLast = null; vi.unstubAllEnvs(); vi.resetModules(); });
+afterEach(() => { cleanupLast?.(); cleanupLast = null; vi.unstubAllEnvs(); vi.doUnmock('../components/stickers/useStickersAvailability.js'); vi.resetModules(); });
 
 const labels = (screen) => screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'));
 
@@ -47,6 +53,16 @@ describe('switch ON', () => {
     expect(screen.getByRole('navigation', { name: 'Contact Hub sections' })).toBeInTheDocument();
     expect(labels(screen)).toEqual(['My Card', 'My People', 'Sticker Wall']);
     expect(current(screen)).toEqual([lit]);
+  });
+
+  it.each(['checking', 'unavailable'])('stickers %s: the bar is My Card and My People only, and each still goes where it did', async (availability) => {
+    const { screen, cleanup, fireEvent } = await renderBarAt('/contact-hub/stickers', 'on', availability);
+    cleanupLast = cleanup;
+    expect(labels(screen)).toEqual(['My Card', 'My People']);
+    expect(screen.queryByRole('button', { name: 'Sticker Wall' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'My Card' }));
+    expect(screen.getByTestId('at').textContent).toBe('/contact-hub/my-card');
+    expect(current(screen)).toEqual(['My Card']);
   });
 
   it('has no More and no Import: Import is added when its screen exists', async () => {

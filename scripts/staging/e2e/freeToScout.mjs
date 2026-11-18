@@ -28,7 +28,7 @@ import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
-import { parseE2eArgs, JourneyRefusal, FIVE_PEOPLE_CSV, FOCUS_PERSON, isPaidRequest, compareAccount, summarize } from './journey.mjs';
+import { parseE2eArgs, JourneyRefusal, FIVE_PEOPLE_CSV, FOCUS_PERSON, isPaidRequest, functionName, compareAccount, summarize } from './journey.mjs';
 import { planSnapshot, readFirestore, readStripe, summarizeAccount, SnapshotRefusal } from '../billingAccountSnapshot.mjs';
 import { readStagingCredential, CredentialRefusal } from '../stagingCredentials.mjs';
 import { RehearsalRefusal, assertClientProject, readClientProject } from '../billingRehearsal/guard.mjs';
@@ -96,11 +96,14 @@ async function run(args) {
   const requests = [];
   let phase = 'free';
   page.on('request', (r) => { if (r.url().includes('/.netlify/functions/')) requests.push({ phase, url: r.url(), paid: isPaidRequest(r.url()) }); });
+  // A function the launcher does not serve answers 404 (stagingDev --only-billing-functions).
+  const notServed = new Set();
+  page.on('response', (r) => { if (r.status() === 404 && r.url().includes('/.netlify/functions/')) notServed.add(functionName(r.url())); });
 
   let uid;
   let personPath;
   let before;
-  const report = () => ({ email: args.email, uid, steps, requests });
+  const report = () => ({ email: args.email, uid, steps, requests, notServed: [...notServed].sort() });
 
   try {
     await fetch(`${MOCK}/__reset`, { method: 'POST' }).catch(() => {
@@ -298,6 +301,7 @@ async function main() {
   const summary = summarize(result.steps);
   console.log(`Free → Scout journey for ${result.email} (${result.uid ?? 'no account'}) on the staging project:`);
   for (const line of summary.lines) console.log(`  ${line}`);
+  if (result.notServed?.length) console.log(`  Functions the app asked for that were not served (404): ${result.notServed.join(', ')}`);
   writeFileSync(args.out, JSON.stringify({ ...result, summary }, null, 2));
   console.log(`Report: ${args.out}`);
   if (summary.failed) return 2;

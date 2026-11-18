@@ -60,8 +60,8 @@ are not renewals. A downgrade at period end renews at Starter's allowance. Invoi
 ledger epoch are not granted; without an epoch the renewal is flagged for review.
 
 **Production change (owner approval):** add `invoice.paid` to the live webhook endpoint's events in
-Stripe. Staging: add `invoice.paid` to the `stripe listen --events` list. Without it, renewals are
-not granted, and with metering on (W4a) paying customers would run out, so the two go live together.
+Stripe. Without it, renewals are not granted, and with metering on (W4a) paying customers would run
+out, so the two go live together.
 
-Test mode: a customer on a test clock, subscribed, clock advanced past the period end →
-`invoice.paid` (subscription_cycle) → the allowance resets once; `stripe events resend` changes nothing.
+Testing it with a Stripe test clock: [STAGING_VALIDATION_RUNBOOK.md](STAGING_VALIDATION_RUNBOOK.md)
+Part 8.

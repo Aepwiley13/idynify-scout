@@ -56,6 +56,7 @@ import { displayNameFor } from '../utils/userIdentity';
 import { useShell } from '../context/ShellContext';
 import ServiceProfileSetup from '../components/serviceProfiles/ServiceProfileSetup';
 import { classifySnapshot } from '../utils/accountVerification';
+import PlanActions from '../components/billing/PlanActions';
 import { planOf, PLAN, isPaidPlan } from '../utils/accountPlan';
 import { PLAN_DETAILS } from '../constants/plans';
 import { supportMailto } from '../constants/support';
@@ -1116,13 +1117,16 @@ export default function UserSettings() {
                           </a>
                         </div>
                       ) : (
-                        /* Plan changes and cancellation move to the Stripe
-                           Customer Portal in billing Phase 2. Until then they go
-                           through support, never through a second checkout. */
-                        <a href={supportMailto()} className="us-action-btn">
-                          <Mail className="w-3.5 h-3.5" />
-                          Change or cancel plan
-                        </a>
+                        /* W3: Starter → Pro on the existing subscription, and the
+                           Customer Portal for payment methods, invoices and
+                           cancelling. Never a second checkout. */
+                        <PlanActions
+                          plan={billing.plan}
+                          cancelAtPeriodEnd={billing.cancelAtPeriodEnd}
+                          currentPeriodEnd={billing.currentPeriodEnd}
+                          autoOpenUpgrade={searchParams.get('upgrade') === 'pro'}
+                          onChanged={retryBilling}
+                        />
                       )}
                     </div>
                   )}

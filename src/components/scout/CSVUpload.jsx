@@ -177,7 +177,7 @@ function TypeHeader({ title, subtitle, onChangeType }) {
         <h3 style={heading(T)}>{title}</h3>
         <p style={muted(T)}>{subtitle}</p>
       </div>
-      <LinkButton onClick={onChangeType}>Change Type</LinkButton>
+      {onChangeType && <LinkButton onClick={onChangeType}>Change Type</LinkButton>}
     </Panel>
   );
 }
@@ -366,7 +366,21 @@ function StatTile({ label, value, sub, tone, testId }) {
 
 const NEW_OUTCOMES = [PREVIEW_OUTCOME.NEW, PREVIEW_OUTCOME.REVIEW];
 
-function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
+/**
+ * The words that differ by where the import is opened. Scout+ keeps these; Contact Hub's My
+ * People passes its own (src/components/contactImport/ImportPeopleDialog.jsx), because a Free
+ * account has no People page or cadences. The import itself is the same either way.
+ */
+const SCOUT_IMPORT_COPY = Object.freeze({
+  title: 'Lead / Contact Upload',
+  incompleteSub: 'Imported — valid email, name missing. Add it later in People.',
+  emailConflictTail: <>The IDYNIFY email is kept, and they will <strong>not</strong> be added to a cadence until you check the email in People.</>,
+  incompleteNote: 'Valid contacts with part of the name missing. They can be added to a cadence now; the greeting uses the first name when there is one and "Hi," otherwise.',
+  tagNote: 'so you can find this group in People.',
+  failedTail: 'Contacts saved before the error are in People with this import\'s tag.',
+});
+
+export function ContactCsvImport({ onContactsAdded, onCancel, onChangeType, copy = SCOUT_IMPORT_COPY }) {
   const T = useT();
   // select → checking → preview → importing
   const [stage, setStage] = useState('select');
@@ -443,7 +457,7 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
       onContactsAdded(items, result);
     } catch (err) {
       console.error('[CSVUpload] import failed', err);
-      setError('The import did not finish. Contacts saved before the error are in People with this import\'s tag.');
+      setError(`The import did not finish. ${copy.failedTail}`);
       setStage('preview');
     } finally {
       setProgress(null);
@@ -474,7 +488,7 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
   return (
     <div style={stack(20)}>
       <TypeHeader
-        title="Lead / Contact Upload"
+        title={copy.title}
         subtitle="Required: a Name (or First + Last Name) or an Email."
         onChangeType={onChangeType}
       />
@@ -537,7 +551,7 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
             />
             <StatTile
               testId="tile-incomplete" tone="cyan" label="Incomplete profiles" value={incomplete.length}
-              sub="Imported — valid email, name missing. Add it later in People."
+              sub={copy.incompleteSub}
             />
             <StatTile
               testId="tile-duplicates" tone="amber" label="Possible duplicates" value={possibleDuplicates}
@@ -553,7 +567,7 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
               <span role="alert">
                 <strong>{emailConflicts} email conflict{emailConflicts !== 1 ? 's' : ''}.</strong>{' '}
                 {emailConflicts === 1 ? 'This person matches' : 'These people match'} an existing contact by phone or LinkedIn, but the CSV email is different.
-                The IDYNIFY email is kept, and they will <strong>not</strong> be added to a cadence until you check the email in People.
+                {copy.emailConflictTail}
                 Details are listed below.
               </span>
             </Panel>
@@ -598,7 +612,7 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
             <div style={{ background: T.surface || T.cardBg, borderRadius: 12, padding: 14, border: `1px solid ${T.border}` }}>
               <h4 style={heading(T, 13)}>Incomplete profiles — will import ({incomplete.length})</h4>
               <p style={{ ...muted(T, 12), marginBottom: 8 }}>
-                Valid contacts with part of the name missing. They can be added to a cadence now; the greeting uses the first name when there is one and "Hi," otherwise.
+                {copy.incompleteNote}
               </p>
               <ul data-testid="csv-incomplete" style={{ listStyle: 'none', padding: 0, margin: 0, fontSize: 13, maxHeight: 160, overflowY: 'auto', ...stack(6) }}>
                 {incomplete.map((r) => (
@@ -647,7 +661,7 @@ function ContactCsvImport({ onContactsAdded, onCancel, onChangeType }) {
               style={{ width: '100%', padding: '9px 12px', borderRadius: 10, border: `1px solid ${T.border2 || T.border}`, background: T.input || T.surface, color: T.text, fontSize: 14, boxSizing: 'border-box' }}
             />
             <p style={{ ...muted(T, 12), marginTop: 6 }}>
-              Every imported contact is tagged <strong style={{ color: T.text }}>{buildImportTag(importName || defaultImportName(file?.name))}</strong> so you can find this group in People.
+              Every imported contact is tagged <strong style={{ color: T.text }}>{buildImportTag(importName || defaultImportName(file?.name))}</strong> {copy.tagNote}
             </p>
           </div>
         </Panel>

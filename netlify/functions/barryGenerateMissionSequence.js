@@ -4,6 +4,7 @@ import { db } from './firebase-admin.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
 import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
 /**
  * BARRY MISSION SEQUENCE GENERATOR (Step 4 → Step 5 Upgrade)
@@ -31,7 +32,7 @@ import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
  *   - Actual message content generated later (just-in-time)
  */
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   const startTime = Date.now();
 
   if (event.httpMethod !== 'POST') {
@@ -346,3 +347,6 @@ Generate the sequence plan now. Respond ONLY with valid JSON.`;
     };
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'barryGenerateMissionSequence' });

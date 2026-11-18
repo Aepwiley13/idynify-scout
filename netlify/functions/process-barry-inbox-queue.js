@@ -41,6 +41,7 @@ import { analyzeInboundMessage } from './utils/barryInboxAnalyzer.js';
 import { composeDraftReply } from './utils/barryDraftComposer.js';
 import { CONVERSATION_STATES } from '../../src/types/conversationState.js';
 import { getConversationState } from '../../src/utils/relationshipRead.js';
+import { isPaidApiEligible } from './utils/paidApiAccess.js';
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -53,6 +54,27 @@ const QUEUE_LIMIT = 10;
 
 /** Every 5 minutes — twice the rate of the 10-minute Gmail sync that feeds it. */
 export const QUEUE_SCHEDULE = '*/5 * * * *';
+
+/**
+ * Billing Phase 1d: Barry reads and drafts replies only for paid accounts and admins.
+ * 'paid' | 'not_paid' | 'unverified', read once per owner per run. An owner whose account
+ * cannot be read is left pending for the next run; nothing is sent to Claude for it.
+ */
+export function ownerAiAccess(cache, uid) {
+  if (typeof uid !== 'string' || !uid) return Promise.resolve('not_paid');
+  if (!cache.has(uid)) {
+    cache.set(uid, (async () => {
+      try {
+        const snap = await db.collection('users').doc(uid).get();
+        return isPaidApiEligible(uid, snap.exists ? snap.data() : null) ? 'paid' : 'not_paid';
+      } catch (err) {
+        console.error('[process-barry-inbox-queue] owner plan unverified', { message: err?.message });
+        return 'unverified';
+      }
+    })());
+  }
+  return cache.get(uid);
+}
 
 export const processInboxQueue = async (event = {}) => {
   if (event.httpMethod === 'OPTIONS') {
@@ -72,6 +94,7 @@ export const processInboxQueue = async (event = {}) => {
   const startMs = Date.now();
   // firstError is carried so the alert email can name a cause, not just a count.
   const results = { processed: 0, succeeded: 0, failed: 0, skipped: 0, entries: [], firstError: null };
+  const ownerAccess = new Map();
 
   try {
     // ── Query pending queue entries ──────────────────────────────────────
@@ -104,6 +127,17 @@ export const processInboxQueue = async (event = {}) => {
         results.skipped++;
         results.entries.push({ messageRecordId, status: 'skipped', reason: 'No contactId' });
         await queueRef.update({ status: 'skipped', updatedAt: FieldValue.serverTimestamp() });
+        continue;
+      }
+
+      // Billing Phase 1d: no Claude call for an account without paid access.
+      const access = await ownerAiAccess(ownerAccess, idynifyUserId);
+      if (access !== 'paid') {
+        results.skipped++;
+        results.entries.push({ messageRecordId, contactId, status: 'skipped', reason: access === 'not_paid' ? 'paid_plan_required' : 'entitlement_unavailable' });
+        if (access === 'not_paid') {
+          await queueRef.update({ status: 'skipped_not_paid', updatedAt: FieldValue.serverTimestamp() });
+        }
         continue;
       }
 

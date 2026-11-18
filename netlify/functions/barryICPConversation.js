@@ -5,6 +5,7 @@ import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
 import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
 import { APOLLO_INDUSTRIES, COMPANY_SIZE_OPTIONS, US_STATES } from '../../src/constants/targetingCanon.js';
 import { sanitizeCompanyKeywords } from '../../src/utils/companyKeywordsResidue.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
 // The supported targeting vocabulary. These lists used to live inline here, in
 // three separate arrays, while `src/constants` carried its own copies of two of
@@ -226,7 +227,7 @@ function extractCompanyKeywords(userInput) {
 // two runtimes cannot drift back into disagreement. See that file for the
 // full rationale and the ABSOLUTE/LEADING/TRAILING residue-term design.
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   const startTime = Date.now();
 
   if (event.httpMethod !== 'POST') {
@@ -996,3 +997,6 @@ RESPOND IN JSON:
 
   return JSON.parse(jsonMatch[0]);
 }
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'barryICPConversation' });

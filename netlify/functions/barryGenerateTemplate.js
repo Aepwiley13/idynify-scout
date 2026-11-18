@@ -11,6 +11,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { MODEL_FAST } from './utils/models.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
@@ -89,7 +90,7 @@ INTENT MAPPING:
 - Fallback stage: usually "warm" or "followup"`;
 }
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
@@ -181,3 +182,6 @@ export const handler = async (event) => {
     };
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'barryGenerateTemplate' });

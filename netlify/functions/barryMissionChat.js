@@ -31,6 +31,7 @@ import { LEGACY_HAIKU_4_5, MODEL_BARRY_SONNET } from './utils/models.js';
 import { claudeErrorCode } from './utils/claudeResponse.js';
 import { processInitialInput, processFollowup } from './barryICPConversation.js';
 import { normalizeClassification, INTENT_PROSPECTING } from '../../src/utils/firstExperienceIntent.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -908,7 +909,7 @@ function getModeDefaultPrompts(mode) {
 
 // ── Handler ───────────────────────────────────────────────────────────────────
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
@@ -1578,3 +1579,6 @@ Return valid JSON only:
     };
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'barryMissionChat' });

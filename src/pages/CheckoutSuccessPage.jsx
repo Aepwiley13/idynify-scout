@@ -4,7 +4,7 @@ import { doc, getDocFromServer } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import { planOf, isPaidPlan } from '../utils/accountPlan';
 import { hasActiveAccess } from '../utils/billingEntitlement';
-import { FREE_PLAN, FREE_PLAN_HOME } from '../constants/freePlan';
+import { FREE_PLAN, FREE_PLAN_HOME, startedOnFreePlan } from '../constants/freePlan';
 import { supportMailto } from '../constants/support';
 import { peekCheckoutReturn, clearCheckoutReturn, CHECKOUT_RETURN_FALLBACK } from '../utils/checkoutReturn';
 
@@ -63,7 +63,10 @@ export default function CheckoutSuccessPage({ account = null, onRecheckAccount }
 
   // Read once: the contact or page this checkout started from, if checkout kept one.
   const [returnTo] = useState(() => peekCheckoutReturn()?.returnTo ?? null);
-  const destination = returnTo ?? CHECKOUT_RETURN_FALLBACK;
+  // No kept place: an account that started on Free goes back to its Contact Hub (no second
+  // onboarding); a paid signup goes on to onboarding as before.
+  const destination = returnTo ?? (FREE_PLAN.enabled && startedOnFreePlan(account?.data) ? FREE_PLAN_HOME : CHECKOUT_RETURN_FALLBACK);
+  const toOnboarding = destination === CHECKOUT_RETURN_FALLBACK;
   const goOn = () => {
     clearCheckoutReturn();
     navigate(destination, { replace: true });
@@ -168,7 +171,7 @@ export default function CheckoutSuccessPage({ account = null, onRecheckAccount }
           ) : (
             <div className="bg-purple-500/20 border border-purple-500/30 rounded-xl p-6 mb-8">
               <p className="text-purple-300 font-mono">
-                {!paid ? 'Confirming your payment…' : returnTo ? 'Taking you back to where you were…' : 'Connecting you to Barry…'}
+                {!paid ? 'Confirming your payment…' : toOnboarding ? 'Connecting you to Barry…' : 'Taking you back to where you were…'}
               </p>
             </div>
           )}
@@ -180,7 +183,7 @@ export default function CheckoutSuccessPage({ account = null, onRecheckAccount }
               onClick={goOn}
               className="bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white font-bold py-4 px-12 rounded-xl transition-all shadow-2xl shadow-purple-500/50 text-lg font-mono"
             >
-              {returnTo ? 'CONTINUE WHERE YOU LEFT OFF' : '🧠 MEET BARRY NOW'}
+              {toOnboarding ? '🧠 MEET BARRY NOW' : 'CONTINUE WHERE YOU LEFT OFF'}
             </button>
           )}
         </div>

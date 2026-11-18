@@ -102,7 +102,7 @@ async function renderSignup(search = '') {
 beforeEach(() => {
   vi.clearAllMocks();
   setDocMock.mockResolvedValue(undefined);
-  createUser.mockResolvedValue({ user: { uid: 'uid-1' } });
+  createUser.mockResolvedValue({ user: { uid: 'uid-1', getIdToken: async () => 'good-token' } });
   validatePasswordMock.mockResolvedValue(POLICY());
   globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true }));
 });
@@ -318,7 +318,7 @@ describe('signup — submission', () => {
   it('creates the account once even when the CTA is double-pressed', async () => {
     const user = userEvent.setup();
     let release;
-    createUser.mockImplementation(() => new Promise(r => { release = () => r({ user: { uid: 'uid-1' } }); }));
+    createUser.mockImplementation(() => new Promise(r => { release = () => r({ user: { uid: 'uid-1', getIdToken: async () => 'good-token' } }); }));
 
     await renderSignup();
     await user.type(screen.getByLabelText('Email'), 'a@b.com');

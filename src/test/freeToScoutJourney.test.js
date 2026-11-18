@@ -3,7 +3,7 @@
  * Stripe or staging: its arguments and refusals, which requests count as paid, the account
  * comparison that proves nothing was lost, the local Apollo stand-in, the loopback-only Apollo
  * override, and stagingDev's --apollo-mock plan. The journey itself runs on the staging machine
- * (scripts/staging/e2e/freeToScout.mjs, docs/billing/FREE_TO_SCOUT_E2E.md).
+ * (scripts/staging/e2e/freeToScout.mjs; docs/billing/STAGING_VALIDATION_RUNBOOK.md Part 9).
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {

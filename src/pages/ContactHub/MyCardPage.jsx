@@ -20,7 +20,8 @@
  * Downloading saves nothing and calls nothing.
  *
  * Contact Hub's entries in the application sidebar are drawn here too (My Card
- * is lit). The people are NOT loaded for it, so My People shows without a count.
+ * is lit). The people are NOT loaded for it, so My People shows without a count;
+ * the Sticker Wall is offered when stickers are available to this account.
  * A draft not yet saved is kept as the page is left and comes back on return
  * (useMyCard, unmount flush).
  */
@@ -32,6 +33,8 @@ import { useImpersonation } from '../../context/ImpersonationContext';
 import { myCardService } from '../../services/myCardService';
 import { CONTACT_HUB_MY_CARD_PATH, CONTACT_HUB_PATH, CONTACT_HUB_STICKERS_PATH } from '../../constants/contactHub';
 import HubSidebarNav from './HubSidebarNav';
+import { useStickersAvailabilityControl } from '../../components/stickers/useStickersAvailability';
+import { AVAILABILITY } from '../../components/stickers/stickersAvailabilityState';
 import { HUB_STATUS } from './peopleRules';
 import MyCardLayout from './myCard/MyCardLayout';
 import MyCardEditor from './myCard/MyCardEditor';
@@ -80,6 +83,9 @@ export default function MyCardPage() {
   const feedback = downloaded && downloaded.forCard === draft.card ? downloaded.result : null;
 
   const navigate = useNavigate();
+  // The Sticker Wall is offered here too, on the server's answer alone: this page is outside ContactHubMain's
+  // sticker provider, and needs neither the people nor the sticker registry for it.
+  const { state: stickersAvailability } = useStickersAvailabilityControl();
   const sidebar = (
     <HubSidebarNav
       status={HUB_STATUS.LOADING}
@@ -89,6 +95,7 @@ export default function MyCardPage() {
       onSelect={() => navigate(CONTACT_HUB_PATH)}
       onOpenWall={() => navigate(CONTACT_HUB_STICKERS_PATH)}
       onOpenCard={() => navigate(CONTACT_HUB_MY_CARD_PATH)}
+      wallAvailable={stickersAvailability === AVAILABILITY.AVAILABLE}
     />
   );
 

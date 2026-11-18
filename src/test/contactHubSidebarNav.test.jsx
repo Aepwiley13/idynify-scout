@@ -344,14 +344,15 @@ describe('sticker permissions and states', () => {
     expect(await within(nav).findByRole('button', { name: 'New sticker' })).toBeInTheDocument();
   });
 
-  it('the sticker list failed to load: My People and a plain message, no Sticker Wall, no New sticker', async () => {
+  it('the sticker list failed to load: a plain message, the Sticker Wall (its own page says what it can show), no New sticker', async () => {
     failRegistry();
     renderApp();
     const nav = await hubNav();
     expect(await within(nav).findByText(/Your stickers could not be loaded\. They have not been changed\./)).toBeInTheDocument();
     expect(within(nav).getByRole('button', { name: /My People/ })).toBeInTheDocument();
     expect(within(nav).queryByRole('button', { name: 'New sticker' })).toBeNull();
-    expect(within(nav).queryByRole('button', { name: 'Sticker Wall' })).toBeNull();
+    // Stickers are available to this person: the destination is still there, as it is on the phone.
+    expect(within(nav).getByRole('button', { name: 'Sticker Wall' })).toBeInTheDocument();
   });
 
   it('no stickers yet: My People, Sticker Wall and New sticker, with no empty list', async () => {
@@ -363,44 +364,154 @@ describe('sticker permissions and states', () => {
     expect(within(nav).queryByRole('list')).toBeNull();
   });
 
-  it('nobody in My People yet: My People (0) and nothing else; the page is the one invitation', async () => {
+  it('nobody in My People yet: My People (0) and the Sticker Wall, but no filters and no New sticker; the page is the one invitation', async () => {
     contactsData.list = [];
     renderApp();
     await screen.findByText('Start with one person');
     await waitFor(() => expect(fake.current.state.configFetches).toBe(1));
     const nav = await hubNav();
-    // Stickers are on and loaded, but there is nobody for them to act on yet.
+    // Stickers are on and loaded, but there is nobody for them to act on yet: the destination is there, the filters are not.
     await waitFor(() => expect(fake.current.state.subscriptions).toBe(1));
-    expect(said(nav)).toEqual(['My Card', 'My People']);
+    expect(said(nav)).toEqual(['My Card', 'My People', 'Sticker Wall']);
     expect(within(nav).getByLabelText('0 people')).toHaveTextContent('0');
     expect(within(nav).getByRole('button', { name: /My People/ })).toHaveAttribute('aria-current', 'page');
     expect(screen.queryByRole('group', { name: 'Filter by sticker' })).toBeNull();
   });
 
-  it('while the people are still loading: My People, with no count yet', async () => {
+  it('while the people are still loading: My People with no count yet, and the Sticker Wall once stickers are known to be available', async () => {
     let finish;
     const { getDocs } = await import('firebase/firestore');
     getDocs.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
     renderApp();
     const nav = await hubNav();
-    expect(said(nav)).toEqual(['My Card', 'My People']);
+    await within(nav).findByRole('button', { name: 'Sticker Wall' });
+    expect(said(nav)).toEqual(['My Card', 'My People', 'Sticker Wall']);
     expect(within(nav).queryByLabelText(/people|person/)).toBeNull();
+    expect(within(nav).queryByRole('button', { name: 'New sticker' })).toBeNull();
     finish({ docs: contactsData.list.map((d) => ({ id: d.id, data: () => d })) });
     expect(await within(nav).findByLabelText('4 people')).toBeInTheDocument();
     expect(await within(nav).findByRole('button', { name: 'New sticker' })).toBeInTheDocument();
   });
 
-  it('the people could not be loaded: My People with no count, and it still leads back to My People', async () => {
+  it('the people could not be loaded: My People with no count, the Sticker Wall (lit, on its own page), and My People still leads back', async () => {
     const user = userEvent.setup();
     contactsData.fail = true;
     renderApp('/contact-hub/stickers');
     await screen.findByText('Your people could not be loaded.');
     const nav = await hubNav();
-    expect(said(nav)).toEqual(['My Card', 'My People']);
+    await within(nav).findByRole('button', { name: 'Sticker Wall' });
+    expect(said(nav)).toEqual(['My Card', 'My People', 'Sticker Wall']);
+    expect(within(nav).getByRole('button', { name: 'Sticker Wall' })).toHaveAttribute('aria-current', 'page');
     expect(within(nav).queryByLabelText(/people|person/)).toBeNull();
     await user.click(within(nav).getByRole('button', { name: /My People/ }));
     expect(router.at).toBe('/contact-hub');
     expect(screen.getByText('Your people could not be loaded.')).toBeInTheDocument();
+  });
+});
+
+describe('the Sticker Wall in the sidebar: the same destinations as the phone, on every Contact Hub page', () => {
+  const states = {
+    enabled: config(),
+    disabled: config({ enabled: false, mode: 'off', readOnly: false }),
+    'not enrolled (beta, not in it)': config({ enabled: false, mode: 'beta', readOnly: false }),
+    'read-only (an admin viewing as the user)': config({ enabled: true, mode: 'beta', readOnly: true }),
+    'an error from the server': { status: 500, body: null },
+    'an answer that is not understood': { status: 200, body: { enabled: 'yes' } },
+  };
+
+  /** The sidebar's Contact Hub entries, and the phone bar's, from one render of both. */
+  function renderBoth(url) {
+    return render(
+      <MemoryRouter initialEntries={[url]}>
+        <RouterProbe />
+        <Sidebar user={{ email: 'aaron@example.test' }} onLogout={() => {}} />
+        <main>
+          <Routes>
+            <Route path="/contact-hub" element={<ContactHubMain />}>
+              <Route index element={<HubPeople />} />
+              <Route path="stickers" element={<HubPeople />} />
+              <Route path="person/:contactId" element={<HubPerson />} />
+            </Route>
+            <Route path="*" element={<div data-testid="elsewhere" />} />
+          </Routes>
+        </main>
+        <BottomNav onOpenMore={() => {}} />
+      </MemoryRouter>,
+    );
+  }
+  const sidebarNav = () => within(globalNav()).queryByRole('navigation', { name: 'Contact Hub sections' });
+  const barNav = () => screen.getAllByRole('navigation', { name: 'Contact Hub sections' }).find((nav) => !globalNav().contains(nav));
+  const labelsOf = (nav) => within(nav).getAllByRole('button').map((b) => b.getAttribute('aria-label') || b.textContent.replace(/\d+$/, '').trim());
+  /** Presses each entry and waits for the address it should reach; true for each that got there. */
+  async function reaches(navOf, expected, user, from) {
+    const got = {};
+    for (const [name, path] of Object.entries(expected)) {
+      // Found afresh each time: going to My Card takes the sidebar's entries away, and coming back draws new ones.
+      const nav = await waitFor(() => { const found = navOf(); expect(found).toBeTruthy(); return found; });
+      await user.click(await within(nav).findByRole('button', { name: new RegExp(`^${name}`) }));
+      try { await waitFor(() => expect(router.at).toBe(path), { timeout: 1500 }); got[name] = path; } catch { got[name] = router.at; }
+      act(() => { router.navigate(from); });
+      await waitFor(() => expect(router.at).toBe(from));
+    }
+    return got;
+  }
+
+  it.each([['My People', '/contact-hub'], ['the Sticker Wall', '/contact-hub/stickers'], ['a person', '/contact-hub/person/p1']])('enabled, on %s: the sidebar and the phone bar offer the same three destinations, and each goes to the same place', async (_page, url) => {
+    const user = userEvent.setup();
+    renderBoth(url);
+    await within(globalNav()).findByRole('navigation', { name: 'Contact Hub sections' });
+    await within(sidebarNav()).findByRole('button', { name: 'Sticker Wall' });
+    expect(labelsOf(sidebarNav()).filter((l) => ['My Card', 'My People', 'Sticker Wall'].includes(l))).toEqual(['My Card', 'My People', 'Sticker Wall']);
+    expect(labelsOf(barNav())).toEqual(['My Card', 'My People', 'Sticker Wall']);
+    const expected = { 'My Card': '/contact-hub/my-card', 'My People': '/contact-hub', 'Sticker Wall': '/contact-hub/stickers' };
+    // Each entry, in the sidebar and on the phone, goes to the same place.
+    expect(await reaches(sidebarNav, expected, user, url)).toEqual(expected);
+    expect(await reaches(barNav, expected, user, url)).toEqual(expected);
+  });
+
+  it('enabled: the Sticker Wall is lit on its own page, and only there', async () => {
+    renderApp('/contact-hub/stickers');
+    const nav = await hubNav();
+    const wall = await within(nav).findByRole('button', { name: 'Sticker Wall' });
+    expect(wall).toHaveAttribute('aria-current', 'page');
+    expect(within(nav).getByRole('button', { name: /My People/ })).not.toHaveAttribute('aria-current', 'page');
+  });
+
+  it('enabled: it is a place to go, and it goes to the wall', async () => {
+    const user = userEvent.setup();
+    renderApp('/contact-hub');
+    const nav = await hubNav();
+    await user.click(await within(nav).findByRole('button', { name: 'Sticker Wall' }));
+    await waitFor(() => expect(router.at).toBe('/contact-hub/stickers'));
+    expect(await screen.findByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeInTheDocument();
+  });
+
+  it.each(Object.entries(states).filter(([name]) => name !== 'enabled'))('%s: no Sticker Wall in the sidebar, on any Contact Hub page, and nothing is subscribed', async (_label, answer) => {
+    fake.current.state.config = answer;
+    for (const url of ['/contact-hub', '/contact-hub/stickers']) {
+      const before = fake.current.state.configFetches;
+      const { unmount } = renderApp(url);
+      const nav = await hubNav();
+      await waitFor(() => expect(fake.current.state.configFetches).toBeGreaterThan(before));
+      await waitFor(() => expect(within(nav).getByRole('button', { name: /My People/ })).toBeInTheDocument());
+      expect(said(nav)).toEqual(['My Card', 'My People']);
+      expect(within(globalNav()).queryByRole('button', { name: /sticker/i })).toBeNull();
+      unmount();
+    }
+    expect(fake.current.state.subscriptions).toBe(0);
+  });
+
+  it('checking: no Sticker Wall until the server has answered, then it appears, without any reload of the people', async () => {
+    let answer;
+    fake.current.services.fetchStickersConfig = () => new Promise((resolve) => { answer = resolve; });
+    renderApp();
+    const nav = await hubNav();
+    await screen.findByRole('list', { name: 'My People' });
+    expect(within(nav).queryByRole('button', { name: 'Sticker Wall' })).toBeNull();
+    const loadsBefore = contactsData.loads;
+    answer(config());
+    expect(await within(nav).findByRole('button', { name: 'Sticker Wall' })).toBeInTheDocument();
+    expect(contactsData.loads).toBe(loadsBefore);
   });
 });
 

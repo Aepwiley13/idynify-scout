@@ -16,18 +16,29 @@
  *
  * WHAT IT SHOWS IN EACH STATE
  * My People is always here, so Contact Hub always has its entry; its count
- * appears once the people have loaded. The sticker entries are added when
- * there is something for them to act on:
- *   people still loading, or failed to load                 My People
- *   nobody in My People yet                                 My People (0)
- *   stickers not available for this account                 My People
- *   stickers still checking or loading                      My People
- *   the sticker list failed to load                         My People, and a message
- *   ready, with people                                      all of it
+ * appears once the people have loaded.
+ *
+ * THE STICKER WALL is here whenever stickers are available to this account, on
+ * every Contact Hub page, whatever the people are doing: the same three
+ * destinations (My Card, My People, Sticker Wall) as the phone's bottom bar for
+ * the same person. "Available" is the server's answer alone (stickersConfig:
+ * enabled, and not read-only), so the flag, the beta enrollment and "viewing as
+ * someone else" all keep their effect: disabled, not enrolled, read-only and
+ * still-checking all show no Sticker Wall. The wall's own page says what it
+ * can show.
+ *
+ * The rest of the sticker entries need people to act on and a loaded registry:
+ *   people still loading, or failed to load                 + Sticker Wall
+ *   nobody in My People yet                                 + Sticker Wall
+ *   stickers not available, or still checking               (no Sticker Wall)
+ *   the sticker list failed to load                         + a message
+ *   ready, with people                                      + each sticker, New sticker
+ *
  * My Card is first and always here. It is drawn by ContactHubMain (beside My
  * People) and by the My Card page, which is not inside ContactHubMain so that
- * opening it loads none of the user's people: there the people are never
- * loaded, so My People has no count and the sticker entries are not offered.
+ * opening it loads none of the user's people: there My People has no count and
+ * the sticker filters are not offered, but the Sticker Wall is (it needs only
+ * the availability answer, passed in as `wallAvailable`).
  *
  * New sticker is offered exactly when the page's own sticker controls are:
  * when stickers are available to this user and their list has loaded.
@@ -56,8 +67,10 @@ import './ContactHub.css';
  * @param selectedId  the sticker My People is filtered by, or null
  * @param onSelect    (stickerId | null) => go to My People with that filter
  * @param onOpenWall  () => go to the Sticker Wall
+ * @param wallAvailable  whether stickers are available, when this is drawn outside the sticker provider
+ *                       (the My Card page); left out, it is read from the page's own sticker state
  */
-export default function HubSidebarNav({ status, people, section, selectedId, onSelect, onOpenWall, onOpenCard }) {
+export default function HubSidebarNav({ status, people, section, selectedId, onSelect, onOpenWall, onOpenCard, wallAvailable }) {
   const slot = useSidebarSlot(CONTACT_HUB_SIDEBAR_SLOT);
   const stickers = useStickers();
   const { ready, active, uid, notify } = stickers;
@@ -70,13 +83,13 @@ export default function HubSidebarNav({ status, people, section, selectedId, onS
   if (!slot) return null;
 
   const loaded = status === HUB_STATUS.READY;
-  // Sticker entries need people to act on (with nobody yet the page is one
-  // invitation) and stickers that are on for this account.
+  // The Sticker Wall: on for exactly the people the server says stickers are available to.
+  const showWall = wallAvailable ?? stickers.availability === AVAILABILITY.AVAILABLE;
+  // The sticker filters and New sticker need people to act on, and a registry that has loaded.
   const withPeople = loaded && people.length > 0 && stickers.availability !== AVAILABILITY.UNAVAILABLE;
   const stickersReady = withPeople && ready;
-  // The wall exists only then; without it that address is My People.
-  const onWall = section === 'wall' && stickersReady;
-  const onPeople = (section === 'people' || (section === 'wall' && !stickersReady)) && !(stickersReady && selectedId);
+  const onWall = section === 'wall' && showWall;
+  const onPeople = (section === 'people' || (section === 'wall' && !showWall)) && !(stickersReady && selectedId);
   const closeDialog = () => { setCreating(false); newButton.current?.focus(); };
   const peopleLabel = `${people.length} ${people.length === 1 ? 'person' : 'people'}`;
 
@@ -106,7 +119,7 @@ export default function HubSidebarNav({ status, people, section, selectedId, onS
             {loaded ? <span className="hub-sidenav-count" aria-label={peopleLabel}>{people.length}</span> : null}
           </button>
 
-          {stickersReady && (
+          {showWall && (
             <button
               type="button"
               className="hub-sidenav-item"

@@ -14,7 +14,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { createFakeStickers } from './helpers/stickersUi';
+import { createFakeStickers, config } from './helpers/stickersUi';
 
 const people = vi.hoisted(() => ({ loads: 0 }));
 const fake = vi.hoisted(() => ({ current: null }));
@@ -60,6 +60,7 @@ vi.mock('../services/stickerService', () => ({
 import ContactHubMain from '../pages/ContactHub/ContactHubMain';
 import MyCardPage from '../pages/ContactHub/MyCardPage';
 import Sidebar from '../components/layout/Sidebar';
+import { bottomNavFor } from '../constants/mobileNavigation';
 import { newCard, normalizeCard } from '../utils/myCardRules';
 
 vi.setConfig({ testTimeout: 20000 });
@@ -80,6 +81,7 @@ function renderApp(url) {
           <Route path="/contact-hub/my-card" element={<MyCardPage />} />
           <Route path="/contact-hub" element={<ContactHubMain />}>
             <Route index element={<div data-testid="people-page" />} />
+            <Route path="stickers" element={<div data-testid="wall-page" />} />
           </Route>
           <Route path="*" element={<div data-testid="elsewhere" />} />
         </Routes>
@@ -88,6 +90,7 @@ function renderApp(url) {
   );
 }
 
+const globalNav = () => screen.getByRole('navigation', { name: 'Global navigation' });
 const hubNav = () => within(screen.getByRole('navigation', { name: 'Global navigation' })).findByRole('navigation', { name: 'Contact Hub sections' });
 const entries = (nav) => within(nav).getAllByRole('button').map((b) => b.getAttribute('aria-label') || b.textContent.replace(/\d+$/, ''));
 const lit = (nav) => within(nav).getAllByRole('button').filter((b) => b.getAttribute('aria-current') === 'page').map((b) => b.textContent.replace(/\d+$/, ''));
@@ -109,22 +112,26 @@ beforeEach(() => {
 afterEach(() => { vi.restoreAllMocks(); globalThis.sessionStorage.clear(); });
 
 describe('My Card in the sidebar', () => {
-  it('on My Card: the first entry, lit, with My People after it and not lit', async () => {
+  it('on My Card: My Card first and lit, then My People (not lit), then the Sticker Wall', async () => {
     renderApp('/contact-hub/my-card');
     const nav = await hubNav();
-    expect(entries(nav)).toEqual(['My Card', 'My People']);
+    await within(nav).findByRole('button', { name: 'Sticker Wall' });
+    expect(entries(nav)).toEqual(['My Card', 'My People', 'Sticker Wall']);
     expect(lit(nav)).toEqual(['My Card']);
     expect(within(nav).getByRole('button', { name: 'My People' })).not.toHaveAttribute('aria-current');
     await screen.findByRole('form', { name: 'Edit your card' });
   });
 
-  it('opening My Card does not load the user\'s people, and shows no count or sticker entries', async () => {
+  it('opening My Card does not load the user\'s people or the sticker registry: no count, no sticker filters, no New sticker', async () => {
     renderApp('/contact-hub/my-card');
     const nav = await hubNav();
     await screen.findByRole('form', { name: 'Edit your card' });
+    await within(nav).findByRole('button', { name: 'Sticker Wall' });
     expect(people.loads).toBe(0);
+    // The Sticker Wall needs only the server's answer: nothing is subscribed, and nothing of the people is read.
+    expect(fake.current.state.subscriptions).toBe(0);
     expect(within(nav).queryByLabelText(/\bpeople?\b/)).toBeNull();
-    expect(within(nav).queryByRole('button', { name: 'Sticker Wall' })).toBeNull();
+    expect(within(nav).queryByRole('list', { name: 'Filter by sticker' })).toBeNull();
     expect(within(nav).queryByRole('button', { name: 'New sticker' })).toBeNull();
   });
 
@@ -181,6 +188,64 @@ describe('My Card in the sidebar', () => {
     const global = screen.getByRole('navigation', { name: 'Global navigation' });
     expect(within(global).getByRole('button', { name: 'Contact Hub' })).toBeInTheDocument();
     expect(document.querySelectorAll('.sidebar-subnav')).toHaveLength(1);
+  });
+});
+
+describe('the Sticker Wall in the sidebar, from My Card', () => {
+  const answers = {
+    disabled: config({ enabled: false, mode: 'off', readOnly: false }),
+    'not enrolled': config({ enabled: false, mode: 'beta', readOnly: false }),
+    'read-only (an admin viewing as the user)': config({ enabled: true, mode: 'beta', readOnly: true }),
+    'an error from the server': { status: 500, body: null },
+    'an answer that is not understood': { status: 200, body: { enabled: 'yes' } },
+  };
+
+  it('enabled: it is offered, and it goes to the wall', async () => {
+    const user = userEvent.setup();
+    renderApp('/contact-hub/my-card');
+    const nav = await hubNav();
+    await user.click(await within(nav).findByRole('button', { name: 'Sticker Wall' }));
+    expect(await screen.findByTestId('wall-page')).toBeInTheDocument();
+    expect(screen.getByTestId('at')).toHaveTextContent('/contact-hub/stickers');
+  });
+
+  it('enabled: it is the same three destinations, in the same order, as My People\'s sidebar and the phone', async () => {
+    renderApp('/contact-hub/my-card');
+    const nav = await hubNav();
+    await within(nav).findByRole('button', { name: 'Sticker Wall' });
+    expect(entries(nav)).toEqual(['My Card', 'My People', 'Sticker Wall']);
+    expect(bottomNavFor('contact-hub').primary.map((cell) => cell.label)).toEqual(entries(nav));
+  });
+
+  it.each(Object.entries(answers))('%s: no Sticker Wall, and nothing is subscribed or loaded', async (_label, answer) => {
+    fake.current.state.config = answer;
+    renderApp('/contact-hub/my-card');
+    const nav = await hubNav();
+    await screen.findByRole('form', { name: 'Edit your card' });
+    await waitFor(() => expect(fake.current.state.configFetches).toBeGreaterThan(0));
+    expect(entries(nav)).toEqual(['My Card', 'My People']);
+    expect(within(globalNav()).queryByRole('button', { name: /sticker/i })).toBeNull();
+    expect(fake.current.state.subscriptions).toBe(0);
+    expect(people.loads).toBe(0);
+  });
+
+  it('still checking: no Sticker Wall until the server has answered, then it appears; the card is not held up', async () => {
+    let answer;
+    fake.current.services.fetchStickersConfig = () => new Promise((resolve) => { answer = resolve; });
+    renderApp('/contact-hub/my-card');
+    const nav = await hubNav();
+    await screen.findByRole('form', { name: 'Edit your card' });
+    expect(entries(nav)).toEqual(['My Card', 'My People']);
+    answer(config());
+    expect(await within(nav).findByRole('button', { name: 'Sticker Wall' })).toBeInTheDocument();
+  });
+
+  it('is asked once for the page, not once for each thing that redraws', async () => {
+    renderApp('/contact-hub/my-card');
+    const nav = await hubNav();
+    await within(nav).findByRole('button', { name: 'Sticker Wall' });
+    await userEvent.type(await screen.findByLabelText('Title'), ' lead');
+    expect(fake.current.state.configFetches).toBe(1);
   });
 });
 

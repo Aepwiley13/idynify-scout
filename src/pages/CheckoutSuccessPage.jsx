@@ -6,6 +6,7 @@ import { planOf, isPaidPlan } from '../utils/accountPlan';
 import { hasActiveAccess } from '../utils/billingEntitlement';
 import { FREE_PLAN, FREE_PLAN_HOME } from '../constants/freePlan';
 import { supportMailto } from '../constants/support';
+import { peekCheckoutReturn, clearCheckoutReturn, CHECKOUT_RETURN_FALLBACK } from '../utils/checkoutReturn';
 
 /** How often, and for how long, this page asks the server whether the payment has been applied. */
 export const CONFIRM_POLL_MS = 2500;
@@ -19,7 +20,8 @@ export const CONFIRM_TIMEOUT_MS = 60000;
  *
  * So this page waits for the server to confirm it: it reads the account from the server (never a
  * saved copy) until paid access is there, then has the app re-check the account, and only once the
- * app's own account state says paid does it go on to /onboarding. If that takes more than a minute
+ * app's own account state says paid does it go on: back to the contact or page the upgrade
+ * started from when checkout kept one (utils/checkoutReturn.js), otherwise /onboarding. If that takes more than a minute
  * the customer is told what is happening and can check again or contact support. Nothing here
  * writes anything or grants anything: the webhook alone does that.
  */
@@ -59,12 +61,23 @@ export default function CheckoutSuccessPage({ account = null, onRecheckAccount }
     return () => { stopped = true; clearTimeout(timer); };
   }, [paid, attempt, onRecheckAccount]);
 
+  // Read once: the contact or page this checkout started from, if checkout kept one.
+  const [returnTo] = useState(() => peekCheckoutReturn()?.returnTo ?? null);
+  const destination = returnTo ?? CHECKOUT_RETURN_FALLBACK;
+  const goOn = () => {
+    clearCheckoutReturn();
+    navigate(destination, { replace: true });
+  };
+
   // The app's account state says paid: on into the product.
   useEffect(() => {
     if (!paid) return undefined;
-    const timer = setTimeout(() => navigate('/onboarding'), 1500);
+    const timer = setTimeout(() => {
+      clearCheckoutReturn();
+      navigate(destination, { replace: true });
+    }, 1500);
     return () => clearTimeout(timer);
-  }, [paid, navigate]);
+  }, [paid, navigate, destination]);
 
   const checkAgain = () => {
     setDelayed(false);
@@ -155,7 +168,7 @@ export default function CheckoutSuccessPage({ account = null, onRecheckAccount }
           ) : (
             <div className="bg-purple-500/20 border border-purple-500/30 rounded-xl p-6 mb-8">
               <p className="text-purple-300 font-mono">
-                {paid ? 'Connecting you to Barry…' : 'Confirming your payment…'}
+                {!paid ? 'Confirming your payment…' : returnTo ? 'Taking you back to where you were…' : 'Connecting you to Barry…'}
               </p>
             </div>
           )}
@@ -164,10 +177,10 @@ export default function CheckoutSuccessPage({ account = null, onRecheckAccount }
               lead back to checkout. */}
           {paid && (
             <button
-              onClick={() => navigate('/onboarding')}
+              onClick={goOn}
               className="bg-gradient-to-r from-purple-500 to-violet-600 hover:from-purple-600 hover:to-violet-700 text-white font-bold py-4 px-12 rounded-xl transition-all shadow-2xl shadow-purple-500/50 text-lg font-mono"
             >
-              🧠 MEET BARRY NOW
+              {returnTo ? 'CONTINUE WHERE YOU LEFT OFF' : '🧠 MEET BARRY NOW'}
             </button>
           )}
         </div>

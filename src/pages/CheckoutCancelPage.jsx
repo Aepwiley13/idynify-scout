@@ -1,8 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import { SUPPORT_EMAIL, supportMailto } from '../constants/support';
+import { peekCheckoutReturn, clearCheckoutReturn, checkoutPath } from '../utils/checkoutReturn';
 
 export default function CheckoutCancelPage() {
   const navigate = useNavigate();
+  // The checkout that was cancelled, if it started from a contact or page (W1).
+  const kept = peekCheckoutReturn();
 
   return (
     <div className="min-h-screen bg-black relative overflow-hidden">
@@ -54,16 +57,19 @@ export default function CheckoutCancelPage() {
           {/* Action Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <button
-              onClick={() => navigate('/checkout')}
+              onClick={() => navigate(kept ? checkoutPath(kept.tier, kept.returnTo) : '/checkout')}
               className="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-4 px-12 rounded-xl transition-all shadow-2xl shadow-cyan-500/50 text-lg font-mono"
             >
               💳 TRY AGAIN
             </button>
             <button
-              onClick={() => navigate('/')}
+              onClick={() => {
+                if (kept) clearCheckoutReturn();
+                navigate(kept ? kept.returnTo : '/');
+              }}
               className="bg-gray-800/50 hover:bg-gray-700/50 text-white font-bold py-4 px-12 rounded-xl transition-all border border-cyan-500/30 text-lg font-mono"
             >
-              🏠 GO HOME
+              {kept ? '← BACK TO WHERE YOU WERE' : '🏠 GO HOME'}
             </button>
           </div>
 

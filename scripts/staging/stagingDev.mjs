@@ -24,6 +24,15 @@
  *                       The CLI otherwise bundles all of them at start, which
  *                       can exhaust memory on a small machine; other functions
  *                       then answer 404, which sticker QA never needs.
+ *   (optional) --only-billing-functions
+ *                       the billing runbook and the Free → Scout journey
+ *                       (docs/billing/STAGING_VALIDATION_RUNBOOK.md): serve only
+ *                       BILLING_JOURNEY_FUNCTIONS, the same way, and skip the
+ *                       edge-function runtime (as --no-edge-functions, with its
+ *                       refusal). Without this, every request on :8888 waits for
+ *                       all ~124 functions to finish bundling (minutes) and for the
+ *                       edge runtime's download. Once the app answers, the launcher
+ *                       prints one line saying so and which functions answer.
  *   (optional) --apollo-mock
  *                       start the local Apollo stand-in (apolloMock.mjs, 127.0.0.1 only) and
  *                       point the functions at it with its fixed key. For the end-to-end test.
@@ -71,12 +80,28 @@ export const STICKER_QA_FUNCTIONS = Object.freeze([
   'stickersConfig', 'adminGetUsers', 'adminStartImpersonation', 'adminGetImpersonationSession', 'adminEndImpersonation',
 ]);
 
-/** A private temporary folder (0700) of links to those functions. Call remove() on exit. */
-export function stickerFunctionsFolder(root, { dir = tmpdir() } = {}) {
+/**
+ * The functions the billing runbook and the Free → Scout journey call. Everything else answers
+ * 404 in --only-billing-functions; the journey's report lists any function the page asked for
+ * and did not get, so a missing one cannot pass unseen.
+ */
+export const BILLING_JOURNEY_FUNCTIONS = Object.freeze([
+  'send-welcome-email', // sign up (best effort; staging has no email key, so nothing is sent)
+  'stickersConfig', // Contact Hub stickers
+  'create-checkout-session', // Upgrade to Scout
+  'stripe-webhook', // payment, plan change and renewal events (stripe listen forwards here)
+  'change-plan', // Starter → Pro
+  'create-portal-session', // Manage billing
+  'barryEnrich', // Enrich contact in Scout (Apollo stand-in)
+  'barryGenerateContext', // asked for when a Scout person opens; staging has no Claude key
+]);
+
+/** A private temporary folder (0700) of links to the named functions. Call remove() on exit. */
+export function functionsFolder(root, names, { dir = tmpdir() } = {}) {
   const folder = mkdtempSync(join(dir, 'staging-functions-'));
   chmodSync(folder, 0o700);
   try {
-    for (const name of STICKER_QA_FUNCTIONS) {
+    for (const name of names) {
       const source = join(root, 'netlify', 'functions', `${name}.js`);
       if (!existsSync(source)) throw new Error(`netlify/functions/${name}.js is missing.`);
       symlinkSync(source, join(folder, `${name}.js`));
@@ -86,6 +111,47 @@ export function stickerFunctionsFolder(root, { dir = tmpdir() } = {}) {
     throw err;
   }
   return { path: folder, remove: () => rmSync(folder, { recursive: true, force: true }) };
+}
+
+export const stickerFunctionsFolder = (root, options) => functionsFolder(root, STICKER_QA_FUNCTIONS, options);
+
+/**
+ * Waits until the app answers GET / with 200, then asks each function for OPTIONS (a CORS
+ * preflight: no body, no token, nothing written). 404 means the CLI does not serve it; any
+ * other answer means it is mounted. Returns { ok, ms, status, functions: [{ name, status }] }.
+ */
+export async function probeReady({ base = 'http://localhost:8888', functions = [], fetchImpl = fetch, timeoutMs = 180_000, intervalMs = 1_000, now = Date.now, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), stopped = () => false } = {}) {
+  const started = now();
+  let status = null;
+  while (now() - started < timeoutMs && !stopped()) {
+    try {
+      status = (await fetchImpl(`${base}/`, { signal: AbortSignal.timeout(10_000) })).status;
+      if (status === 200) break;
+    } catch {
+      status = null;
+    }
+    await sleep(intervalMs);
+  }
+  if (status !== 200) return { ok: false, ms: now() - started, status, functions: [] };
+  const answers = [];
+  for (const name of functions) {
+    let answer = null;
+    try {
+      answer = (await fetchImpl(`${base}/.netlify/functions/${name}`, { method: 'OPTIONS', signal: AbortSignal.timeout(30_000) })).status;
+    } catch {
+      answer = null;
+    }
+    answers.push({ name, status: answer });
+  }
+  return { ok: answers.every((a) => a.status !== null && a.status !== 404), ms: now() - started, status, functions: answers };
+}
+
+/** The one line the launcher prints once the app answers. Pure. */
+export function readyLine(result, base = 'http://localhost:8888') {
+  if (result.status !== 200) return `✗ ${base} did not answer 200 within ${Math.round(result.ms / 1000)} s (last: ${result.status ?? 'no answer'}).`;
+  const missing = result.functions.filter((f) => f.status === null || f.status === 404).map((f) => f.name);
+  const head = `${base} answered 200 after ${Math.round(result.ms / 1000)} s; ${result.functions.length - missing.length} of ${result.functions.length} functions answer`;
+  return missing.length ? `✗ ${head}. Not answering: ${missing.join(', ')}.` : `✓ ${head}. Ready.`;
 }
 
 /** The CLI arguments: `netlify dev --offline`, plus the switches asked for. */
@@ -150,7 +216,12 @@ async function main() {
     }),
     ...checkCredential(fileEnv, credential),
   ];
-  const noEdgeFunctions = argv.includes('--no-edge-functions');
+  const onlyBilling = argv.includes('--only-billing-functions');
+  if (onlyBilling && argv.includes('--only-sticker-functions')) {
+    console.error('Refused: use --only-billing-functions or --only-sticker-functions, not both.');
+    return 1;
+  }
+  const noEdgeFunctions = onlyBilling || argv.includes('--no-edge-functions');
   const apolloMock = argv.includes('--apollo-mock') ? await startApolloMock({ port: DEFAULT_APOLLO_MOCK_PORT }) : null;
   const plan = planDevRun({
     fileEnv, credential, shellEnv: process.env, checks, rest: argv.includes('--rest'),
@@ -162,12 +233,24 @@ async function main() {
     console.error('\nRefused: the app was not started.');
     return 1;
   }
-  const functions = argv.includes('--only-sticker-functions') ? stickerFunctionsFolder(repoRoot()) : null;
-  console.log(`Preflight passed. Starting the app against ${fileEnv.VITE_FIREBASE_PROJECT_ID} (browser, functions and sign-in)${billing ? ', Stripe in test mode' : ''}${apolloMock ? `, Apollo stand-in at ${apolloMock.url}` : ''}, credential from ${credential.source}${functions ? `, serving only: ${STICKER_QA_FUNCTIONS.join(', ')}` : ''}.`);
+  const served = onlyBilling ? BILLING_JOURNEY_FUNCTIONS : argv.includes('--only-sticker-functions') ? STICKER_QA_FUNCTIONS : null;
+  let functions = null;
+  try {
+    functions = served ? functionsFolder(repoRoot(), served) : null;
+  } catch (err) {
+    await apolloMock?.close();
+    console.error(`Refused: ${err.message} This mode needs the integration branch (STAGING_VALIDATION_RUNBOOK.md Part 1).`);
+    return 1;
+  }
+  console.log(`Preflight passed. Starting the app against ${fileEnv.VITE_FIREBASE_PROJECT_ID} (browser, functions and sign-in)${billing ? ', Stripe in test mode' : ''}${apolloMock ? `, Apollo stand-in at ${apolloMock.url}` : ''}, credential from ${credential.source}${served ? `, serving only: ${served.join(', ')}` : ''}${noEdgeFunctions ? ', edge runtime off' : ''}.`);
   const child = spawn('npx', devArgs({ noEdgeFunctions, functionsDir: functions?.path }), { cwd: repoRoot(), stdio: 'inherit', env: plan.childEnv });
+  let exited = false;
+  if (onlyBilling) {
+    probeReady({ functions: BILLING_JOURNEY_FUNCTIONS, stopped: () => exited }).then((result) => { if (!exited) console.log(`\n${readyLine(result)}\n`); });
+  }
   const stop = () => { functions?.remove(); apolloMock?.close(); };
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(signal, () => { child.kill(signal); stop(); process.exit(130); });
-  child.on('exit', (code) => { stop(); process.exitCode = code ?? 1; });
+  child.on('exit', (code) => { exited = true; stop(); process.exitCode = code ?? 1; });
   return undefined;
 }
 

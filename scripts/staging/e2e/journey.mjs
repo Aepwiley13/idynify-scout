@@ -76,6 +76,15 @@ export function isPaidRequest(url) {
   }
 }
 
+/** The function a /.netlify/functions/<name> URL calls, or null. */
+export function functionName(url) {
+  try {
+    return new URL(url).pathname.match(/^\/\.netlify\/functions\/([^/?]+)/)?.[1] ?? null;
+  } catch {
+    return null;
+  }
+}
+
 const filled = (v) => !(v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0));
 const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 

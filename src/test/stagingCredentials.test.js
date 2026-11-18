@@ -19,7 +19,9 @@ import {
   parseServiceAccountKey, parseCredentialFile, readStagingCredential, withCredential, checkCredential, temporaryKeyFile, redactKeys,
   CredentialRefusal, KEY_VARIABLE, FILE_VARIABLE, ADC_MODE,
 } from '../../scripts/staging/stagingCredentials.mjs';
-import { planDevRun, devArgs, hasEdgeFunctions, stickerFunctionsFolder, STICKER_QA_FUNCTIONS } from '../../scripts/staging/stagingDev.mjs';
+import {
+  planDevRun, devArgs, hasEdgeFunctions, stickerFunctionsFolder, STICKER_QA_FUNCTIONS, functionsFolder, BILLING_JOURNEY_FUNCTIONS, probeReady, readyLine,
+} from '../../scripts/staging/stagingDev.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(here, '../..');
@@ -216,6 +218,94 @@ describe('serving only the sticker QA functions', () => {
   });
 });
 
+describe('serving only the billing journey functions (--only-billing-functions)', () => {
+  const fakeRoot = (names) => {
+    const root = mkdtempSync(join(tmpdir(), 'billing-root-'));
+    mkdirSync(join(root, 'netlify', 'functions'), { recursive: true });
+    for (const n of names) writeFileSync(join(root, 'netlify', 'functions', `${n}.js`), 'export const handler = () => ({ statusCode: 200 });');
+    return root;
+  };
+
+  it('names the signup, checkout, webhook, plan-change, portal and Scout functions, and nothing else', () => {
+    expect([...BILLING_JOURNEY_FUNCTIONS].sort()).toEqual([
+      'barryEnrich', 'barryGenerateContext', 'change-plan', 'create-checkout-session', 'create-portal-session',
+      'send-welcome-email', 'stickersConfig', 'stripe-webhook',
+    ]);
+  });
+
+  it('links exactly those from a private temporary folder, and removes it', () => {
+    const root = fakeRoot([...BILLING_JOURNEY_FUNCTIONS, 'search-companies', 'generate-section-1']);
+    const folder = functionsFolder(root, BILLING_JOURNEY_FUNCTIONS);
+    expect(statSync(folder.path).mode & 0o777).toBe(0o700);
+    expect(readdirSync(folder.path).sort()).toEqual(BILLING_JOURNEY_FUNCTIONS.map((n) => `${n}.js`).sort());
+    folder.remove();
+    expect(existsSync(folder.path)).toBe(false);
+  });
+
+  it('refuses a checkout that lacks one, naming it, and leaves no folder behind', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'billing-links-'));
+    const root = fakeRoot(BILLING_JOURNEY_FUNCTIONS.filter((n) => n !== 'change-plan'));
+    expect(() => functionsFolder(root, BILLING_JOURNEY_FUNCTIONS, { dir })).toThrow('netlify/functions/change-plan.js is missing.');
+    expect(readdirSync(dir)).toEqual([]);
+  });
+
+  it('every one present in this checkout runs on short-lived credentials (the shared init)', () => {
+    for (const name of BILLING_JOURNEY_FUNCTIONS) {
+      const file = join(REPO, 'netlify/functions', `${name}.js`);
+      if (!existsSync(file)) continue; // W3/W4a functions: on the integration branch, where this runs in full
+      const source = readFileSync(file, 'utf8');
+      const sharedInit = source.includes("from './firebase-admin.js'") || source.includes("import('./firebase-admin.js')");
+      const usesAdmin = /firebase-admin|initializeApp\(/.test(source);
+      expect(sharedInit || !usesAdmin, name).toBe(true);
+    }
+  });
+
+  const clock = () => {
+    let t = 0;
+    return { now: () => t, sleep: async (ms) => { t += ms; } };
+  };
+
+  it('readiness: waits for 200 on /, then asks each function for OPTIONS (no body, no token)', async () => {
+    const asked = [];
+    let gets = 0;
+    const fetchImpl = async (url, init = {}) => {
+      asked.push([init.method ?? 'GET', url, init.body, init.headers]);
+      if (url.endsWith(':8888/')) {
+        gets += 1;
+        if (gets < 3) throw new Error('ECONNREFUSED');
+        return { status: 200 };
+      }
+      return { status: url.endsWith('/stripe-webhook') ? 405 : 401 };
+    };
+    const result = await probeReady({ functions: ['create-checkout-session', 'stripe-webhook'], fetchImpl, ...clock() });
+    expect(result).toMatchObject({ ok: true, status: 200, functions: [{ name: 'create-checkout-session', status: 401 }, { name: 'stripe-webhook', status: 405 }] });
+    expect(asked.filter(([m]) => m === 'OPTIONS').every(([, , body, headers]) => body === undefined && headers === undefined)).toBe(true);
+    expect(readyLine(result)).toMatch(/^✓ http:\/\/localhost:8888 answered 200 after \d+ s; 2 of 2 functions answer\. Ready\.$/);
+  });
+
+  it('readiness: a function the CLI does not serve (404) or that does not answer is named', async () => {
+    const fetchImpl = async (url) => {
+      if (url.endsWith('/')) return { status: 200 };
+      if (url.endsWith('/change-plan')) return { status: 404 };
+      if (url.endsWith('/barryEnrich')) throw new Error('timeout');
+      return { status: 405 };
+    };
+    const result = await probeReady({ functions: ['change-plan', 'barryEnrich', 'stripe-webhook'], fetchImpl, ...clock() });
+    expect(result.ok).toBe(false);
+    expect(readyLine(result)).toBe('✗ http://localhost:8888 answered 200 after 0 s; 1 of 3 functions answer. Not answering: change-plan, barryEnrich.');
+  });
+
+  it('readiness: a page that never answers 200 is reported, and it stops when the app exits', async () => {
+    const never = await probeReady({ fetchImpl: async () => { throw new Error('timeout'); }, timeoutMs: 5_000, ...clock() });
+    expect(never).toMatchObject({ ok: false, status: null });
+    expect(readyLine(never)).toBe('✗ http://localhost:8888 did not answer 200 within 5 s (last: no answer).');
+    let calls = 0;
+    const stoppedEarly = await probeReady({ fetchImpl: async () => { calls += 1; return { status: 502 }; }, stopped: () => calls >= 2, ...clock() });
+    expect(stoppedEarly).toMatchObject({ ok: false, status: 502 });
+    expect(calls).toBe(2);
+  });
+});
+
 describe('the tools, with the key in STAGING_SERVICE_ACCOUNT_KEY', () => {
   const run = (name, args, env = {}) => {
     try {
@@ -237,6 +327,13 @@ describe('the tools, with the key in STAGING_SERVICE_ACCOUNT_KEY', () => {
     expect(status).toBe(0);
     expect(out).toContain('✓ credential-project');
     expect(out).toContain('✓ private-key');
+    expect(out).not.toContain(KEY_LINE);
+  });
+
+  it('the launcher refuses both function modes together, before starting anything', () => {
+    const { status, out } = run('stagingDev.mjs', [`--env=${envFile()}`, '--only-billing-functions', '--only-sticker-functions'], { PRODUCTION_FIREBASE_PROJECT_ID: PROD, [KEY_VARIABLE]: b64() });
+    expect(status).toBe(1);
+    expect(out).toContain('not both');
     expect(out).not.toContain(KEY_LINE);
   });
 

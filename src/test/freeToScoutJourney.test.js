@@ -7,7 +7,7 @@
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
-  parseE2eArgs, JourneyRefusal, FIVE_PEOPLE_CSV, isPaidRequest, compareAccount, summarize, BILLING_FIELDS,
+  parseE2eArgs, JourneyRefusal, FIVE_PEOPLE_CSV, isPaidRequest, functionName, compareAccount, summarize, BILLING_FIELDS,
 } from '../../scripts/staging/e2e/journey.mjs';
 import { startApolloMock, answer, mockPerson, APOLLO_MOCK_KEY } from '../../scripts/staging/apolloMock.mjs';
 import { apolloBaseUrl, APOLLO_LIVE_BASE } from '../../netlify/functions/utils/apolloConstants.js';
@@ -51,6 +51,15 @@ describe('paid requests', () => {
     '/.netlify/functions/searchPeopleLater', 'not a url',
   ])('%s does not', (path) => {
     expect(isPaidRequest(path.startsWith('/') ? `http://localhost:8888${path}` : path)).toBe(false);
+  });
+});
+
+describe('functionName (for the report of functions not served)', () => {
+  it('reads the function from its URL', () => {
+    expect(functionName('http://localhost:8888/.netlify/functions/change-plan')).toBe('change-plan');
+    expect(functionName('http://localhost:8888/.netlify/functions/barryEnrich?x=1')).toBe('barryEnrich');
+    expect(functionName('http://localhost:8888/contact-hub')).toBeNull();
+    expect(functionName('not a url')).toBeNull();
   });
 });
 

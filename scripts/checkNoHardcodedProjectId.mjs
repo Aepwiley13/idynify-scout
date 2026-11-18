@@ -37,7 +37,9 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
-const ROOT = new URL('..', import.meta.url).pathname;
+// PROJECT_ID_GUARD_ROOT lets src/test/checkNoHardcodedProjectId.test.js run this exact script over a scratch tree.
+// Nothing in CI or the build sets it; the default is this repository.
+const ROOT = process.env.PROJECT_ID_GUARD_ROOT ?? new URL('..', import.meta.url).pathname;
 const SCANNED = ['src', 'netlify/functions', 'scripts'];
 
 const DETECTORS = [
@@ -85,6 +87,29 @@ const ALLOWED = new Map([
    'An allowlist of one, not configuration. The billing rehearsal refuses every project that is not this pinned staging name (and, against the emulator, a "demo-" namespace that cannot reach a real backend). Nothing falls back to either literal.'],
 ]);
 
+/**
+ * Exceptions for ONE exact literal in ONE file, narrower than ALLOWED (which excuses a whole file).
+ * A line is excused only when it is a `projectId: '<literal>'` assignment (the literal-config detector)
+ * and nothing on it still trips a detector once that literal is taken out. So the file can name this
+ * demo project and nothing else: a real project id, another demo id, an env-var fallback, or a second
+ * literal on the same line still fail. The list only shrinks, like ALLOWED.
+ */
+const ALLOWED_LITERALS = new Map([
+  ['scripts/rules-check/my-card.mjs', {
+    literals: ['demo-my-card'],
+    why: 'Emulator fixture for the My Card rules suite. Firebase reserves the "demo-" prefix for projects that cannot reach a real backend, so this literal is safe by construction; it is allowed here by exact value, so nothing else in the file is excused.',
+  }],
+]);
+
+/** Is this line's only project-id literal one that this file is allowed to name? */
+function isAllowedLiteral(rel, line, hit) {
+  const entry = ALLOWED_LITERALS.get(rel);
+  if (!entry || hit.name !== 'literal-config') return false;
+  let rest = line;
+  for (const literal of entry.literals) rest = rest.split(`'${literal}'`).join("''").split(`"${literal}"`).join('""').split(`\`${literal}\``).join('``');
+  return rest !== line && !DETECTORS.some((d) => d.re.test(rest));
+}
+
 /** A line that is only a comment cannot configure anything. */
 const isComment = (line) => /^\s*(\/\/|\*|\/\*)/.test(line);
 
@@ -100,6 +125,7 @@ function walk(dir, out = []) {
 
 const violations = [];
 const allowedHit = new Set();
+const literalHit = new Set();
 
 for (const base of SCANNED) {
   for (const file of walk(join(ROOT, base))) {
@@ -109,12 +135,14 @@ for (const base of SCANNED) {
       const hit = DETECTORS.find((d) => d.re.test(line));
       if (!hit) return;
       if (ALLOWED.has(rel)) { allowedHit.add(rel); return; }
+      if (isAllowedLiteral(rel, line, hit)) { literalHit.add(rel); return; }
       violations.push({ rel, line: i + 1, text: line.trim(), detector: hit.name, why: hit.why });
     });
   }
 }
 
 const stale = [...ALLOWED.keys()].filter((f) => !allowedHit.has(f));
+const staleLiterals = [...ALLOWED_LITERALS.keys()].filter((f) => !literalHit.has(f));
 
 if (violations.length === 0) {
   console.log(`✓ no hardcoded Firebase project id in ${SCANNED.join(', ')}`);
@@ -122,6 +150,10 @@ if (violations.length === 0) {
   if (stale.length) {
     console.log('\n  Note — allowlist entries that matched nothing (safe to delete):');
     for (const f of stale) console.log(`    ${f}`);
+  }
+  if (staleLiterals.length) {
+    console.log('\n  Note — exact-literal exceptions that matched nothing (safe to delete):');
+    for (const f of staleLiterals) console.log(`    ${f}`);
   }
   process.exit(0);
 }
@@ -138,6 +170,7 @@ console.error(
   '  · Client code       — import.meta.env.VITE_FIREBASE_PROJECT_ID\n\n' +
   'A literal here means a misconfigured deploy reaches real customer data\n' +
   'instead of failing. If this occurrence is a test fixture rather than\n' +
-  'configuration, add it to ALLOWED in this file with a reason.\n'
+  'configuration, add it to ALLOWED (a whole file) or ALLOWED_LITERALS (one exact\n' +
+  'literal in one file) in this file with a reason.\n'
 );
 process.exit(1);

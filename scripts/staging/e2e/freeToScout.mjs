@@ -126,20 +126,22 @@ async function run(args) {
       return { pending: true, detail: 'My Card found; its steps come with the Contact Hub team\'s branch' };
     });
 
-    await step('3. Add a person, then import five from a CSV file', async () => {
+    await step('3. Import five contacts from a CSV file straight away, then add one person', async () => {
       await page.goto(`${args.base}/contact-hub`);
-      await page.getByRole('button', { name: /add your first person/i }).click();
-      await page.getByPlaceholder('John Doe').fill('Morgan First');
-      await page.getByRole('dialog').getByRole('button', { name: 'Add Person' }).click();
-      await page.getByText('Morgan First was added to My People.').waitFor();
-      await page.getByRole('button', { name: 'Import People' }).click();
+      // The first-run screen offers both: no one has to be added by hand before importing.
+      await page.getByText('Start with one person').waitFor();
+      await page.getByRole('button', { name: 'Import Contacts' }).click();
       await page.getByTestId('csv-upload').setInputFiles({ name: 'people.csv', mimeType: 'text/csv', buffer: Buffer.from(FIVE_PEOPLE_CSV) });
       await page.getByText('Preview: people.csv').waitFor();
       await page.getByRole('button', { name: 'Import 5 contacts' }).click();
       await page.getByText('5 people added.').waitFor();
+      await page.getByRole('button', { name: 'Add Person' }).first().click();
+      await page.getByPlaceholder('John Doe').fill('Morgan First');
+      await page.getByRole('dialog').getByRole('button', { name: 'Add Person' }).click();
+      await page.getByText('Morgan First was added to My People.').waitFor();
       const contacts = await db.collection('users').doc(uid).collection('contacts').get();
       if (contacts.size !== 6) throw new Error(`Expected 6 people in users/{uid}/contacts, found ${contacts.size}.`);
-      return { detail: '6 people in the canonical contacts collection' };
+      return { detail: '5 imported from the first screen, 1 added; 6 in the canonical contacts collection' };
     });
 
     await step('4. Organize: a sticker and a note on one person', async () => {
@@ -203,7 +205,20 @@ async function run(args) {
       return { detail: 'same uid; one customer, one subscription, 400 credits, one grant' };
     });
 
-    await step('8. Enrich the person in Scout; credits charged once', async () => {
+    await step('7b. Scout is open with no second signup, import or onboarding', async () => {
+      const personUrl = page.url();
+      await page.goto(`${args.base}/`);
+      await page.waitForURL(/\/contact-hub(\/|$)/, { timeout: 30_000 });
+      if (/\/barry|\/onboarding|\/signup|\/checkout/.test(page.url())) throw new Error(`Sent to ${page.url()} after upgrading.`);
+      await page.goto(`${args.base}/scout`);
+      await page.waitForLoadState('networkidle');
+      if (await page.getByRole('heading', { name: 'This is part of Scout' }).count()) throw new Error('Scout still shows the upgrade screen.');
+      await page.goto(personUrl);
+      await page.getByRole('button', { name: 'Enrich contact' }).waitFor();
+      return { detail: 'home is Contact Hub; Scout opens; back on the person' };
+    });
+
+    await step(args.expectMetering ? '8. Enrich the person in Scout; credits charged once' : '8. Enrich the person in Scout (metering off: nothing charged)', async () => {
       phase = 'paid';
       const creditsBefore = (await db.collection('users').doc(uid).get()).data().credits.remaining;
       await page.getByRole('button', { name: 'Enrich contact' }).click();
@@ -214,9 +229,20 @@ async function run(args) {
       const after = (await db.collection('users').doc(uid).get()).data().credits.remaining;
       const ledger = (await db.collection('users').doc(uid).collection('creditTransactions').get()).docs.map((d) => d.data());
       const charged = creditsBefore - after;
+      if (!args.expectMetering) {
+        if (charged !== 0 || ledger.length) throw new Error(`Metering is expected off, but credits changed (${creditsBefore} → ${after}) or were logged. Is CREDIT_METERING set in the env file?`);
+        return { detail: `enriched with ${calls.length} mocked Apollo call(s); metering off, nothing charged` };
+      }
       if (charged <= 0) throw new Error(`Credits did not go down (${creditsBefore} → ${after}). Is CREDIT_METERING=on in the env file?`);
       if (ledger.filter((e) => e.cost > 0).length !== 1) throw new Error(`Expected one charge in the credit log, found ${ledger.length} entries.`);
-      return { detail: `${charged} credit(s) charged, ${calls.length} mocked Apollo call(s), one log entry` };
+      // A second press within the retry window replays the answer: no Apollo call, no charge.
+      const callsBefore = (await mockCalls()).length;
+      await page.getByRole('button', { name: 'Enrich contact' }).click();
+      await page.getByRole('button', { name: 'Enrich contact' }).waitFor({ timeout: 60_000 });
+      const again = (await db.collection('users').doc(uid).get()).data().credits.remaining;
+      if (again !== after) throw new Error(`A repeated enrichment within the retry window charged again (${after} → ${again}).`);
+      if ((await mockCalls()).length !== callsBefore) throw new Error('A repeated enrichment within the retry window called Apollo again.');
+      return { detail: `${charged} credit(s) charged once; a repeat within the window charged nothing; ${calls.length} mocked Apollo call(s)` };
     });
 
     await step('9. Nothing the customer made was lost or changed', async () => {

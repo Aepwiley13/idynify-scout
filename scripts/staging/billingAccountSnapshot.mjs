@@ -97,7 +97,8 @@ export function summarizeAccount({ user, allocations = [], ambiguous = [], opera
       stripeCustomerId: user?.stripeCustomerId ?? null, stripeSubscriptionId: user?.stripeSubscriptionId ?? null,
       credits: credits ?? null, pendingCheckout: claim,
     },
-    grants: allocations.map((a) => ({ subscription: a.id, priceId: a.priceId ?? null, grantedAt: a.grantedAt ?? null })),
+    // kind: 'checkout' for the first grant; 'plan_change' (W3) and 'renewal' (W4b) for the others.
+    grants: allocations.map((a) => ({ subscription: a.id, kind: a.kind ?? 'checkout', priceId: a.priceId ?? null, credits: a.credits ?? null, grantedAt: a.grantedAt ?? null })),
     reviews: ambiguous.map((a) => ({ reason: a.reason, status: a.status })),
     operations: operations.length,
     stripe: stripe ? {
@@ -162,7 +163,7 @@ function print(summary, { json }) {
   if (json) { console.log(JSON.stringify(summary, null, 2)); return; }
   console.log(`Plan: ${summary.plan}`);
   console.log(`Account: ${JSON.stringify(summary.account)}`);
-  console.log(`Grants: ${summary.grants.length ? summary.grants.map((g) => g.subscription).join(', ') : 'none'}`);
+  console.log(`Grants: ${summary.grants.length ? summary.grants.map((g) => `${g.kind} ${g.subscription}${g.credits != null ? ` (+${g.credits})` : ''}`).join(', ') : 'none'}`);
   if (summary.stripe) {
     console.log(`Stripe subscriptions: ${summary.stripe.subscriptions.map((s) => `${s.id} ${s.status}`).join(', ') || 'none'}`);
     console.log(`Stripe checkout sessions: ${summary.stripe.sessions.map((s) => `${s.id} ${s.status}/${s.paymentStatus}`).join(', ') || 'none'}`);

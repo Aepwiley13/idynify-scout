@@ -241,7 +241,7 @@ export default function HubPeople() {
     </button>
   );
   const importButton = (
-    <button key="import" type="button" className="hub-secondary-btn" aria-label="Import People" style={{ color: T.text, borderColor: T.border }} onClick={() => setImporting(true)}>
+    <button key="import" type="button" className="hub-secondary-btn" aria-label="Import Contacts" style={{ color: T.text, borderColor: T.border }} onClick={() => setImporting(true)}>
       <Upload size={16} aria-hidden="true" />
       Import
     </button>
@@ -312,6 +312,12 @@ export default function HubPeople() {
             <button type="button" className="hub-primary-btn hub-primary-btn--wide" style={{ background: T.accent }} onClick={() => setAdding(true)}>
               <UserPlus size={18} aria-hidden="true" />
               Add Your First Person
+            </button>
+            {/* Owner decision (billing W2): a new account can bring its existing contacts
+                straight away, without adding someone by hand first. */}
+            <button type="button" className="hub-secondary-btn" style={{ color: T.text, borderColor: T.border }} onClick={() => setImporting(true)}>
+              <Upload size={16} aria-hidden="true" />
+              Import Contacts
             </button>
           </div>
         )}

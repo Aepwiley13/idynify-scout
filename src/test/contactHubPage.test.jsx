@@ -310,11 +310,13 @@ describe('Add Person', () => {
 describe('no one in My People yet', () => {
   beforeEach(() => { contactsData.list = []; });
 
-  it('shows a friendly message and exactly one action', async () => {
+  // Owner decision (billing W2): two actions on the first-run screen, adding a person or
+  // importing existing contacts, so nobody has to add someone by hand before importing.
+  it('shows a friendly message and two actions: add a person, or import contacts', async () => {
     renderHub();
     expect(await screen.findByText('Start with one person')).toBeInTheDocument();
     expect(screen.getByText(/All you need is their name\./)).toBeInTheDocument();
-    expect(screen.getAllByRole('button').map((b) => b.textContent.trim())).toEqual(['Add Your First Person']);
+    expect(screen.getAllByRole('button').map((b) => b.textContent.trim())).toEqual(['Add Your First Person', 'Import Contacts']);
   });
 
   it('draws nothing to search, filter, count or manage', async () => {

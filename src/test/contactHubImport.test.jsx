@@ -190,7 +190,7 @@ describe("Contact Hub's words", () => {
     // An email-only row brings up the "incomplete" wording too.
     await importCsv(`${FIVE}\n,,mia@example.test,,,`);
     expect(screen.getByText(HUB_IMPORT_COPY.incompleteNote)).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Import People' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Import Contacts' })).toBeInTheDocument();
     expect(screen.getByText(HUB_IMPORT_COPY.title)).toBeInTheDocument();
     expect(screen.queryByText(/Change Type/)).toBeNull();
     const dialog = screen.getByRole('dialog');

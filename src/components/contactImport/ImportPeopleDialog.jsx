@@ -49,7 +49,7 @@ export default function ImportPeopleDialog({ onClose, onImported }) {
         onKeyDown={onKeyDown}
       >
         <div className="hub-dialog-head">
-          <h2 id={titleId} className="hub-dialog-title">Import People</h2>
+          <h2 id={titleId} className="hub-dialog-title">Import Contacts</h2>
           <button type="button" className="hub-icon-btn hub-icon-btn--plain" aria-label="Close" onClick={onClose} style={{ color: T.textMuted }}>
             <X size={20} aria-hidden="true" />
           </button>

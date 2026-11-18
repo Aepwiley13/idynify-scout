@@ -74,3 +74,10 @@
   min-height: 44px;
   text-decoration: none;
 }
+
+/* Upgrades on hold (constants/upgradeHold.js): one support link under the plans. */
+.upgrade-required-support {
+  gap: 8px;
+  padding: 0 20px;
+  margin-bottom: 16px;
+}

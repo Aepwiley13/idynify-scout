@@ -6,6 +6,9 @@
  *                           server-verified free account is let in; on a paid
  *                           route it sees UpgradeRequired inside the shell.
  *   SignedInSignupRedirect  where a signed-in visitor to /signup goes.
+ *   CheckoutHold            the launch fallback while upgrades are on hold
+ *                           (constants/upgradeHold.js): /checkout serves only
+ *                           today's live signup flow.
  *   (freePlanHomeFor, for SmartRedirect, is in constants/freePlan.js.)
  *
  * With the switch off every one of these behaves exactly as App.jsx did
@@ -17,6 +20,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { AccountGate } from '../AccountUnverified';
 import UpgradeRequired from './UpgradeRequired';
 import { FREE_PLAN, isFreePlanPath, signupPlanFor, signupLandingPath, freePlanRedirectFor } from '../../constants/freePlan';
+import { checkoutHoldRedirect } from '../../constants/upgradeHold';
 
 /**
  * AccountGate for the shell. `layout(content)` wraps content in the shell
@@ -51,4 +55,14 @@ export function SignedInSignupRedirect() {
   // Already signed in: a paid tier in the link goes to its checkout; otherwise the
   // Contact Hub, whether or not new Free signups are open (`existing`).
   return <Navigate to={signupLandingPath(signupPlanFor(new URLSearchParams(search).get('tier'), { enabled: true }))} />;
+}
+
+/**
+ * Around /checkout, inside its purchase gate (so the account is the server's answer). While
+ * upgrades are on hold, an existing account is sent to Settings → Billing instead of being
+ * offered a Payment Link; a new paid signup that has not paid yet checks out as today.
+ */
+export function CheckoutHold({ account, children }) {
+  const destination = checkoutHoldRedirect(account);
+  return destination ? <Navigate to={destination} replace /> : children;
 }

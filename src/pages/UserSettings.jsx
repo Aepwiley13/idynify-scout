@@ -59,6 +59,7 @@ import { classifySnapshot } from '../utils/accountVerification';
 import { planOf, PLAN, isPaidPlan } from '../utils/accountPlan';
 import { PLAN_DETAILS } from '../constants/plans';
 import { supportMailto } from '../constants/support';
+import { UPGRADES_OPEN } from '../constants/upgradeHold';
 import './UserSettings.css';
 
 /* ─── accent ─────────────────────────────────────────────────────────────── */
@@ -1106,7 +1107,7 @@ export default function UserSettings() {
                         <div className="us-billing-plan-badge">{PLAN_LABELS[billing.plan]}</div>
                         <span className="us-billing-plan-price">{PLAN_PRICES[billing.plan]}</span>
                       </div>
-                      {billing.plan === PLAN.FREE ? (
+                      {billing.plan === PLAN.FREE && UPGRADES_OPEN ? (
                         <div className="us-billing-plan-actions">
                           <a href="/checkout?tier=starter" className="us-action-btn us-action-btn--primary">
                             Upgrade to Starter
@@ -1115,6 +1116,13 @@ export default function UserSettings() {
                             Upgrade to Pro
                           </a>
                         </div>
+                      ) : billing.plan === PLAN.FREE ? (
+                        /* Upgrades on hold (constants/upgradeHold.js): support starts
+                           the plan in Stripe, on this account's own customer. */
+                        <a href={supportMailto()} className="us-action-btn us-action-btn--primary">
+                          <Mail className="w-3.5 h-3.5" />
+                          Contact us to start Scout
+                        </a>
                       ) : (
                         /* Plan changes and cancellation move to the Stripe
                            Customer Portal in billing Phase 2. Until then they go
@@ -1129,6 +1137,7 @@ export default function UserSettings() {
                   {billing?.plan === PLAN.FREE && (
                     <p className="us-billing-plan-note">
                       {PLAN_DETAILS.free.summary} Your contacts, stickers and notes are yours to keep on every plan.
+                      {!UPGRADES_OPEN && ' Upgrading from here opens soon; until then we set up Scout for you.'}
                     </p>
                   )}
                 </section>

@@ -7,7 +7,7 @@ import { ImpersonationProvider } from './context/ImpersonationContext';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useAccountVerification } from './utils/accountVerification';
 import { AccountGate } from './components/AccountUnverified';
-import { ShellAccountGate, SignedInSignupRedirect } from './components/billing/freePlanRouting';
+import { ShellAccountGate, SignedInSignupRedirect, CheckoutHold } from './components/billing/freePlanRouting';
 import { freePlanHomeFor, SMART_REDIRECT_REQUIRES_PAYMENT } from './constants/freePlan';
 
 // Pages
@@ -328,7 +328,7 @@ function App() {
         <Route path="/getting-started" element={<ProtectedRoute><GettingStarted /></ProtectedRoute>} />
 
         {/* Payment Routes - Auth required but payment NOT required (to avoid redirect loop) */}
-        <Route path="/checkout" element={<ProtectedRoute requirePayment={false} purchase><CheckoutPage /></ProtectedRoute>} />
+        <Route path="/checkout" element={<ProtectedRoute requirePayment={false} purchase><CheckoutHold account={account}><CheckoutPage /></CheckoutHold></ProtectedRoute>} />
         <Route path="/checkout/success" element={<ProtectedRoute requirePayment={false} purchase><CheckoutSuccessPage /></ProtectedRoute>} />
         <Route path="/checkout/cancel" element={<ProtectedRoute requirePayment={false} purchase><CheckoutCancelPage /></ProtectedRoute>} />
 

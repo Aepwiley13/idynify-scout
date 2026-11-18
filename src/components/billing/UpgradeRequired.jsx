@@ -9,17 +9,21 @@
  * It starts nothing by itself. The plan buttons go to /checkout, which needs
  * the server's own answer about the account before it offers a purchase, and
  * the server refuses a second subscription for anyone who already has one.
+ * While upgrades are on hold (constants/upgradeHold.js) there are no plan
+ * buttons: one support link instead.
  */
 import { Link } from 'react-router-dom';
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft, Check, Mail } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { FREE_PLAN_HOME } from '../../constants/freePlan';
 import { PLAN_DETAILS } from '../../constants/plans';
+import { UPGRADES_OPEN } from '../../constants/upgradeHold';
+import { supportMailto } from '../../constants/support';
 import './UpgradeRequired.css';
 
 const PAID = ['starter', 'pro'];
 
-export default function UpgradeRequired() {
+export default function UpgradeRequired({ upgradesOpen = UPGRADES_OPEN }) {
   const T = useT();
   return (
     <section className="upgrade-required" aria-labelledby="upgrade-required-title" style={{ color: T.text }}>
@@ -38,17 +42,24 @@ export default function UpgradeRequired() {
               <p className="upgrade-required-plan-summary" style={{ color: T.textMuted }}>
                 <Check size={14} aria-hidden="true" /> {plan.summary}
               </p>
-              <Link
-                className="upgrade-required-cta"
-                to={`/checkout?tier=${id}`}
-                style={{ background: T.accent, color: '#fff' }}
-              >
-                Choose {plan.name}
-              </Link>
+              {upgradesOpen && (
+                <Link
+                  className="upgrade-required-cta"
+                  to={`/checkout?tier=${id}`}
+                  style={{ background: T.accent, color: '#fff' }}
+                >
+                  Choose {plan.name}
+                </Link>
+              )}
             </div>
           );
         })}
       </div>
+      {!upgradesOpen && (
+        <a className="upgrade-required-cta upgrade-required-support" href={supportMailto()} style={{ background: T.accent, color: '#fff' }}>
+          <Mail size={16} aria-hidden="true" /> Contact us to start Scout
+        </a>
+      )}
       <Link className="upgrade-required-back" to={FREE_PLAN_HOME} style={{ color: T.text }}>
         <ArrowLeft size={16} aria-hidden="true" /> Back to Contact Hub
       </Link>

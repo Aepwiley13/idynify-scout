@@ -15,6 +15,13 @@ import { ShellProvider } from '../context/ShellContext';
 let nextSnapshot;
 const getDocMock = vi.fn(async () => nextSnapshot());
 
+// Upgrades open (with authenticated checkout) or on hold (the launch fallback, constants/upgradeHold.js).
+const hold = vi.hoisted(() => ({ open: true }));
+vi.mock('../constants/upgradeHold', async (importOriginal) => ({
+  ...(await importOriginal()),
+  get UPGRADES_OPEN() { return hold.open; },
+}));
+
 vi.mock('../firebase/config', () => ({
   auth: { currentUser: { uid: 'u1', email: 'u1@example.test' }, onAuthStateChanged: () => () => {} },
   db: {},
@@ -72,6 +79,8 @@ beforeEach(() => {
 });
 
 describe('Settings → Billing', () => {
+  beforeEach(() => { hold.open = true; });
+
   it('a Free account: Free, $0, both upgrades, no credit meter, no billing dates', async () => {
     nextSnapshot = server({ email: 'u1@example.test' });
     renderBilling();
@@ -82,6 +91,27 @@ describe('Settings → Billing', () => {
     expect(screen.queryByText('Billing dates')).not.toBeInTheDocument();
     expect(screen.queryByText('Credit usage')).not.toBeInTheDocument();
     expect(screen.getByText(/yours to keep on every plan/)).toBeInTheDocument();
+  });
+
+  it('upgrades on hold: a Free account is offered no purchase, only support', async () => {
+    hold.open = false;
+    nextSnapshot = server({ email: 'u1@example.test' });
+    renderBilling();
+    expect(await screen.findByText('Free')).toBeInTheDocument();
+    expect(checkoutLinks()).toEqual([]);
+    expect(screen.getByRole('link', { name: /contact us to start scout/i }).getAttribute('href')).toMatch(/^mailto:/);
+    expect(screen.getByText(/Upgrading from here opens soon/)).toBeInTheDocument();
+    expect(screen.getByText(/yours to keep on every plan/)).toBeInTheDocument();
+  });
+
+  it('upgrades on hold: a paying customer sees exactly what they saw before', async () => {
+    hold.open = false;
+    nextSnapshot = server({ hasCompletedPayment: true, subscriptionTier: 'starter', credits: { total: 400, used: 10, remaining: 390, resetDate: null } });
+    renderBilling();
+    expect(await screen.findByText('Starter')).toBeInTheDocument();
+    expect(checkoutLinks()).toEqual([]);
+    expect(screen.getByRole('link', { name: /change or cancel plan/i })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /contact us to start scout/i })).toBeNull();
   });
 
   it('a paying customer: their plan, and no link to a second checkout', async () => {
@@ -128,6 +158,8 @@ describe('Settings → Billing', () => {
 });
 
 describe('UpgradeRequired', () => {
+  beforeEach(() => { hold.open = true; });
+
   function renderUpgrade() {
     return render(
       <MemoryRouter>
@@ -149,5 +181,18 @@ describe('UpgradeRequired', () => {
   it('tells a free customer their data stays free', () => {
     renderUpgrade();
     expect(screen.getByText(/Your contacts, stickers and notes stay free/)).toBeInTheDocument();
+  });
+
+  it('upgrades on hold: the plans are described, nothing is offered for sale, support starts Scout', () => {
+    render(
+      <MemoryRouter>
+        <ThemeProvider><UpgradeRequired upgradesOpen={false} /></ThemeProvider>
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Scout Starter')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /choose/i })).toBeNull();
+    expect(screen.queryAllByRole('link').map((a) => a.getAttribute('href')).filter((h) => h.startsWith('/checkout'))).toEqual([]);
+    expect(screen.getByRole('link', { name: /contact us to start scout/i }).getAttribute('href')).toMatch(/^mailto:/);
+    expect(screen.getByRole('link', { name: /back to contact hub/i }).getAttribute('href')).toBe('/contact-hub');
   });
 });

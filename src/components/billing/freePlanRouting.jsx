@@ -16,6 +16,8 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { AccountGate } from '../AccountUnverified';
 import UpgradeRequired from './UpgradeRequired';
+import { AccountPlanContext } from './accountPlanContext';
+import { planOf } from '../../utils/accountPlan';
 import { FREE_PLAN, isFreePlanPath, signupPlanFor, signupLandingPath, freePlanRedirectFor } from '../../constants/freePlan';
 
 /**
@@ -35,7 +37,8 @@ export function ShellAccountGate({ requirePayment = true, layout, children, ...g
       requirePayment={requirePayment && !freeRoute}
       upgrade={FREE_PLAN.enabled ? (redirect ? <Navigate to={redirect} replace /> : layout(<UpgradeRequired />)) : null}
     >
-      {children}
+      {/* Screens in the shell that offer an upgrade read the plan from here (W1). */}
+      <AccountPlanContext.Provider value={planOf(gate.account)}>{children}</AccountPlanContext.Provider>
     </AccountGate>
   );
 }

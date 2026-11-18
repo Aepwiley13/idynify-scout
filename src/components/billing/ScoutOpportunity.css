@@ -1,0 +1,16 @@
+/* W1: the Scout preview on a Contact Hub person page. Buttons reuse Contact Hub's classes. */
+.scout-opportunity { display: flex; flex-direction: column; gap: 10px; }
+.scout-opportunity-head { display: flex; align-items: center; gap: 8px; }
+.scout-opportunity-title { font-size: 18px; font-weight: 700; margin: 0; }
+.scout-opportunity-lead { margin: 0; line-height: 1.5; }
+.scout-opportunity-cta { align-self: flex-start; text-decoration: none; }
+.scout-opportunity-plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.scout-opportunity-plan {
+  display: flex; flex-direction: column; gap: 2px; min-height: 44px; padding: 12px 14px;
+  border: 1px solid; border-radius: 12px; text-decoration: none;
+}
+.scout-opportunity-plan:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+.scout-opportunity-plan-name { font-weight: 700; }
+.scout-opportunity-plan-price { font-size: 14px; }
+.scout-opportunity-plan-summary { font-size: 13px; line-height: 1.4; }
+.scout-opportunity-note { margin: 0; font-size: 13px; }

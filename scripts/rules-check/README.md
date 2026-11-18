@@ -26,8 +26,8 @@ No production project, no credentials, no access to real data.
   exactly the known fields within their limits, sharing off, the next revision,
   no delete, no other document, nothing nested, legacy cards still savable) and
   the app's own service (`myCardCore.js`) through them, including two saves
-  racing. Run it on its own: `emulators:exec --only firestore --project demo-my-card
-  "node scripts/rules-check/my-card.mjs"` (CI's rules step does not list it yet).
+  racing. CI's rules step runs it with the others; to run it on its own:
+  `emulators:exec --only firestore --project demo-my-card "node scripts/rules-check/my-card.mjs"`.
 - `write-semantics.mjs` — **what a write does** to the fields it was not told
   about. Guards the rediscovery `updateMask`.
 

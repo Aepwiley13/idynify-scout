@@ -91,12 +91,14 @@ jobs:
       # sticker code against those rules, concurrency included;
       # `stickers-flag-parity` checks the rules, stickersConfig and the app's
       # availability hook agree in every rollout mode;
+      # `my-card` covers the My Card document's rules (shape, limits, sharing off,
+      # the next revision, no delete) and the app's own service through them;
       # `write-semantics` covers what a write
       # does to the fields it was not told about — the class of bug a mock
       # cannot catch, because the thing under test is Firestore's own PATCH
       # behaviour.
       - name: Run the rules suite
-        run: npx --yes firebase-tools@15 emulators:exec --only firestore --project demo-icp-rules "node scripts/rules-check/cases.mjs && node scripts/rules-check/stickers.mjs && node scripts/rules-check/sticker-services.mjs && node scripts/rules-check/stickers-flag-parity.mjs && node scripts/rules-check/write-semantics.mjs"
+        run: npx --yes firebase-tools@15 emulators:exec --only firestore --project demo-icp-rules "node scripts/rules-check/cases.mjs && node scripts/rules-check/stickers.mjs && node scripts/rules-check/sticker-services.mjs && node scripts/rules-check/stickers-flag-parity.mjs && node scripts/rules-check/write-semantics.mjs && node scripts/rules-check/my-card.mjs"
 
   # Billing hardening (PR 1): webhook/checkout/credit-tracking concurrency and fencing, against a
   # real Firestore emulator. These are vitest files under src/test/ that the plain `test` job

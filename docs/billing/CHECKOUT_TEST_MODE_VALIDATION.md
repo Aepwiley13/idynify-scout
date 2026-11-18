@@ -20,9 +20,10 @@ after every scenario is `scripts/staging/billingAccountSnapshot.mjs`.
    |---|---|---|
    | Customers | Write | checkout creates the customer |
    | Checkout Sessions | Write | checkout creates, reads and lists sessions; the webhook reads line items |
-   | Subscriptions | Read | duplicate check, webhook, snapshot |
+   | Subscriptions | Write | duplicate check, webhook, snapshot; Write for the Starter → Pro change (W3) |
+   | Invoices | Read | the Starter → Pro price preview (W3) |
    | Products, Prices | Write | the one-time catalog setup |
-   | Customer portal | Write | the one-time portal configuration |
+   | Customer portal | Write | the one-time portal configuration, and portal sessions (W3) |
    | Everything else | None | — |
 
    The Dashboard groups these resources slightly differently from this table. Anything not
@@ -72,7 +73,7 @@ and remove the line from the env file.
    ```
 4. In a second terminal, forward Stripe's test events to the local functions and leave it running:
    ```bash
-   stripe listen --forward-to localhost:8888/.netlify/functions/stripe-webhook --events checkout.session.completed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted
+   stripe listen --forward-to localhost:8888/.netlify/functions/stripe-webhook --events checkout.session.completed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted,invoice.paid
    ```
    Put the `whsec_…` it prints into the env file.
 5. Check, then start the app:

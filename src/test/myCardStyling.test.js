@@ -127,6 +127,74 @@ describe('text can be read in both themes', () => {
   }
 });
 
+describe('Upload photo and the crop dialog can be hit, seen and used on a phone', () => {
+  const px = (selector, property) => Number(rule(selector).match(new RegExp(`(?:^|[;{\\s])${property}:\\s*(\\d+)px`))?.[1]);
+
+  it('Upload photo, the zoom buttons and the zoom slider are at least 44px to hit', () => {
+    expect(px('.mycard-upload', 'min-height')).toBeGreaterThanOrEqual(44);
+    expect(px('.mycard-crop-iconbtn', 'width')).toBeGreaterThanOrEqual(44);
+    expect(px('.mycard-crop-iconbtn', 'height')).toBeGreaterThanOrEqual(44);
+    expect(px('.mycard-crop-slider', 'min-height')).toBeGreaterThanOrEqual(44);
+  });
+
+  it('keeps Advanced a quiet link whose touch area is still 44px', () => {
+    expect(rule('.mycard-advanced-toggle')).toBeTruthy();
+    expect(rule('.mycard-linkbtn')).toMatch(/min-height:\s*32px/);
+    expect(rule('.mycard-linkbtn::after')).toMatch(/inset:\s*-6px/);
+  });
+
+  it('draws the picture area square, and lets a finger drag it without the page scrolling', () => {
+    const viewport = rule('.mycard-crop-viewport');
+    expect(viewport).toMatch(/aspect-ratio:\s*1\s*\/\s*1/);
+    expect(viewport).toMatch(/touch-action:\s*none/);
+    expect(viewport).toMatch(/overflow:\s*hidden/);
+    expect(rule('.mycard-crop-img')).toMatch(/position:\s*absolute/);
+    expect(rule('.mycard-crop-img')).toMatch(/max-width:\s*none/);
+    expect(rule('.mycard-crop-img')).toMatch(/pointer-events:\s*none/);
+  });
+
+  it('is a sheet that fits any phone: no wider than the screen, never taller than it, and it scrolls inside if it must', () => {
+    const panel = rule('.mycard-crop');
+    expect(panel).toMatch(/width:\s*100%/);
+    expect(Number(panel.match(/max-width:\s*(\d+)px/)[1])).toBeLessThanOrEqual(480);
+    expect(panel).toMatch(/max-height:\s*100dvh/);
+    expect(panel).toMatch(/overflow-y:\s*auto/);
+    expect(panel).toMatch(/env\(safe-area-inset-bottom\)/);
+    expect(css).toMatch(/@media \(min-width:\s*600px\)\s*\{[^}]*\.mycard-crop-backdrop\s*\{[^}]*align-items:\s*center/s);
+  });
+
+  it('sits above the page and the Save bar, in the page\'s own colours', () => {
+    expect(rule('.mycard-crop-backdrop')).toMatch(/position:\s*fixed/);
+    expect(rule('.mycard-crop-backdrop')).toMatch(/inset:\s*0/);
+    expect(Number(rule('.mycard-crop-backdrop').match(/z-index:\s*(\d+)/)[1])).toBeGreaterThanOrEqual(1000);
+    expect(rule('.mycard-crop')).toMatch(/background:\s*var\(--bg-card\)/);
+    expect(rule('.mycard-crop')).toMatch(/color:\s*var\(--text-primary\)/);
+  });
+
+  it('shows how the photo will sit on the card: a circle in the brand colour over the square', () => {
+    const guide = rule('.mycard-crop-guide');
+    expect(guide).toMatch(/border-radius:\s*50%/);
+    expect(guide).toMatch(/border:\s*2px solid var\(--accent\)/);
+    expect(guide).toMatch(/pointer-events:\s*none/);
+  });
+
+  for (const [themeName, vars] of Object.entries(THEMES)) {
+    it(`the dialog's words and its quiet text on the card, ${themeName}: at least 4.5:1`, () => {
+      const card = parseColour(vars['--bg-card']);
+      expect(contrast(parseColour(vars['--text-primary']), card)).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(parseColour(vars['--text-secondary']), card)).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it(`an error in the dialog, ${themeName}: at least 4.5:1 on the card`, () => {
+      expect(contrast(parseColour(vars['--status-error-text']), parseColour(vars['--bg-card']))).toBeGreaterThanOrEqual(4.5);
+    });
+
+    it(`the brand circle against the card, ${themeName}: at least 3:1`, () => {
+      expect(contrast(parseColour(vars['--accent']), parseColour(vars['--bg-card']))).toBeGreaterThanOrEqual(3);
+    });
+  }
+});
+
 describe('the page\'s buttons, bar and notices can be read and hit, in both themes', () => {
   const touchHeight = (selector) => {
     const own = Number(rule(selector).match(/min-height:\s*(\d+)px/)?.[1]);
@@ -258,7 +326,8 @@ describe('controls are easy to hit and to see', () => {
   it('has a visible focus ring for every control', () => {
     const focus = css.match(/([^{}]*):focus-visible[^{}]*\{([^}]*)\}/s);
     expect(focus).not.toBeNull();
-    for (const selector of ['.mycard-input:focus-visible', '.mycard-share:focus-visible', '.mycard-suggest:focus-visible', '.mycard-linkbtn:focus-visible', '.mycard-switch-btn:focus-visible']) {
+    for (const selector of ['.mycard-input:focus-visible', '.mycard-share:focus-visible', '.mycard-suggest:focus-visible', '.mycard-linkbtn:focus-visible', '.mycard-switch-btn:focus-visible',
+      '.mycard-upload:focus-visible', '.mycard-crop-iconbtn:focus-visible', '.mycard-crop-slider:focus-visible', '.mycard-crop-viewport:focus-visible']) {
       expect(css).toContain(selector);
     }
     expect(css).toMatch(/:focus-visible[^{}]*\{\s*outline:\s*2px solid var\(--accent\)/s);
@@ -401,9 +470,10 @@ describe('the components stand alone', () => {
   it('import only React, icons, the card rules and each other, and for the download alone, the vCard maker', () => {
     for (const name of code) {
       for (const from of imports(name)) {
-        // The one extra: the file that downloads a contact needs the vCard maker, and nothing more.
+        // The extras: the file that downloads a contact needs the vCard maker; the photo part draws its dialog on the page
+        // (react-dom's portal); the photo files use the photo utility, which is pure and local-only (photoPrep.test.js).
         const allowedHere = name === 'downloadContact.js' && from === '../../../utils/vcard';
-        expect(allowedHere || /^(?:react|lucide-react|\.\/[\w.]+|\.\.\/\.\.\/\.\.\/utils\/(?:myCardRules|myCardSuggestions)|\.\.\/\.\.\/\.\.\/theme\/tokens)$/.test(from), `${name} imports ${from}`).toBe(true);
+        expect(allowedHere || /^(?:react|lucide-react|\.\/[\w.]+|\.\.\/\.\.\/\.\.\/utils\/(?:myCardRules|myCardSuggestions|photoPrep)|\.\.\/\.\.\/\.\.\/theme\/tokens)$/.test(from) || (from === 'react-dom' && name === 'MyCardPhoto.jsx'), `${name} imports ${from}`).toBe(true);
       }
     }
   });

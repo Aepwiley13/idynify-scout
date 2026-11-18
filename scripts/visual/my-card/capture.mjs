@@ -157,9 +157,9 @@ async function press(key, code, keyCode) {
   }
 }
 
-/** Press "Change photo link", as a person would. */
+/** Press "Advanced", which shows the photo link, as a person would. */
 async function revealPhotoLink() {
-  await evaluate('[...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Change photo link").click()');
+  await evaluate('[...document.querySelectorAll("button")].find((b) => b.textContent.trim() === "Advanced").click()');
   await wait(200);
 }
 
@@ -208,30 +208,49 @@ const PAGE_SHOTS = [
   ['d01-saved-card', { ...DESKTOP, state: 'existing' }],
   ['d02-new-card-prefilled', { ...DESKTOP, state: 'new' }],
   ['d03-unsaved-changes', { ...DESKTOP, state: 'existing', steps: 'edit:Title=Director of Mathematics' }],
-  ['d04-just-saved', { ...DESKTOP, state: 'existing', steps: 'edit:Title=Director of Mathematics,click:Save' }],
-  ['d05-fix-before-saving', { ...DESKTOP, state: 'existing', steps: 'edit:Email=ada@,edit:Phone=call me,click:Save' }],
-  ['d06-failed-save', { ...DESKTOP, state: 'saveerror', steps: 'edit:Title=Director of Mathematics,click:Save' }],
+  ['d04-just-saved', { ...DESKTOP, state: 'existing', steps: 'edit:Title=Director of Mathematics|click:Save' }],
+  ['d05-fix-before-saving', { ...DESKTOP, state: 'existing', steps: 'edit:Email=ada@|edit:Phone=call me|click:Save' }],
+  ['d06-failed-save', { ...DESKTOP, state: 'saveerror', steps: 'edit:Title=Director of Mathematics|click:Save' }],
   ['d07-draft-restored', { ...DESKTOP, state: 'restored' }],
   ['d08-discard-asks-first', { ...DESKTOP, state: 'restored', steps: 'click:Discard changes' }],
-  ['d09-newer-version-saved', { ...DESKTOP, state: 'saveconflict', steps: 'edit:Title=Director of Mathematics,click:Save' }],
-  ['d10-overwrite-asks-first', { ...DESKTOP, state: 'saveconflict', steps: 'edit:Title=Director of Mathematics,click:Save,click:Save my version over it' }],
-  ['d11-load-latest-asks-first', { ...DESKTOP, state: 'saveconflict', steps: 'edit:Title=Director of Mathematics,click:Save,click:Load latest saved version' }],
+  ['d09-newer-version-saved', { ...DESKTOP, state: 'saveconflict', steps: 'edit:Title=Director of Mathematics|click:Save' }],
+  ['d10-overwrite-asks-first', { ...DESKTOP, state: 'saveconflict', steps: 'edit:Title=Director of Mathematics|click:Save|click:Save my version over it' }],
+  ['d11-load-latest-asks-first', { ...DESKTOP, state: 'saveconflict', steps: 'edit:Title=Director of Mathematics|click:Save|click:Load latest saved version' }],
   ['d12-draft-older-than-saved', { ...DESKTOP, state: 'olddraft' }],
-  ['d13-download-left-something-out', { ...DESKTOP, state: 'existing', steps: 'toggle:Email,edit:Email=ada@,click:Download contact' }],
+  ['d13-download-left-something-out', { ...DESKTOP, state: 'existing', steps: 'toggle:Email|edit:Email=ada@|click:Download contact' }],
   ['d14-could-not-load', { ...DESKTOP, state: 'loaderror' }],
   ['d15-viewing-as-someone-else', { ...DESKTOP, state: 'impersonating' }],
-  ['t01-tablet-newer-version-saved', { ...TABLET, state: 'saveconflict', steps: 'edit:Title=Director of Mathematics,click:Save' }],
+  ['t01-tablet-newer-version-saved', { ...TABLET, state: 'saveconflict', steps: 'edit:Title=Director of Mathematics|click:Save' }],
   ['p01-phone-saved-card', { ...PHONE, state: 'existing' }],
   ['p02-phone-unsaved-changes', { ...PHONE, state: 'existing', steps: 'edit:Title=Director of Mathematics' }],
-  ['p03-phone-fix-before-saving', { ...PHONE, state: 'existing', steps: 'edit:Email=ada@,click:Save' }],
-  ['p04-phone-failed-save', { ...PHONE, state: 'saveerror', steps: 'edit:Title=Director of Mathematics,click:Save' }],
+  ['p03-phone-fix-before-saving', { ...PHONE, state: 'existing', steps: 'edit:Email=ada@|click:Save' }],
+  ['p04-phone-failed-save', { ...PHONE, state: 'saveerror', steps: 'edit:Title=Director of Mathematics|click:Save' }],
   ['p05-phone-draft-restored', { ...PHONE, state: 'restored' }],
-  ['p06-phone-newer-version-saved', { ...PHONE, state: 'saveconflict', steps: 'edit:Title=Director of Mathematics,click:Save' }],
-  ['p07-phone-overwrite-asks-first', { ...PHONE, state: 'saveconflict', steps: 'edit:Title=Director of Mathematics,click:Save,click:Save my version over it' }],
+  ['p06-phone-newer-version-saved', { ...PHONE, state: 'saveconflict', steps: 'edit:Title=Director of Mathematics|click:Save' }],
+  ['p07-phone-overwrite-asks-first', { ...PHONE, state: 'saveconflict', steps: 'edit:Title=Director of Mathematics|click:Save|click:Save my version over it' }],
   ['p08-phone-preview-with-download', { ...PHONE, state: 'existing', steps: 'click:Preview' }],
-  ['p09-phone-download-left-something-out', { ...PHONE, state: 'existing', steps: 'toggle:Email,edit:Email=ada@,click:Preview,click:Download contact' }],
+  ['p09-phone-download-left-something-out', { ...PHONE, state: 'existing', steps: 'toggle:Email|edit:Email=ada@|click:Preview|click:Download contact' }],
   ['p10-phone-could-not-load', { ...PHONE, state: 'loaderror' }],
   ['p11-phone-viewing-as-someone-else', { ...PHONE, state: 'impersonating' }],
+  // Upload photo and the crop dialog (P3), on a synthetic picture.
+  ['d16-photo-upload-first', { ...DESKTOP, state: 'new' }],
+  ['d17-crop-dialog-opened', { ...DESKTOP, state: 'existing', steps: 'upload:photo' }],
+  ['d18-crop-zoomed-and-moved', { ...DESKTOP, state: 'existing', steps: 'upload:photo|zoom:2.4|drag:60/-40' }],
+  ['d19-crop-picture-cannot-be-used', { ...DESKTOP, state: 'existing', steps: 'upload:broken' }],
+  ['d20-photo-added-unsaved', { ...DESKTOP, state: 'existing', steps: 'upload:photo|zoom:1.8|click:Use photo' }],
+  ['d21-remove-asks-first', { ...DESKTOP, state: 'existing', steps: 'click:Remove photo' }],
+  ['d24-linkedin-photo-is-the-quiet-second-option', { ...DESKTOP, state: 'new', steps: 'click:Remove photo|click:Yes, remove it' }],
+  ['d22-advanced-link-open', { ...DESKTOP, state: 'existing', steps: 'click:Advanced' }],
+  ['d23-photo-private-after-upload', { ...DESKTOP, state: 'existing', steps: 'toggle:Photo|upload:photo|click:Use photo' }],
+  ['t02-tablet-crop-dialog', { ...TABLET, state: 'existing', steps: 'upload:photo|zoom:1.6' }],
+  ['p14-phone-photo-section', { ...PHONE, state: 'new' }],
+  ['p15-phone-crop-dialog', { ...PHONE, state: 'existing', steps: 'upload:photo' }],
+  ['p16-phone-crop-zoomed-and-moved', { ...PHONE, state: 'existing', steps: 'upload:photo|zoom:2.4|drag:50/-30' }],
+  ['p17-phone-crop-cannot-be-used', { ...PHONE, state: 'existing', steps: 'upload:broken' }],
+  ['p18-phone-photo-added-unsaved', { ...PHONE, state: 'existing', steps: 'upload:photo|click:Use photo' }],
+  ['p19-phone-remove-asks-first', { ...PHONE, state: 'existing', steps: 'click:Remove photo' }],
+  ['p21-phone-linkedin-photo-second-option', { ...PHONE, state: 'new', steps: 'click:Remove photo|click:Yes, remove it' }],
+  ['p20-phone-advanced-link-open', { ...PHONE, state: 'existing', steps: 'click:Advanced' }],
 ];
 // My Card inside the real navigation: the sidebar on desktop and tablet, the bottom bar on a phone.
 const SHELL_SHOTS = [

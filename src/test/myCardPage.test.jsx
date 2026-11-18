@@ -6,7 +6,7 @@
  * impersonation context are stand-ins.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, within, act } from '@testing-library/react';
+import { render, screen, within, act, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -22,11 +22,14 @@ const mocks = vi.hoisted(() => {
 vi.mock('../firebase/config', () => ({ db: {}, auth: mocks.auth }));
 vi.mock('../services/myCardService', () => ({ myCardService: mocks.service }));
 vi.mock('../context/ImpersonationContext', () => ({ useImpersonation: () => mocks.impersonation }));
+// Only the photo-making is stood in for (jsdom has no canvas); the crop dialog, form, draft and save are the real ones.
+vi.mock('../utils/photoPrep', async (importOriginal) => ({ ...(await importOriginal()), prepareProfilePhoto: vi.fn() }));
 
 import MyCardPage from '../pages/ContactHub/MyCardPage';
 import { saveDraft, readDraft, draftKey } from '../pages/ContactHub/myCard/state/myCardDraftStorage';
 import { DEFAULT_SHARE, newCard, normalizeCard } from '../utils/myCardRules';
 import { fingerprintOf, photoDataUrl } from './helpers/photoFixtures';
+import { prepareProfilePhoto } from '../utils/photoPrep';
 
 const savedCard = (extra = {}) => ({ ...newCard(), firstName: 'Ada', lastName: 'Lovelace', title: 'Analyst', ...extra });
 const okResult = (revision = 3, extra = {}) => ({ status: 'ok', card: savedCard(extra), revision });
@@ -1026,6 +1029,7 @@ describe('an uploaded photo', () => {
     const { service } = await open({ load: withPicture() });
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Remove photo' }));
+    await user.click(screen.getByRole('button', { name: 'Yes, remove it' }));
     await user.click(saveButton());
     await screen.findByText('All changes saved');
     expect(service.saveMyCard.mock.calls[0][0].photoUrl).toBe('');
@@ -1082,5 +1086,230 @@ describe('an uploaded photo', () => {
     expect(getItem).not.toHaveBeenCalled();
     expect(leaks()).toBe(false);
     expect(globalThis.sessionStorage.getItem('idynify.myCardDraftPhoto.v1:U')).not.toBeNull();
+  });
+});
+
+describe('adding a photo with Upload photo', () => {
+  const made = photoDataUrl(320, 30_000, { tag: 11 });
+  const madeAgain = photoDataUrl(320, 24_000, { tag: 12 });
+  const makes = (...urls) => {
+    let n = 0;
+    prepareProfilePhoto.mockReset();
+    prepareProfilePhoto.mockImplementation(async (_file, options) => ({ dataUrl: urls[Math.min(n++, urls.length - 1)], widthPx: 320, heightPx: 320, bytes: 30_000, chars: 40_000, crop: options?.crop, attempts: 1 }));
+  };
+  const picture = () => new File(['synthetic'], 'me.jpg', { type: 'image/jpeg' });
+  const dialog = () => screen.getByRole('dialog', { name: 'Crop your photo' });
+  const photoUseButton = () => within(dialog()).getByRole('button', { name: 'Use photo' });
+  const card = () => screen.getByRole('article', { name: 'Card for Ada Lovelace' });
+  const kept = (storage = globalThis.sessionStorage) => [...Array(storage.length).keys()].map((i) => storage.key(i)).sort();
+  const settle = (ms = 700) => act(async () => { await new Promise((resolve) => { setTimeout(resolve, ms); }); });
+
+  beforeEach(() => {
+    URL.createObjectURL = vi.fn(() => 'blob:synthetic');
+    URL.revokeObjectURL = vi.fn();
+  });
+
+  /** Picks a picture, lets the dialog load it, and uses it. */
+  async function upload(user, { move = false } = {}) {
+    await user.upload(screen.getByLabelText('Choose a photo from your device'), picture(), { applyAccept: false });
+    const img = dialog().querySelector('.mycard-crop-img');
+    Object.defineProperty(img, 'naturalWidth', { value: 4000, configurable: true });
+    Object.defineProperty(img, 'naturalHeight', { value: 3000, configurable: true });
+    fireEvent.load(img);
+    await waitFor(() => expect(photoUseButton()).toBeEnabled());
+    if (move) fireEvent.change(within(dialog()).getByRole('slider', { name: 'Zoom' }), { target: { value: '2' } });
+    await user.click(photoUseButton());
+  }
+
+  it('makes the photo the card\'s at once, as an unsaved edit: in the preview, and the page says so', async () => {
+    makes(made);
+    await open();
+    const user = userEvent.setup();
+    expect(card().querySelector('img')).toBeNull();
+    await upload(user);
+    expect(card().querySelector('img')).toHaveAttribute('src', made);
+    expect(screen.getByText('You have unsaved changes')).toBeInTheDocument();
+    expect(saveButton()).toBeEnabled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('is saved with Save, against the revision the card was loaded at, and then the card is as saved', async () => {
+    makes(made);
+    const { service } = await open();
+    const user = userEvent.setup();
+    await upload(user);
+    await user.click(saveButton());
+    await screen.findByText('All changes saved');
+    expect(service.saveMyCard).toHaveBeenCalledTimes(1);
+    expect(service.saveMyCard.mock.calls[0][0].photoUrl).toBe(made);
+    expect(service.saveMyCard.mock.calls[0][1]).toEqual({ expectedRevision: 3 });
+    expect(card().querySelector('img')).toHaveAttribute('src', made);
+  });
+
+  it('is kept in the tab as part of the draft, and is there again when the page is opened again', async () => {
+    makes(made);
+    const first = await open();
+    const user = userEvent.setup();
+    await upload(user);
+    await settle();
+    expect(kept()).toEqual(['idynify.myCardDraft.v1:U', 'idynify.myCardDraftPhoto.v1:U']);
+    first.view.unmount();
+    await open();
+    expect(card().querySelector('img')).toHaveAttribute('src', made);
+    expect(screen.getByText('We restored the changes you hadn\'t saved')).toBeInTheDocument();
+    expect(screen.getByText('You have unsaved changes')).toBeInTheDocument();
+  });
+
+  it('is forgotten from the tab once it is saved', async () => {
+    makes(made);
+    await open();
+    const user = userEvent.setup();
+    await upload(user);
+    await settle();
+    expect(kept()).toHaveLength(2);
+    await user.click(saveButton());
+    await screen.findByText('All changes saved');
+    await settle();
+    expect(kept()).toEqual([]);
+  });
+
+  it('survives a failed save: still on the card, still kept, and sent again on a retry', async () => {
+    makes(made);
+    const { service } = await open();
+    service.saveMyCard.mockResolvedValueOnce(OFFLINE);
+    const user = userEvent.setup();
+    await upload(user);
+    await user.click(saveButton());
+    expect(await screen.findByRole('alert')).toHaveTextContent('Couldn\'t save your changes');
+    expect(card().querySelector('img')).toHaveAttribute('src', made);
+    await settle();
+    expect(kept()).toHaveLength(2);
+    await user.click(screen.getByRole('button', { name: 'Try again' }));
+    await screen.findByText('All changes saved');
+    expect(service.saveMyCard.mock.calls[1][0].photoUrl).toBe(made);
+  });
+
+  it('survives a conflict: the photo is kept, "Photo" is named as a difference, and it is sent only if the person chooses to', async () => {
+    makes(made);
+    const { service } = await open();
+    service.saveMyCard.mockResolvedValueOnce({ status: 'conflict', current: okResult(5, { photoUrl: madeAgain, title: 'Newer' }) });
+    const user = userEvent.setup();
+    await upload(user);
+    await user.click(saveButton());
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(/These differ from your version: .*Photo/);
+    expect(alert.textContent).not.toMatch(/Photo link/);
+    expect(card().querySelector('img')).toHaveAttribute('src', made);
+    expect(service.saveMyCard).toHaveBeenCalledTimes(1);
+    await user.click(screen.getByRole('button', { name: 'Save my version over it' }));
+    await user.click(screen.getByRole('button', { name: 'Overwrite with my version' }));
+    await screen.findByText('All changes saved');
+    expect(service.saveMyCard.mock.calls[1][0].photoUrl).toBe(made);
+    expect(service.saveMyCard.mock.calls[1][1]).toEqual({ expectedRevision: 5 });
+  });
+
+  it('is replaced by the saved photo, and forgotten, if the person chooses the latest saved version', async () => {
+    makes(made);
+    const { service } = await open();
+    service.saveMyCard.mockResolvedValueOnce({ status: 'conflict', current: okResult(5, { photoUrl: madeAgain, title: 'Newer' }) });
+    const user = userEvent.setup();
+    await upload(user);
+    await user.click(saveButton());
+    await screen.findByRole('alert');
+    await user.click(screen.getByRole('button', { name: 'Load latest saved version' }));
+    await user.click(screen.getByRole('button', { name: 'Replace my edits' }));
+    expect(card().querySelector('img')).toHaveAttribute('src', madeAgain);
+    await settle();
+    expect(kept()).toEqual([]);
+  });
+
+  it('is replaced by another upload, and removed with a confirmation, and each is just another edit to save', async () => {
+    makes(made, madeAgain);
+    const { service } = await open({ load: okResult(3, { photoUrl: 'https://images.example.com/ada.jpg' }) });
+    const user = userEvent.setup();
+    await upload(user);
+    expect(card().querySelector('img')).toHaveAttribute('src', made);
+    await upload(user, { move: true });
+    expect(card().querySelector('img')).toHaveAttribute('src', madeAgain);
+    await user.click(screen.getByRole('button', { name: 'Remove photo' }));
+    expect(card().querySelector('img')).toHaveAttribute('src', madeAgain);
+    await user.click(screen.getByRole('button', { name: 'Yes, remove it' }));
+    expect(card().querySelector('img')).toBeNull();
+    await user.click(saveButton());
+    await screen.findByText('All changes saved');
+    expect(service.saveMyCard.mock.calls[0][0].photoUrl).toBe('');
+  });
+
+  it('is in the contact file, embedded, when the Photo switch is on, and not when it is off; and the page is saying nothing about it', async () => {
+    makes(made);
+    const downloads = stubDownloads();
+    await open();
+    const user = userEvent.setup();
+    await upload(user);
+    await user.click(screen.getByRole('button', { name: 'Download contact' }));
+    const text = (await downloads.text()).replace(/\r\n /g, '');
+    expect(text).toContain(`PHOTO;ENCODING=b;TYPE=JPEG:${made.slice('data:image/jpeg;base64,'.length)}`);
+    await user.click(screen.getByRole('switch', { name: 'Photo on your card' }));
+    await user.click(screen.getByRole('button', { name: 'Download contact' }));
+    const second = (await downloads.text()).replace(/\r\n /g, '');
+    expect(second).not.toContain('PHOTO');
+    expect(second).not.toContain(fingerprintOf(made));
+  });
+
+  it('is never written to the screen as text, in a message, a notice or a label, at any step', async () => {
+    makes(made);
+    const { service } = await open();
+    service.saveMyCard.mockResolvedValueOnce(OFFLINE);
+    const user = userEvent.setup();
+    await upload(user);
+    await user.click(saveButton());
+    await screen.findByRole('alert');
+    const everything = [
+      document.body.textContent,
+      ...[...document.querySelectorAll('input, textarea')].map((node) => node.value),
+      ...[...document.querySelectorAll('*')].flatMap((node) => [...node.attributes].filter((a) => !(node.tagName === 'IMG' && a.name === 'src')).map((a) => a.value)),
+    ];
+    expect(everything.some((text) => text.includes(fingerprintOf(made)) || /data:image\/jpeg;base64/.test(text))).toBe(false);
+  });
+
+  it('is not carried to the next account that signs in: the first account\'s draft and picture are forgotten', async () => {
+    makes(made);
+    await open();
+    const user = userEvent.setup();
+    await upload(user);
+    await settle();
+    expect(kept()).toHaveLength(2);
+    act(() => { mocks.auth.currentUser = { uid: 'V' }; mocks.auth.listeners.forEach((listener) => listener({ uid: 'V' })); });
+    await screen.findByRole('form', { name: 'Edit your card' });
+    expect(card().querySelector('img')).toBeNull();
+    expect(screen.queryByText('We restored the changes you hadn\'t saved')).toBeNull();
+    await settle(100);
+    expect(kept().filter((key) => key.endsWith(':U'))).toEqual([]);
+  });
+
+  it('sends nothing to anyone: no network call is made by adding, cropping, using or saving a photo', async () => {
+    makes(made);
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    const xhr = vi.spyOn(XMLHttpRequest.prototype, 'open');
+    try {
+      await open();
+      const user = userEvent.setup();
+      await upload(user, { move: true });
+      await user.click(saveButton());
+      await screen.findByText('All changes saved');
+      expect(fetchSpy).not.toHaveBeenCalled();
+      expect(xhr).not.toHaveBeenCalled();
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  it('is not offered, and nothing is read or kept, while viewing as someone else', async () => {
+    makes(made);
+    mocks.impersonation.isImpersonating = true;
+    installService();
+    render(page());
+    expect(await screen.findByText('You\'re viewing as someone else')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Upload photo' })).toBeNull();
+    expect(screen.queryByLabelText('Choose a photo from your device')).toBeNull();
   });
 });

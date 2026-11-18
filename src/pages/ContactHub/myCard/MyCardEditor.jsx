@@ -10,22 +10,16 @@
  * empty field (the suggestions from utils/myCardSuggestions), the field offers
  * it as a button. Nothing is filled in until it is pressed.
  *
- * THE PHOTO is the friendliest part. With a LinkedIn photo on offer, that is
- * the one big button; the pasted link is still there ("Paste a photo link
- * instead") for anyone who wants another picture. With a photo, the raw link is
- * tucked away behind "Change photo link" (the photo can also be removed).
- * With nothing on offer, the link field is simply there.
- *
- * The link is never hidden when it needs attention: a message about it, a
- * value the rules refuse and a picture that did not load all show it. Once it
- * has been shown it stays, so it cannot vanish while it is being typed in.
+ * THE PHOTO has its own part (MyCardPhoto): Upload photo first, a LinkedIn photo
+ * second when one is on offer, and the pasted link under "Advanced".
  */
-import { useId, useRef, useState } from 'react';
-import { Linkedin, Sparkles } from 'lucide-react';
-import CardAvatar from './CardAvatar';
+import { useId } from 'react';
+import { Sparkles } from 'lucide-react';
+import MyCardPhoto from './MyCardPhoto';
 import ShareToggle from './ShareToggle';
 import { EDITOR_SECTIONS, FIELD_META } from './cardDraft';
-import { SHAREABLE_FIELDS, cardInitials, isPhotoPicture, normalizeCardField } from '../../../utils/myCardRules';
+import { SHAREABLE_FIELDS } from '../../../utils/myCardRules';
+import { prepareProfilePhoto } from '../../../utils/photoPrep';
 import { openSuggestions } from '../../../utils/myCardSuggestions';
 
 const SOURCE_LABEL = Object.freeze({
@@ -50,22 +44,14 @@ function suggestionText(field, { value, source }) {
  * @param {(field: string, suggestion: object) => void} [props.onUseSuggestion]
  * @param {() => void} [props.onSubmit]  Enter in a field
  * @param {boolean} [props.disabled]
+ * @param {typeof prepareProfilePhoto} [props.preparePhoto]  makes the photo from a picked file; replaceable for tests
  */
 export default function MyCardEditor({
-  card, errors = {}, suggestions = null, onEdit, onBlur, onShare, onUseSuggestion, onSubmit, disabled = false,
+  card, errors = {}, suggestions = null, onEdit, onBlur, onShare, onUseSuggestion, onSubmit, disabled = false, preparePhoto = prepareProfilePhoto,
 }) {
   const uid = useId();
   const open = openSuggestions(card, suggestions);
-  const [failedPhoto, setFailedPhoto] = useState(null);
-  const [revealPhotoLink, setRevealPhotoLink] = useState(false);
-  // Set when the link is revealed by a button, so the field takes focus as it appears
-  // (the button that was pressed is gone, and focus would otherwise be lost).
-  const focusLinkWhenShown = useRef(false);
   const id = (field) => `${uid}-${field}`;
-  const showPhotoLink = () => { focusLinkWhenShown.current = true; setRevealPhotoLink(true); };
-
-  const validPhoto = normalizeCardField('photoUrl', card.photoUrl).value;
-  const photoProblem = failedPhoto !== null && failedPhoto === validPhoto;
 
   // "Use “Ada Lovelace”": one button for whichever of the two names are empty and suggested.
   const nameFields = ['firstName', 'lastName'].filter((name) => open[name]);
@@ -88,103 +74,6 @@ export default function MyCardEditor({
     );
   }
 
-  function renderPhoto() {
-    const meta = FIELD_META.photoUrl;
-    const message = errors.photoUrl;
-    const suggestion = open.photoUrl && onUseSuggestion ? open.photoUrl : null;
-    const hasPhoto = card.photoUrl.trim() !== '';
-    // With a good photo the raw link stays out of the way. It is shown when it was asked
-    // for (and stays), when it has a message, when what is there is not a valid link or
-    // did not load a picture, and when there is no photo on offer (it is then the only way in).
-    const hasGoodPhoto = hasPhoto && validPhoto !== '';
-    const showLink = revealPhotoLink || Boolean(message) || photoProblem || (hasPhoto && !hasGoodPhoto) || (!suggestion && !hasPhoto);
-    // A picture kept in the card is a very long string of letters and digits: never shown as text, or put in a box.
-    const photoIsData = isPhotoPicture(card.photoUrl);
-    const hint = photoProblem
-      ? 'That link didn\'t load a picture, so your initials are used. Check the link, or leave it empty.'
-      : (photoIsData && hasGoodPhoto ? 'Your uploaded photo is in use. Paste a link to use that instead, or remove the photo.' : meta.hint);
-    const messageId = `${id('photoUrl')}-message`;
-
-    return (
-      <div key="photoUrl" className="mycard-field mycard-field--photoUrl">
-        <div className="mycard-photo-row">
-          <CardAvatar photoUrl={validPhoto} initials={cardInitials(card)} size="lg" onPhotoFailed={setFailedPhoto} />
-          <div className="mycard-photo-main">
-            <div className="mycard-field-head">
-              <span className="mycard-label">Photo</span>
-              <ShareToggle
-                label={meta.shareLabel}
-                shared={card.share.photoUrl === true}
-                onChange={(value) => onShare('photoUrl', value)}
-                disabled={disabled}
-              />
-            </div>
-            {suggestion ? suggestButton({
-              primary: true,
-              icon: suggestion.source === 'linkedin' ? <Linkedin size={16} aria-hidden="true" /> : <Sparkles size={14} aria-hidden="true" />,
-              onClick: () => onUseSuggestion('photoUrl', suggestion),
-              children: suggestionText('photoUrl', suggestion),
-            }) : null}
-            {(suggestion && !showLink) || (hasGoodPhoto && !showLink) || hasPhoto ? (
-              <div className="mycard-photo-actions">
-                {suggestion && !showLink ? (
-                  <button type="button" className="mycard-linkbtn" disabled={disabled} onClick={showPhotoLink}>
-                    Paste a photo link instead
-                  </button>
-                ) : null}
-                {hasGoodPhoto && !showLink ? (
-                  <button type="button" className="mycard-linkbtn" disabled={disabled} onClick={showPhotoLink}>
-                    {photoIsData ? 'Use a photo link instead' : 'Change photo link'}
-                  </button>
-                ) : null}
-                {hasPhoto ? (
-                  <button
-                    type="button"
-                    className="mycard-linkbtn"
-                    disabled={disabled}
-                    onClick={() => { setRevealPhotoLink(false); onEdit('photoUrl', ''); }}
-                  >
-                    Remove photo
-                  </button>
-                ) : null}
-              </div>
-            ) : null}
-            {!suggestion && !hasPhoto ? <p className="mycard-message">Add a photo so people recognize you.</p> : null}
-          </div>
-        </div>
-        {showLink ? (
-          <div className="mycard-field">
-            <label htmlFor={id('photoUrl')} className="mycard-label">{meta.label}</label>
-            <input
-              id={id('photoUrl')}
-              ref={(element) => {
-                if (element && focusLinkWhenShown.current) { focusLinkWhenShown.current = false; element.focus(); }
-              }}
-              className="mycard-input"
-              type={meta.type}
-              inputMode={meta.inputMode}
-              autoComplete={meta.autoComplete}
-              placeholder={meta.placeholder}
-              value={photoIsData ? '' : card.photoUrl}
-              disabled={disabled}
-              aria-invalid={message ? 'true' : undefined}
-              aria-describedby={message || hint ? messageId : undefined}
-              spellCheck={false}
-              autoCapitalize="none"
-              // Once the link is being edited it stays, however the value looks mid-typing.
-              onChange={(event) => { setRevealPhotoLink(true); onEdit('photoUrl', event.target.value); }}
-              onBlur={() => onBlur('photoUrl')}
-            />
-            {message ? (
-              <p id={messageId} className="mycard-message mycard-message--error" role="alert">{message}</p>
-            ) : hint ? (
-              <p id={messageId} className="mycard-message">{hint}</p>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-    );
-  }
 
   function renderField(field) {
     const meta = FIELD_META[field];
@@ -258,7 +147,17 @@ export default function MyCardEditor({
           <h3 id={`${uid}-${section.id}`} className="mycard-section-title">{section.title}</h3>
           {section.id === 'you' ? (
             <>
-              {renderPhoto()}
+              <MyCardPhoto
+                card={card}
+                message={errors.photoUrl}
+                suggestion={open.photoUrl && onUseSuggestion ? { text: suggestionText('photoUrl', open.photoUrl), source: open.photoUrl.source } : null}
+                onEdit={onEdit}
+                onBlur={onBlur}
+                onShare={onShare}
+                onUseSuggestion={() => onUseSuggestion('photoUrl', open.photoUrl)}
+                disabled={disabled}
+                preparePhoto={preparePhoto}
+              />
               <div className="mycard-name">
                 {renderField('firstName')}
                 {renderField('lastName')}

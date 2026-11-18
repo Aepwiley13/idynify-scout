@@ -6,7 +6,7 @@
  */
 import { useState } from 'react';
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, within, fireEvent } from '@testing-library/react';
+import { render, screen, within, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import MyCardEditor from '../pages/ContactHub/myCard/MyCardEditor';
 import MyCardPreview from '../pages/ContactHub/myCard/MyCardPreview';
@@ -18,7 +18,7 @@ import { EXIF, fingerprintOf, photoDataUrl } from './helpers/photoFixtures';
 import { buildCardSuggestions } from '../utils/myCardSuggestions';
 
 /** What a page does: holds the draft, and puts the editor and the preview in the layout. */
-function Page({ initial = newCard(), suggestions = null, onSubmit, onDraft, actions = null }) {
+function Page({ initial = newCard(), suggestions = null, onSubmit, onDraft, actions = null, disabled = false, preparePhoto }) {
   const draft = useCardDraft(initial);
   onDraft?.(draft);
   return (
@@ -34,6 +34,8 @@ function Page({ initial = newCard(), suggestions = null, onSubmit, onDraft, acti
           onShare={draft.setShare}
           onUseSuggestion={draft.useSuggestion}
           onSubmit={onSubmit}
+          disabled={disabled}
+          preparePhoto={preparePhoto}
         />
       )}
       preview={<MyCardPreview card={draft.card} />}
@@ -42,6 +44,7 @@ function Page({ initial = newCard(), suggestions = null, onSubmit, onDraft, acti
 }
 
 const preview = () => screen.getByRole('region', { name: 'What people will see' });
+const openAdvanced = () => userEvent.click(screen.getByRole('button', { name: 'Advanced' }));
 const field = (name) => screen.getByLabelText(name);
 const toggle = (label) => screen.getByRole('switch', { name: `${label} on your card` });
 const named = { ...newCard(), firstName: 'Ada', lastName: 'Lovelace' };
@@ -49,9 +52,12 @@ const named = { ...newCard(), firstName: 'Ada', lastName: 'Lovelace' };
 describe('the editor', () => {
   it('has every field, each with a label', () => {
     render(<Page />);
-    for (const label of ['Photo link', 'First name', 'Last name', 'Title', 'Organization', 'Email', 'Phone', 'LinkedIn', 'Instagram', 'Website']) {
+    for (const label of ['First name', 'Last name', 'Title', 'Organization', 'Email', 'Phone', 'LinkedIn', 'Instagram', 'Website']) {
       expect(field(label)).toBeInTheDocument();
     }
+    // The photo is an action first; its link is under Advanced.
+    expect(screen.getByRole('button', { name: 'Upload photo' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Photo link')).toBeNull();
     expect(screen.getByRole('form', { name: 'Edit your card' })).toBeInTheDocument();
   });
 
@@ -356,7 +362,7 @@ describe('suggestions', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Use my LinkedIn photo' }));
     // The photo is set, so the raw link stays out of the way until asked for.
     expect(screen.queryByLabelText('Photo link')).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Change photo link' }));
+    await openAdvanced();
     expect(field('Photo link')).toHaveValue('https://media.example.com/ada.jpg');
     const image = within(preview()).getByRole('article').querySelector('img');
     expect(image).toHaveAttribute('src', 'https://media.example.com/ada.jpg');
@@ -381,80 +387,113 @@ describe('suggestions', () => {
   });
 });
 
-describe('the photo, friendly first', () => {
+describe('the photo: upload first', () => {
   const linkedinOffer = buildCardSuggestions({ linkedin: { status: 'connected', pictureUrl: 'https://media.example.com/ada.jpg' } });
+  const withLink = { ...named, photoUrl: 'https://images.example.com/ada.jpg' };
+  const photoBlock = () => document.querySelector('.mycard-field--photoUrl');
+  const buttonsIn = (root) => [...root.querySelectorAll('button')].map((button) => button.textContent.trim());
 
-  it('leads with the LinkedIn photo when one is on offer, and tucks the link away', () => {
+  it('leads with Upload photo, then the LinkedIn photo when one is on offer, with the link under Advanced', () => {
     render(<Page initial={named} suggestions={linkedinOffer} />);
-    expect(screen.getByRole('button', { name: 'Use my LinkedIn photo' })).toBeInTheDocument();
+    const upload = screen.getByRole('button', { name: 'Upload photo' });
+    const linkedin = screen.getByRole('button', { name: 'Use my LinkedIn photo' });
+    expect(upload.compareDocumentPosition(linkedin) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(buttonsIn(photoBlock()).filter((text) => /Upload photo|Use my LinkedIn photo|Advanced/.test(text))).toEqual(['Upload photo', 'Use my LinkedIn photo', 'Advanced']);
     expect(screen.queryByLabelText('Photo link')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Paste a photo link instead' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Advanced' })).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('still lets a person paste a link instead', async () => {
+  it('makes Upload photo the one friendly button, and the LinkedIn photo the quieter one', () => {
     render(<Page initial={named} suggestions={linkedinOffer} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Paste a photo link instead' }));
-    expect(field('Photo link')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Paste a photo link instead' })).toBeNull();
-    await userEvent.type(field('Photo link'), 'https://images.example.com/mine.jpg');
-    expect(within(preview()).getByRole('article').querySelector('img')).toHaveAttribute('src', 'https://images.example.com/mine.jpg');
+    expect(screen.getByRole('button', { name: 'Upload photo' })).toHaveClass('mycard-upload');
+    expect(screen.getByRole('button', { name: 'Use my LinkedIn photo' })).toHaveClass('mycard-suggest');
+    expect(screen.getByRole('button', { name: 'Use my LinkedIn photo' })).not.toHaveClass('mycard-suggest--primary');
   });
 
-  it('shows the link field straight away when there is nothing on offer, with a gentle prompt', () => {
-    render(<Page initial={named} />);
-    expect(field('Photo link')).toBeInTheDocument();
-    expect(screen.getByText('Add a photo so people recognize you.')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /^Use my/ })).toBeNull();
-  });
-
-  it('hides the raw link when a good photo is set, behind "Change photo link"', () => {
-    render(<Page initial={{ ...named, photoUrl: 'https://images.example.com/ada.jpg' }} suggestions={linkedinOffer} />);
-    expect(screen.queryByLabelText('Photo link')).toBeNull();
-    expect(screen.queryByDisplayValue('https://images.example.com/ada.jpg')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Change photo link' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Remove photo' })).toBeInTheDocument();
-    // The photo itself is still shown, in the editor and on the card.
-    expect(within(preview()).getByRole('article').querySelector('img')).toHaveAttribute('src', 'https://images.example.com/ada.jpg');
-    expect(screen.queryByRole('button', { name: 'Use my LinkedIn photo' })).toBeNull();
-  });
-
-  it('reveals the editable link on "Change photo link", and moves focus into it', async () => {
-    render(<Page initial={{ ...named, photoUrl: 'https://images.example.com/ada.jpg' }} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Change photo link' }));
+  it('opens the link under Advanced, moves focus into it, and closes it again', async () => {
+    render(<Page initial={withLink} />);
+    const advanced = screen.getByRole('button', { name: 'Advanced' });
+    expect(advanced).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(advanced);
+    expect(advanced).toHaveAttribute('aria-expanded', 'true');
+    expect(advanced).toHaveAttribute('aria-controls', document.getElementById(advanced.getAttribute('aria-controls')).id);
     expect(field('Photo link')).toHaveValue('https://images.example.com/ada.jpg');
     expect(field('Photo link')).toHaveFocus();
-    expect(screen.queryByRole('button', { name: 'Change photo link' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Remove photo' })).toBeInTheDocument();
+    await userEvent.click(advanced);
+    expect(screen.queryByLabelText('Photo link')).toBeNull();
+    expect(advanced).toHaveAttribute('aria-expanded', 'false');
   });
 
-  it('reveals the link with the keyboard too: Enter or Space on the button', async () => {
+  it('opens Advanced with the keyboard: Enter or Space on the button', async () => {
     const user = userEvent.setup();
-    render(<Page initial={{ ...named, photoUrl: 'https://images.example.com/ada.jpg' }} />);
-    screen.getByRole('button', { name: 'Change photo link' }).focus();
+    render(<Page initial={withLink} />);
+    screen.getByRole('button', { name: 'Advanced' }).focus();
     await user.keyboard('{Enter}');
     expect(field('Photo link')).toHaveFocus();
   });
 
-  it('is a real button, in the Tab order before the photo\'s link, and named plainly', () => {
-    render(<Page initial={{ ...named, photoUrl: 'https://images.example.com/ada.jpg' }} />);
-    const button = screen.getByRole('button', { name: 'Change photo link' });
-    expect(button.tagName).toBe('BUTTON');
-    expect(button).toHaveAttribute('type', 'button');
-    expect(button).toHaveAccessibleName('Change photo link');
+  it('with nothing on offer, asks for a photo gently, and the link is still under Advanced', () => {
+    render(<Page initial={named} />);
+    expect(screen.getByRole('button', { name: 'Upload photo' })).toBeInTheDocument();
+    expect(screen.getByText('Add a photo so people recognize you.')).toBeInTheDocument();
+    expect(screen.queryByLabelText('Photo link')).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Use my/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove photo' })).toBeNull();
   });
 
-  it('edits the revealed link, and the card follows', async () => {
-    render(<Page initial={{ ...named, photoUrl: 'https://images.example.com/ada.jpg' }} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Change photo link' }));
+  it('with a photo set, keeps the raw link out of the way, and offers Upload photo and Remove photo, not a LinkedIn photo', () => {
+    render(<Page initial={withLink} suggestions={linkedinOffer} />);
+    expect(screen.queryByLabelText('Photo link')).toBeNull();
+    expect(screen.queryByDisplayValue('https://images.example.com/ada.jpg')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Upload photo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Remove photo' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Use my LinkedIn photo' })).toBeNull();
+    expect(within(preview()).getByRole('article').querySelector('img')).toHaveAttribute('src', 'https://images.example.com/ada.jpg');
+  });
+
+  it('is real buttons, named plainly, in the Tab order', () => {
+    render(<Page initial={withLink} />);
+    for (const name of ['Upload photo', 'Remove photo', 'Advanced']) {
+      const button = screen.getByRole('button', { name });
+      expect(button.tagName).toBe('BUTTON');
+      expect(button).toHaveAttribute('type', 'button');
+      expect(button).toHaveAccessibleName(name);
+      expect(button.tabIndex).toBe(0);
+    }
+  });
+
+  it('presses the file picker open from Upload photo, and from the keyboard', async () => {
+    const user = userEvent.setup();
+    render(<Page initial={named} />);
+    const click = vi.spyOn(HTMLInputElement.prototype, 'click');
+    await user.click(screen.getByRole('button', { name: 'Upload photo' }));
+    expect(click).toHaveBeenCalledTimes(1);
+    screen.getByRole('button', { name: 'Upload photo' }).focus();
+    await user.keyboard('{Enter}');
+    expect(click).toHaveBeenCalledTimes(2);
+    click.mockRestore();
+  });
+
+  it('has a file input for pictures only, one at a time, out of the Tab order and named', () => {
+    render(<Page initial={named} />);
+    const input = screen.getByLabelText('Choose a photo from your device');
+    expect(input).toHaveAttribute('type', 'file');
+    expect(input).toHaveAttribute('accept', 'image/*');
+    expect(input).not.toHaveAttribute('multiple');
+    expect(input.tabIndex).toBe(-1);
+  });
+
+  it('edits the link under Advanced, and the card follows', async () => {
+    render(<Page initial={withLink} />);
+    await openAdvanced();
     await userEvent.clear(field('Photo link'));
     await userEvent.type(field('Photo link'), 'https://images.example.com/new.jpg');
     expect(within(preview()).getByRole('article').querySelector('img')).toHaveAttribute('src', 'https://images.example.com/new.jpg');
   });
 
   it('keeps the link on screen while it is being typed, even when what is typed is briefly valid or not', async () => {
-    render(<Page initial={{ ...named, photoUrl: 'https://images.example.com/ada.jpg' }} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Change photo link' }));
-    await userEvent.clear(field('Photo link'));
+    render(<Page initial={withLink} />);
+    await openAdvanced();
     for (const text of ['h', 'https://', 'https://images.example.com/n', 'https://images.example.com/new.jpg']) {
       await userEvent.clear(field('Photo link'));
       await userEvent.type(field('Photo link'), text);
@@ -462,99 +501,125 @@ describe('the photo, friendly first', () => {
     }
   });
 
-  it('keeps a link that was shown for a problem on screen while it is fixed, instead of hiding it once it looks fine', async () => {
+  it('opens Advanced by itself when what is there is not a valid link, and keeps it open while it is fixed', async () => {
     render(<Page initial={{ ...named, photoUrl: 'http://images.example.com/insecure.jpg' }} />);
-    // Shown by itself: what is there is not a valid link.
-    expect(field('Photo link')).toBeInTheDocument();
-    await userEvent.clear(field('Photo link'));
+    expect(screen.getByRole('button', { name: 'Advanced' })).toHaveAttribute('aria-expanded', 'true');
+    expect(field('Photo link')).toHaveValue('http://images.example.com/insecure.jpg');
     for (const text of ['https://', 'https://images.example.com/f', 'https://images.example.com/fixed.jpg']) {
       await userEvent.clear(field('Photo link'));
       await userEvent.type(field('Photo link'), text);
       expect(screen.getByLabelText('Photo link'), text).toBeInTheDocument();
     }
-    // The photo is good now, and the field is still there for the person to finish with.
-    expect(field('Photo link')).toHaveValue('https://images.example.com/fixed.jpg');
     expect(within(preview()).getByRole('article').querySelector('img')).toHaveAttribute('src', 'https://images.example.com/fixed.jpg');
   });
 
-  it('validates the revealed link as before, and says what is wrong', async () => {
+  it('validates the link as before, and says what is wrong', async () => {
     const user = userEvent.setup();
-    render(<Page initial={{ ...named, photoUrl: 'https://images.example.com/ada.jpg' }} />);
-    await user.click(screen.getByRole('button', { name: 'Change photo link' }));
+    render(<Page initial={withLink} />);
+    await openAdvanced();
     await user.clear(field('Photo link'));
     await user.type(field('Photo link'), 'http://images.example.com/insecure.jpg');
     await user.tab();
     expect(screen.getByRole('alert')).toHaveTextContent(/starts with https/);
     expect(field('Photo link')).toHaveAttribute('aria-invalid', 'true');
-    // And a value the rules refuse never reaches the card.
     expect(within(preview()).getByRole('article').querySelector('img')).toBeNull();
   });
 
-  it('removes the photo from the hidden state, back to the friendly start', async () => {
-    render(<Page initial={{ ...named, photoUrl: 'https://images.example.com/ada.jpg' }} suggestions={linkedinOffer} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
-    expect(within(preview()).getByText('AL')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Use my LinkedIn photo' })).toBeInTheDocument();
-    expect(screen.queryByLabelText('Photo link')).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Change photo link' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Remove photo' })).toBeNull();
-  });
-
-  it('removes the photo from the revealed state too, and goes back to the friendly start', async () => {
-    render(<Page initial={{ ...named, photoUrl: 'https://images.example.com/ada.jpg' }} suggestions={linkedinOffer} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Change photo link' }));
-    await userEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
-    expect(screen.queryByLabelText('Photo link')).toBeNull();
-    expect(screen.getByRole('button', { name: 'Use my LinkedIn photo' })).toBeInTheDocument();
-  });
-
-  it('shows the link by itself when what is there is not a valid link, so it can be fixed', () => {
-    render(<Page initial={{ ...named, photoUrl: 'http://images.example.com/insecure.jpg' }} />);
-    expect(field('Photo link')).toHaveValue('http://images.example.com/insecure.jpg');
-    expect(screen.queryByRole('button', { name: 'Change photo link' })).toBeNull();
-    expect(screen.getByRole('button', { name: 'Remove photo' })).toBeInTheDocument();
-  });
-
-  it('shows the link by itself when the picture does not load, with the reason', () => {
+  it('opens Advanced by itself when the picture does not load, with the reason', () => {
     render(<Page initial={{ ...named, photoUrl: 'https://images.example.com/gone.jpg' }} />);
     expect(screen.queryByLabelText('Photo link')).toBeNull();
     for (const image of document.querySelectorAll('img')) fireEvent.error(image);
+    expect(screen.getByRole('button', { name: 'Advanced' })).toHaveAttribute('aria-expanded', 'true');
     expect(field('Photo link')).toHaveAccessibleDescription(/didn.t load a picture, so your initials are used/);
-    expect(screen.queryByRole('button', { name: 'Change photo link' })).toBeNull();
+  });
+
+  describe('removing the photo', () => {
+    it('asks first, says what happens, and puts the safe choice in focus', async () => {
+      render(<Page initial={withLink} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
+      const ask = screen.getByRole('group', { name: /Remove your photo\?/ });
+      expect(ask).toHaveTextContent('People will see your initials instead. Nothing changes in your saved card until you press Save.');
+      expect(within(ask).getByRole('button', { name: 'Yes, remove it' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Keep my photo' })).toHaveFocus();
+      // Nothing has been removed yet.
+      expect(within(preview()).getByRole('article').querySelector('img')).toHaveAttribute('src', 'https://images.example.com/ada.jpg');
+      expect(screen.queryByRole('button', { name: 'Upload photo' })).toBeNull();
+    });
+
+    it('keeps the photo, and puts focus back on Remove photo, when it is not wanted after all', async () => {
+      render(<Page initial={withLink} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Keep my photo' }));
+      expect(screen.queryByRole('group', { name: /Remove your photo/ })).toBeNull();
+      expect(within(preview()).getByRole('article').querySelector('img')).toHaveAttribute('src', 'https://images.example.com/ada.jpg');
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Remove photo' })).toHaveFocus());
+    });
+
+    it('keeps the photo on Escape-free keyboard use too: Enter on "Keep my photo"', async () => {
+      const user = userEvent.setup();
+      render(<Page initial={withLink} />);
+      await user.click(screen.getByRole('button', { name: 'Remove photo' }));
+      await user.keyboard('{Enter}');
+      expect(within(preview()).getByRole('article').querySelector('img')).toHaveAttribute('src', 'https://images.example.com/ada.jpg');
+    });
+
+    it('removes it only when it is confirmed, leaves the initials, and puts focus on Upload photo', async () => {
+      let draft;
+      render(<Page initial={withLink} suggestions={linkedinOffer} onDraft={(d) => { draft = d; }} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Yes, remove it' }));
+      expect(draft.card.photoUrl).toBe('');
+      expect(within(preview()).getByText('AL')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Remove photo' })).toBeNull();
+      expect(screen.getByRole('button', { name: 'Use my LinkedIn photo' })).toBeInTheDocument();
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Upload photo' })).toHaveFocus());
+    });
+
+    it('says, for a screen reader, that it is removed and not yet saved, and lets the words go', async () => {
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+      try {
+        render(<Page initial={withLink} />);
+        fireEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Yes, remove it' }));
+        expect(screen.getByText('Photo removed. It is not saved until you press Save.')).toBeInTheDocument();
+        await act(async () => { await vi.advanceTimersByTimeAsync(6100); });
+        expect(screen.queryByText(/Photo removed/)).toBeNull();
+      } finally { vi.useRealTimers(); }
+    });
+
+    it('asks for a photo that is only a link, and for one that was uploaded, alike', async () => {
+      render(<Page initial={{ ...named, photoUrl: photoDataUrl(320, 20_000) }} />);
+      await userEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
+      expect(screen.getByRole('group', { name: /Remove your photo\?/ })).toBeInTheDocument();
+    });
+
+    it('is not offered for a photo that is not there', () => {
+      render(<Page initial={named} suggestions={linkedinOffer} />);
+      expect(screen.queryByRole('button', { name: 'Remove photo' })).toBeNull();
+    });
   });
 
   it('does not touch the privacy switch: it stays in place and keeps its state', async () => {
-    render(<Page initial={{ ...named, photoUrl: 'https://images.example.com/ada.jpg' }} />);
+    render(<Page initial={withLink} />);
     expect(toggle('Photo')).toHaveAttribute('aria-checked', 'true');
     await userEvent.click(toggle('Photo'));
     expect(within(preview()).getByRole('article').querySelector('img')).toBeNull();
     expect(within(preview()).getByText(/Kept private: Photo/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole('button', { name: 'Change photo link' }));
+    await openAdvanced();
     expect(toggle('Photo')).toHaveAttribute('aria-checked', 'false');
     await userEvent.click(toggle('Photo'));
     expect(within(preview()).getByRole('article').querySelector('img')).toHaveAttribute('src', 'https://images.example.com/ada.jpg');
   });
 
-  it('never fills in or changes a photo that is set: a suggestion is not offered over it', () => {
-    render(<Page initial={{ ...named, photoUrl: 'https://images.example.com/ada.jpg' }} suggestions={linkedinOffer} />);
-    expect(screen.queryByRole('button', { name: /^Use my/ })).toBeNull();
-  });
-
-  it('removing the photo with nothing on offer leaves the link field empty and in place', async () => {
-    render(<Page initial={{ ...named, photoUrl: 'https://images.example.com/ada.jpg' }} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
-    expect(field('Photo link')).toHaveValue('');
-    expect(screen.getByText('Add a photo so people recognize you.')).toBeInTheDocument();
-  });
-
-  it('does not offer to remove a photo that is not there', () => {
-    render(<Page initial={named} suggestions={linkedinOffer} />);
-    expect(screen.queryByRole('button', { name: 'Remove photo' })).toBeNull();
-  });
-
-  it('keeps the photo\'s Shared / Private switch in the photo block, named for the photo', () => {
+  it('keeps the photo\'s Shared / Private switch in the photo block, named for the photo, with every way of adding one', () => {
     render(<Page initial={named} suggestions={linkedinOffer} />);
     expect(toggle('Photo')).toHaveAttribute('aria-checked', 'true');
+    expect(photoBlock()).toContainElement(toggle('Photo'));
+  });
+
+  it('never fills in or changes a photo that is set: a suggestion is not offered over it', () => {
+    render(<Page initial={withLink} suggestions={linkedinOffer} />);
+    expect(screen.queryByRole('button', { name: /^Use my/ })).toBeNull();
   });
 
   it('uses the LinkedIn photo with a keyboard: Tab to the button, Enter', async () => {
@@ -566,10 +631,17 @@ describe('the photo, friendly first', () => {
     expect(screen.queryByLabelText('Photo link')).toBeNull();
   });
 
-  it('reports a failed picture by the link, without hiding the link', () => {
-    render(<Page initial={{ ...named, photoUrl: 'https://images.example.com/gone.jpg' }} suggestions={linkedinOffer} />);
-    for (const image of document.querySelectorAll('img')) fireEvent.error(image);
-    expect(field('Photo link')).toHaveAccessibleDescription(/didn.t load a picture/);
+  it('turns every way of adding or removing a photo off when the form is read-only', () => {
+    render(<Page initial={withLink} suggestions={linkedinOffer} disabled />);
+    for (const name of ['Upload photo', 'Remove photo', 'Advanced']) expect(screen.getByRole('button', { name })).toBeDisabled();
+    expect(screen.getByLabelText('Choose a photo from your device')).toBeDisabled();
+    expect(toggle('Photo')).toBeDisabled();
+  });
+
+  it('is called "Photo", not "Photo link", wherever the photo itself is meant', () => {
+    render(<Page initial={{ ...named, photoUrl: photoDataUrl(320, 20_000) }} />);
+    expect(photoBlock().querySelector('.mycard-label')).toHaveTextContent(/^Photo$/);
+    expect(screen.queryByText('Photo link')).toBeNull();
   });
 });
 
@@ -726,8 +798,7 @@ describe('an uploaded photo', () => {
 
   it('stays out of the link box even when the box is opened: it is empty, and says the photo is in use', async () => {
     render(<Page initial={withPhoto} />);
-    expect(screen.queryByRole('button', { name: 'Change photo link' })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Use a photo link instead' }));
+    await openAdvanced();
     expect(field('Photo link')).toHaveValue('');
     expect(field('Photo link')).toHaveFocus();
     expect(screen.getByText('Your uploaded photo is in use. Paste a link to use that instead, or remove the photo.')).toBeInTheDocument();
@@ -737,17 +808,18 @@ describe('an uploaded photo', () => {
   it('is replaced by a link that is typed in, and the link is then shown as a link', async () => {
     let draft;
     render(<Page initial={withPhoto} onDraft={(d) => { draft = d; }} />);
-    await userEvent.click(screen.getByRole('button', { name: 'Use a photo link instead' }));
+    await openAdvanced();
     await userEvent.type(field('Photo link'), 'https://images.example.com/new.jpg');
     expect(draft.card.photoUrl).toBe('https://images.example.com/new.jpg');
     expect(field('Photo link')).toHaveValue('https://images.example.com/new.jpg');
     expect(within(preview()).getByRole('article').querySelector('img')).toHaveAttribute('src', 'https://images.example.com/new.jpg');
   });
 
-  it('is removed by "Remove photo", leaving the initials', async () => {
+  it('is removed by "Remove photo" once confirmed, leaving the initials', async () => {
     let draft;
     render(<Page initial={withPhoto} onDraft={(d) => { draft = d; }} />);
     await userEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Yes, remove it' }));
     expect(draft.card.photoUrl).toBe('');
     expect(within(preview()).getByRole('article').querySelector('img')).toBeNull();
     expect(within(preview()).getByRole('article')).toHaveTextContent('AL');
@@ -765,17 +837,19 @@ describe('an uploaded photo', () => {
     expect(preview().innerHTML).not.toContain(fingerprintOf(photo));
   });
 
-  it('is not shown, as text or otherwise, when what is held is not a finished photo', () => {
+  it('is not shown, as text or otherwise, when what is held is not a finished photo', async () => {
     const bad = photoDataUrl(320, 5000, { extra: EXIF });
     const { container } = render(<Page initial={{ ...named, photoUrl: bad }} />);
     expect(container.innerHTML).not.toContain(fingerprintOf(bad));
     expect(textual().some((text) => text.includes(bad.slice(300, 360)))).toBe(false);
     expect(within(preview()).getByRole('article').querySelector('img')).toBeNull();
+    await openAdvanced();
     expect(field('Photo link')).toHaveValue('');
   });
 
   it('is a short piece of text typed into the link box like any other text: shown, and refused with the usual message', async () => {
     render(<Page initial={named} />);
+    await openAdvanced();
     await userEvent.type(field('Photo link'), 'data:image/png;base64,AAAA');
     expect(field('Photo link')).toHaveValue('data:image/png;base64,AAAA');
   });

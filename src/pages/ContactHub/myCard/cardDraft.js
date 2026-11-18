@@ -35,7 +35,9 @@ export const EDITOR_SECTIONS = Object.freeze([
 
 export const FIELD_META = Object.freeze({
   photoUrl: {
-    label: 'Photo link', shareLabel: 'Photo', type: 'text', inputMode: 'url', autoComplete: 'off', placeholder: 'https://…',
+    // The field is the person's PHOTO, whether they uploaded it or pasted a link: that is what it is called in a
+    // conflict or a repair. Only the box under "Advanced" is a "Photo link".
+    label: 'Photo', linkLabel: 'Photo link', shareLabel: 'Photo', type: 'text', inputMode: 'url', autoComplete: 'off', placeholder: 'https://…',
     hint: 'A link to a picture, starting with https://. Your initials are used without one.',
   },
   firstName: { label: 'First name', type: 'text', inputMode: 'text', autoComplete: 'given-name', placeholder: 'Ada', hint: null },

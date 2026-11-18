@@ -59,7 +59,7 @@ describe('cards that differ', () => {
   it('names the photo by what a person calls it', () => {
     const { changes } = diffCards(base({ photoUrl: 'https://images.example.com/new.jpg', share: { ...DEFAULT_SHARE, photoUrl: false } }), base());
     expect(changes).toEqual([
-      { kind: 'value', field: 'photoUrl', label: 'Photo link' },
+      { kind: 'value', field: 'photoUrl', label: 'Photo' },
       { kind: 'switch', field: 'photoUrl', label: 'Photo' },
     ]);
   });

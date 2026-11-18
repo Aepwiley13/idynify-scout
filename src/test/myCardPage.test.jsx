@@ -26,6 +26,7 @@ vi.mock('../context/ImpersonationContext', () => ({ useImpersonation: () => mock
 import MyCardPage from '../pages/ContactHub/MyCardPage';
 import { saveDraft, readDraft, draftKey } from '../pages/ContactHub/myCard/state/myCardDraftStorage';
 import { DEFAULT_SHARE, newCard, normalizeCard } from '../utils/myCardRules';
+import { fingerprintOf, photoDataUrl } from './helpers/photoFixtures';
 
 const savedCard = (extra = {}) => ({ ...newCard(), firstName: 'Ada', lastName: 'Lovelace', title: 'Analyst', ...extra });
 const okResult = (revision = 3, extra = {}) => ({ status: 'ok', card: savedCard(extra), revision });
@@ -957,5 +958,129 @@ describe('leaving, and being usable', () => {
     expect(view.container.querySelector('.mycard')).toHaveAttribute('data-view', 'preview');
     await user.click(screen.getByRole('button', { name: 'Edit' }));
     expect(field('Title')).toHaveValue('Analyst Lead');
+  });
+});
+
+describe('an uploaded photo', () => {
+  const photo = photoDataUrl(320, 36_000, { tag: 1 });
+  const newer = photoDataUrl(320, 28_000, { tag: 2 });
+  const withPicture = (picture = photo, extra = {}) => okResult(3, { photoUrl: picture, ...extra });
+  /** Everything a person or a screen reader could be given as text, apart from an image's own source. */
+  const textual = () => [
+    document.body.textContent,
+    ...[...document.querySelectorAll('input, textarea')].map((node) => node.value),
+    ...[...document.querySelectorAll('*')].flatMap((node) => [...node.attributes]
+      .filter((attribute) => !(node.tagName === 'IMG' && attribute.name === 'src'))
+      .map((attribute) => attribute.value)),
+  ];
+  const leaks = () => textual().some((text) => text.includes(fingerprintOf(photo)) || /data:image\/jpeg;base64/.test(text));
+  const unfolded = (text) => text.replace(/\r\n /g, '');
+
+  it('is shown as the photo and never as text, anywhere on the page', async () => {
+    await open({ load: withPicture() });
+    expect(document.querySelector('.mycard-photo-row img')).toHaveAttribute('src', photo);
+    expect(within(screen.getByRole('article', { name: 'Card for Ada Lovelace' })).getByRole('heading', { name: 'Ada Lovelace' })).toBeInTheDocument();
+    expect(leaks()).toBe(false);
+    expect(screen.getByText('All changes saved')).toBeInTheDocument();
+  });
+
+  it('stays out of every notice and message: a conflict, a failed save, and an invalid card', async () => {
+    const { service } = await open({ load: withPicture() });
+    const user = userEvent.setup();
+    service.saveMyCard.mockResolvedValueOnce({ status: 'conflict', current: okResult(5, { photoUrl: newer, title: 'Newer' }) });
+    await typeInto(user, 'Title', 'Mine');
+    await user.click(saveButton());
+    expect(await screen.findByRole('alert')).toHaveTextContent(/A newer version of your card was saved/);
+    expect(screen.getByRole('alert')).toHaveTextContent(/Title/);
+    expect(leaks()).toBe(false);
+    expect(textual().some((text) => text.includes(fingerprintOf(newer)))).toBe(false);
+  });
+
+  it('is in the contact file, embedded, when the Photo switch is on, and not when it is off', async () => {
+    const downloads = stubDownloads();
+    await open({ load: withPicture(photo, { share: { ...DEFAULT_SHARE, photoUrl: true } }) });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Download contact' }));
+    const text = unfolded(await downloads.text());
+    expect(text).toContain(`PHOTO;ENCODING=b;TYPE=JPEG:${photo.slice('data:image/jpeg;base64,'.length)}\r\n`);
+    expect(text).not.toContain('data:image');
+
+    await user.click(screen.getByRole('switch', { name: 'Photo on your card' }));
+    await user.click(screen.getByRole('button', { name: 'Download contact' }));
+    const second = unfolded(await downloads.text());
+    expect(second).not.toContain('PHOTO');
+    expect(second).not.toContain(fingerprintOf(photo));
+    expect(second).toContain('FN:Ada Lovelace');
+  });
+
+  it('is gone from what people would see, in the preview, the moment the switch is off', async () => {
+    await open({ load: withPicture(photo, { share: { ...DEFAULT_SHARE, photoUrl: true } }) });
+    const card = () => screen.getByRole('article', { name: 'Card for Ada Lovelace' });
+    expect(card().querySelector('img')).toHaveAttribute('src', photo);
+    await userEvent.click(screen.getByRole('switch', { name: 'Photo on your card' }));
+    expect(card().querySelector('img')).toBeNull();
+    expect(card().innerHTML).not.toContain(fingerprintOf(photo));
+  });
+
+  it('is saved as removed when removed, and the card goes on from the revision made', async () => {
+    const { service } = await open({ load: withPicture() });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Remove photo' }));
+    await user.click(saveButton());
+    await screen.findByText('All changes saved');
+    expect(service.saveMyCard.mock.calls[0][0].photoUrl).toBe('');
+    expect(service.saveMyCard.mock.calls[0][1]).toEqual({ expectedRevision: 3 });
+  });
+
+  it('comes back after a refresh with the draft that held it, noticed, unsaved, and not shown as text', async () => {
+    saveDraft({ uid: 'U', card: savedCard({ photoUrl: photo, title: 'Recovered' }), baseRevision: 3 }, { now: Date.now() - 1000 });
+    await open();
+    expect(document.querySelector('.mycard-photo-row img')).toHaveAttribute('src', photo);
+    expect(field('Title')).toHaveValue('Recovered');
+    expect(screen.getByText('We restored the changes you hadn\'t saved')).toBeInTheDocument();
+    expect(screen.queryByText(/couldn't be restored/)).toBeNull();
+    expect(screen.getByText('You have unsaved changes')).toBeInTheDocument();
+    expect(leaks()).toBe(false);
+  });
+
+  it('says plainly that it could not be restored when its kept picture is gone, and the rest of the draft is back', async () => {
+    saveDraft({ uid: 'U', card: savedCard({ photoUrl: photo, title: 'Recovered' }), baseRevision: 3 }, { now: Date.now() - 1000 });
+    globalThis.sessionStorage.removeItem('idynify.myCardDraftPhoto.v1:U');
+    await open();
+    expect(field('Title')).toHaveValue('Recovered');
+    expect(screen.getByText('Your uploaded photo couldn\'t be restored. Choose it again.')).toBeInTheDocument();
+    expect(document.querySelector('.mycard-photo-row img')).toBeNull();
+  });
+
+  it('says so, with nothing else, when the photo was the only thing in the draft and it could not be restored', async () => {
+    saveDraft({ uid: 'U', card: savedCard({ photoUrl: photo }), baseRevision: 3 }, { now: Date.now() - 1000 });
+    globalThis.sessionStorage.removeItem('idynify.myCardDraftPhoto.v1:U');
+    await open();
+    expect(screen.getByText('Your uploaded photo couldn\'t be restored. Choose it again.')).toBeInTheDocument();
+    expect(screen.getByText('All changes saved')).toBeInTheDocument();
+  });
+
+  it('is never written to the console, whatever happens', async () => {
+    const spies = ['log', 'info', 'warn', 'error', 'debug'].map((method) => vi.spyOn(console, method).mockImplementation(() => {}));
+    const { service } = await open({ load: withPicture() });
+    const user = userEvent.setup();
+    service.saveMyCard.mockResolvedValueOnce(OFFLINE);
+    await typeInto(user, 'Title', 'Director');
+    await user.click(saveButton());
+    await screen.findByRole('alert');
+    for (const spy of spies) for (const call of spy.mock.calls) expect(JSON.stringify(call)).not.toContain(fingerprintOf(photo));
+    spies.forEach((spy) => spy.mockRestore());
+  });
+
+  it('is not read, kept or shown while viewing as someone else, even if a draft with one is waiting', async () => {
+    saveDraft({ uid: 'U', card: savedCard({ photoUrl: photo }), baseRevision: 3 }, { now: Date.now() - 1000 });
+    const getItem = vi.spyOn(Storage.prototype, 'getItem');
+    mocks.impersonation.isImpersonating = true;
+    installService();
+    render(page());
+    expect(await screen.findByText('You\'re viewing as someone else')).toBeInTheDocument();
+    expect(getItem).not.toHaveBeenCalled();
+    expect(leaks()).toBe(false);
+    expect(globalThis.sessionStorage.getItem('idynify.myCardDraftPhoto.v1:U')).not.toBeNull();
   });
 });

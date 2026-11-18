@@ -92,7 +92,9 @@ export function useMyCard({
     const l = latest.current;
     const { currentUid: signedIn, now: clock, options: storageOptions } = outside.current;
     if (!l.persist || !l.uid || (signedIn && signedIn() !== l.uid)) return;
-    saveDraft({ uid: l.uid, card: l.card, baseRevision: l.revision }, { ...storageOptions, now: clock() });
+    const kept = saveDraft({ uid: l.uid, card: l.card, baseRevision: l.revision }, { ...storageOptions, now: clock() });
+    // An uploaded photo that could not be kept is said so, never dropped silently; a draft with none is fine.
+    dispatch({ type: A.PHOTO_KEEP_CHANGED, kept: kept?.photoKept !== false });
   }, [cancelTimer]);
 
   // ── Load ───────────────────────────────────────────────────────────────────
@@ -151,7 +153,7 @@ export function useMyCard({
       hydrated.current = true;
       dispatch({ type: A.LOAD_SUCCEEDED, loadId, uid, result: loaded, suggestions, unavailable });
       if (plan.action === 'restore' || plan.action === 'conflict') {
-        dispatch({ type: A.RECOVERY_RESTORED, savedAt: plan.savedAt, baseRevision: plan.baseRevision });
+        dispatch({ type: A.RECOVERY_RESTORED, savedAt: plan.savedAt, baseRevision: plan.baseRevision, photoLost: plan.photoLost });
       }
       if (plan.action === 'conflict') dispatch({ type: A.CONFLICT_DETECTED, current: loaded, changes: plan.changes });
     })();

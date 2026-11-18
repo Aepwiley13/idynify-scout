@@ -98,7 +98,9 @@ function Conflict({ state, choices, saving, changeLabels, onChoose, onCancel, on
   );
 }
 
-function Recovered({ onDismiss, onDiscard }) {
+const PHOTO_LOST_TEXT = 'Your uploaded photo couldn\'t be restored. Choose it again.';
+
+function Recovered({ onDismiss, onDiscard, photoLost = false }) {
   const [confirming, setConfirming] = useState(false);
   return (
     <section className="mycard-notice mycard-notice--info" role="status" aria-labelledby="mycard-recovered-title">
@@ -114,6 +116,7 @@ function Recovered({ onDismiss, onDiscard }) {
       ) : (
         <>
           <p className="mycard-notice-text">They are in the form now, and nothing is saved until you press Save.</p>
+          {photoLost ? <p className="mycard-notice-text">{PHOTO_LOST_TEXT}</p> : null}
           <div className="mycard-notice-actions">
             <button type="button" className="mycard-btn mycard-btn--secondary" onClick={() => setConfirming(true)}>Discard changes</button>
             <button type="button" className="mycard-btn mycard-btn--secondary" onClick={onDismiss}>OK</button>
@@ -177,10 +180,20 @@ export function MyCardNotices({
       {/* With a conflict on screen, the conflict is where the choices are; this only says what happened. */}
       {state.recovered ? (
         state.conflict ? (
-          <p className="mycard-notice mycard-notice--info mycard-notice-text" role="status">We restored the changes you hadn&apos;t saved.</p>
+          <p className="mycard-notice mycard-notice--info mycard-notice-text" role="status">
+            We restored the changes you hadn&apos;t saved.{state.recovered.photoLost ? ` ${PHOTO_LOST_TEXT}` : ''}
+          </p>
         ) : (
-          <Recovered onDismiss={onDismissRecovered} onDiscard={onDiscardRecovered} />
+          <Recovered onDismiss={onDismissRecovered} onDiscard={onDiscardRecovered} photoLost={state.recovered.photoLost === true} />
         )
+      ) : null}
+
+      {/* Said as it happens, not only on the way back in: a photo is lost the moment storage will not take it. */}
+      {state.photoKept === false ? (
+        <section className="mycard-notice mycard-notice--info" role="status" aria-labelledby="mycard-photo-kept-title">
+          <h2 id="mycard-photo-kept-title" className="mycard-notice-title">Your new photo isn&apos;t being kept</h2>
+          <p className="mycard-notice-text">If you leave or reload this page before you save, it will be lost. Press Save to keep it.</p>
+        </section>
       ) : null}
 
       {state.repaired && (repaired.length > 0 || sharingReset) ? (

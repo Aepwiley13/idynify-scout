@@ -26,12 +26,22 @@
  *   of the stored card, so a field added to the card later, the switches
  *   themselves, timestamps and anything unexpected in the record cannot leak.
  *
+ * THE PHOTO is one of three things: nothing, an https link, or a small JPEG
+ *   picture kept IN the card as a data URL (made by utils/photoPrep.js). Which
+ *   is the same field and the same switch: a Private photo is as absent from
+ *   the view, the preview and a download whether it is a link or a picture.
+ *   A data URL is accepted only if it passes photoPrep's inspection (a real,
+ *   square, metadata-free JPEG within the size cap): the card never keeps
+ *   something merely CLAIMED to be a photo. A refused one gives a message that
+ *   never contains the data.
+ *
  * DEFAULTS
  *   Email and phone start private, as do Instagram and website. Photo, title,
  *   organization and LinkedIn start shared. Defaults are only ever applied
  *   when a new card is made (newCard): the owner sees every switch before
  *   saving. A stored card with no switches shares nothing but the name.
  */
+import { inspectPhotoDataUrl } from './photoPrep.js';
 
 /** Where a user's card will be stored: users/{uid}/card/main. Not written yet. */
 export const CARD_COLLECTION = 'card';
@@ -70,7 +80,7 @@ export const DEFAULT_SHARE = Object.freeze({
 export const CARD_LIMITS = Object.freeze({
   firstName: 60,
   lastName: 60,
-  photoUrl: 500,
+  photoUrl: 500,           // an https LINK; a picture kept in the card has its own cap (PHOTO.MAX_DATA_URL_CHARS)
   title: 100,
   organization: 120,
   email: 254,
@@ -164,10 +174,42 @@ function normalizeWebsite(raw) {
   return { value: url.href, error: null };
 }
 
-/** An image link. https only: a card is shown on secure pages. */
+const PHOTO_NOT_USABLE = 'That photo couldn\'t be used. Choose another, or remove it.';
+
+// The last picture checked, by identity: a card is normalized many times as the form redraws, and a
+// picture is tens of kilobytes to decode and walk. The result is the same for the same string.
+let lastPhotoCheck = { input: null, output: null };
+
+/** A picture kept in the card: a data URL, valid only if it is a finished profile photo (photoPrep). */
+function normalizePhotoDataUrl(text) {
+  if (lastPhotoCheck.input !== text) {
+    const output = inspectPhotoDataUrl(text).ok ? { value: text, error: null } : { value: '', error: PHOTO_NOT_USABLE };
+    lastPhotoCheck = { input: text, output };
+  }
+  return { ...lastPhotoCheck.output };
+}
+
+/**
+ * Whether a photo value is a picture kept in the card (or something that claims to be one), as opposed to a
+ * link. Anything that starts with "data:" (in any case) counts: it is never shown to a person as text.
+ */
+export const isPhotoData = (value) => typeof value === 'string' && /^data:/i.test(value.trimStart());
+
+/** Text this short in the photo field is text a person typed. A picture kept in the card is far longer. */
+export const PHOTO_TEXT_MAX_CHARS = 512;
+
+/**
+ * Whether a photo value is a PICTURE (a long data URL), to be kept out of text boxes and out of the draft's
+ * text fields, as opposed to a link or a few characters somebody typed. It need not be a valid photo: a long
+ * data URL that is not one is still never shown or kept as text.
+ */
+export const isPhotoPicture = (value) => isPhotoData(value) && value.length > PHOTO_TEXT_MAX_CHARS;
+
+/** A photo: nothing, an https link, or a finished profile photo as a data URL. */
 function normalizePhotoUrl(raw) {
   const text = cleanText(raw);
   if (!text) return { value: '', error: null };
+  if (isPhotoData(text)) return normalizePhotoDataUrl(text);
   if (text.length > CARD_LIMITS.photoUrl) return { value: '', error: tooLong('photoUrl') };
   const url = parseWebUrl(text);
   if (!url || url.protocol !== 'https:') {

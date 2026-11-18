@@ -7,6 +7,9 @@ import {
   escapeVCardText, buildContactVCard, buildMyCardVCard, myCardVCardFileName, downloadVCard,
 } from '../utils/vcard';
 import { SHAREABLE_FIELDS } from '../utils/myCardRules';
+import { PHOTO, inspectPhotoDataUrl } from '../utils/photoPrep';
+import { decodeBase64 } from '../capture/preparedImage';
+import { EXIF, base64Of, fingerprintOf, photoDataUrl } from './helpers/photoFixtures';
 
 const CRLF = '\r\n';
 const linesOf = (text) => text.split(CRLF);
@@ -277,6 +280,77 @@ describe('My Card', () => {
   it('leaves out a photo that is not an https link', () => {
     expect(buildMyCardVCard(card({ photoUrl: 'data:image/png;base64,AAAA' }))).not.toContain('PHOTO');
     expect(buildMyCardVCard(card({ photoUrl: 'http://images.example.com/a.jpg' }))).not.toContain('PHOTO');
+  });
+
+  describe('an uploaded photo', () => {
+    const photo = photoDataUrl(320, 36_000);
+    const embedded = (text) => unfold(text).match(/PHOTO;ENCODING=b;TYPE=JPEG:([A-Za-z0-9+/=]+)\r\n/)?.[1];
+
+    it('is embedded, as vCard 3.0 writes a picture, when the Photo switch is on', () => {
+      const text = buildMyCardVCard(card({ photoUrl: photo }));
+      expect(embedded(text)).toBe(base64Of(photo));
+      expect(text).not.toContain('VALUE=uri');
+      expect(text).not.toContain('data:');
+    });
+
+    it('comes back out exactly: unfolded and decoded it is the same JPEG', () => {
+      const bytes = decodeBase64(embedded(buildMyCardVCard(card({ photoUrl: photo }))));
+      expect(Array.from(bytes.subarray(0, 3))).toEqual([0xFF, 0xD8, 0xFF]);
+      expect(Array.from(bytes.subarray(-2))).toEqual([0xFF, 0xD9]);
+      expect(bytes.length).toBe(36_000);
+      expect(inspectPhotoDataUrl(`${PHOTO.DATA_URL_PREFIX}${embedded(buildMyCardVCard(card({ photoUrl: photo })))}`).ok).toBe(true);
+    });
+
+    it('keeps the file well formed: lines of at most 75 bytes, CRLF throughout, framed, and not much bigger than the picture', () => {
+      const text = buildMyCardVCard(card({ photoUrl: photo }));
+      expect(text.startsWith(`BEGIN:VCARD${CRLF}VERSION:3.0${CRLF}`)).toBe(true);
+      expect(text.endsWith(`END:VCARD${CRLF}`)).toBe(true);
+      expect(text).not.toMatch(/[^\r]\n/);
+      for (const line of linesOf(text)) expect(new TextEncoder().encode(line).length).toBeLessThanOrEqual(75);
+      expect(text.length).toBeLessThan(36_000 * 1.4 + 800);
+      // Every other line is still where it was.
+      expect(unfold(text)).toContain(`FN:Ada Lovelace${CRLF}`);
+      expect(unfold(text).trimEnd().endsWith('END:VCARD')).toBe(true);
+    });
+
+    it('is never in the file when the Photo switch is off, in any way: not as a line, not as a fragment of the picture', () => {
+      const text = buildMyCardVCard(card({ photoUrl: photo, share: { ...ALL_ON, photoUrl: false } }));
+      expect(text).not.toContain('PHOTO');
+      expect(text).not.toContain(fingerprintOf(photo));
+      expect(unfold(text)).not.toContain(fingerprintOf(photo));
+      expect(text).toContain('FN:Ada Lovelace');
+    });
+
+    it('is never in the file for a card that shares nothing but its name, or whose switches are missing or odd', () => {
+      for (const share of [{}, null, undefined, 'all', { photoUrl: 'true' }, { photoUrl: 1 }, []]) {
+        const text = buildMyCardVCard(card({ photoUrl: photo, share }));
+        expect(unfold(text), JSON.stringify(share)).not.toContain(fingerprintOf(photo));
+        expect(text).not.toContain('PHOTO');
+      }
+    });
+
+    it('never puts in a picture that is not a finished profile photo', () => {
+      for (const bad of [photoDataUrl(320, 5000, { extra: EXIF }), photoDataUrl(400, 5000), photoDataUrl(320, 60_000), `data:image/png;base64,${base64Of(photo)}`, `${PHOTO.DATA_URL_PREFIX}AAAA`]) {
+        const text = buildMyCardVCard(card({ photoUrl: bad }));
+        expect(text).not.toContain('PHOTO');
+        expect(text).not.toContain('Exif');
+      }
+    });
+
+    it('leaves a link as a link, and a card with no photo with none', () => {
+      expect(buildMyCardVCard(card())).toContain('PHOTO;VALUE=uri:https://images.example.com/ada.jpg');
+      expect(buildMyCardVCard(card({ photoUrl: '' }))).not.toContain('PHOTO');
+    });
+
+    it('has no name: no file, whatever the photo', () => {
+      expect(buildMyCardVCard(card({ firstName: '', lastName: '', photoUrl: photo }))).toBeNull();
+    });
+
+    it('does not change the card, or the photo, it is given', () => {
+      const input = card({ photoUrl: photo });
+      buildMyCardVCard(input);
+      expect(input.photoUrl).toBe(photo);
+    });
   });
 
   it('is valid vCard 3.0 framing with a trailing line break and no line over 75 bytes', () => {

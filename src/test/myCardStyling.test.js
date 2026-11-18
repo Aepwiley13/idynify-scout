@@ -332,7 +332,8 @@ describe('the state modules stand alone', () => {
     for (const name of stateFiles.filter((file) => file !== 'useMyCard.js')) {
       for (const from of stateImports(name)) {
         expect(from, `${name} imports ${from}`).not.toMatch(/react/);
-        expect(from, `${name} imports ${from}`).toMatch(/^(?:\.\/my[A-Za-z]+|\.\.\/cardDraft|\.\.\/\.\.\/\.\.\/\.\.\/utils\/myCardRules)$/);
+        // photoPrep is the pure, local-only photo utility: the draft storage re-inspects a kept picture with it.
+        expect(from, `${name} imports ${from}`).toMatch(/^(?:\.\/my[A-Za-z]+|\.\.\/cardDraft|\.\.\/\.\.\/\.\.\/\.\.\/utils\/(?:myCardRules|photoPrep))$/);
       }
     }
     for (const from of stateImports('useMyCard.js')) {
@@ -420,8 +421,16 @@ describe('Download contact can reach no database and no network', () => {
     for (const from of importsOf(downloadSource)) expect(from).not.toMatch(REACHES);
   });
 
-  it('the vCard maker imports only the card rules', () => {
-    expect(importsOf(vcardSource)).toEqual(['./myCardRules']);
+  it('the vCard maker imports only the card rules and the photo utility\'s constants', () => {
+    // photoPrep is pure and local-only (photoPrep.test.js): the maker needs the data-URL prefix from it, nothing else.
+    expect(importsOf(vcardSource)).toEqual(['./myCardRules', './photoPrep']);
+  });
+
+  it('the photo utility itself imports only the capture code\'s JPEG helpers, and the card rules only the photo utility', () => {
+    const utility = readFileSync(root('src/utils/photoPrep.js'), 'utf8');
+    expect(importsOf(utility)).toEqual(['../capture/preparedImage.js']);
+    const rules = readFileSync(root('src/utils/myCardRules.js'), 'utf8');
+    expect(importsOf(rules)).toEqual(['./photoPrep.js']);
   });
 
   it('neither makes a call that could read or write anything but a file on the device', () => {

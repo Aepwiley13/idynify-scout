@@ -37,6 +37,7 @@ export const MY_CARD_ACTION = Object.freeze({
   SESSION_ENDED: 'session/ended',
   RECOVERY_RESTORED: 'recovery/restored',
   RECOVERY_DISMISSED: 'recovery/dismissed',
+  PHOTO_KEEP_CHANGED: 'photo-keep/changed',
   SAVE_STARTED: 'save/started',
   SAVE_OVER_STARTED: 'save/over-started',
   SAVE_SUCCEEDED: 'save/succeeded',
@@ -64,7 +65,8 @@ export const initialMyCardState = Object.freeze({
   repaired: null, // { errors, repairs } when the saved card had to be repaired
   suggestions: Object.freeze({}),
   unavailable: Object.freeze([]), // suggestion sources that could not be read
-  recovered: null, // { savedAt, baseRevision } while a restored draft is announced
+  recovered: null, // { savedAt, baseRevision, photoLost? } while a restored draft is announced (photoLost only when true)
+  photoKept: true, // false while an uploaded photo in the draft could not be kept in the tab's storage
   saveId: 0,
   save: 'idle', // idle | saving | saved | error
   saveError: null, // { code, message, retryable }
@@ -147,7 +149,13 @@ export function myCardReducer(state = initialMyCardState, action = {}) {
 
     case MY_CARD_ACTION.RECOVERY_RESTORED: {
       if (state.load !== 'ready') return state;
-      return { ...state, recovered: { savedAt: action.savedAt ?? null, baseRevision: action.baseRevision ?? null } };
+      return { ...state, recovered: { savedAt: action.savedAt ?? null, baseRevision: action.baseRevision ?? null, ...(action.photoLost === true ? { photoLost: true } : {}) } };
+    }
+
+    case MY_CARD_ACTION.PHOTO_KEEP_CHANGED: {
+      if (state.load !== 'ready') return state;
+      const photoKept = action.kept !== false;
+      return state.photoKept === photoKept ? state : { ...state, photoKept };
     }
 
     case MY_CARD_ACTION.RECOVERY_DISMISSED:
@@ -178,6 +186,7 @@ export function myCardReducer(state = initialMyCardState, action = {}) {
         conflict: null,
         recovered: null,
         repaired: null,
+        photoKept: true,
       };
     }
 
@@ -241,6 +250,7 @@ export function myCardReducer(state = initialMyCardState, action = {}) {
         repaired: current.status === 'repaired' ? { errors: current.errors ?? {}, repairs: current.repairs ?? [] } : null,
         conflict: null,
         recovered: null,
+        photoKept: true,
         save: 'idle',
         saveError: null,
       };
@@ -325,8 +335,11 @@ export function planRecovery({ stored, loaded }) {
   if (!isObject(stored) || stored.status !== 'ok') return { action: 'none' };
   const { draft } = stored;
   const { changes } = diffCards(draft.card, loaded.card);
-  if (changes.length === 0) return { action: 'discard' };
-  const base = { card: draft.card, savedAt: draft.savedAt, baseRevision: draft.baseRevision };
+  // An uploaded photo that was in the draft and is not there to give back is told to the person, even when
+  // nothing else differs: forgetting the draft would forget that it was ever there.
+  const photoLost = draft.photoLost === true;
+  const base = { card: draft.card, savedAt: draft.savedAt, baseRevision: draft.baseRevision, ...(photoLost ? { photoLost } : {}) };
+  if (changes.length === 0) return photoLost ? { action: 'restore', ...base } : { action: 'discard' };
   if (draft.baseRevision === loaded.revision) return { action: 'restore', ...base };
   return { action: 'conflict', ...base, changes };
 }

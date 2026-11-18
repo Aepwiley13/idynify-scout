@@ -528,6 +528,63 @@ describe('what to do with a draft found in storage', () => {
   });
 });
 
+describe('a photo that could not be kept, or restored', () => {
+  it('is told as soon as the tab will not keep it, and told no more once it can', () => {
+    const state = ready();
+    expect(state.photoKept).toBe(true);
+    const lost = run(state, { type: A.PHOTO_KEEP_CHANGED, kept: false });
+    expect(lost.photoKept).toBe(false);
+    expect(run(lost, { type: A.PHOTO_KEEP_CHANGED, kept: true }).photoKept).toBe(true);
+    // Anything that is not exactly false is "kept": a result with no photo in it says nothing is wrong.
+    expect(run(lost, { type: A.PHOTO_KEEP_CHANGED, kept: undefined }).photoKept).toBe(true);
+    expect(run(state, { type: A.PHOTO_KEEP_CHANGED, kept: true })).toBe(state);
+  });
+
+  it('is not told before the card has loaded, or after the account has gone', () => {
+    const loadingState = loading();
+    expect(run(loadingState, { type: A.PHOTO_KEEP_CHANGED, kept: false })).toBe(loadingState);
+    expect(run(ready(), { type: A.PHOTO_KEEP_CHANGED, kept: false }, { type: A.SESSION_ENDED }).photoKept).toBe(true);
+    expect(run(ready(), { type: A.PHOTO_KEEP_CHANGED, kept: false }, { type: A.LOAD_STARTED, uid: 'V', loadId: 2 }).photoKept).toBe(true);
+  });
+
+  it('stops being told once the card is saved, or the latest saved version is loaded: there is no draft to keep', () => {
+    const lost = run(ready(), { type: A.PHOTO_KEEP_CHANGED, kept: false });
+    const saved = run(startSave(lost), { type: A.SAVE_SUCCEEDED, saveId: 1, revision: 4 });
+    expect(saved.photoKept).toBe(true);
+    const viaConflict = choose(conflictAfterSave(lost), CONFLICT_CHOICE.LOAD_LATEST);
+    expect(run(viaConflict, { type: A.LOAD_LATEST_CONFIRMED }).photoKept).toBe(true);
+  });
+
+  it('is part of what a restored draft announces, only when it is true', () => {
+    expect(run(ready(), { type: A.RECOVERY_RESTORED, savedAt: 1700, baseRevision: 3, photoLost: true }).recovered)
+      .toEqual({ savedAt: 1700, baseRevision: 3, photoLost: true });
+    for (const photoLost of [false, undefined, 'yes', 1, null]) {
+      expect(run(ready(), { type: A.RECOVERY_RESTORED, savedAt: 1700, baseRevision: 3, photoLost }).recovered).toEqual({ savedAt: 1700, baseRevision: 3 });
+    }
+  });
+
+  describe('when a draft is found', () => {
+    const stored = (card, baseRevision, photoLost, savedAt = 1700) => ({ status: 'ok', draft: { card, baseRevision, savedAt, photoLost } });
+    const loaded = (card, revision) => ({ card, revision });
+
+    it('restores a draft whose photo is gone even when nothing else differs, instead of forgetting that it was there', () => {
+      expect(planRecovery({ stored: stored(savedCard(), 3, true), loaded: loaded(savedCard(), 3) })).toEqual({
+        action: 'restore', card: savedCard(), savedAt: 1700, baseRevision: 3, photoLost: true,
+      });
+      // From an older revision too: nothing differs, so there is no conflict to raise.
+      expect(planRecovery({ stored: stored(savedCard(), 1, true), loaded: loaded(savedCard(), 3) }).action).toBe('restore');
+    });
+
+    it('says the photo is gone in a restore and in a conflict, and nothing about it when it is not', () => {
+      const draftCard = savedCard({ title: 'Edited' });
+      expect(planRecovery({ stored: stored(draftCard, 3, true), loaded: loaded(savedCard(), 3) })).toMatchObject({ action: 'restore', photoLost: true });
+      expect(planRecovery({ stored: stored(draftCard, 2, true), loaded: loaded(savedCard({ title: 'Newer' }), 5) })).toMatchObject({ action: 'conflict', photoLost: true });
+      expect(planRecovery({ stored: stored(draftCard, 3, false), loaded: loaded(savedCard(), 3) })).not.toHaveProperty('photoLost');
+      expect(planRecovery({ stored: stored(savedCard(), 3, false), loaded: loaded(savedCard(), 3) })).toEqual({ action: 'discard' });
+    });
+  });
+});
+
 describe('the reducer itself', () => {
   it('returns the same state for an action it does not know, or for nothing', () => {
     const state = ready();

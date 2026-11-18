@@ -14,6 +14,7 @@ import MyCardLayout from '../pages/ContactHub/myCard/MyCardLayout';
 import CardAvatar from '../pages/ContactHub/myCard/CardAvatar';
 import { useCardDraft } from '../pages/ContactHub/myCard/useCardDraft';
 import { newCard } from '../utils/myCardRules';
+import { EXIF, fingerprintOf, photoDataUrl } from './helpers/photoFixtures';
 import { buildCardSuggestions } from '../utils/myCardSuggestions';
 
 /** What a page does: holds the draft, and puts the editor and the preview in the layout. */
@@ -698,5 +699,84 @@ describe('the draft the page holds', () => {
     await user.click(screen.getByRole('button', { name: 'reset' }));
     expect(field('Title')).toHaveValue('Saved title');
     expect(latest.dirty).toBe(false);
+  });
+});
+
+describe('an uploaded photo', () => {
+  const photo = photoDataUrl(320, 36_000, { tag: 1 });
+  const withPhoto = { ...named, photoUrl: photo };
+  /** Everything a person or a screen reader could be given as text: content, values and every attribute except an image's own source. */
+  const textual = (root = document.body) => [
+    root.textContent,
+    ...[...root.querySelectorAll('input, textarea')].map((node) => node.value),
+    ...[...root.querySelectorAll('*')].flatMap((node) => [...node.attributes]
+      .filter((attribute) => !(node.tagName === 'IMG' && attribute.name === 'src'))
+      .map((attribute) => attribute.value)),
+  ];
+  const leaks = (root) => textual(root).some((text) => text.includes(fingerprintOf(photo)) || /data:image\/jpeg;base64/.test(text));
+
+  it('is shown as the photo, in the form and on the card, and nowhere as text', () => {
+    const { container } = render(<Page initial={withPhoto} />);
+    expect(within(preview()).getByRole('article').querySelector('img')).toHaveAttribute('src', photo);
+    expect(container.querySelector('.mycard-photo-row img')).toHaveAttribute('src', photo);
+    expect(leaks(document.body)).toBe(false);
+    expect(screen.queryByLabelText('Photo link')).toBeNull();
+    expect(screen.queryByDisplayValue(/data:image/)).toBeNull();
+  });
+
+  it('stays out of the link box even when the box is opened: it is empty, and says the photo is in use', async () => {
+    render(<Page initial={withPhoto} />);
+    expect(screen.queryByRole('button', { name: 'Change photo link' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Use a photo link instead' }));
+    expect(field('Photo link')).toHaveValue('');
+    expect(field('Photo link')).toHaveFocus();
+    expect(screen.getByText('Your uploaded photo is in use. Paste a link to use that instead, or remove the photo.')).toBeInTheDocument();
+    expect(leaks(document.body)).toBe(false);
+  });
+
+  it('is replaced by a link that is typed in, and the link is then shown as a link', async () => {
+    let draft;
+    render(<Page initial={withPhoto} onDraft={(d) => { draft = d; }} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Use a photo link instead' }));
+    await userEvent.type(field('Photo link'), 'https://images.example.com/new.jpg');
+    expect(draft.card.photoUrl).toBe('https://images.example.com/new.jpg');
+    expect(field('Photo link')).toHaveValue('https://images.example.com/new.jpg');
+    expect(within(preview()).getByRole('article').querySelector('img')).toHaveAttribute('src', 'https://images.example.com/new.jpg');
+  });
+
+  it('is removed by "Remove photo", leaving the initials', async () => {
+    let draft;
+    render(<Page initial={withPhoto} onDraft={(d) => { draft = d; }} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Remove photo' }));
+    expect(draft.card.photoUrl).toBe('');
+    expect(within(preview()).getByRole('article').querySelector('img')).toBeNull();
+    expect(within(preview()).getByRole('article')).toHaveTextContent('AL');
+  });
+
+  it('follows the Photo switch: private, it is gone from the card people would see, and the owner still has it in the form', async () => {
+    render(<Page initial={{ ...withPhoto, share: { ...newCard().share, photoUrl: true } }} />);
+    expect(within(preview()).getByRole('article').querySelector('img')).toHaveAttribute('src', photo);
+    await userEvent.click(toggle('Photo'));
+    expect(within(preview()).getByRole('article').querySelector('img')).toBeNull();
+    expect(within(preview()).getByText(/Kept private:.*Photo/)).toBeInTheDocument();
+    expect(document.querySelector('.mycard-photo-row img')).toHaveAttribute('src', photo);
+    // Not in the preview in any form: not a source, not text.
+    expect(leaks(preview())).toBe(false);
+    expect(preview().innerHTML).not.toContain(fingerprintOf(photo));
+  });
+
+  it('is not shown, as text or otherwise, when what is held is not a finished photo', () => {
+    const bad = photoDataUrl(320, 5000, { extra: EXIF });
+    const { container } = render(<Page initial={{ ...named, photoUrl: bad }} />);
+    expect(container.innerHTML).not.toContain(fingerprintOf(bad));
+    expect(textual().some((text) => text.includes(bad.slice(300, 360)))).toBe(false);
+    expect(within(preview()).getByRole('article').querySelector('img')).toBeNull();
+    expect(field('Photo link')).toHaveValue('');
+  });
+
+  it('is a short piece of text typed into the link box like any other text: shown, and refused with the usual message', async () => {
+    render(<Page initial={named} />);
+    await userEvent.type(field('Photo link'), 'data:image/png;base64,AAAA');
+    expect(field('Photo link')).toHaveValue('data:image/png;base64,AAAA');
   });
 });

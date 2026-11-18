@@ -9,7 +9,11 @@ import {
   CARD_SCHEMA_VERSION, CARD_DOC_SEGMENTS, PUBLIC_VIEW_KEYS,
   normalizeCardField, normalizeShare, normalizeCard, newCard,
   cardDisplayName, cardInitials, publicCardView, publishedCardView,
+  isPhotoData, isPhotoPicture, PHOTO_TEXT_MAX_CHARS,
 } from '../utils/myCardRules';
+import { PHOTO } from '../utils/photoPrep';
+import { EXIF, base64Of, fingerprintOf, jpegBytes, photoDataUrl } from './helpers/photoFixtures';
+import { encodeBase64 } from '../capture/preparedImage';
 
 const ALL_ON = Object.fromEntries(SHAREABLE_FIELDS.map((field) => [field, true]));
 
@@ -384,6 +388,127 @@ describe('one field at a time', () => {
         expect(result.value, bad).toBe('');
         expect(result.error, bad).toBeTruthy();
       }
+    });
+  });
+
+  describe('a photo kept in the card', () => {
+    const good = photoDataUrl(320, 20_000);
+
+    it('accepts a finished profile photo: a real, square, metadata-free JPEG data URL', () => {
+      expect(normalizeCardField('photoUrl', good)).toEqual({ value: good, error: null });
+      expect(normalizeCardField('photoUrl', photoDataUrl(64, 2000)).error).toBeNull();
+      expect(isPhotoData(good)).toBe(true);
+    });
+
+    it('accepts nothing, and still accepts an https link: the other two kinds of photo are unchanged', () => {
+      expect(normalizeCardField('photoUrl', '')).toEqual({ value: '', error: null });
+      expect(normalizeCardField('photoUrl', 'https://images.example.com/ada.jpg').value).toBe('https://images.example.com/ada.jpg');
+      expect(isPhotoData('https://images.example.com/ada.jpg')).toBe(false);
+    });
+
+    it('is not held to the 500 characters a link is held to, and a link still is', () => {
+      expect(good.length).toBeGreaterThan(CARD_LIMITS.photoUrl);
+      expect(normalizeCardField('photoUrl', good).error).toBeNull();
+      expect(normalizeCardField('photoUrl', `https://example.com/${'a'.repeat(CARD_LIMITS.photoUrl)}`).error).toBeTruthy();
+    });
+
+    it('refuses anything that only CLAIMS to be a photo, with one plain message that never holds the data', () => {
+      const cases = {
+        'another image type': `data:image/png;base64,${base64Of(good)}`,
+        'an SVG, which can carry script': 'data:image/svg+xml;base64,PHN2Zy8+',
+        'an uppercase prefix': good.replace('data:image/jpeg', 'DATA:image/jpeg'),
+        'only the prefix': PHOTO.DATA_URL_PREFIX,
+        'base64 that is not base64': `${PHOTO.DATA_URL_PREFIX}not base64!!`,
+        'base64 of the wrong length': `${PHOTO.DATA_URL_PREFIX}${base64Of(good).slice(0, -1)}`,
+        'text that is not a JPEG': `${PHOTO.DATA_URL_PREFIX}${encodeBase64(new TextEncoder().encode('hello world, not a jpeg at all'))}`,
+        'a JPEG cut short': photoDataUrl(320, 5000, { end: false }),
+        'a JPEG that is not square': photoDataUrl(320, 5000, { width: 320, height: 200 }),
+        'a JPEG that is too big': photoDataUrl(400, 5000),
+        'a JPEG that is too small': photoDataUrl(63, 2000),
+        'a JPEG with EXIF in it': photoDataUrl(320, 5000, { extra: EXIF }),
+        'a JPEG over the size cap': photoDataUrl(320, 60_000),
+        'a picture with a line break in it': `${good.slice(0, 5000)}\n${good.slice(5000)}`,
+        'a picture with a space in it': `${good.slice(0, 5000)} ${good.slice(5000)}`,
+      };
+      for (const [what, value] of Object.entries(cases)) {
+        const result = normalizeCardField('photoUrl', value);
+        expect(result.value, what).toBe('');
+        expect(result.error, what).toBe('That photo couldn\'t be used. Choose another, or remove it.');
+        expect(result.error).not.toContain(base64Of(good).slice(0, 40));
+      }
+    });
+
+    it('treats bare base64, with no data: prefix, as the bad link it is', () => {
+      const result = normalizeCardField('photoUrl', base64Of(good));
+      expect(result.value).toBe('');
+      expect(result.error).toBeTruthy();
+      expect(result.error).not.toContain(base64Of(good).slice(0, 40));
+    });
+
+    it('cannot be fooled by a different kind of data: script, HTML, or a link dressed as a photo', () => {
+      for (const bad of ['data:text/html;base64,PHNjcmlwdD4=', 'data:image/jpeg;base64,/9j/<script>', 'data:,hello', 'data:', `javascript:${good}`, `https://x.example.com/?${good}`.slice(0, 600)]) {
+        expect(normalizeCardField('photoUrl', bad).value, bad.slice(0, 40)).toBe('');
+      }
+    });
+
+    it('checks each picture as it is, not as the last one was: valid, refused, valid, another valid', () => {
+      const other = photoDataUrl(320, 20_000, { tag: 7 });
+      expect(normalizeCardField('photoUrl', good).value).toBe(good);
+      expect(normalizeCardField('photoUrl', photoDataUrl(400, 5000)).value).toBe('');
+      expect(normalizeCardField('photoUrl', good).value).toBe(good);
+      expect(normalizeCardField('photoUrl', other).value).toBe(other);
+      expect(normalizeCardField('photoUrl', good).value).toBe(good);
+    });
+
+    it('is kept by a card, and refused by a card: the field is blanked and named', () => {
+      const kept = normalizeCard({ firstName: 'Ada', photoUrl: good });
+      expect(kept.valid).toBe(true);
+      expect(kept.card.photoUrl).toBe(good);
+      const refused = normalizeCard({ firstName: 'Ada', photoUrl: photoDataUrl(320, 5000, { extra: EXIF }) });
+      expect(refused.card.photoUrl).toBe('');
+      expect(Object.keys(refused.errors)).toEqual(['photoUrl']);
+      expect(refused.valid).toBe(false);
+    });
+
+    it('can be replaced by a link, or by another picture, or removed', () => {
+      const other = photoDataUrl(320, 20_000, { tag: 9 });
+      expect(normalizeCard({ firstName: 'Ada', photoUrl: other }).card.photoUrl).toBe(other);
+      expect(normalizeCard({ firstName: 'Ada', photoUrl: 'https://example.com/a.jpg' }).card.photoUrl).toBe('https://example.com/a.jpg');
+      expect(normalizeCard({ firstName: 'Ada', photoUrl: '' }).card.photoUrl).toBe('');
+    });
+
+    it('is shown to others only when the Photo switch is on: a private picture is as absent as a private link', () => {
+      const card = (share) => ({ firstName: 'Ada', lastName: 'L', photoUrl: good, share, sharingEnabled: false });
+      expect(publicCardView(card({ ...ALL_ON })).photoUrl).toBe(good);
+      expect(publicCardView(card({ ...ALL_ON, photoUrl: false }))).not.toHaveProperty('photoUrl');
+      expect(publicCardView(card({}))).not.toHaveProperty('photoUrl');
+      expect(publicCardView(card(null))).not.toHaveProperty('photoUrl');
+      expect(publicCardView(card({ ...ALL_ON, photoUrl: 'true' }))).not.toHaveProperty('photoUrl');
+      // And nothing of it leaks through any other key.
+      const view = publicCardView(card({ ...ALL_ON, photoUrl: false }));
+      expect(JSON.stringify(view)).not.toContain(fingerprintOf(good));
+    });
+
+    it('is not shown, even when switched on, if it is not a valid photo', () => {
+      const bad = photoDataUrl(320, 5000, { extra: EXIF });
+      const view = publicCardView({ firstName: 'Ada', photoUrl: bad, share: { ...ALL_ON } });
+      expect(view).not.toHaveProperty('photoUrl');
+      expect(JSON.stringify(view)).not.toContain('Exif');
+    });
+
+    it('tells a picture from text a person typed: a long data URL is a picture, a few characters starting data: are text', () => {
+      expect(isPhotoPicture(good)).toBe(true);
+      expect(isPhotoPicture(photoDataUrl(320, 5000, { extra: EXIF }))).toBe(true);
+      expect(isPhotoPicture(`data:${'a'.repeat(PHOTO_TEXT_MAX_CHARS)}`)).toBe(true);
+      for (const text of ['', 'data:', 'data:image/png;base64,AAAA', `data:${'a'.repeat(PHOTO_TEXT_MAX_CHARS - 6)}`, 'https://example.com/a.jpg', 'x'.repeat(2000), 42, null, undefined]) {
+        expect(isPhotoPicture(text), String(text).slice(0, 30)).toBe(false);
+      }
+      expect(PHOTO_TEXT_MAX_CHARS).toBe(512);
+    });
+
+    it('is a picture that is only ever one of the three kinds of photo: nothing, a link or a data URL', () => {
+      expect(jpegBytes(320, 1000).length).toBe(1000);
+      for (const v of ['', 'https://example.com/a.jpg', good]) expect(normalizeCardField('photoUrl', v).error).toBeNull();
     });
   });
 

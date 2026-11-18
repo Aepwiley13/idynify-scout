@@ -3,20 +3,21 @@
  * sessionStorage and a fixed clock: what is kept, for whom, for how long, how
  * it is thrown away, and that nothing it does can fail the page.
  */
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
-  DRAFT_KEY_PREFIX, DRAFT_MAX_AGE_MS, DRAFT_MAX_BYTES, DRAFT_VERSION,
-  buildDraftPayload, clearAllMyCardDrafts, clearDraft, draftKey, purgeOtherAccounts, readDraft, saveDraft,
+  DRAFT_KEY_PREFIX, DRAFT_MAX_AGE_MS, DRAFT_MAX_BYTES, DRAFT_PHOTO_KEY_PREFIX, DRAFT_PHOTO_MAX_BYTES, DRAFT_VERSION,
+  buildDraftPayload, clearAllMyCardDrafts, clearDraft, draftKey, draftPhotoKey, draftPhotoOf, purgeOtherAccounts, readDraft, saveDraft,
 } from '../pages/ContactHub/myCard/state/myCardDraftStorage';
+import { EXIF, fingerprintOf, photoDataUrl } from './helpers/photoFixtures';
 import { CARD_FIELDS, DEFAULT_SHARE, SHAREABLE_FIELDS, newCard } from '../utils/myCardRules';
 
 /** The parts of sessionStorage this module uses, with ways to make each fail. */
 class FakeStorage {
-  constructor({ failOn = [] } = {}) { this.map = new Map(); this.failOn = new Set(failOn); }
+  constructor({ failOn = [], failSetKeys = [] } = {}) { this.map = new Map(); this.failOn = new Set(failOn); this.failSetKeys = new Set(failSetKeys); }
   get length() { if (this.failOn.has('length')) throw new Error('denied'); return this.map.size; }
   key(index) { if (this.failOn.has('key')) throw new Error('denied'); return [...this.map.keys()][index] ?? null; }
   getItem(key) { if (this.failOn.has('getItem')) throw new Error('denied'); return this.map.has(key) ? this.map.get(key) : null; }
-  setItem(key, value) { if (this.failOn.has('setItem')) throw Object.assign(new Error('quota'), { name: 'QuotaExceededError' }); this.map.set(key, String(value)); }
+  setItem(key, value) { if (this.failOn.has('setItem') || [...this.failSetKeys].some((k) => key.startsWith(k))) throw Object.assign(new Error('quota'), { name: 'QuotaExceededError' }); this.map.set(key, String(value)); }
   removeItem(key) { if (this.failOn.has('removeItem')) throw new Error('denied'); this.map.delete(key); }
 }
 
@@ -397,5 +398,274 @@ describe('when storage fails, the page does not', () => {
     expect(readDraft('U', { now: NOW }).status).toBe('ok');
     expect(clearAllMyCardDrafts()).toBe(1);
     expect(globalThis.sessionStorage.length).toBe(0);
+  });
+});
+
+describe('an uploaded photo', () => {
+  const photo = photoDataUrl(320, 40_000, { tag: 1 });
+  const other = photoDataUrl(320, 30_000, { tag: 2 });
+  const withPhoto = (photoUrl = photo, extra = {}) => draft({ card: card({ photoUrl }), ...extra });
+  const photoStored = (storage, uid = 'U') => JSON.parse(storage.getItem(`${DRAFT_PHOTO_KEY_PREFIX}${uid}`));
+  const keysOf = (storage) => [...storage.map.keys()].sort();
+  afterEach(() => { vi.restoreAllMocks(); });
+
+  it('has its own key, per account, beside the draft\'s', () => {
+    expect(draftPhotoKey('abc123')).toBe(`${DRAFT_PHOTO_KEY_PREFIX}abc123`);
+    expect(DRAFT_PHOTO_KEY_PREFIX).toBe('idynify.myCardDraftPhoto.v1:');
+    expect(DRAFT_PHOTO_KEY_PREFIX.startsWith(DRAFT_KEY_PREFIX)).toBe(false);
+    for (const bad of ['', 'a b', 'a/b', 'a:b', null, undefined, 7, {}]) expect(draftPhotoKey(bad), String(bad)).toBeNull();
+  });
+
+  it('is kept apart from the draft, which stays small, and says where it is', () => {
+    const storage = new FakeStorage();
+    expect(saveDraft(withPhoto(), { storage, now: NOW })).toEqual({ ok: true, photoKept: true });
+    expect(keysOf(storage)).toEqual([`${DRAFT_KEY_PREFIX}U`, `${DRAFT_PHOTO_KEY_PREFIX}U`]);
+    const main = storage.getItem(`${DRAFT_KEY_PREFIX}U`);
+    expect(main.length).toBeLessThan(DRAFT_MAX_BYTES);
+    expect(main).not.toContain(fingerprintOf(photo));
+    expect(stored(storage)).toMatchObject({ photo: 'separate', fields: { photoUrl: '' } });
+    expect(photoStored(storage)).toEqual({ v: DRAFT_VERSION, uid: 'U', savedAt: NOW, dataUrl: photo });
+    expect(photo.length).toBeGreaterThan(DRAFT_MAX_BYTES);
+  });
+
+  it('comes back with the draft, exactly, and says nothing was lost', () => {
+    const storage = new FakeStorage();
+    saveDraft(withPhoto(), { storage, now: NOW });
+    const result = readDraft('U', { storage, now: NOW + 1000 });
+    expect(result.status).toBe('ok');
+    expect(result.draft.card.photoUrl).toBe(photo);
+    expect(result.draft.card).toMatchObject({ firstName: 'Ada', title: 'Analyst', sharingEnabled: false });
+    expect(result.draft).toMatchObject({ baseRevision: 3, savedAt: NOW, photoLost: false });
+  });
+
+  it('keeps nothing but the allowlist in the photo key too: the picture, the account and the moment', () => {
+    const storage = new FakeStorage();
+    saveDraft(withPhoto(photo, { card: card({ photoUrl: photo, share: { ...DEFAULT_SHARE, email: true } }) }), { storage, now: NOW });
+    expect(Object.keys(photoStored(storage)).sort()).toEqual(['dataUrl', 'savedAt', 'uid', 'v']);
+    const raw = storage.getItem(`${DRAFT_PHOTO_KEY_PREFIX}U`);
+    expect(raw).not.toMatch(/ada@example|Lovelace|Analyst|share|sharingEnabled/);
+  });
+
+  it('is a draft with no photo field when there is no picture: exactly what it always was', () => {
+    const storage = new FakeStorage();
+    expect(saveDraft(draft(), { storage, now: NOW })).toEqual({ ok: true });
+    expect(Object.keys(stored(storage)).sort()).toEqual(['baseRevision', 'fields', 'savedAt', 'share', 'uid', 'v']);
+    expect(keysOf(storage)).toEqual([`${DRAFT_KEY_PREFIX}U`]);
+    expect(readDraft('U', { storage, now: NOW }).draft.photoLost).toBe(false);
+  });
+
+  it('is replaced by the next picture, and by a link, and gone when the photo is cleared', () => {
+    const storage = new FakeStorage();
+    saveDraft(withPhoto(photo), { storage, now: NOW });
+    saveDraft(withPhoto(other), { storage, now: NOW + 1000 });
+    expect(photoStored(storage)).toMatchObject({ dataUrl: other, savedAt: NOW + 1000 });
+    expect(readDraft('U', { storage, now: NOW + 2000 }).draft.card.photoUrl).toBe(other);
+
+    saveDraft(withPhoto('https://media.example.com/ada.jpg'), { storage, now: NOW + 3000 });
+    expect(keysOf(storage)).toEqual([`${DRAFT_KEY_PREFIX}U`]);
+    expect(readDraft('U', { storage, now: NOW + 3500 }).draft.card.photoUrl).toBe('https://media.example.com/ada.jpg');
+
+    saveDraft(withPhoto(photo), { storage, now: NOW + 4000 });
+    saveDraft(withPhoto(''), { storage, now: NOW + 5000 });
+    expect(keysOf(storage)).toEqual([`${DRAFT_KEY_PREFIX}U`]);
+    expect(readDraft('U', { storage, now: NOW + 5500 }).draft.card.photoUrl).toBe('');
+  });
+
+  it('lasts as long as the draft and no longer: a draft that has expired takes its picture with it', () => {
+    const storage = new FakeStorage();
+    saveDraft(withPhoto(), { storage, now: NOW });
+    expect(readDraft('U', { storage, now: NOW + DRAFT_MAX_AGE_MS }).status).toBe('ok');
+    expect(readDraft('U', { storage, now: NOW + DRAFT_MAX_AGE_MS + 1 })).toEqual({ status: 'discarded', reason: 'expired' });
+    expect(storage.map.size).toBe(0);
+    // A draft dated in the future is not believed either.
+    saveDraft(withPhoto(), { storage, now: NOW + 10 * HOUR });
+    expect(readDraft('U', { storage, now: NOW }).status).toBe('discarded');
+    expect(storage.map.size).toBe(0);
+  });
+
+  it('is one account\'s: another account reads nothing, and cannot reach it', () => {
+    const storage = new FakeStorage();
+    saveDraft(withPhoto(), { storage, now: NOW });
+    expect(readDraft('B', { storage, now: NOW })).toEqual({ status: 'none' });
+    expect(keysOf(storage)).toHaveLength(2);
+    // Even with the keys swapped about: a draft written for A is not B's, whatever key it is found under.
+    storage.setItem(`${DRAFT_KEY_PREFIX}B`, storage.getItem(`${DRAFT_KEY_PREFIX}U`));
+    storage.setItem(`${DRAFT_PHOTO_KEY_PREFIX}B`, storage.getItem(`${DRAFT_PHOTO_KEY_PREFIX}U`));
+    expect(readDraft('B', { storage, now: NOW })).toEqual({ status: 'discarded', reason: 'uid' });
+    expect(storage.getItem(`${DRAFT_PHOTO_KEY_PREFIX}B`)).toBeNull();
+    expect(readDraft('U', { storage, now: NOW }).draft.card.photoUrl).toBe(photo);
+  });
+
+  it('is forgotten with the draft: clearing an account takes both keys, and only that account\'s', () => {
+    const storage = new FakeStorage();
+    saveDraft(withPhoto(photo, { uid: 'A' }), { storage, now: NOW });
+    saveDraft(withPhoto(other, { uid: 'B' }), { storage, now: NOW });
+    expect(clearDraft('A', { storage })).toBe(true);
+    expect(keysOf(storage)).toEqual([`${DRAFT_KEY_PREFIX}B`, `${DRAFT_PHOTO_KEY_PREFIX}B`]);
+  });
+
+  it('is removed when another account opens My Card, and kept for the account that did', () => {
+    const storage = new FakeStorage();
+    saveDraft(withPhoto(photo, { uid: 'A' }), { storage, now: NOW });
+    saveDraft(withPhoto(other, { uid: 'B' }), { storage, now: NOW });
+    expect(purgeOtherAccounts('B', { storage })).toBe(2);
+    expect(keysOf(storage)).toEqual([`${DRAFT_KEY_PREFIX}B`, `${DRAFT_PHOTO_KEY_PREFIX}B`]);
+    expect(readDraft('B', { storage, now: NOW }).draft.card.photoUrl).toBe(other);
+    expect(purgeOtherAccounts('nobody', { storage })).toBe(2);
+    expect(storage.map.size).toBe(0);
+  });
+
+  it('is removed at sign-out, for every account in the tab, with the drafts', () => {
+    const storage = new FakeStorage();
+    saveDraft(withPhoto(photo, { uid: 'A' }), { storage, now: NOW });
+    saveDraft(withPhoto(other, { uid: 'B' }), { storage, now: NOW });
+    saveDraft(draft({ uid: 'C' }), { storage, now: NOW });
+    storage.setItem('something.else', 'stays');
+    expect(clearAllMyCardDrafts({ storage })).toBe(5);
+    expect(keysOf(storage)).toEqual(['something.else']);
+  });
+
+  it('is said to be lost, not dropped silently, when storage will not take it: the draft is kept without it', () => {
+    const storage = new FakeStorage({ failSetKeys: [DRAFT_PHOTO_KEY_PREFIX] });
+    expect(saveDraft(withPhoto(), { storage, now: NOW })).toEqual({ ok: true, photoKept: false });
+    expect(keysOf(storage)).toEqual([`${DRAFT_KEY_PREFIX}U`]);
+    expect(stored(storage)).toMatchObject({ photo: 'lost', fields: { photoUrl: '', title: 'Analyst' } });
+    const result = readDraft('U', { storage, now: NOW });
+    expect(result.status).toBe('ok');
+    expect(result.draft).toMatchObject({ photoLost: true, card: { photoUrl: '', title: 'Analyst' } });
+  });
+
+  it('takes the older picture out when a newer one will not fit, so the old one cannot come back in its place', () => {
+    const storage = new FakeStorage();
+    saveDraft(withPhoto(photo), { storage, now: NOW });
+    storage.failSetKeys = new Set([DRAFT_PHOTO_KEY_PREFIX]);
+    expect(saveDraft(withPhoto(other), { storage, now: NOW + 1000 })).toEqual({ ok: true, photoKept: false });
+    expect(storage.getItem(`${DRAFT_PHOTO_KEY_PREFIX}U`)).toBeNull();
+    expect(readDraft('U', { storage, now: NOW + 2000 }).draft).toMatchObject({ photoLost: true, card: { photoUrl: '' } });
+  });
+
+  it('leaves no picture behind when the draft itself cannot be kept', () => {
+    const storage = new FakeStorage({ failSetKeys: [DRAFT_KEY_PREFIX] });
+    expect(saveDraft(withPhoto(), { storage, now: NOW })).toEqual({ ok: false, reason: 'error', photoKept: false });
+    expect(storage.map.size).toBe(0);
+    const tooBig = new FakeStorage();
+    expect(saveDraft(withPhoto(photo, { card: card({ photoUrl: photo, title: 'a'.repeat(9000) }) }), { storage: tooBig, now: NOW })).toEqual({ ok: false, reason: 'too-large', photoKept: false });
+    expect(tooBig.map.size).toBe(0);
+  });
+
+  it('says it was not kept when there is no storage at all, and when the draft is unusable', () => {
+    expect(saveDraft(withPhoto(), { storage: null, now: NOW })).toEqual({ ok: false, reason: 'unavailable', photoKept: false });
+    expect(saveDraft(withPhoto(photo, { uid: '' }), { storage: new FakeStorage(), now: NOW })).toEqual({ ok: false, reason: 'invalid', photoKept: false });
+  });
+
+  it('says it was lost when its key is gone, or is not exactly what this module wrote', () => {
+    const damage = {
+      'removed': (storage) => storage.removeItem(`${DRAFT_PHOTO_KEY_PREFIX}U`),
+      'not JSON': (storage) => storage.setItem(`${DRAFT_PHOTO_KEY_PREFIX}U`, '{not json'),
+      'not an object': (storage) => storage.setItem(`${DRAFT_PHOTO_KEY_PREFIX}U`, '[1,2]'),
+      'an extra key': (storage) => storage.setItem(`${DRAFT_PHOTO_KEY_PREFIX}U`, JSON.stringify({ ...photoStored(storage), extra: 1 })),
+      'a missing key': (storage) => storage.setItem(`${DRAFT_PHOTO_KEY_PREFIX}U`, JSON.stringify({ v: 1, uid: 'U', savedAt: NOW })),
+      'another version': (storage) => storage.setItem(`${DRAFT_PHOTO_KEY_PREFIX}U`, JSON.stringify({ ...photoStored(storage), v: 2 })),
+      'another account': (storage) => storage.setItem(`${DRAFT_PHOTO_KEY_PREFIX}U`, JSON.stringify({ ...photoStored(storage), uid: 'X' })),
+      'another moment (not the draft\'s)': (storage) => storage.setItem(`${DRAFT_PHOTO_KEY_PREFIX}U`, JSON.stringify({ ...photoStored(storage), savedAt: NOW - 1 })),
+      'a picture that is not a finished photo': (storage) => storage.setItem(`${DRAFT_PHOTO_KEY_PREFIX}U`, JSON.stringify({ ...photoStored(storage), dataUrl: photoDataUrl(320, 5000, { extra: EXIF }) })),
+      'a picture that is not a JPEG': (storage) => storage.setItem(`${DRAFT_PHOTO_KEY_PREFIX}U`, JSON.stringify({ ...photoStored(storage), dataUrl: 'data:image/svg+xml;base64,PHN2Zy8+' })),
+      'a link instead of a picture': (storage) => storage.setItem(`${DRAFT_PHOTO_KEY_PREFIX}U`, JSON.stringify({ ...photoStored(storage), dataUrl: 'https://evil.example.com/a.jpg' })),
+      'a picture that is not text': (storage) => storage.setItem(`${DRAFT_PHOTO_KEY_PREFIX}U`, JSON.stringify({ ...photoStored(storage), dataUrl: 42 })),
+      'over its size': (storage) => storage.setItem(`${DRAFT_PHOTO_KEY_PREFIX}U`, JSON.stringify({ ...photoStored(storage), dataUrl: photoDataUrl(320, 120_000) })),
+    };
+    for (const [what, harm] of Object.entries(damage)) {
+      const storage = new FakeStorage();
+      saveDraft(withPhoto(), { storage, now: NOW });
+      harm(storage);
+      const result = readDraft('U', { storage, now: NOW });
+      expect(result.status, what).toBe('ok');
+      expect(result.draft.photoLost, what).toBe(true);
+      expect(result.draft.card.photoUrl, what).toBe('');
+      expect(result.draft.card.title, `${what}: the rest of the draft is still there`).toBe('Analyst');
+      expect(storage.getItem(`${DRAFT_PHOTO_KEY_PREFIX}U`), `${what}: nothing is left behind`).toBeNull();
+    }
+  });
+
+  it('discards a draft whose photo field is not one of the three states, and takes the picture with it', () => {
+    const storage = new FakeStorage();
+    saveDraft(withPhoto(), { storage, now: NOW });
+    put(storage, 'U', { ...stored(storage), photo: 'somewhere else' });
+    expect(readDraft('U', { storage, now: NOW })).toEqual({ status: 'discarded', reason: 'malformed' });
+    expect(storage.map.size).toBe(0);
+  });
+
+  it('forgets a picture that belongs to no draft: found beside a draft that has none, or with no draft', () => {
+    const storage = new FakeStorage();
+    saveDraft(draft(), { storage, now: NOW });
+    storage.setItem(`${DRAFT_PHOTO_KEY_PREFIX}U`, JSON.stringify({ v: 1, uid: 'U', savedAt: NOW, dataUrl: photo }));
+    const result = readDraft('U', { storage, now: NOW });
+    expect(result.draft.card.photoUrl).toBe('');
+    expect(result.draft.photoLost).toBe(false);
+    expect(storage.getItem(`${DRAFT_PHOTO_KEY_PREFIX}U`)).toBeNull();
+    // And saving a draft with no picture forgets one left from before.
+    storage.setItem(`${DRAFT_PHOTO_KEY_PREFIX}U`, 'stale');
+    saveDraft(draft(), { storage, now: NOW });
+    expect(storage.getItem(`${DRAFT_PHOTO_KEY_PREFIX}U`)).toBeNull();
+  });
+
+  it('never accepts a picture inside the draft\'s own text fields: a draft that holds one was not written by this module', () => {
+    const storage = new FakeStorage();
+    saveDraft(draft(), { storage, now: NOW });
+    put(storage, 'U', { ...stored(storage), fields: { ...stored(storage).fields, photoUrl: photo } });
+    expect(readDraft('U', { storage, now: NOW })).toEqual({ status: 'discarded', reason: 'too-large' });
+    const small = new FakeStorage();
+    saveDraft(draft(), { storage: small, now: NOW });
+    put(small, 'U', { ...stored(small), fields: { ...stored(small).fields, photoUrl: `data:${'a'.repeat(900)}` } });
+    expect(readDraft('U', { storage: small, now: NOW })).toEqual({ status: 'discarded', reason: 'malformed' });
+  });
+
+  it('keeps short text typed into the link box as typed, even if it starts with "data:", and drops a long one that is not a photo', () => {
+    const storage = new FakeStorage();
+    saveDraft(draft({ card: card({ photoUrl: 'data:image/png;base64,AAAA' }) }), { storage, now: NOW });
+    expect(readDraft('U', { storage, now: NOW }).draft.card.photoUrl).toBe('data:image/png;base64,AAAA');
+    // Long, and not a finished photo: not kept, as text or as a picture. (The form refuses it anyway.)
+    const bad = photoDataUrl(320, 5000, { extra: EXIF });
+    expect(draftPhotoOf({ photoUrl: bad })).toBeNull();
+    expect(saveDraft(draft({ card: card({ photoUrl: bad }) }), { storage, now: NOW + 1 })).toEqual({ ok: true });
+    expect(keysOf(storage)).toEqual([`${DRAFT_KEY_PREFIX}U`]);
+    expect(storage.getItem(`${DRAFT_KEY_PREFIX}U`)).not.toContain('Exif');
+    expect(readDraft('U', { storage, now: NOW + 2 }).draft.card.photoUrl).toBe('');
+  });
+
+  it('only ever picks a finished profile photo out of a card to keep', () => {
+    expect(draftPhotoOf({ photoUrl: photo })).toBe(photo);
+    for (const value of ['', 'https://example.com/a.jpg', 'data:image/png;base64,AAAA', photoDataUrl(400, 5000), photoDataUrl(320, 60_000), 42, null, undefined]) {
+      expect(draftPhotoOf({ photoUrl: value }), String(value).slice(0, 30)).toBeNull();
+    }
+    expect(draftPhotoOf(null)).toBeNull();
+    expect(draftPhotoOf({})).toBeNull();
+    expect(DRAFT_PHOTO_MAX_BYTES).toBeGreaterThan(65_536);
+  });
+
+  it('builds its payload with the picture left out, whatever the card holds', () => {
+    const payload = buildDraftPayload({ uid: 'U', card: card({ photoUrl: photo }), baseRevision: 3, now: NOW });
+    expect(JSON.stringify(payload)).not.toContain(fingerprintOf(photo));
+    expect(payload.photo).toBe('separate');
+    expect(payload.fields.photoUrl).toBe('');
+    expect(buildDraftPayload({ uid: 'U', card: card({ photoUrl: photo }), baseRevision: 3, now: NOW, photo: 'lost' }).photo).toBe('lost');
+  });
+
+  it('reads a draft from before photos as it always did', () => {
+    const storage = new FakeStorage();
+    put(storage, 'U', goodPayload());
+    const result = readDraft('U', { storage, now: NOW });
+    expect(result.status).toBe('ok');
+    expect(result.draft.photoLost).toBe(false);
+  });
+
+  it('never writes the picture, or any part of it, to the console', () => {
+    const spies = ['log', 'info', 'warn', 'error', 'debug'].map((method) => vi.spyOn(console, method).mockImplementation(() => {}));
+    const storage = new FakeStorage({ failSetKeys: [DRAFT_PHOTO_KEY_PREFIX] });
+    saveDraft(withPhoto(), { storage, now: NOW });
+    saveDraft(withPhoto(), { storage: new FakeStorage(), now: NOW });
+    readDraft('U', { storage, now: NOW });
+    clearDraft('U', { storage });
+    for (const spy of spies) expect(spy).not.toHaveBeenCalled();
   });
 });

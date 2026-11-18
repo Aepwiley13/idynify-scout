@@ -4,8 +4,9 @@
  *
  * Two things are checked:
  *   - the rules: the owner can read and write users/{uid}/card/main only as the
- *     rules allow (known fields, each within its limit, sharing off, the next
- *     revision, no delete, no other document, nothing nested), and another
+ *     rules allow (known fields, each within its limit, a photo that is nothing, an https link or a
+ *     bounded JPEG data URL, sharing off, the next revision, no delete, no other document, nothing
+ *     nested), and another
  *     signed-in user and an anonymous visitor can do nothing with it;
  *   - the app's own service code (src/services/myCard/myCardCore.js), given
  *     this package's copy of the web SDK, doing its work through those rules:
@@ -22,6 +23,7 @@ import {
 } from 'firebase/firestore';
 import { createMyCardService, MY_CARD_STATUS as S, MY_CARD_ERRORS as E } from '../../src/services/myCard/myCardCore.js';
 import { CARD_FIELDS, CARD_LIMITS, DEFAULT_SHARE, SHAREABLE_FIELDS, newCard } from '../../src/utils/myCardRules.js';
+import { EXIF, base64Of, photoDataUrl } from '../../src/test/helpers/photoFixtures.js';
 
 const env = await initializeTestEnvironment({
   projectId: 'demo-my-card',
@@ -423,13 +425,232 @@ check('rules: every field has its limit, the same as CARD_LIMITS: at the limit i
   assert((await read(CARD(U))) === undefined, 'nothing was created');
 });
 
-check('rules: the photo is an https link or nothing: no data, no script, no plain http', async () => {
+check('rules: a photo link is https or nothing: no script, no plain http, no other kind of link', async () => {
   await wipeCard(U);
   for (const photoUrl of ['http://example.com/a.jpg', 'data:image/jpeg;base64,/9j/4AAQ', 'javascript:alert(1)', 'ftp://example.com/a.jpg', 'https:/x', ' https://example.com/a.jpg', 'blob:https://example.com/x']) {
     await expectCode(put(owner(), stored({ photoUrl })), 'permission-denied', `photo ${photoUrl.slice(0, 24)}`);
   }
   await expectCode(put(owner(), stored({ photoUrl: 'https://media.example.com/ada.jpg?x=1' })), 'ok', 'an https link');
   await expectCode(put(owner(), stored({ photoUrl: '', revision: 2 })), 'ok', 'no photo');
+});
+
+/** A photo data URL of exactly this many characters, in the shape the rules look at (not a real picture). */
+const PREFIX = 'data:image/jpeg;base64,';
+const photoOfLength = (total, { start = '/9j/', fill = 'A', tail = '' } = {}) => {
+  const body = total - PREFIX.length - start.length - tail.length;
+  return `${PREFIX}${start}${fill.repeat(body)}${tail}`;
+};
+/** The longest length the rules take: 23 + a multiple of 4, at most 80,000. */
+const LONGEST = 23 + 4 * Math.floor((80_000 - 23) / 4);
+
+check('rules: a photo picture is taken only as a bounded JPEG data URL, and the bounds are the bounds', async () => {
+  // At and inside the bounds.
+  for (const length of [203, 703, 20_003, 65_535, 65_539, LONGEST]) {
+    await wipeCard(U);
+    await expectCode(put(owner(), stored({ photoUrl: photoOfLength(length) })), 'ok', `a photo of ${length} characters`);
+  }
+  await wipeCard(U);
+  await expectCode(put(owner(), stored({ photoUrl: photoOfLength(LONGEST - 4, { tail: '=' }) })), 'ok', 'with one padding character');
+  await wipeCard(U);
+  await expectCode(put(owner(), stored({ photoUrl: photoOfLength(LONGEST - 4, { tail: '==' }) })), 'ok', 'with two padding characters');
+  // Outside them.
+  const refused = [
+    ['one block over the longest', photoOfLength(LONGEST + 4)],
+    ['far over: 200,000 characters', photoOfLength(200_003)],
+    ['a megabyte', photoOfLength(1_000_003)],
+    ['under 200 characters', photoOfLength(199)],
+    ['the prefix and nothing', PREFIX],
+    ['a length that is not a whole number of base64 blocks', photoOfLength(LONGEST - 1)],
+    ['another length that is not', photoOfLength(5000)],
+  ];
+  for (const [what, photoUrl] of refused) {
+    await wipeCard(U);
+    await expectCode(put(owner(), stored({ photoUrl })), 'permission-denied', what);
+  }
+  assert((await read(CARD(U))) === undefined, 'nothing was created');
+});
+
+check('rules: a photo picture is refused unless it is exactly a JPEG data URL: type, start, characters and padding', async () => {
+  // Every case is exactly 1003 characters, a valid length (23 + a multiple of 4) inside the bounds, so the
+  // ONE thing wrong with it is the thing named. A case that is also the wrong length proves nothing.
+  const shaped = ({ prefix = PREFIX, start = '/9j/', tail = '', total = 1003 } = {}) => `${prefix}${start}${'A'.repeat(total - prefix.length - start.length - tail.length)}${tail}`;
+  assert(shaped().length === 1003 && (1003 - 23) % 4 === 0, 'the cases are the right length');
+  await wipeCard(U);
+  await expectCode(put(owner(), stored({ photoUrl: shaped() })), 'ok', 'the same shape, with nothing wrong, is accepted');
+  const cases = [
+    ['a PNG data URL', shaped({ prefix: 'data:image/png;base64,' })],
+    ['a JPG (not JPEG) type', shaped({ prefix: 'data:image/jpg;base64,' })],
+    ['a GIF data URL', shaped({ prefix: 'data:image/gif;base64,' })],
+    ['a WebP data URL', shaped({ prefix: 'data:image/webp;base64,' })],
+    ['an SVG, which can carry script', shaped({ prefix: 'data:image/svg+xml;base64,' })],
+    ['HTML', shaped({ prefix: 'data:text/html;base64,' })],
+    ['an uppercase prefix', shaped({ prefix: 'DATA:IMAGE/JPEG;BASE64,' })],
+    ['a mixed-case type', shaped({ prefix: 'data:image/JPEG;base64,' })],
+    ['a parameter in the type', shaped({ prefix: 'data:image/jpeg;charset=utf-8;base64,' })],
+    ['not base64 at all', shaped({ prefix: 'data:image/jpeg,' })],
+    ['a space before the data', shaped({ start: ' /9j' })],
+    ['no prefix', shaped({ prefix: '' })],
+    ['a link where the prefix should be', shaped({ prefix: 'https://example.com/a/' })],
+    ['a PNG\'s own first bytes after the JPEG prefix', shaped({ start: 'iVBO' })],
+    ['a start that is nearly a JPEG\'s', shaped({ start: '/9k/' })],
+    ['a start that is shorter than a JPEG\'s', shaped({ start: '/9j' })],
+    ['the URL-safe alphabet: a dash', shaped({ tail: 'AA-A' })],
+    ['the URL-safe alphabet: an underscore', shaped({ tail: 'AA_A' })],
+    ['a newline inside', shaped({ tail: 'A\nAA' })],
+    ['a tab inside', shaped({ tail: 'A\tAA' })],
+    ['a space inside', shaped({ tail: 'A AA' })],
+    ['a quote inside', shaped({ tail: 'AA"A' })],
+    ['an angle bracket inside', shaped({ tail: 'AA<A' })],
+    ['script after the picture', shaped({ tail: '<svg>' })],
+    ['a non-ASCII letter inside', shaped({ tail: 'AAéA' })],
+    ['padding in the middle', shaped({ tail: '==AA' })],
+    ['three padding characters', shaped({ tail: 'A===' })],
+    ['padding and then more', shaped({ tail: 'A=AA' })],
+    ['a second data URL after the first', `${shaped({ total: 503 })}${shaped({ total: 500 })}`],
+    ['a link with a picture on the end', `https://example.com/?x=${shaped({ total: 980 })}`],
+    ['a plain link in front of a whole picture', `https://example.com/${shaped({ total: 983 })}`],
+    ['letters in front of a whole picture', `abc${shaped({ total: 1000 })}`],
+  ];
+  for (const [what, photoUrl] of cases) {
+    assert(photoUrl.length === 1003, `${what}: the case is ${photoUrl.length} characters, not 1003`);
+    await wipeCard(U);
+    await expectCode(put(owner(), stored({ photoUrl })), 'permission-denied', what);
+  }
+  for (const photoUrl of [42, true, null, ['x'], { a: 1 }]) {
+    await expectCode(put(owner(), stored({ photoUrl })), 'permission-denied', `a photo that is ${JSON.stringify(photoUrl)}`);
+  }
+  assert((await read(CARD(U))) === undefined, 'nothing was created');
+});
+
+check('rules: a card with a photo picture is still held to every other rule', async () => {
+  const photoUrl = photoOfLength(30_003);
+  await wipeCard(U);
+  await seed(CARD(U), stored({ revision: 4, photoUrl }));
+  const next = { photoUrl, revision: 5 };
+  await expectCode(put(owner(), stored({ ...next, sharingEnabled: true })), 'permission-denied', 'sharingEnabled true');
+  await expectCode(put(owner(), { ...stored(next), extra: 'x' }), 'permission-denied', 'an extra field');
+  await expectCode(put(owner(), without(stored(next), 'website')), 'permission-denied', 'a missing field');
+  await expectCode(put(owner(), stored({ ...next, title: 'x'.repeat(101) })), 'permission-denied', 'a title over its limit');
+  await expectCode(put(owner(), stored({ ...next, schemaVersion: 2 })), 'permission-denied', 'schemaVersion 2');
+  await expectCode(put(owner(), stored({ ...next, revision: 4 })), 'permission-denied', 'the same revision');
+  await expectCode(put(owner(), stored({ ...next, revision: 1 })), 'permission-denied', 'a stale revision');
+  await expectCode(put(owner(), stored({ ...next, revision: 7 })), 'permission-denied', 'a skipped revision');
+  await expectCode(put(owner(), stored({ ...next, createdAt: '2027-01-01T00:00:00.000Z' })), 'permission-denied', 'a changed createdAt');
+  await expectCode(updateDoc(doc(owner(), CARD(U)), { sharingEnabled: true, revision: 5 }), 'permission-denied', 'a partial update to sharingEnabled true');
+  await expectCode(deleteDoc(doc(owner(), CARD(U))), 'permission-denied', 'delete');
+  for (const [who, db] of [['another signed-in user', other()], ['an anonymous visitor', anon()]]) {
+    await expectCode(getDoc(doc(db, CARD(U))), 'permission-denied', `${who} cannot read the picture`);
+    await expectCode(put(db, stored({ ...next, title: 'Mallory' })), 'permission-denied', `${who} cannot write one`);
+    await expectCode(getDocs(collectionGroup(db, 'card')), 'permission-denied', `${who} cannot find it by searching`);
+  }
+  assert((await read(CARD(U))).photoUrl === photoUrl && (await read(CARD(U))).revision === 4, 'the stored card is untouched');
+  await expectCode(put(owner(), stored(next)), 'ok', 'and the valid next revision, with the picture, is accepted');
+});
+
+check('rules: a photo can be added, replaced, swapped for a link and removed, one revision at a time', async () => {
+  await wipeCard(U);
+  const steps = [
+    ['no photo', ''],
+    ['a picture', photoOfLength(20_003)],
+    ['another picture', photoOfLength(30_003, { fill: 'B' })],
+    ['a link', 'https://media.example.com/ada.jpg'],
+    ['a picture again', photoOfLength(25_003)],
+    ['nothing', ''],
+  ];
+  let revision = 0;
+  for (const [what, photoUrl] of steps) {
+    revision += 1;
+    await expectCode(put(owner(), stored({ photoUrl, revision })), 'ok', `${what} (revision ${revision})`);
+  }
+  assert((await read(CARD(U))).photoUrl === '' && (await read(CARD(U))).revision === 6, 'ends with no photo at revision 6');
+});
+
+check('rules: the largest card allowed is far below Firestore\'s 1 MiB document limit', async () => {
+  await wipeCard(U);
+  const biggest = stored({
+    photoUrl: photoOfLength(LONGEST), firstName: 'a'.repeat(60), lastName: 'a'.repeat(60), title: 'a'.repeat(100), organization: 'a'.repeat(120),
+    email: 'a'.repeat(254), phone: 'a'.repeat(40), linkedinUrl: 'a'.repeat(200), instagram: 'a'.repeat(30), website: 'a'.repeat(200),
+  });
+  await expectCode(put(owner(), biggest), 'ok', 'a card with everything at its limit');
+  const bytes = new TextEncoder().encode(JSON.stringify(await read(CARD(U)))).length;
+  assert(bytes < 100_000, `the largest card is ${bytes} bytes`);
+});
+
+// A picture the real utility would make: a real JPEG layout of the finished size. (Not a photograph.)
+const realPhoto = (length = 20_000, tag = 0) => photoDataUrl(320, length, { tag });
+
+check('service: a photo picture is saved through the rules, replaced, swapped for a link, cleared and kept across a conflict', async () => {
+  await wipeCard(U);
+  const a = tab();
+  const b = tab();
+  const one = realPhoto(20_000, 1);
+  const first = await a.saveMyCard(goodCard({ photoUrl: one }), { expectedRevision: null });
+  assert(first.status === S.SAVED && first.revision === 1 && first.card.photoUrl === one, `first: ${first.status}`);
+  assert((await read(CARD(U))).photoUrl === one, 'stored');
+  const loaded = await a.loadMyCard();
+  assert(loaded.status === S.OK && loaded.card.photoUrl === one, 'loads back exactly');
+
+  const two = realPhoto(30_000, 2);
+  const replaced = await a.saveMyCard(goodCard({ photoUrl: two }), { expectedRevision: 1 });
+  assert(replaced.status === S.SAVED && replaced.revision === 2 && (await read(CARD(U))).photoUrl === two, 'replaced');
+
+  // Another tab, with the old copy, tries to save its own photo: a conflict, and the stored photo is not touched.
+  const lost = await b.saveMyCard(goodCard({ photoUrl: realPhoto(25_000, 3) }), { expectedRevision: 1 });
+  assert(lost.status === S.CONFLICT && lost.current.card.photoUrl === two && lost.current.revision === 2, `conflict: ${lost.status}`);
+  assert((await read(CARD(U))).photoUrl === two, 'the stored photo survived the conflict');
+
+  const link = await a.saveMyCard(goodCard({ photoUrl: 'https://media.example.com/ada.jpg' }), { expectedRevision: 2 });
+  assert(link.status === S.SAVED && (await read(CARD(U))).photoUrl === 'https://media.example.com/ada.jpg', 'swapped for a link');
+  const back = await a.saveMyCard(goodCard({ photoUrl: one }), { expectedRevision: 3 });
+  assert(back.status === S.SAVED && (await read(CARD(U))).photoUrl === one, 'and back to a picture');
+  const cleared = await a.saveMyCard(goodCard({ photoUrl: '' }), { expectedRevision: 4 });
+  assert(cleared.status === S.SAVED && (await read(CARD(U))).photoUrl === '' && cleared.revision === 5, 'cleared');
+  assert((await read(CARD(U))).sharingEnabled === false, 'sharing stays off throughout');
+});
+
+check('service: eight saves racing, each with its own photo: one lands and the rest are conflicts, never "no access"', async () => {
+  await wipeCard(U);
+  const base = await tab().saveMyCard(goodCard({ photoUrl: realPhoto(20_000, 9) }), { expectedRevision: null });
+  const results = await Promise.all(Array.from({ length: 8 }, (_, i) => tab().saveMyCard(goodCard({ photoUrl: realPhoto(20_000 + i, i) }), { expectedRevision: base.revision })));
+  const saved = results.filter((r) => r.status === S.SAVED);
+  const conflicts = results.filter((r) => r.status === S.CONFLICT);
+  assert(saved.length === 1 && conflicts.length === 7, `saved ${saved.length}, conflicts ${conflicts.length}: ${results.map((r) => r.status).join(',')}`);
+  assert((await read(CARD(U))).photoUrl === saved[0].card.photoUrl, 'the winner\'s photo is what is stored');
+});
+
+check('service: a picture that is not a finished profile photo is not saved at all, and nothing is written', async () => {
+  await wipeCard(U);
+  const real = realPhoto(20_000, 5);
+  const bad = [photoDataUrl(320, 5000, { extra: EXIF }), photoDataUrl(400, 5000), photoDataUrl(320, 60_000), `data:image/png;base64,${base64Of(real)}`, `${PREFIX}${'A'.repeat(100)}`];
+  for (const photoUrl of bad) {
+    const result = await tab().saveMyCard(goodCard({ photoUrl }), { expectedRevision: null });
+    assert(result.status === S.INVALID && 'photoUrl' in result.errors, `got ${result.status}`);
+  }
+  assert((await read(CARD(U))) === undefined, 'nothing was written');
+});
+
+check('service: cards saved before photos (a link, none, damaged) take a picture, and a stored picture that is not valid loads repaired', async () => {
+  for (const [what, legacy] of [
+    ['a link', stored({ photoUrl: 'https://media.example.com/ada.jpg', revision: 3 })],
+    ['no photo', stored({ photoUrl: '', revision: 3 })],
+    ['no revision', without(stored({ photoUrl: '' }), 'revision')],
+  ]) {
+    await wipeCard(U);
+    await seed(CARD(U), legacy);
+    const service = tab();
+    const loaded = await service.loadMyCard();
+    const photoUrl = realPhoto(20_000, 4);
+    const saved = await service.saveMyCard({ ...loaded.card, photoUrl }, { expectedRevision: loaded.revision });
+    assert(saved.status === S.SAVED && (await read(CARD(U))).photoUrl === photoUrl, `${what}: ${saved.status}`);
+  }
+  // A picture stored by hand that is not a real photo (the rules cannot walk a JPEG) loads repaired, blank, and saves.
+  await wipeCard(U);
+  await seed(CARD(U), stored({ photoUrl: photoOfLength(5003), revision: 2 }));
+  const service = tab();
+  const loaded = await service.loadMyCard();
+  assert(loaded.status === S.REPAIRED && loaded.card.photoUrl === '' && 'photoUrl' in loaded.errors, `got ${loaded.status}`);
+  const saved = await service.saveMyCard(loaded.card, { expectedRevision: loaded.revision });
+  assert(saved.status === S.SAVED && (await read(CARD(U))).photoUrl === '', 'and saving keeps the tidied card');
 });
 
 check('rules: the Shared / Private switches are exactly the eight, each true or false', async () => {

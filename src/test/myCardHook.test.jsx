@@ -10,7 +10,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { useMyCard } from '../pages/ContactHub/myCard/state/useMyCard';
 import { clearAllMyCardDrafts, draftKey, readDraft, saveDraft } from '../pages/ContactHub/myCard/state/myCardDraftStorage';
-import { DRAFT_MAX_AGE_MS } from '../pages/ContactHub/myCard/state/myCardDraftStorage';
+import { DRAFT_MAX_AGE_MS, DRAFT_PHOTO_KEY_PREFIX } from '../pages/ContactHub/myCard/state/myCardDraftStorage';
+import { fingerprintOf, photoDataUrl } from './helpers/photoFixtures';
 import { CONFLICT_CHOICE } from '../pages/ContactHub/myCard/state/myCardState';
 import { DEFAULT_SHARE, newCard, normalizeCard } from '../utils/myCardRules';
 import { FakeSessionStorage } from './helpers/fakeSessionStorage';
@@ -958,5 +959,276 @@ describe('nothing is saved that was not asked for', () => {
     await settle(); await settle();
     t.hook.unmount();
     expect(t.service.saveMyCard).not.toHaveBeenCalled();
+  });
+});
+
+describe('an uploaded photo', () => {
+  const photo = photoDataUrl(320, 36_000, { tag: 1 });
+  const other = photoDataUrl(320, 24_000, { tag: 2 });
+  const savedWithPhoto = (picture) => makeService({ loadMyCard: vi.fn(async () => okResult(3, { photoUrl: picture })) });
+  const photoKeyOf = (uid = 'U') => `${DRAFT_PHOTO_KEY_PREFIX}${uid}`;
+  const pageHide = () => window.dispatchEvent(new Event('pagehide'));
+  const hasKeys = (storage) => [...storage.map.keys()].sort();
+
+  it('is kept as part of the draft, apart from it, after the usual pause', async () => {
+    const t = await mount();
+    await edit(t, 'photoUrl', photo);
+    expect(t.draft().dirty).toBe(true);
+    expect(t.now().status).toBe('unsaved');
+    expect(t.storage.map.size).toBe(0);
+    await advance(DEBOUNCE);
+    expect(hasKeys(t.storage)).toEqual([draftKey('U'), photoKeyOf()]);
+    const kept = stored(t.storage);
+    expect(kept.draft.card.photoUrl).toBe(photo);
+    expect(kept.draft).toMatchObject({ baseRevision: 3, photoLost: false });
+    expect(t.state().photoKept).toBe(true);
+    expect(t.service.saveMyCard).not.toHaveBeenCalled();
+  });
+
+  it('survives a refresh, and leaving and coming back: restored exactly, with the notice, unsaved', async () => {
+    const storage = new FakeSessionStorage();
+    const first = await mount({ storage });
+    await edit(first, 'photoUrl', photo);
+    pageHide();
+    first.hook.unmount();
+    const second = await mount({ storage });
+    expect(second.draft().card.photoUrl).toBe(photo);
+    expect(second.draft().dirty).toBe(true);
+    expect(second.state().recovered).toMatchObject({ baseRevision: 3 });
+    expect(second.state().recovered.photoLost).toBeUndefined();
+    expect(second.now().availability.enabled).toBe(true);
+    expect(second.service.saveMyCard).not.toHaveBeenCalled();
+  });
+
+  it('is sent with a Save, as the card\'s photo, and the draft and its picture are forgotten once it is saved', async () => {
+    const t = await mount();
+    await edit(t, 'photoUrl', photo);
+    await advance(DEBOUNCE);
+    expect(hasKeys(t.storage)).toHaveLength(2);
+    await act(async () => { await t.now().actions.save(); });
+    expect(t.service.saveMyCard).toHaveBeenCalledTimes(1);
+    expect(t.service.saveMyCard.mock.calls[0][0].photoUrl).toBe(photo);
+    expect(t.service.saveMyCard.mock.calls[0][1]).toEqual({ expectedRevision: 3 });
+    expect(t.state()).toMatchObject({ revision: 4, save: 'saved', photoKept: true });
+    expect(t.draft().dirty).toBe(false);
+    await advance(5000);
+    expect(t.storage.map.size).toBe(0);
+  });
+
+  it('survives a save that fails: still in the form, still kept, and sent again on a retry', async () => {
+    const service = makeService({
+      saveMyCard: vi.fn()
+        .mockResolvedValueOnce({ ...NOT_BODY })
+        .mockImplementation(async (card, { expectedRevision }) => ({ status: 'saved', card: normalizeCard(card).card, revision: (expectedRevision ?? 0) + 1 })),
+    });
+    const t = await mount({ service });
+    await edit(t, 'photoUrl', photo);
+    await act(async () => { await t.now().actions.save(); });
+    expect(t.state()).toMatchObject({ save: 'error' });
+    expect(t.draft().card.photoUrl).toBe(photo);
+    expect(t.draft().dirty).toBe(true);
+    pageHide();
+    expect(stored(t.storage).draft.card.photoUrl).toBe(photo);
+    await act(async () => { await t.now().actions.save(); });
+    expect(t.service.saveMyCard.mock.calls[1][0].photoUrl).toBe(photo);
+    expect(t.state()).toMatchObject({ save: 'saved', revision: 4 });
+  });
+
+  describe('and a conflict', () => {
+    const conflicting = () => makeService({
+      saveMyCard: vi.fn()
+        .mockResolvedValueOnce({ status: 'conflict', current: okResult(5, { photoUrl: other, title: 'Newer elsewhere' }) })
+        .mockImplementation(async (card, { expectedRevision }) => ({ status: 'saved', card: normalizeCard(card).card, revision: (expectedRevision ?? 0) + 1 })),
+    });
+    async function inConflict() {
+      const t = await mount({ service: conflicting() });
+      await edit(t, 'photoUrl', photo);
+      await act(async () => { await t.now().actions.save(); });
+      return t;
+    }
+
+    it('keeps the photo edit, in the form and in the tab, and names the photo as one of the differences', async () => {
+      const t = await inConflict();
+      expect(t.state().conflict).toBeTruthy();
+      expect(t.state().conflict.changes.map((c) => c.field)).toContain('photoUrl');
+      expect(t.draft().card.photoUrl).toBe(photo);
+      pageHide();
+      expect(stored(t.storage).draft.card.photoUrl).toBe(photo);
+      expect(hasKeys(t.storage)).toHaveLength(2);
+    });
+
+    it('sends the photo when the person chooses to save over the newer version, against the revision just seen', async () => {
+      const t = await inConflict();
+      act(() => t.now().actions.chooseConflict(CONFLICT_CHOICE.SAVE_OVER));
+      await act(async () => { await t.now().actions.confirmSaveOver(); });
+      expect(t.service.saveMyCard).toHaveBeenCalledTimes(2);
+      expect(t.service.saveMyCard.mock.calls[1][0].photoUrl).toBe(photo);
+      expect(t.service.saveMyCard.mock.calls[1][1]).toEqual({ expectedRevision: 5 });
+      await advance(5000);
+      expect(t.storage.map.size).toBe(0);
+    });
+
+    it('replaces the photo with the saved one, and forgets the kept picture, only when the person chooses to load the latest', async () => {
+      const t = await inConflict();
+      act(() => t.now().actions.chooseConflict(CONFLICT_CHOICE.LOAD_LATEST));
+      expect(t.draft().card.photoUrl).toBe(photo);
+      act(() => { t.now().actions.confirmLoadLatest(); });
+      expect(t.draft().card.photoUrl).toBe(other);
+      expect(t.draft().dirty).toBe(false);
+      await advance(5000);
+      expect(t.storage.map.size).toBe(0);
+    });
+
+    it('is restored with the conflict when it is found after another version was saved', async () => {
+      const storage = new FakeSessionStorage();
+      saveDraft({ uid: 'U', card: savedCard({ photoUrl: photo, title: 'Mine' }), baseRevision: 2 }, { storage, now: NOW - 60_000 });
+      const t = await mount({ storage });
+      expect(t.draft().card.photoUrl).toBe(photo);
+      expect(t.state().conflict.changes.map((c) => c.field)).toContain('photoUrl');
+      expect(t.state().recovered).not.toBeNull();
+    });
+  });
+
+  it('can be replaced by another photo, a link, or nothing, and what is kept follows', async () => {
+    const t = await mount({ service: savedWithPhoto(photo) });
+    expect(t.draft().card.photoUrl).toBe(photo);
+    expect(t.draft().dirty).toBe(false);
+
+    await edit(t, 'photoUrl', other);
+    await advance(DEBOUNCE);
+    expect(stored(t.storage).draft.card.photoUrl).toBe(other);
+
+    await edit(t, 'photoUrl', 'https://media.example.com/ada.jpg');
+    await advance(DEBOUNCE);
+    expect(hasKeys(t.storage)).toEqual([draftKey('U')]);
+    expect(stored(t.storage).draft.card.photoUrl).toBe('https://media.example.com/ada.jpg');
+
+    await edit(t, 'photoUrl', '');
+    await advance(DEBOUNCE);
+    expect(hasKeys(t.storage)).toEqual([draftKey('U')]);
+    expect(stored(t.storage).draft.card.photoUrl).toBe('');
+    expect(t.draft().dirty).toBe(true);
+
+    // Back to what is saved: nothing to keep, and nothing is.
+    await edit(t, 'photoUrl', photo);
+    await advance(DEBOUNCE);
+    expect(t.draft().dirty).toBe(false);
+    expect(t.storage.map.size).toBe(0);
+  });
+
+  it('can be removed, saved as removed, and the next save is against the revision made', async () => {
+    const t = await mount({ service: savedWithPhoto(photo) });
+    await edit(t, 'photoUrl', '');
+    await act(async () => { await t.now().actions.save(); });
+    expect(t.service.saveMyCard.mock.calls[0][0].photoUrl).toBe('');
+    expect(t.draft().card.photoUrl).toBe('');
+    expect(t.state().revision).toBe(4);
+  });
+
+  it('says so, as it happens, when the tab will not keep it, and stops saying so once it is gone or kept', async () => {
+    const storage = new FakeSessionStorage();
+    const refuse = vi.spyOn(storage, 'setItem').mockImplementation((key, value) => {
+      if (key.startsWith(DRAFT_PHOTO_KEY_PREFIX)) throw Object.assign(new Error('full'), { name: 'QuotaExceededError' });
+      storage.map.set(key, String(value));
+    });
+    const t = await mount({ storage });
+    expect(t.state().photoKept).toBe(true);
+    await edit(t, 'photoUrl', photo);
+    await advance(DEBOUNCE);
+    expect(t.state().photoKept).toBe(false);
+    // The photo is still in the form: only the safety net is missing, and the draft is kept without it.
+    expect(t.draft().card.photoUrl).toBe(photo);
+    expect(stored(storage).draft).toMatchObject({ photoLost: true, card: { photoUrl: '' } });
+    // Removing it, the warning goes.
+    await edit(t, 'photoUrl', '');
+    await edit(t, 'title', 'Director');
+    await advance(DEBOUNCE);
+    expect(t.state().photoKept).toBe(true);
+    refuse.mockRestore();
+  });
+
+  it('says so too when there is no storage at all, and saves still work', async () => {
+    const t = await mount({ storage: new FakeSessionStorage({ failOn: ['setItem'] }) });
+    await edit(t, 'photoUrl', photo);
+    await advance(DEBOUNCE);
+    expect(t.state().photoKept).toBe(false);
+    await act(async () => { await t.now().actions.save(); });
+    expect(t.service.saveMyCard.mock.calls[0][0].photoUrl).toBe(photo);
+    expect(t.state()).toMatchObject({ save: 'saved', photoKept: true });
+  });
+
+  it('is announced as not restored, never silently dropped, when its kept picture is gone', async () => {
+    const storage = new FakeSessionStorage();
+    const first = await mount({ storage });
+    await edit(first, 'title', 'Director');
+    await edit(first, 'photoUrl', photo);
+    pageHide();
+    first.hook.unmount();
+    storage.removeItem(photoKeyOf());
+    const second = await mount({ storage });
+    expect(second.draft().card.title).toBe('Director');
+    expect(second.draft().card.photoUrl).toBe('');
+    expect(second.state().recovered).toMatchObject({ photoLost: true });
+  });
+
+  it('is announced as not restored even when it was the only thing in the draft', async () => {
+    const storage = new FakeSessionStorage();
+    saveDraft({ uid: 'U', card: savedCard({ photoUrl: photo }), baseRevision: 3 }, { storage, now: NOW - 60_000 });
+    storage.removeItem(photoKeyOf());
+    const t = await mount({ storage });
+    expect(t.draft().card.photoUrl).toBe('');
+    expect(t.draft().dirty).toBe(false);
+    expect(t.state().recovered).toMatchObject({ photoLost: true });
+  });
+
+  it('forgets a draft with no photo trouble and nothing else different, silently, as before', async () => {
+    const storage = new FakeSessionStorage();
+    saveDraft({ uid: 'U', card: savedCard(), baseRevision: 3 }, { storage, now: NOW - 60_000 });
+    const t = await mount({ storage });
+    expect(t.state().recovered).toBeNull();
+    expect(storage.map.size).toBe(0);
+  });
+
+  it('keeps each account\'s picture apart: the second account sees none, and the first\'s is forgotten when it opens', async () => {
+    const storage = new FakeSessionStorage();
+    saveDraft({ uid: 'A', card: savedCard({ photoUrl: photo }), baseRevision: 3 }, { storage, now: NOW - 60_000 });
+    const t = await mount({ storage, uid: 'B' });
+    expect(t.draft().card.photoUrl).toBe('');
+    expect(t.state().recovered).toBeNull();
+    expect(hasKeys(storage)).toEqual([]);
+  });
+
+  it('is forgotten with every draft at sign-out', async () => {
+    const t = await mount();
+    await edit(t, 'photoUrl', photo);
+    await advance(DEBOUNCE);
+    expect(hasKeys(t.storage)).toHaveLength(2);
+    clearAllMyCardDrafts({ storage: t.storage });
+    expect(t.storage.map.size).toBe(0);
+  });
+
+  it('is neither read nor kept, nor are the keys touched, while viewing as someone else', async () => {
+    const storage = new FakeSessionStorage();
+    saveDraft({ uid: 'U', card: savedCard({ photoUrl: photo }), baseRevision: 3 }, { storage, now: NOW - 60_000 });
+    const before = [...storage.map.entries()];
+    storage.log.length = 0;
+    const t = await mount({ storage, impersonating: true });
+    expect(t.state().load).toBe('blocked');
+    expect(t.draft().card.photoUrl).toBe('');
+    expect(storage.log).toEqual([]);
+    expect([...storage.map.entries()]).toEqual(before);
+  });
+
+  it('never reaches the console: not when kept, restored, lost or saved', async () => {
+    const spies = ['log', 'info', 'warn', 'error', 'debug'].map((method) => vi.spyOn(console, method).mockImplementation(() => {}));
+    const storage = new FakeSessionStorage({ failOn: ['setItem'] });
+    const t = await mount({ storage });
+    await edit(t, 'photoUrl', photo);
+    await advance(DEBOUNCE);
+    await act(async () => { await t.now().actions.save(); });
+    for (const spy of spies) {
+      for (const call of spy.mock.calls) expect(JSON.stringify(call)).not.toContain(fingerprintOf(photo));
+    }
+    spies.forEach((spy) => spy.mockRestore());
   });
 });

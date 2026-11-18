@@ -1,4 +1,5 @@
-import { publicCardView } from './myCardRules';
+import { isPhotoData, publicCardView } from './myCardRules';
+import { PHOTO } from './photoPrep';
 
 /**
  * vCard (.vcf) text, version 3.0, which iPhone and Android contacts both read.
@@ -49,6 +50,14 @@ const encoder = new TextEncoder();
  * space. Never inside a multi-byte character.
  */
 function foldLine(line) {
+  if (line.length <= FOLD_AT && encoder.encode(line).length <= FOLD_AT) return line;
+  // Plain ASCII, however long (an embedded photo is tens of thousands of characters): cut by count, which
+  // is the same cut the character walk below makes, without measuring each character.
+  if (/^[\x20-\x7e]*$/.test(line)) {
+    const pieces = [line.slice(0, FOLD_AT)];
+    for (let at = FOLD_AT; at < line.length; at += FOLD_AT - 1) pieces.push(line.slice(at, at + FOLD_AT - 1));
+    return pieces.join('\r\n ');
+  }
   if (encoder.encode(line).length <= FOLD_AT) return line;
   const parts = [];
   let current = '';
@@ -143,6 +152,16 @@ export function buildContactVCard(contact) {
 }
 
 /**
+ * The PHOTO line for a card's photo. A link is written as a link (phones may ignore it); a picture kept in
+ * the card (utils/photoPrep.js: a JPEG, already checked) is EMBEDDED, as vCard 3.0 writes it, so it comes
+ * with the contact. Only ever called with the public view's photo: a Private photo never gets here.
+ */
+function photoLine(photoUrl) {
+  if (isPhotoData(photoUrl)) return `PHOTO;ENCODING=b;TYPE=JPEG:${photoUrl.slice(PHOTO.DATA_URL_PREFIX.length)}`;
+  return `PHOTO;VALUE=uri:${uriValue(photoUrl)}`;
+}
+
+/**
  * A person's own My Card as vCard text, or null when the card has no name.
  *
  * Takes the stored card (or the editor's state) and builds from
@@ -168,7 +187,7 @@ export function buildMyCardVCard(card) {
   if (view.website) lines.push(`URL:${uriValue(view.website)}`);
   if (view.linkedinUrl) lines.push(`URL;TYPE=LinkedIn:${uriValue(view.linkedinUrl)}`);
   if (view.instagram) lines.push(`URL;TYPE=Instagram:https://www.instagram.com/${uriValue(view.instagram)}`);
-  if (view.photoUrl) lines.push(`PHOTO;VALUE=uri:${uriValue(view.photoUrl)}`);
+  if (view.photoUrl) lines.push(photoLine(view.photoUrl));
   return assemble(lines);
 }
 

@@ -25,7 +25,7 @@ import { Linkedin, Sparkles } from 'lucide-react';
 import CardAvatar from './CardAvatar';
 import ShareToggle from './ShareToggle';
 import { EDITOR_SECTIONS, FIELD_META } from './cardDraft';
-import { SHAREABLE_FIELDS, cardInitials, normalizeCardField } from '../../../utils/myCardRules';
+import { SHAREABLE_FIELDS, cardInitials, isPhotoPicture, normalizeCardField } from '../../../utils/myCardRules';
 import { openSuggestions } from '../../../utils/myCardSuggestions';
 
 const SOURCE_LABEL = Object.freeze({
@@ -98,9 +98,11 @@ export default function MyCardEditor({
     // did not load a picture, and when there is no photo on offer (it is then the only way in).
     const hasGoodPhoto = hasPhoto && validPhoto !== '';
     const showLink = revealPhotoLink || Boolean(message) || photoProblem || (hasPhoto && !hasGoodPhoto) || (!suggestion && !hasPhoto);
+    // A picture kept in the card is a very long string of letters and digits: never shown as text, or put in a box.
+    const photoIsData = isPhotoPicture(card.photoUrl);
     const hint = photoProblem
       ? 'That link didn\'t load a picture, so your initials are used. Check the link, or leave it empty.'
-      : meta.hint;
+      : (photoIsData && hasGoodPhoto ? 'Your uploaded photo is in use. Paste a link to use that instead, or remove the photo.' : meta.hint);
     const messageId = `${id('photoUrl')}-message`;
 
     return (
@@ -132,7 +134,7 @@ export default function MyCardEditor({
                 ) : null}
                 {hasGoodPhoto && !showLink ? (
                   <button type="button" className="mycard-linkbtn" disabled={disabled} onClick={showPhotoLink}>
-                    Change photo link
+                    {photoIsData ? 'Use a photo link instead' : 'Change photo link'}
                   </button>
                 ) : null}
                 {hasPhoto ? (
@@ -163,7 +165,7 @@ export default function MyCardEditor({
               inputMode={meta.inputMode}
               autoComplete={meta.autoComplete}
               placeholder={meta.placeholder}
-              value={card.photoUrl}
+              value={photoIsData ? '' : card.photoUrl}
               disabled={disabled}
               aria-invalid={message ? 'true' : undefined}
               aria-describedby={message || hint ? messageId : undefined}

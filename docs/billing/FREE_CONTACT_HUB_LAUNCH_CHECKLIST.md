@@ -6,40 +6,26 @@ production Firebase rules. Phase 1 needs **no Firestore rules deploy**.
 
 ## A. Code, merged in this order (each with approval)
 
-| # | PR | Why | Required for launch? |
-|---|---|---|---|
-| A1 | Concurrent-checkout test fix (#805) | Removes a one-in-ten CI flake in `billing-emulator`; test-only | Recommended first, so every later PR's CI is trustworthy |
-| A2 | Phase 0: Stripe test mode (#801) | Lets A6 be validated in Stripe test mode | Yes, for B |
-| A3 | **Phase 1c: paid-API guard (#806)** | Free and lapsed accounts can no longer make Idynify pay for Apollo, including by calling the functions directly; the weekday refresh skips them | **Yes — before the Free plan is switched on** |
-| A3b | **Phase 1d: paid-AI guard (#809)** | The same for Claude: every Claude-powered function refuses accounts without paid access (402) before any Claude call; the Barry inbox worker skips them; the shell hides Barry from them | **Yes — before the Free plan is switched on** |
-| A4 | Phase 1a: Free accounts (#802) | No-card signup, free Contact Hub, in-app upgrade screen. Off until the build switch in C1. Its free welcome email carries the **owner's final copy** (relationships and connections) before C1 | Yes |
-| A4b | Welcome-email hardening (#807, separate workstream) | Merged by that workstream after #802; billing does not change it | That workstream's call |
-| A5 | Integration check with Contact Hub / My Card | Rebase onto `main` after the Contact Hub team's My Card merge; re-run CI and the free-route tests | Yes |
-| A6 | Phase 1b: authenticated checkout (#803) | Retires Payment Links (duplicate-subscription risk for existing and returning customers) | **Only after B passes.** If B is not done in time, use A6-alt instead |
-| A6-alt | Upgrade hold (#810), **instead of** A6 | Free Contact Hub launches; no existing account is offered a Payment Link (support starts Scout for them); today's paid signup flow is unchanged | Only if A6 is not ready at launch. #803 lifts it later |
+The current PR list and merge order are kept in one place: the description of the CI-only
+integration PR, https://github.com/Aepwiley13/idynify-scout/pull/808. In short: #805 → #801 → #806 →
+#809 → #802 → (#807) → W2 #811 → #803 → W1 #812 → W3 #813 → W4a #814 → W4b #815 → W6 #816 → #804.
+#803 (authenticated checkout) is the intended launch path; #810 (upgrade hold) is a fallback only
+if #803 cannot pass validation, and is not part of the primary launch.
 
-## B. Stripe test-mode validation (before A6 is published)
+## B. Validation in staging (before anything is published)
 
-The exact procedure, including how to create and store the restricted test-mode key without it
-ever entering a chat or the repository, is
-[CHECKOUT_TEST_MODE_VALIDATION.md](CHECKOUT_TEST_MODE_VALIDATION.md) (in #801). Scenarios S1–S7
-must all pass, each confirmed with the read-only `billingAccountSnapshot.mjs`:
+Every test step, from the environment check to the browser journey, is in
+[STAGING_VALIDATION_RUNBOOK.md](STAGING_VALIDATION_RUNBOOK.md), the single source of truth. All of
+Parts 0–10 must pass, with metering off. Part 11 (credits in staging) runs only once approved.
 
-1. Successful payment, Starter, then Pro: one customer, one subscription, 400 or 1,250 credits, paid access. The success page waits for the webhook and never shows checkout again.
-2. Canceled checkout: still Free; retrying reopens the same session; once it expires, a new one.
-3. Declined card: no subscription, no credits, no review record.
-4. Resubscription after cancelling: the same customer, a second subscription, credits granted again.
-5. An existing subscriber trying to buy again: sent to Billing, nothing offered, still one subscription.
-6. A replayed webhook: no second grant.
+## Launch blockers (must be cleared, each with approval)
 
-**If A6 is not ready**, the Free plan launches with **A6-alt (#810)** instead, and Payment Links stay
-live only for today's paid signup flow:
-- **No existing account is offered a purchase.** Settings → Billing and "This is part of Scout" show
-  "Contact us to start Scout"; `/checkout` sends a Free, lapsed or subscribed account to Settings →
-  Billing. Support starts the plan in the Stripe Dashboard on that account's own customer.
-- **A new paid signup** (a paid plan chosen at signup, not paid yet, no Stripe history) checks out by
-  Payment Link exactly as today.
-- When B passes, #803 is published with the hold lifted in the same release.
+| Blocker | Clears when |
+|---|---|
+| Staging validation not yet run | Runbook Parts 0–10 pass |
+| My Card not yet integrated | The Contact Hub team's branch is in #808 and the journey passes without `--skip-my-card` |
+| **Paid Apollo spending has no per-account limit while `CREDIT_METERING` is off** (any paying account or admin can make unlimited paid lookups; details in `CREDIT_METERING.md`) | Approved rates with metering and renewal on together, or an approved interim daily ceiling, before broad paid enrichment |
+| **Today, any signed-in account can call the Apollo functions directly** | #806 published (before the Free plan is switched on) |
 
 ## C. Production configuration (owner, each approved separately)
 

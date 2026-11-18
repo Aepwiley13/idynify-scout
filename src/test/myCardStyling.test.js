@@ -480,12 +480,13 @@ describe('the components stand alone', () => {
     }
   });
 
-  it('import only React, icons, the card rules and each other, and for the download alone, the vCard maker', () => {
+  it('import only React, icons, the card rules and each other, and for the download and the card image alone, the vCard maker', () => {
     for (const name of code) {
       for (const from of imports(name)) {
         // The extras: the file that downloads a contact needs the vCard maker; the photo part draws its dialog on the page
         // (react-dom's portal); the photo files use the photo utility, which is pure and local-only (photoPrep.test.js).
-        const allowedHere = name === 'downloadContact.js' && from === '../../../utils/vcard';
+        // The card image takes its file name from the contact file's naming rule (one rule for both downloads).
+        const allowedHere = (name === 'downloadContact.js' || name === 'cardImage.js') && from === '../../../utils/vcard';
         expect(allowedHere || /^(?:react|lucide-react|\.\/[\w.]+|\.\.\/\.\.\/\.\.\/utils\/(?:myCardRules|myCardSuggestions|photoPrep)|\.\.\/\.\.\/\.\.\/theme\/tokens)$/.test(from) || (from === 'react-dom' && name === 'MyCardPhoto.jsx'), `${name} imports ${from}`).toBe(true);
       }
     }

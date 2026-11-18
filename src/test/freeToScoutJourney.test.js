@@ -18,7 +18,8 @@ afterEach(() => { vi.restoreAllMocks(); });
 describe('arguments', () => {
   it('defaults to the local app, a fresh address and a report outside the repository', () => {
     const a = parseE2eArgs([], { now: 123, tmp: '/tmp/x' });
-    expect(a).toMatchObject({ base: 'http://localhost:8888', email: 'idynify-e2e-123@e2e.example.test', out: '/tmp/x/idynify-e2e-123.json', headed: false, withPro: false });
+    expect(a).toMatchObject({ base: 'http://localhost:8888', email: 'idynify-e2e-123@e2e.example.test', out: '/tmp/x/idynify-e2e-123.json', headed: false, withPro: false, expectMetering: false });
+    expect(parseE2eArgs(['--expect-metering']).expectMetering).toBe(true);
     expect(a.password).toMatch(/^E2e-.+!9$/);
   });
 

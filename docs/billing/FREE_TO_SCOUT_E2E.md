@@ -54,11 +54,12 @@ stand-in**. No real Apollo request is made (the test checks it), nothing touches
 |---|---|---|
 | 1 | Sign up Free | Lands in Contact Hub; the account has no billing fields |
 | 2 | My Card | Pending until the Contact Hub team's My Card is merged (`--skip-my-card`) |
-| 3 | Add one person, import five from CSV | "5 people added."; 6 people in `users/{uid}/contacts` |
+| 3 | Import five from CSV on the empty first screen, then add one person | "5 people added."; 6 people in `users/{uid}/contacts` |
 | 4 | Sticker and note on Ana Lopez | Both visible |
 | 5 | Scout preview | "Scout can fill in the rest"; **no paid function called and no Apollo call** so far; account snapshot taken |
 | 6 | Upgrade to Scout → Scout Starter → Stripe | Paid on Stripe's test page; success page reached |
 | 7 | Back in Scout | On `/contact/<Ana>`; the billing checks all pass (one customer, one subscription, 400 credits, one grant); same uid |
+| 7b | No second signup, import or onboarding | `/` lands on Contact Hub (not Barry onboarding); Scout opens without the upgrade screen |
 | 8 | Enrich Ana | The stand-in was called with the mock key only; credits down; **one** charge in the credit log |
 | 9 | Nothing lost | Every person, sticker, note, the card and any other document unchanged; Ana gained values only in empty fields; only billing fields changed on the account |
 | 10 | `--with-pro` | Same subscription id, Pro, still one live subscription |

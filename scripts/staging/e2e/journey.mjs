@@ -30,11 +30,14 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1']);
  * --headed    show the browser (needed to finish payment by hand if Stripe's page changes)
  * --with-pro  then upgrade Starter → Pro in Settings (W3)
  * --skip-my-card  run without the My Card step (until the Contact Hub team's My Card is merged)
+ * --expect-metering  the app runs with CREDIT_METERING=on (staging only, mocked Apollo): enriching
+ *             must charge credits exactly once. Without it, metering is expected off: enriching
+ *             works and charges nothing
  * --out       where to write the JSON report (default: the system temp directory)
  */
 export function parseE2eArgs(argv, { now = Date.now(), tmp = '/tmp' } = {}) {
   const args = {
-    base: 'http://localhost:8888', email: null, password: null, headed: false, withPro: false, skipMyCard: false, out: null,
+    base: 'http://localhost:8888', email: null, password: null, headed: false, withPro: false, skipMyCard: false, expectMetering: false, out: null,
   };
   for (const a of argv) {
     if (a.startsWith('--base=')) args.base = a.slice(7);
@@ -43,6 +46,7 @@ export function parseE2eArgs(argv, { now = Date.now(), tmp = '/tmp' } = {}) {
     else if (a === '--headed') args.headed = true;
     else if (a === '--with-pro') args.withPro = true;
     else if (a === '--skip-my-card') args.skipMyCard = true;
+    else if (a === '--expect-metering') args.expectMetering = true;
     else throw new JourneyRefusal(`Unknown argument: ${a}`);
   }
   let url;

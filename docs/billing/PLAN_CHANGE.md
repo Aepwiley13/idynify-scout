@@ -36,19 +36,11 @@ Pro → Starter goes through support for now.
 The webhook change also corrects a gap that existed before W3: a plan change made in the Stripe
 Dashboard (for example by support) is now reflected in the account's tier, limits and features.
 
-## Stripe test-mode scenarios (add to the checkout validation run)
+## Testing it in Stripe test mode
 
-| # | Scenario | Pass |
-|---|---|---|
-| P1 | A Starter account → Upgrade to Pro → Confirm, card `4242…` | Preview amount equals the invoice. One subscription (same id), Pro price. Account: `pro`, 850 more credits, one `plan_change` marker |
-| P2 | Same, card `4000 0027 6000 3184` (authentication required) | "Confirm the payment" link; account stays Starter until the invoice is paid there, then Pro |
-| P3 | Same, card `4000 0000 0000 0341` (attaches, charge fails) | Stays Starter; the pending update expires; no Pro, no credits |
-| P4 | `stripe events resend` the P1 `customer.subscription.updated` | No change; still one marker |
-| P5 | Manage billing → update card, view invoice, cancel at period end | Portal shows no plan switching. Account `cancelAtPeriodEnd: true`; Upgrade to Pro is not offered |
-| P6 | A Starter account opens `/checkout?tier=pro` | Lands on Billing with the Pro preview open. Still one subscription |
-
-The restricted test-mode key needs, in addition to the checkout list: **Subscriptions: Write**
-(the update), **Invoices: Read** (the preview), **Customer portal: Write** (sessions).
+The scenarios (P1–P6) and the extra test-key permissions are in
+[STAGING_VALIDATION_RUNBOOK.md](STAGING_VALIDATION_RUNBOOK.md) Parts 2 and 7, the single source of
+truth for staging validation.
 
 ## Production configuration (owner approval, each separately)
 

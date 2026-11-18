@@ -114,7 +114,10 @@ describe('signup', () => {
     expect(freePlanHomeFor({ status: ACCOUNT.VERIFIED, data: FREE_SIGNUP })).toBeNull(); // switch off in tests
     expect(freePlanHomeFor({ status: ACCOUNT.VERIFIED, data: FREE_SIGNUP }, { enabled: true })).toBe(FREE_PLAN_HOME);
     expect(freePlanHomeFor({ status: ACCOUNT.UNVERIFIED, data: null }, { enabled: true })).toBeNull();
-    expect(freePlanHomeFor({ status: ACCOUNT.VERIFIED, data: PAID_PRO }, { enabled: true })).toBeNull();
+    // A paid signup (it chose its tier) keeps its usual home and onboarding.
+    expect(freePlanHomeFor({ status: ACCOUNT.VERIFIED, data: { ...PAID_PRO, selectedTier: 'pro' } }, { enabled: true })).toBeNull();
+    // Started Free, then upgraded: Contact Hub, not onboarding.
+    expect(freePlanHomeFor({ status: ACCOUNT.VERIFIED, data: { ...FREE_SIGNUP, ...PAID_PRO } }, { enabled: true })).toBe(FREE_PLAN_HOME);
     expect(SMART_REDIRECT_REQUIRES_PAYMENT).toBe(true); // switch off: unchanged
   });
 

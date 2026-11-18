@@ -150,6 +150,7 @@ describe('/checkout/success returns the customer once the account says paid', ()
         <Route path="/checkout/success" element={<CheckoutSuccessPage account={account} onRecheckAccount={vi.fn()} />} />
         <Route path="/contact/:contactId" element={<p>Scout contact page</p>} />
         <Route path="/onboarding" element={<p>Onboarding</p>} />
+        <Route path="/contact-hub" element={<p>Contact Hub</p>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -164,11 +165,19 @@ describe('/checkout/success returns the customer once the account says paid', ()
     expect(peekCheckoutReturn()).toBeNull();
   });
 
-  it('paid, nothing kept: the usual destination', async () => {
+  it('a paid signup, nothing kept: onboarding as before', async () => {
     vi.useFakeTimers();
-    renderSuccess(PAID);
+    renderSuccess(verified({ ...PAID.data, selectedTier: 'starter' }));
     await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
     expect(screen.getByTestId('where')).toHaveTextContent(CHECKOUT_RETURN_FALLBACK);
+  });
+
+  it('started Free, nothing kept (upgraded from Settings): back to Contact Hub, no second onboarding', async () => {
+    vi.useFakeTimers();
+    renderSuccess(PAID);
+    expect(screen.getByText('Taking you back to where you were…')).toBeInTheDocument();
+    await act(async () => { await vi.advanceTimersByTimeAsync(1500); });
+    expect(screen.getByTestId('where')).toHaveTextContent('/contact-hub');
   });
 
   it('not paid yet: it goes nowhere, whatever was kept', async () => {

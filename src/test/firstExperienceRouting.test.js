@@ -77,7 +77,8 @@ describe('every entry point lands on the canonical route', () => {
   it('checkout success sends new users to the canonical route', () => {
     // With no place to return to (billing W1: utils/checkoutReturn.js), the destination is
     // the canonical onboarding route.
-    expect(read('../pages/CheckoutSuccessPage.jsx')).toMatch(/const destination = returnTo \?\? CHECKOUT_RETURN_FALLBACK;/);
+    // An account that started on Free goes back to Contact Hub instead (startedOnFreePlan).
+    expect(read('../pages/CheckoutSuccessPage.jsx')).toMatch(/const destination = returnTo \?\? \(FREE_PLAN\.enabled && startedOnFreePlan\(account\?\.data\) \? FREE_PLAN_HOME : CHECKOUT_RETURN_FALLBACK\);/);
     expect(read('../utils/checkoutReturn.js')).toMatch(/export const CHECKOUT_RETURN_FALLBACK = '\/onboarding';/);
   });
 

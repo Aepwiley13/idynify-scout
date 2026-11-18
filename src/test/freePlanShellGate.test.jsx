@@ -25,7 +25,7 @@ vi.mock('../components/billing/UpgradeRequired', () => ({ default: () => <p>Upgr
 const { ShellAccountGate, SignedInSignupRedirect } = await import('../components/billing/freePlanRouting');
 const { freePlanHomeFor, SMART_REDIRECT_REQUIRES_PAYMENT } = await import('../constants/freePlan');
 
-const PAID = { hasCompletedPayment: true, subscriptionTier: 'pro' };
+const PAID = { hasCompletedPayment: true, subscriptionTier: 'pro', selectedTier: 'pro' };
 const UNPAID = { hasCompletedPayment: false };
 const FREE_SIGNUP = { email: 'new@example.test' };
 const snapshot = (data, { fromCache = false } = {}) => ({ exists: () => data !== null, data: () => data, metadata: { fromCache } });
@@ -163,6 +163,14 @@ describe('SmartRedirect and signed-in /signup', () => {
     expect(freePlanHomeFor({ status: ACCOUNT.VERIFIED, data: PAID })).toBeNull();
     expect(freePlanHomeFor({ status: ACCOUNT.UNVERIFIED, data: null })).toBeNull();
     expect(freePlanHomeFor({ status: ACCOUNT.CACHED, data: PAID })).toBeNull();
+  });
+
+  it('an account that started Free and upgraded goes to Contact Hub, never forced into onboarding', () => {
+    const UPGRADED = { ...FREE_SIGNUP, hasCompletedPayment: true, subscriptionTier: 'starter' };
+    expect(freePlanHomeFor({ status: ACCOUNT.VERIFIED, data: UPGRADED })).toBe(CONTACT_HUB_PATH);
+    expect(freePlanHomeFor({ status: ACCOUNT.CACHED, data: UPGRADED })).toBe(CONTACT_HUB_PATH);
+    // If they chose to do Barry's onboarding, their usual home applies.
+    expect(freePlanHomeFor({ status: ACCOUNT.VERIFIED, data: { ...UPGRADED, onboardingComplete: true } })).toBeNull();
   });
 
   it.each([['', CONTACT_HUB_PATH], ['?tier=pro', '/checkout'], ['?tier=starter', '/checkout']])(

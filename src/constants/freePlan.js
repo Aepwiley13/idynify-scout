@@ -28,7 +28,7 @@
  */
 import { CONTACT_HUB, CONTACT_HUB_PATH, contactHubPersonPath } from './contactHub';
 import { SHELL_MIGRATION } from './shellMigration';
-import { planOf, PLAN } from '../utils/accountPlan';
+import { planOf, PLAN, isPaidPlan } from '../utils/accountPlan';
 
 export const FREE_PLAN_MODES = Object.freeze({ ON: 'on', EXISTING: 'existing', OFF: 'off' });
 
@@ -114,8 +114,27 @@ export function freePlanRedirectFor(pathname) {
 
 /** SmartRedirect's destination for a server-verified free account; null otherwise. */
 export function freePlanHomeFor(account, { enabled = FREE_PLAN.enabled } = {}) {
-  return enabled && planOf(account) === PLAN.FREE ? FREE_PLAN_HOME : null;
+  if (!enabled) return null;
+  const plan = planOf(account);
+  if (plan === PLAN.FREE) return FREE_PLAN_HOME;
+  // Started on Free and upgraded (billing W1): the account's people are already here, Scout
+  // opens from the shell, and Barry's onboarding stays available but is never forced on it.
+  if (isPaidPlan(plan) && startedOnFreePlan(account?.data) && !onboardingDone(account?.data)) return FREE_PLAN_HOME;
+  return null;
 }
+
+const PAID_SIGNUP_TIERS = new Set(['starter', 'pro']);
+
+/**
+ * Did this account start on the Free plan? A paid signup always records the tier it chose
+ * (selectedTier, Signup.jsx and firestore.rules signupBillingFields); a Free signup records
+ * none, and paying later does not add one. Pure.
+ */
+export function startedOnFreePlan(data) {
+  return Boolean(data) && !PAID_SIGNUP_TIERS.has(data.selectedTier);
+}
+
+const onboardingDone = (data) => data?.onboardingComplete === true || data?.onboarding?.completed === true;
 
 /** Whether SmartRedirect must see paid access before it lets an account through. */
 export const SMART_REDIRECT_REQUIRES_PAYMENT = !FREE_PLAN.enabled;

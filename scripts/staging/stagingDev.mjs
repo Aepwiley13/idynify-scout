@@ -24,6 +24,9 @@
  *                       The CLI otherwise bundles all of them at start, which
  *                       can exhaust memory on a small machine; other functions
  *                       then answer 404, which sticker QA never needs.
+ *   (optional) --apollo-mock
+ *                       start the local Apollo stand-in (apolloMock.mjs, 127.0.0.1 only) and
+ *                       point the functions at it with its fixed key. For the end-to-end test.
  *   (optional) --billing
  *                       a billing run (docs/billing/STRIPE_TEST_MODE.md): the env
  *                       file may hold Stripe in TEST MODE ONLY, checked by
@@ -42,6 +45,7 @@ import { resolve, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import process from 'node:process';
 import { checkStagingEnv, parseEnvFile, committable, repoRoot, checkoutInputs, INTEGRATION_KEYS } from './stagingPreflight.mjs';
+import { startApolloMock, APOLLO_MOCK_KEY, DEFAULT_APOLLO_MOCK_PORT } from './apolloMock.mjs';
 import {
   readStagingCredential, withCredential, checkCredential, CredentialRefusal, KEY_VARIABLE, FILE_VARIABLE,
 } from './stagingCredentials.mjs';
@@ -97,7 +101,7 @@ export function devArgs({ noEdgeFunctions = false, functionsDir = null } = {}) {
  * { ok, problems, childEnv }. Pure: the checks' results come in, the app's
  * environment comes out.
  */
-export function planDevRun({ fileEnv, credential, shellEnv = {}, checks = [], rest = false, noEdgeFunctions = false, edgeFunctionsDeclared = false }) {
+export function planDevRun({ fileEnv, credential, shellEnv = {}, checks = [], rest = false, noEdgeFunctions = false, edgeFunctionsDeclared = false, apolloMockUrl = null }) {
   const problems = checks.filter((r) => !r.ok).map((r) => `${r.id}: ${r.message}`);
   if (!credential) problems.push(`credential: set ${KEY_VARIABLE} or ${FILE_VARIABLE} to the staging service-account key.`);
   if (noEdgeFunctions && edgeFunctionsDeclared) problems.push('edge-functions: this project declares edge functions; run without --no-edge-functions.');
@@ -106,10 +110,17 @@ export function planDevRun({ fileEnv, credential, shellEnv = {}, checks = [], re
   for (const [name, value] of Object.entries(shellEnv)) if (!dropFromShell(name)) childEnv[name] = value;
   Object.assign(childEnv, withCredential(fileEnv, credential));
   if (rest) childEnv.FIRESTORE_PREFER_REST = 'true';
+  // --apollo-mock: the functions talk to the local stand-in (apolloMock.mjs) with its fixed,
+  // non-secret key. A real Apollo key is never passed: the env file may not hold one (I5) and
+  // the shell's is dropped above.
+  if (apolloMockUrl) {
+    childEnv.APOLLO_API_KEY = APOLLO_MOCK_KEY;
+    childEnv.APOLLO_MOCK_URL = apolloMockUrl;
+  }
   return { ok: true, problems: [], childEnv };
 }
 
-function main() {
+async function main() {
   const argv = process.argv.slice(2);
   const envArg = argv.find((a) => a.startsWith('--env='));
   if (!envArg) { console.error('Refused: pass --env=<path to the staging env file>.'); return 1; }
@@ -140,19 +151,21 @@ function main() {
     ...checkCredential(fileEnv, credential),
   ];
   const noEdgeFunctions = argv.includes('--no-edge-functions');
+  const apolloMock = argv.includes('--apollo-mock') ? await startApolloMock({ port: DEFAULT_APOLLO_MOCK_PORT }) : null;
   const plan = planDevRun({
     fileEnv, credential, shellEnv: process.env, checks, rest: argv.includes('--rest'),
-    noEdgeFunctions, edgeFunctionsDeclared: hasEdgeFunctions(repoRoot()),
+    noEdgeFunctions, edgeFunctionsDeclared: hasEdgeFunctions(repoRoot()), apolloMockUrl: apolloMock?.url ?? null,
   });
   if (!plan.ok) {
+    await apolloMock?.close();
     for (const p of plan.problems) console.error(`  ✗ ${p}`);
     console.error('\nRefused: the app was not started.');
     return 1;
   }
   const functions = argv.includes('--only-sticker-functions') ? stickerFunctionsFolder(repoRoot()) : null;
-  console.log(`Preflight passed. Starting the app against ${fileEnv.VITE_FIREBASE_PROJECT_ID} (browser, functions and sign-in)${billing ? ', Stripe in test mode' : ''}, credential from ${credential.source}${functions ? `, serving only: ${STICKER_QA_FUNCTIONS.join(', ')}` : ''}.`);
+  console.log(`Preflight passed. Starting the app against ${fileEnv.VITE_FIREBASE_PROJECT_ID} (browser, functions and sign-in)${billing ? ', Stripe in test mode' : ''}${apolloMock ? `, Apollo stand-in at ${apolloMock.url}` : ''}, credential from ${credential.source}${functions ? `, serving only: ${STICKER_QA_FUNCTIONS.join(', ')}` : ''}.`);
   const child = spawn('npx', devArgs({ noEdgeFunctions, functionsDir: functions?.path }), { cwd: repoRoot(), stdio: 'inherit', env: plan.childEnv });
-  const stop = () => { functions?.remove(); };
+  const stop = () => { functions?.remove(); apolloMock?.close(); };
   for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(signal, () => { child.kill(signal); stop(); process.exit(130); });
   child.on('exit', (code) => { stop(); process.exitCode = code ?? 1; });
   return undefined;
@@ -160,6 +173,6 @@ function main() {
 
 const invokedDirectly = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (invokedDirectly) {
-  const code = main();
+  const code = await main();
   if (code !== undefined) process.exitCode = code;
 }

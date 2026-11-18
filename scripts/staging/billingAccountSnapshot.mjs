@@ -138,7 +138,7 @@ export function planSnapshot(shellEnv, credential) {
   return { env, target, stripeKey: key ?? null };
 }
 
-async function readFirestore(db, uid) {
+export async function readFirestore(db, uid) {
   const userSnap = await db.collection('users').doc(uid).get();
   const byUid = async (coll) => (await db.collection(coll).where('uid', '==', uid).get()).docs.map((d) => ({ id: d.id, ...d.data() }));
   return {
@@ -149,7 +149,7 @@ async function readFirestore(db, uid) {
   };
 }
 
-async function readStripe(stripe, customerId) {
+export async function readStripe(stripe, customerId) {
   if (!customerId) return { customer: null, subscriptions: [], sessions: [] };
   const customer = await stripe.customers.retrieve(customerId);
   const subscriptions = (await stripe.subscriptions.list({ customer: customerId, status: 'all', limit: 20 })).data ?? [];

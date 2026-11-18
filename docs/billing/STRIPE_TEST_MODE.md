@@ -69,7 +69,7 @@ VITE_FREE_PLAN=on                      # the free plan switch (free-accounts PR)
 
 1. Start forwarding webhooks to the local functions. Leave it running:
    ```bash
-   stripe listen --forward-to localhost:8888/.netlify/functions/stripe-webhook --events checkout.session.completed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted
+   stripe listen --forward-to localhost:8888/.netlify/functions/stripe-webhook --events checkout.session.completed,customer.subscription.created,customer.subscription.updated,customer.subscription.deleted,invoice.paid
    ```
    It prints a `whsec_…` signing secret. Put it in the env file as `STRIPE_WEBHOOK_SECRET`.
 2. Check the env file, then start the app:

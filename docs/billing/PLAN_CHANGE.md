@@ -57,3 +57,19 @@ The restricted test-mode key needs, in addition to the checkout list: **Subscrip
    period end; **plan switching off**). Set its id as `STRIPE_PORTAL_CONFIGURATION_ID` in Netlify.
    Without it, Manage billing says it is not available yet and nothing else is affected.
 2. The live webhook endpoint already receives `customer.subscription.updated`; nothing to add.
+
+## Monthly renewal (W4b)
+
+`invoice.paid` with `billing_reason: 'subscription_cycle'` resets the plan's monthly allowance
+(Starter 400, Pro 1,250; unused credits do not carry over) for the subscription on file, once per
+invoice (`billingAllocations/{subscription}__renewal__{invoice}`), through the same lock and event
+ledger. The first invoice (checkout grants it) and a plan change's proration invoice (granted above)
+are not renewals. A downgrade at period end renews at Starter's allowance. Invoices from before the
+ledger epoch are not granted; without an epoch the renewal is flagged for review.
+
+**Production change (owner approval):** add `invoice.paid` to the live webhook endpoint's events in
+Stripe. Staging: add `invoice.paid` to the `stripe listen --events` list. Without it, renewals are
+not granted, and with metering on (W4a) paying customers would run out, so the two go live together.
+
+Test mode: a customer on a test clock, subscribed, clock advanced past the period end →
+`invoice.paid` (subscription_cycle) → the allowance resets once; `stripe events resend` changes nothing.

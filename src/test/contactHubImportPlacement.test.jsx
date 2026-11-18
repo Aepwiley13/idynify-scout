@@ -74,7 +74,7 @@ vi.mock('../components/scout/ManualContactForm', () => ({
 
 vi.mock('../components/contactImport/ImportPeopleDialog', () => ({
   default: (props) => (
-    <div role="dialog" aria-label="Import People">
+    <div role="dialog" aria-label="Import Contacts">
       <button type="button" onClick={() => {
         // What the real importer does: write people to users/{uid}/contacts, then report.
         contactsData.list.push(
@@ -145,23 +145,33 @@ describe('Import in My People', () => {
     await screen.findByRole('list', { name: 'My People' });
     expect(contactsData.loads).toBe(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Import People' }));
-    expect(screen.getByRole('dialog', { name: 'Import People' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Import Contacts' }));
+    expect(screen.getByRole('dialog', { name: 'Import Contacts' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'finish import' }));
 
     await waitFor(() => expect(contactsData.loads).toBe(2));
     expect(contactsData.paths).toEqual(['users/u1/contacts', 'users/u1/contacts']);
     await waitFor(() => expect(names()).toEqual(expect.arrayContaining(['Imported One', 'Imported Two'])));
-    expect(screen.queryByRole('dialog', { name: 'Import People' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: 'Import Contacts' })).toBeNull();
     expect(screen.getByText('2 people added, 1 person already in My People.')).toHaveClass('hub-status');
+  });
+
+  it('a brand-new account with no one yet can import straight away, from the first screen', async () => {
+    contactsData.list = [];
+    renderHub();
+    await screen.findByText('Start with one person');
+    fireEvent.click(screen.getByRole('button', { name: 'Import Contacts' }));
+    fireEvent.click(screen.getByRole('button', { name: 'finish import' }));
+    await waitFor(() => expect(names()).toEqual(expect.arrayContaining(['Imported One', 'Imported Two'])));
+    expect(screen.queryByText('Start with one person')).toBeNull();
   });
 
   it('closing the importer changes nothing', async () => {
     renderHub();
     await screen.findByRole('list', { name: 'My People' });
-    fireEvent.click(screen.getByRole('button', { name: 'Import People' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Import Contacts' }));
     fireEvent.click(screen.getByRole('button', { name: 'close' }));
-    expect(screen.queryByRole('dialog', { name: 'Import People' })).toBeNull();
+    expect(screen.queryByRole('dialog', { name: 'Import Contacts' })).toBeNull();
     expect(contactsData.loads).toBe(1);
   });
 });

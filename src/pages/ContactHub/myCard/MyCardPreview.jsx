@@ -7,8 +7,9 @@
  * rules refuse never appear here, so the preview cannot show more than a
  * shared card would.
  *
- * THE CARD IS JUST THE CARD. Photo, name, title and organization lead; the
- * contact details follow. Nothing about privacy is written on it. What is kept
+ * THE CARD IS JUST THE CARD. The organization (when shared) is the header, in
+ * the place the IDYNIFY wordmark used to take; photo, name and title lead; the
+ * contact details follow; a small "Made with IDYNIFY" closes it. Nothing about privacy is written on it. What is kept
  * private, and the fact that sharing is not on yet, are said in a note beside
  * it, so the card looks the way it will look when it is shared.
  *
@@ -23,6 +24,9 @@ import { BRAND, THEMES } from '../../../theme/tokens';
 // The card is IDYNIFY-branded in every theme, like the sign-in screens: the brand's
 // navy, indigo, purple and pink, and white on them. Set here from the app's own
 // design tokens, so the stylesheet holds no colour of its own.
+/** The header when there is no organization to show: neutral, and says nothing about anyone. */
+export const HEADER_FALLBACK = 'Contact card';
+
 const BRAND_SURFACE = Object.freeze({
   '--mycard-brand-1': BRAND.navy,
   '--mycard-brand-2': BRAND.indigo,
@@ -64,14 +68,15 @@ export default function MyCardPreview({ card, sharing = false }) {
 
       {view ? (
         <article className="mycard-card" aria-label={`Card for ${view.name}`} style={BRAND_SURFACE}>
-          <div className="mycard-card-banner" aria-hidden="true">
-            <span className="mycard-card-brand">IDYNIFY</span>
+          <div className="mycard-card-banner" aria-hidden={view.organization ? undefined : 'true'}>
+            {view.organization
+              ? <span className="mycard-card-brand mycard-card-brand--org">{view.organization}</span>
+              : <span className="mycard-card-brand">{HEADER_FALLBACK}</span>}
           </div>
           <div className="mycard-card-body">
             <CardAvatar photoUrl={view.photoUrl} initials={view.initials} size="xl" tone="brand" />
             <h3 className="mycard-card-name">{view.name}</h3>
             {view.title ? <p className="mycard-card-title">{view.title}</p> : null}
-            {view.organization ? <p className="mycard-card-org">{view.organization}</p> : null}
             {hasDetails ? (
               <ul className="mycard-rows">
                 {view.email ? <Row icon={<Mail size={16} />} label="Email">{softBreaks(view.email)}</Row> : null}
@@ -81,6 +86,7 @@ export default function MyCardPreview({ card, sharing = false }) {
                 {view.website ? <Row icon={<Globe size={16} />} label="Website">{softBreaks(readableLink(view.website))}</Row> : null}
               </ul>
             ) : null}
+            <p className="mycard-card-made">Made with IDYNIFY</p>
           </div>
         </article>
       ) : (

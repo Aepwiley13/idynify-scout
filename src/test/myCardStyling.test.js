@@ -276,6 +276,19 @@ describe('the card is branded in every theme', () => {
     expect(rule('.mycard-card-banner')).toMatch(/linear-gradient\(135deg, var\(--mycard-brand-1\)/);
   });
 
+  it('keeps the organization header off the pink corner, where small white text would be under 4.5:1', () => {
+    expect(contrast(parseColour(white), parseColour(BRAND.pink))).toBeLessThan(4.5);
+    expect(rule('.mycard-card-brand--org')).toMatch(/max-width:\s*calc\(100% - 96px\)/);
+    expect(rule('.mycard-card-brand--org')).not.toMatch(/right:/);
+    expect(rule('.mycard-card-brand--org')).toMatch(/-webkit-line-clamp:\s*2/);
+  });
+
+  it('keeps the attribution small and quiet, in the card\'s own secondary text', () => {
+    const made = rule('.mycard-card-made');
+    expect(made).toMatch(/font-size:\s*12px/);
+    expect(made).toMatch(/color:\s*var\(--text-secondary\)/);
+  });
+
   it('lifts the photo above the banner it overlaps, so it is never half hidden', () => {
     const avatar = rule('.mycard-card-body .mycard-avatar');
     expect(avatar).toMatch(/margin-top:\s*-56px/);
@@ -360,7 +373,7 @@ describe('layout', () => {
   });
 
   it('wraps long names and addresses instead of overflowing', () => {
-    for (const selector of ['.mycard-card-name', '.mycard-row-value', '.mycard-card-title', '.mycard-card-org']) {
+    for (const selector of ['.mycard-card-name', '.mycard-row-value', '.mycard-card-title', '.mycard-card-brand--org']) {
       expect(rule(selector), selector).toMatch(/overflow-wrap:\s*anywhere/);
     }
     expect(rule('.mycard-input')).toMatch(/min-width:\s*0/);

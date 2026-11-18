@@ -208,6 +208,14 @@
   position: absolute; top: 16px; left: 20px;
   font-size: 12px; font-weight: 800; letter-spacing: 0.22em; color: var(--mycard-on-brand);
 }
+/* An organization's name is the header: readable first, so a calmer tracking, up to two lines,
+   and kept off the pink corner, where white is thinnest (4.3:1), and clear of the photo. */
+.mycard-card-brand--org {
+  max-width: calc(100% - 96px);
+  font-size: 15px; font-weight: 700; letter-spacing: 0.04em; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  overflow-wrap: anywhere;
+}
 .mycard-card-body {
   display: flex; flex-direction: column; align-items: center; gap: 2px;
   padding: 0 24px 24px; text-align: center;
@@ -221,7 +229,7 @@
 }
 .mycard-card-name { margin: 0; max-width: 100%; font-size: 28px; font-weight: 800; line-height: 1.15; letter-spacing: -0.01em; overflow-wrap: anywhere; }
 .mycard-card-title { margin: 4px 0 0; max-width: 100%; font-size: 17px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
-.mycard-card-org { margin: 0; max-width: 100%; font-size: 15px; line-height: 1.3; color: var(--text-secondary); overflow-wrap: anywhere; }
+.mycard-card-made { margin: 18px 0 0; font-size: 12px; line-height: 1.2; letter-spacing: 0.02em; color: var(--text-secondary); }
 
 .mycard-rows {
   display: flex; flex-direction: column; gap: 2px; width: 100%;

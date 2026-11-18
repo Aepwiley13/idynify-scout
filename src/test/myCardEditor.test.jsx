@@ -135,9 +135,9 @@ describe('the preview follows what is typed', () => {
     await userEvent.type(field('Organization'), 'Analytical Engines');
     const card = within(preview()).getByRole('article', { name: 'Card for Ada Lovelace' });
     expect(within(card).getByRole('heading', { name: 'Ada Lovelace' })).toBeInTheDocument();
-    // Title and organization lead on lines of their own, under the name.
+    // The title is under the name; the organization is the card's header.
     expect(within(card).getByText('Analyst')).toHaveClass('mycard-card-title');
-    expect(within(card).getByText('Analytical Engines')).toHaveClass('mycard-card-org');
+    expect(within(card).getByText('Analytical Engines')).toHaveClass('mycard-card-brand--org');
   });
 
   it('keeps every word about privacy off the card: beside it, never on it', async () => {
@@ -150,13 +150,38 @@ describe('the preview follows what is typed', () => {
     expect(within(aside).getByText(/Sharing isn.t turned on yet/)).toBeInTheDocument();
   });
 
-  it('puts the photo, name, title and organization first on the card, details after', async () => {
+  it('puts the organization in the header, then photo, name, title, details and the attribution', async () => {
     render(<Page initial={{ ...named, title: 'Analyst', organization: 'Analytical Engines', photoUrl: 'https://images.example.com/a.jpg', email: 'ada@example.com', share: { photoUrl: true, title: true, organization: true, email: true } }} />);
     const card = within(preview()).getByRole('article');
-    const order = [card.querySelector('img'), within(card).getByRole('heading', { name: 'Ada Lovelace' }), within(card).getByText('Analyst'), within(card).getByText('Analytical Engines'), within(card).getByRole('list')];
+    const order = [within(card).getByText('Analytical Engines'), card.querySelector('img'), within(card).getByRole('heading', { name: 'Ada Lovelace' }), within(card).getByText('Analyst'), within(card).getByRole('list'), within(card).getByText('Made with IDYNIFY')];
     for (let i = 1; i < order.length; i += 1) {
       expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING, `item ${i}`).toBeTruthy();
     }
+  });
+
+  it('shows a neutral header, and no wordmark, when there is no organization', async () => {
+    render(<Page initial={named} />);
+    const card = within(preview()).getByRole('article');
+    expect(card.querySelector('.mycard-card-brand')).toHaveTextContent('Contact card');
+    expect(card.querySelector('.mycard-card-banner')).toHaveAttribute('aria-hidden', 'true');
+    expect(within(card).getAllByText(/IDYNIFY/)).toHaveLength(1);
+    expect(within(card).getByText('Made with IDYNIFY')).toHaveClass('mycard-card-made');
+  });
+
+  it('shows a private organization nowhere on the card, and the neutral header instead', async () => {
+    render(<Page initial={{ ...named, organization: 'Analytical Engines', share: { organization: false } }} />);
+    const card = within(preview()).getByRole('article');
+    expect(card.textContent).not.toMatch(/Analytical Engines/);
+    expect(card.querySelector('.mycard-card-brand')).toHaveTextContent('Contact card');
+    expect(within(preview()).getByText(/Kept private: .*Organization/)).toBeInTheDocument();
+  });
+
+  it('follows the organization as it is typed, and the attribution stays at the bottom', async () => {
+    render(<Page initial={named} />);
+    await userEvent.type(field('Organization'), 'Acme');
+    const card = within(preview()).getByRole('article');
+    expect(card.querySelector('.mycard-card-brand')).toHaveTextContent('Acme');
+    expect(card.querySelector('.mycard-card-body').lastElementChild).toHaveTextContent('Made with IDYNIFY');
   });
 
   it('shows the initials without a photo', async () => {

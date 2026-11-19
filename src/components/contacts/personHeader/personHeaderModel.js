@@ -23,9 +23,10 @@
  *   stickers       services/stickers/stickerCore (visibleStickers, STICKER_COLORS)
  *
  * TOLERANT. A missing, blank, wrongly-typed or malformed value is left out, never
- * shown as "undefined" or "[object Object]", and never makes the model throw. Very
- * long values are clipped (a generous cap, with an ellipsis) so one bad import
- * cannot break a layout. A link is only offered when it is safe: a mailto address
+ * shown as "undefined" or "[object Object]", and never makes the model throw. Text is
+ * tidied (one line, no control characters) but NEVER shortened: the model holds the
+ * complete value, and how a very long one is shown (wrapping, line clamps, an
+ * accessible full-text label) is the component's job. A link is only offered when it is safe: a mailto address
  * cannot carry a second recipient, a subject or a header; a tel number is digits
  * and an optional leading +; a social address is rebuilt, not echoed.
  *
@@ -54,8 +55,8 @@ import { primaryPhone, phoneDisplay, readContactPhones } from '../../../utils/co
 import { readSocialProfiles, platformLabel } from '../../../utils/socialProfiles.js';
 import { STICKER_COLORS, visibleStickers } from '../../../services/stickers/stickerCore.js';
 
-/** Generous caps for text shown in a header: far above anything a person types, far below a layout breaker. */
-export const LIMITS = Object.freeze({ name: 200, title: 200, organization: 200, location: 200, emoji: 16 });
+/** The one cap: a sticker's emoji is at most this many characters (the sticker rules' own limit), so it stays one small mark. */
+export const LIMITS = Object.freeze({ emoji: 16 });
 
 /** "Active" means a message or contact in this long. The existing contact card's rule. */
 export const ACTIVE_WINDOW_MS = 30 * 86_400_000;
@@ -73,10 +74,11 @@ function line(value) {
   return value.replace(/\p{Cc}/gu, ' ').replace(/\s+/gu, ' ').trim();
 }
 
-/** `value` as a clean line of at most `max` characters (whole characters, never half of one), or null. */
-function clipped(value, max) {
+/** `value` as a clean line, complete, or null when there is nothing. With `max`: at most that many whole characters (never half of one). */
+function tidy(value, max = Infinity) {
   const text = line(value);
   if (!text) return null;
+  if (max === Infinity) return text;
   const parts = graphemesOf(text);
   if (parts.length <= max) return text;
   return `${parts.slice(0, max - 1).join('').trimEnd()}…`;
@@ -104,14 +106,14 @@ export function initialsOf(name) {
 
 /** "Salt Lake City, UT, United States" from whichever parts the contact has; `location` wins when it is set. */
 export function locationText(contact) {
-  const direct = clipped(contact?.location, LIMITS.location);
+  const direct = tidy(contact?.location);
   if (direct) return direct;
   const parts = [];
   for (const field of ['city', 'state', 'country']) {
     const part = line(contact?.[field]);
     if (part && !parts.some((p) => p.toLowerCase() === part.toLowerCase())) parts.push(part);
   }
-  return clipped(parts.join(', '), LIMITS.location);
+  return tidy(parts.join(', '));
 }
 
 // ─── Links ───────────────────────────────────────────────────────────────────
@@ -155,7 +157,7 @@ function phoneOf(contact) {
   if (!entry) return null;
   const href = safeTelHref(entry.value);
   if (!href) return null;
-  const text = clipped(phoneDisplay(entry), 60);
+  const text = tidy(phoneDisplay(entry));
   return text ? { text, href, label: entry.label } : null;
 }
 
@@ -171,9 +173,9 @@ function stickersOf(contact, stickersById) {
   if (!(stickersById instanceof Map)) return null;
   return visibleStickers(contact ?? {}, stickersById).map((s) => ({
     id: String(s.id),
-    name: clipped(s.name, LIMITS.name) ?? '',
+    name: tidy(s.name) ?? '',
     color: STICKER_COLORS.includes(s.color) ? s.color : 'gray',
-    emoji: clipped(s.emoji, LIMITS.emoji),
+    emoji: tidy(s.emoji, LIMITS.emoji),
   })).filter((s) => s.name !== '');
 }
 
@@ -224,14 +226,14 @@ export function buildPersonHeaderModel(contact, { stickersById = null, now = Dat
   const parts = nameParts(nameSource);
   const hasName = Boolean(parts.name || parts.first || parts.last);
   // Never the email address as a name: the address has its own pill.
-  const name = clipped(contactDisplayName(nameSource, { email: false }), LIMITS.name) ?? UNKNOWN_CONTACT;
+  const name = tidy(contactDisplayName(nameSource, { email: false })) ?? UNKNOWN_CONTACT;
   const { thumbnail, full } = resolveContactPhotoSources(source);
 
   return deepFreeze({
     name,
     hasName,
-    title: clipped(source.title, LIMITS.title),
-    organization: clipped(source.company_name, LIMITS.organization) ?? clipped(source.company, LIMITS.organization),
+    title: tidy(source.title),
+    organization: tidy(source.company_name) ?? tidy(source.company),
     location: locationText(source),
     avatar: { initials: hasName ? initialsOf(name) : '?', photoUrl: thumbnail, fullPhotoUrl: full },
     phone: phoneOf(source),

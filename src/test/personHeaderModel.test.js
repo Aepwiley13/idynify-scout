@@ -392,17 +392,31 @@ describe('missing, malformed, long and international values', () => {
     expect(JSON.stringify(m)).not.toMatch(/undefined|\[object Object\]|NaN/);
   });
 
-  it('clips very long values to a sane length, with an ellipsis, at a whole character', () => {
-    const long = 'Ünïcødé '.repeat(500);
-    const m = model({ name: long, title: long, company_name: long, location: long });
+  it('keeps complete values, however long: the model never shortens what the contact holds', () => {
+    const long = 'Ünïcødé '.repeat(500).trim();
+    const m = model({ name: long, title: long, company_name: long, location: long, phone: `801-555-0100 x${'1'.repeat(6)}` });
     for (const field of ['name', 'title', 'organization', 'location']) {
-      expect([...m[field]].length, field).toBeLessThanOrEqual(LIMITS[field]);
-      expect(m[field].endsWith('…'), field).toBe(true);
+      expect(m[field], field).toBe(long);
+      expect(m[field].endsWith('…'), field).toBe(false);
     }
-    const emoji = model({ title: '👩🏽‍💻'.repeat(500) }).title;
-    expect(/[\uD800-\uDBFF]…$/.test(emoji)).toBe(false);
-    expect(model({ title: 'x'.repeat(LIMITS.title) }).title).toBe('x'.repeat(LIMITS.title));
-    expect(model({ title: 'x'.repeat(LIMITS.title + 1) }).title).toHaveLength(LIMITS.title);
+    // A name of 5,000 characters, a title of 10,000, in international scripts and with emoji: whole.
+    const huge = `${'李小龍 '.repeat(1700)}${'👩🏽‍💻'.repeat(500)}`.trim();
+    expect(model({ name: huge, title: huge }).name).toBe(huge);
+    expect(model({ name: huge, title: huge }).title).toBe(huge);
+    expect(model({ title: 'x'.repeat(LIMITS.emoji + 5000) }).title).toHaveLength(LIMITS.emoji + 5000);
+    expect(model({ location: 'a, '.repeat(1000).replace(/, $/, '') }).location).toHaveLength(2998);
+  });
+
+  it('keeps a long sticker name whole, and keeps only a sticker\'s emoji to one small mark', () => {
+    const name = 'Community partner and supporter of the annual school fundraiser '.repeat(3).trim();
+    const m = model({ sticker_ids: ['a'] }, { stickersById: registry({ id: 'a', name, color: 'teal', emoji: '🙂'.repeat(60) }) });
+    expect(m.stickers[0].name).toBe(name);
+    expect([...m.stickers[0].emoji].length).toBeLessThanOrEqual(LIMITS.emoji);
+  });
+
+  it('tidies a long value without losing any of it: control characters and runs of spaces go, words stay', () => {
+    const messy = Array.from({ length: 300 }, (_, i) => `word${i}`).join(' \n\t ');
+    expect(model({ title: messy }).title).toBe(Array.from({ length: 300 }, (_, i) => `word${i}`).join(' '));
   });
 
   it('keeps international text whole', () => {

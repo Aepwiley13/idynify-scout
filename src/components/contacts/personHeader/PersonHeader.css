@@ -1,0 +1,185 @@
+/* PersonHeader: a person's identity card.
+
+   Colours are the shell's theme variables (src/index.css, set on html[data-theme])
+   and nothing else, so every theme works without a second sheet. The one exception
+   is the brand: --ph-purple, --ph-indigo and --ph-pink arrive from the design tokens
+   (PersonHeader.jsx). The purple is mixed toward the theme's own text colour, so it is
+   a deep purple on a light theme and a light one on a dark theme, and reads on both.
+
+   Layout follows the header's OWN width (a container query), not the screen's: the
+   same card is right in a 960px page, a narrow column or a phone. With no container
+   query support the base layout, the phone's, is used, which is always safe.
+
+   Every control (a link) is 44px to hit. Nothing here removes a focus outline. */
+
+.ph {
+  container-type: inline-size;
+  container-name: ph;
+  width: 100%;
+  box-sizing: border-box;
+  /* The accent used as text and icon colour. */
+  --ph-ink: #5b21b6;
+  --ph-tint: rgba(124, 58, 237, 0.10);
+  --ph-tint-strong: rgba(124, 58, 237, 0.16);
+  color: var(--text-primary);
+}
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .ph {
+    --ph-ink: color-mix(in srgb, var(--ph-purple) 60%, var(--text-primary));
+    --ph-tint: color-mix(in srgb, var(--ph-purple) 9%, var(--bg-card));
+    --ph-tint-strong: color-mix(in srgb, var(--ph-purple) 16%, var(--bg-card));
+  }
+}
+
+.ph ul { list-style: none; margin: 0; padding: 0; }
+.ph p, .ph h1, .ph h2, .ph h3, .ph h4, .ph h5, .ph h6 { margin: 0; }
+.ph-sr {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+/* ── The card: the phone's layout first ── */
+.ph-card {
+  /* The photo's size: set here, on the card, because a container query styles what is inside the container. */
+  --ph-avatar: 76px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "avatar identity" "contacts contacts" "stickers stickers";
+  column-gap: 16px;
+  row-gap: 16px;
+  align-items: start;
+  box-sizing: border-box;
+  padding: 18px 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card), 0 10px 30px rgba(124, 58, 237, 0.07);
+}
+
+/* ── Photo and initials ── */
+.ph-avatar-wrap { grid-area: avatar; align-self: start; position: relative; width: var(--ph-avatar); height: var(--ph-avatar); flex: 0 0 auto; }
+.ph-avatar {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%; box-sizing: border-box;
+  border-radius: 50%; overflow: hidden;
+  background: linear-gradient(135deg, var(--ph-indigo), var(--ph-purple));
+  color: #fff;
+  box-shadow: 0 0 0 3px var(--bg-card), 0 0 0 4px var(--border), 0 6px 18px rgba(124, 58, 237, 0.18);
+}
+.ph-avatar-img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ph-avatar-initials {
+  font-size: calc(var(--ph-avatar) * 0.36); font-weight: 700; letter-spacing: 0.02em; line-height: 1;
+  white-space: nowrap; overflow: hidden; max-width: 100%;
+}
+/* Quiet: small, at the edge of the photo, with a ring in the card colour. */
+.ph-activity {
+  position: absolute; right: 2px; bottom: 2px; box-sizing: border-box;
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--bg-card);
+}
+.ph-activity--on { background: #1d9e75; }
+.ph-activity--off { background: #8a8a98; }
+
+/* ── Identity: name, subtitle, location ── */
+.ph-identity { grid-area: identity; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.ph-name {
+  text-align: left;
+  font-size: 24px; font-weight: 800; line-height: 1.15; letter-spacing: -0.01em; color: var(--text-primary);
+  overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden;
+}
+.ph-subtitle {
+  text-align: left;
+  font-size: 15px; line-height: 1.35; font-weight: 500; color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+.ph-subtitle-part { display: block; }
+.ph-sep { display: none; }
+.ph-location {
+  display: flex; align-items: flex-start; gap: 6px;
+  font-size: 14px; line-height: 1.35; color: var(--text-secondary); min-width: 0;
+}
+.ph-location-icon { flex: 0 0 auto; margin-top: 1px; color: var(--ph-ink); }
+.ph-location-text {
+  text-align: left; min-width: 0; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+
+/* ── Ways to reach them: pills, and a button-sized link for each profile ── */
+.ph-contacts { grid-area: contacts; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+/* On a phone the phone and email are full width: the easiest thing to hit. */
+.ph-contact:not(.ph-contact--social) { flex: 1 1 100%; min-width: 0; }
+.ph-pill, .ph-social {
+  display: inline-flex; align-items: center; box-sizing: border-box;
+  min-height: 44px; border: 1px solid var(--border-2); border-radius: 999px;
+  background: var(--bg-card); color: var(--text-primary); text-decoration: none;
+}
+.ph-pill { gap: 10px; width: 100%; max-width: 100%; padding: 0 18px 0 14px; font-size: 15px; font-weight: 600; }
+.ph-pill-icon { flex: 0 0 auto; color: var(--ph-ink); }
+.ph-pill-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-social { justify-content: center; width: 44px; padding: 0; color: var(--ph-ink); }
+.ph-pill:hover, .ph-social:hover { background: var(--ph-tint); border-color: var(--ph-ink); }
+.ph-pill:focus-visible, .ph-social:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 2px; background: var(--ph-tint); }
+@media (prefers-reduced-motion: no-preference) {
+  .ph-pill, .ph-social { transition: background-color 0.15s ease, border-color 0.15s ease; }
+}
+
+/* ── Stickers: soft pills in their own colours ── */
+.ph-stickers { grid-area: stickers; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; align-content: flex-start; }
+.ph-sticker {
+  display: inline-flex; align-items: center; gap: 7px; box-sizing: border-box;
+  max-width: 100%; min-width: 0; padding: 6px 13px 6px 11px;
+  border: 1.5px solid var(--ph-sticker-border); border-radius: 999px;
+  background: var(--ph-sticker-tint); color: var(--text-primary);
+  font-size: 14px; font-weight: 600; line-height: 1.25;
+}
+.ph-sticker-dot { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%; background: var(--ph-sticker-dot); }
+.ph-sticker-emoji { flex: 0 0 auto; font-size: 15px; line-height: 1; }
+.ph-sticker-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* A row that is not there takes no room, and leaves no gap. (c: ways to reach them, s: stickers.) */
+.ph-card[data-layout="c1s0"] { grid-template-areas: "avatar identity" "contacts contacts"; }
+.ph-card[data-layout="c0s1"] { grid-template-areas: "avatar identity" "stickers stickers"; }
+.ph-card[data-layout="c0s0"] { grid-template-areas: "avatar identity"; }
+
+/* ── Tablet: photo and identity side by side, the ways to reach them under the identity,
+      the stickers on a row of their own ── */
+@container ph (min-width: 540px) {
+  .ph-card {
+    --ph-avatar: 96px;
+    grid-template-areas: "avatar identity" "avatar contacts" "stickers stickers";
+    column-gap: 22px;
+    row-gap: 14px;
+    padding: 24px;
+  }
+  .ph-card[data-layout="c1s0"] { grid-template-areas: "avatar identity" "avatar contacts"; }
+  .ph-card[data-layout="c0s1"] { grid-template-areas: "avatar identity" "stickers stickers"; }
+  .ph-card[data-layout="c0s0"] { grid-template-areas: "avatar identity"; }
+  .ph-name { font-size: 28px; }
+  .ph-subtitle { font-size: 16px; }
+  .ph-subtitle-part { display: inline; }
+  .ph-sep { display: inline; }
+  .ph-location { font-size: 15px; }
+  .ph-contact:not(.ph-contact--social) { flex: 0 1 auto; max-width: 100%; }
+  .ph-pill { width: auto; max-width: min(100%, 340px); }
+  .ph-stickers { margin-top: 4px; }
+}
+
+/* ── Desktop: photo, identity and the ways to reach them, the stickers at the top right ── */
+@container ph (min-width: 820px) {
+  .ph-card {
+    --ph-avatar: 112px;
+    grid-template-columns: auto minmax(0, 1fr) minmax(240px, 34%);
+    grid-template-areas: "avatar identity stickers" "avatar contacts contacts";
+    column-gap: 28px;
+    padding: 28px 32px;
+    border-radius: 24px;
+  }
+  .ph-card[data-layout="c1s0"] { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "avatar identity" "avatar contacts"; }
+  .ph-card[data-layout="c0s1"] { grid-template-areas: "avatar identity stickers"; }
+  .ph-card[data-layout="c0s0"] { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "avatar identity"; }
+  .ph-name { font-size: 32px; }
+  .ph-subtitle { font-size: 17px; }
+  .ph-stickers { margin-top: 6px; }
+}

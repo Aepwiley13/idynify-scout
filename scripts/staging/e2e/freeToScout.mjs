@@ -21,7 +21,14 @@
  *   PRODUCTION_FIREBASE_PROJECT_ID=<production id> STRIPE_SECRET_KEY=<rk_test_… from the env file> \
  *     node scripts/staging/e2e/freeToScout.mjs [--headed] [--with-pro] [--skip-my-card]
  *
- * Exit code 0 only if every step passed; 2 if any failed; 3 if all ran but some were pending.
+ * Result and exit code: PASS (0) only if every step ran and passed; FAIL (2) if a step failed (the
+ * journey stops there); INCOMPLETE (3) if nothing failed but a step is pending (My Card while it is
+ * skipped; the sticker part when staging does not offer stickers to a new account). INCOMPLETE is
+ * not a pass.
+ *
+ * The Apollo stand-in's call log is never cleared: the journey counts the calls already there when
+ * it starts and only looks at the ones after, so other testing against the same stand-in keeps its
+ * log. Do not use the app by hand while the journey runs: the stand-in cannot tell whose call it is.
  */
 import { Buffer } from 'node:buffer';
 import { writeFileSync } from 'node:fs';
@@ -29,7 +36,10 @@ import { tmpdir } from 'node:os';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
 import { launchChromium } from '../stagingBrowser.mjs';
-import { parseE2eArgs, JourneyRefusal, FIVE_PEOPLE_CSV, FOCUS_PERSON, isPaidRequest, functionName, compareAccount, summarize } from './journey.mjs';
+import {
+  parseE2eArgs, JourneyRefusal, FIVE_PEOPLE_CSV, FOCUS_PERSON, isPaidRequest, functionName, compareAccount, summarize,
+  stickerStepPlan, callsSince, verifyProUpgrade, appRecordsAdded,
+} from './journey.mjs';
 import { planSnapshot, readFirestore, readStripe, summarizeAccount, SnapshotRefusal } from '../billingAccountSnapshot.mjs';
 import { readStagingCredential, CredentialRefusal } from '../stagingCredentials.mjs';
 import { RehearsalRefusal, assertClientProject, readClientProject } from '../billingRehearsal/guard.mjs';
@@ -99,16 +109,38 @@ async function run(args) {
   // A function the launcher does not serve answers 404 (stagingDev --only-billing-functions).
   const notServed = new Set();
   page.on('response', (r) => { if (r.status() === 404 && r.url().includes('/.netlify/functions/')) notServed.add(functionName(r.url())); });
+  // The app's own answer on whether stickers are offered to this account (step 4b).
+  let stickerAnswer = null;
+  page.on('response', async (r) => {
+    if (functionName(r.url()) !== 'stickersConfig' || r.request().method() !== 'POST') return;
+    let body = null;
+    try { body = await r.json(); } catch { body = null; }
+    stickerAnswer = { status: r.status(), body };
+  });
+  const waitFor = async (read, timeoutMs, everyMs = 1_000) => {
+    const until = Date.now() + timeoutMs;
+    for (;;) {
+      const value = await read();
+      if (value) return value;
+      if (Date.now() > until) return null;
+      await new Promise((r) => setTimeout(r, everyMs));
+    }
+  };
 
   let uid;
   let personPath;
   let before;
+  let starter;
+  let apolloBaseline;
+  const newMockCalls = async () => callsSince(await mockCalls(), apolloBaseline);
   const report = () => ({ email: args.email, uid, steps, requests, notServed: [...notServed].sort() });
 
   try {
-    await fetch(`${MOCK}/__reset`, { method: 'POST' }).catch(() => {
+    try {
+      apolloBaseline = (await mockCalls()).length;
+    } catch {
       throw new JourneyRefusal(`The Apollo stand-in is not running at ${MOCK}. Start the app with stagingDev.mjs --apollo-mock.`);
-    });
+    }
 
     await step('1. Sign up Free, no card', async () => {
       await page.goto(`${args.base}/signup`);
@@ -148,26 +180,34 @@ async function run(args) {
       return { detail: '5 imported from the first screen, 1 added; 6 in the canonical contacts collection' };
     });
 
-    await step('4. Organize: a sticker and a note on one person', async () => {
+    await step('4. Organize: a note on one person', async () => {
       await page.getByRole('link', { name: FOCUS_PERSON }).first().click();
       await page.waitForURL(/\/contact-hub\/person\//);
       personPath = `contacts/${decodeURIComponent(page.url().split('/person/')[1])}`;
-      await page.getByRole('button', { name: /^Add sticker/ }).first().click();
-      await page.getByPlaceholder('Search or create…').fill('Friends');
-      await page.getByRole('option', { name: /Create sticker .Friends./ }).click();
-      await page.getByText('Friends').first().waitFor();
       await page.getByRole('button', { name: '+ Add Note' }).click();
       await page.getByPlaceholder(/Write a quick note/).fill('Met at the E2E gala');
       await page.getByRole('button', { name: 'Save' }).click();
       await page.getByText('Met at the E2E gala').waitFor();
-      return { detail: `${FOCUS_PERSON}: sticker "Friends", one note` };
+      return { detail: `${FOCUS_PERSON}: one note` };
+    });
+
+    await step('4b. Organize: a sticker on the same person', async () => {
+      await waitFor(() => stickerAnswer, 15_000, 500);
+      const plan = stickerStepPlan(stickerAnswer);
+      if (plan.action === 'fail') throw new Error(plan.reason);
+      if (plan.action === 'pending') return { pending: true, detail: plan.reason };
+      await page.getByRole('button', { name: /^Add sticker/ }).first().click();
+      await page.getByPlaceholder('Search or create…').fill('Friends');
+      await page.getByRole('option', { name: /Create sticker .Friends./ }).click();
+      await page.getByText('Friends').first().waitFor();
+      return { detail: `${FOCUS_PERSON}: sticker "Friends"` };
     });
 
     await step('5. See what Scout could add, with no paid request', async () => {
       await page.getByRole('heading', { name: 'Scout can fill in the rest' }).waitFor();
       const paid = requests.filter((r) => r.paid);
       if (paid.length) throw new Error(`A Free account made paid requests: ${paid.map((r) => r.url).join(', ')}`);
-      const apollo = await mockCalls();
+      const apollo = await newMockCalls();
       if (apollo.length) throw new Error(`Apollo was called ${apollo.length} time(s) for a Free account.`);
       before = await readTree(db, uid);
       return { detail: `no paid request among ${requests.length} function calls; account snapshot taken (${Object.keys(before).length} documents)` };
@@ -206,7 +246,10 @@ async function run(args) {
       if (summary.plan !== 'starter') throw new Error(`Plan is ${summary.plan}, expected starter.`);
       if (bad.length) throw new Error(`Billing checks failed: ${bad.map((c) => c.id).join(', ')}`);
       if ((await admin.auth().getUserByEmail(args.email)).uid !== uid) throw new Error('The account changed.');
-      return { detail: 'same uid; one customer, one subscription, 400 credits, one grant' };
+      // What step 10 compares the Pro upgrade against.
+      const live = (summary.stripe?.subscriptions ?? []).filter((x) => !['canceled', 'incomplete_expired'].includes(x.status));
+      starter = { subscriptionId: summary.account.stripeSubscriptionId, price: live[0]?.price ?? null, creditsTotal: summary.account.credits?.total ?? null };
+      return { detail: `same uid; one customer, one subscription (${starter.subscriptionId}), ${starter.creditsTotal} credits, one grant` };
     });
 
     await step('7b. Scout is open with no second signup, import or onboarding', async () => {
@@ -227,7 +270,7 @@ async function run(args) {
       const creditsBefore = (await db.collection('users').doc(uid).get()).data().credits.remaining;
       await page.getByRole('button', { name: 'Enrich contact' }).click();
       await page.getByRole('button', { name: 'Enrich contact' }).waitFor({ timeout: 60_000 });
-      const calls = await mockCalls();
+      const calls = await newMockCalls();
       if (!calls.length) throw new Error('Enrichment did not reach the Apollo stand-in.');
       if (calls.some((c) => !c.mockKey)) throw new Error('A request reached the stand-in without the mock key.');
       const after = (await db.collection('users').doc(uid).get()).data().credits.remaining;
@@ -253,22 +296,34 @@ async function run(args) {
       const afterTree = await readTree(db, uid);
       const problems = compareAccount(before, afterTree, { enrichedContactPath: personPath });
       if (problems.length) throw new Error(problems.map((p) => `${p.path}${p.field ? `.${p.field}` : ''}: ${p.problem}`).join('; '));
-      return { detail: `${Object.keys(before).length} documents checked` };
+      const appRecords = appRecordsAdded(before, afterTree);
+      return { detail: `${Object.keys(before).length} documents checked${appRecords.length ? `; app records added (allowed): ${appRecords.join(', ')}` : ''}` };
     });
 
     if (args.withPro) {
       await step('10. Starter → Pro on the same subscription', async () => {
-        const subBefore = (await db.collection('users').doc(uid).get()).data().stripeSubscriptionId;
+        if (!starter) throw new Error('The Starter state from step 7 is missing.');
         await page.goto(`${args.base}/settings?tab=billing`);
         await page.getByRole('button', { name: 'Upgrade to Pro' }).click();
         await page.getByRole('button', { name: 'Confirm upgrade' }).click();
         await page.getByText(/You are on Scout Pro/).waitFor({ timeout: 90_000 });
-        const summary = await billing(uid);
-        const account = (await db.collection('users').doc(uid).get()).data();
-        if (account.stripeSubscriptionId !== subBefore) throw new Error('The subscription changed: a second subscription was created.');
-        if (summary.checks.some((c) => c.id === 'one-live-subscription' && !c.ok)) throw new Error('More than one live subscription.');
-        if (account.subscriptionTier !== 'pro') throw new Error(`Tier is ${account.subscriptionTier}.`);
-        return { detail: `same subscription ${subBefore}; Pro; ${account.credits.remaining} credits` };
+        // The webhook writes the plan and its 850-credit grant together; wait until both are visible.
+        const summary = await waitFor(async () => {
+          const s = await billing(uid);
+          return s.plan === 'pro' && s.grants.some((g) => g.kind === 'plan_change') ? s : null;
+        }, 90_000);
+        if (!summary) throw new Error('Pro and its plan-change grant did not both appear within 90 s.');
+        const problems = verifyProUpgrade({ starter, summary });
+        if (problems.length) throw new Error(problems.join(' '));
+        return { detail: `same subscription ${starter.subscriptionId}, active on Pro; 1,250 credits; one 400-credit checkout grant and one 850-credit plan-change grant; all billing checks pass` };
+      });
+
+      await step('10b. Nothing the customer made was lost or changed, after Pro', async () => {
+        const afterPro = await readTree(db, uid);
+        const problems = compareAccount(before, afterPro, { enrichedContactPath: personPath });
+        if (problems.length) throw new Error(problems.map((p) => `${p.path}${p.field ? `.${p.field}` : ''}: ${p.problem}`).join('; '));
+        const appRecords = appRecordsAdded(before, afterPro);
+        return { detail: `${Object.keys(before).length} documents checked against the Free snapshot${appRecords.length ? `; app records added (allowed): ${appRecords.join(', ')}` : ''}` };
       });
     }
   } catch (err) {
@@ -301,6 +356,7 @@ async function main() {
   const summary = summarize(result.steps);
   console.log(`Free → Scout journey for ${result.email} (${result.uid ?? 'no account'}) on the staging project:`);
   for (const line of summary.lines) console.log(`  ${line}`);
+  console.log(`\n${summary.result}`);
   if (result.notServed?.length) console.log(`  Functions the app asked for that were not served (404): ${result.notServed.join(', ')}`);
   writeFileSync(args.out, JSON.stringify({ ...result, summary }, null, 2));
   console.log(`Report: ${args.out}`);

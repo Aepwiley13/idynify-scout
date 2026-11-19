@@ -99,6 +99,14 @@ export const BILLING_FIELDS = new Set([
 export const BILLING_COLLECTIONS = new Set(['creditCharges', 'creditTransactions', 'creditUsage']);
 
 /**
+ * Records the app itself creates under users/{uid} once paid features are on: the Barry panel
+ * starts a session (barry_sessions/{id}) when it appears and keeps its conversation
+ * (barryConversations/missionControl). They are not customer data, so they may appear and
+ * change; they may not disappear, and nothing else may change because of them.
+ */
+export const APP_RECORD_COLLECTIONS = new Set(['barry_sessions', 'barryConversations']);
+
+/**
  * Compares two snapshots of an account: { [docPath]: data }, paths relative to users/{uid}
  * ('' is the account document itself). Returns a list of problems; empty means nothing the
  * customer made was lost or changed.
@@ -118,7 +126,7 @@ export function compareAccount(before, after, { enrichedContactPath = null } = {
   for (const [path, data] of Object.entries(after)) {
     const top = path.split('/')[0];
     if (!(path in before)) {
-      if (!BILLING_COLLECTIONS.has(top)) problems.push({ path, problem: 'unexpected new document' });
+      if (!BILLING_COLLECTIONS.has(top) && !APP_RECORD_COLLECTIONS.has(top)) problems.push({ path, problem: 'unexpected new document' });
       continue;
     }
     const old = before[path];
@@ -126,7 +134,7 @@ export function compareAccount(before, after, { enrichedContactPath = null } = {
     for (const key of keys) {
       if (same(old?.[key], data?.[key])) continue;
       if (path === '' && BILLING_FIELDS.has(key)) continue;
-      if (BILLING_COLLECTIONS.has(top)) continue;
+      if (BILLING_COLLECTIONS.has(top) || APP_RECORD_COLLECTIONS.has(top)) continue;
       if (path === enrichedContactPath && !filled(old?.[key])) continue;
       problems.push({ path: path || '(account)', field: key, problem: filled(old?.[key]) ? 'changed' : 'added outside enrichment' });
     }
@@ -134,10 +142,90 @@ export function compareAccount(before, after, { enrichedContactPath = null } = {
   return problems;
 }
 
-/** One line per step for the console, and whether the journey passed. Pure. */
+/** The app records (APP_RECORD_COLLECTIONS) that appeared between two snapshots, for the report. Pure. */
+export function appRecordsAdded(before, after) {
+  return Object.keys(after).filter((path) => !(path in before) && APP_RECORD_COLLECTIONS.has(path.split('/')[0])).sort();
+}
+
+/** Apollo stand-in calls made since `baseline` (the count when the journey started). Pure. */
+export function callsSince(calls, baseline) {
+  return calls.slice(Math.max(0, baseline));
+}
+
+/**
+ * What step 4b does with the sticker part, from the app's own stickersConfig answer
+ * ({ status, body } or null). Pure.
+ *   do       the server offers stickers to this account: add one; a failure is a FAIL
+ *   pending  the server says stickers are not offered (the staging rollout setting): not a pass
+ *   fail     no answer, an error, or an answer that cannot be read: the state is unknown
+ */
+export function stickerStepPlan(answer) {
+  if (!answer) return { action: 'fail', reason: 'The app received no stickersConfig answer, so whether stickers are offered is unknown.' };
+  if (answer.status !== 200) return { action: 'fail', reason: `stickersConfig answered ${answer.status}.` };
+  const body = answer.body;
+  if (!body || typeof body.enabled !== 'boolean') return { action: 'fail', reason: 'stickersConfig answered 200 without an enabled flag.' };
+  if (body.readOnly === true) return { action: 'fail', reason: 'stickersConfig says read-only, which only an admin viewing as someone gets.' };
+  if (body.enabled) return { action: 'do' };
+  return { action: 'pending', reason: `stickers are not offered to this account on staging (stickersConfig: enabled false, mode ${body.mode ?? 'unknown'}); the note was still checked` };
+}
+
+const PLAN_CREDITS = Object.freeze({ starter: 400, pro: 1250 });
+const NOT_LIVE = new Set(['canceled', 'incomplete_expired']);
+
+/**
+ * Everything that must hold after Starter → Pro, from billingAccountSnapshot's summary and the
+ * Starter state step 7 recorded ({ subscriptionId, price, creditsTotal }). Returns problems;
+ * empty means the upgrade is right. Pure.
+ */
+export function verifyProUpgrade({ starter, summary }) {
+  const problems = [];
+  const account = summary?.account ?? {};
+  const subs = summary?.stripe?.subscriptions ?? [];
+  const live = subs.filter((s) => !NOT_LIVE.has(s.status));
+  const grants = summary?.grants ?? [];
+  if (!starter?.subscriptionId) problems.push('No Starter subscription was recorded before the upgrade.');
+  if (starter?.creditsTotal !== PLAN_CREDITS.starter) problems.push(`Starter showed ${starter?.creditsTotal ?? 'no'} credits before the upgrade, not ${PLAN_CREDITS.starter}.`);
+  if (account.stripeSubscriptionId !== starter?.subscriptionId) problems.push(`The account's subscription is ${account.stripeSubscriptionId ?? 'none'}, not ${starter?.subscriptionId}: a second subscription.`);
+  if (live.length !== 1) problems.push(`Stripe has ${live.length} live subscriptions for this customer, not exactly one.`);
+  const sub = live[0];
+  if (sub && sub.id !== starter?.subscriptionId) problems.push(`The live subscription is ${sub.id}, not ${starter?.subscriptionId}.`);
+  if (sub && sub.status !== 'active') problems.push(`The subscription is ${sub.status}, not active.`);
+  if (sub && sub.price === starter?.price) problems.push('The subscription is still on the Starter price.');
+  if (summary?.plan !== 'pro' || account.subscriptionTier !== 'pro') problems.push(`The account is ${account.subscriptionTier ?? summary?.plan ?? 'unknown'}, not pro.`);
+  if (account.subscriptionStatus !== 'active') problems.push(`The account's subscription status is ${account.subscriptionStatus ?? 'unset'}, not active.`);
+  const total = typeof account.credits === 'object' && account.credits ? account.credits.total : null;
+  if (total !== PLAN_CREDITS.pro) problems.push(`Credits total ${total ?? 'none'}, not ${PLAN_CREDITS.pro}.`);
+  const checkout = grants.filter((g) => g.kind === 'checkout');
+  const planChange = grants.filter((g) => g.kind === 'plan_change');
+  const others = grants.filter((g) => g.kind !== 'checkout' && g.kind !== 'plan_change');
+  if (checkout.length !== 1) problems.push(`${checkout.length} checkout grants, not exactly one.`);
+  else if (checkout[0].subscription !== starter?.subscriptionId || checkout[0].priceId !== starter?.price) problems.push('The checkout grant is not the 400-credit Starter grant on this subscription.');
+  if (planChange.length !== 1) problems.push(`${planChange.length} plan-change grants, not exactly one.`);
+  else {
+    if (planChange[0].credits !== PLAN_CREDITS.pro - PLAN_CREDITS.starter) problems.push(`The plan-change grant is ${planChange[0].credits ?? 'no'} credits, not ${PLAN_CREDITS.pro - PLAN_CREDITS.starter}.`);
+    if (sub && planChange[0].priceId !== sub.price) problems.push('The plan-change grant is not for the Pro price on the subscription.');
+  }
+  if (others.length) problems.push(`Unexpected grants: ${others.map((g) => g.kind).join(', ')}.`);
+  const failing = (summary?.checks ?? []).filter((c) => !c.ok);
+  if (failing.length) problems.push(`Billing checks failing: ${failing.map((c) => c.id).join(', ')}.`);
+  return problems;
+}
+
+/**
+ * One line per step, and the verdict. Pure.
+ *   PASS        every step ran and passed
+ *   FAIL        a step failed; the journey stopped there, so later steps did not run
+ *   INCOMPLETE  nothing failed, but at least one step is pending: NOT a pass
+ */
 export function summarize(steps) {
   const lines = steps.map((s) => `${s.status === 'pass' ? '✓' : s.status === 'pending' ? '…' : '✗'} ${s.name}${s.detail ? ` — ${s.detail}` : ''}`);
   const failed = steps.filter((s) => s.status === 'fail');
   const pending = steps.filter((s) => s.status === 'pending');
-  return { lines, passed: failed.length === 0 && pending.length === 0, complete: pending.length === 0, failed: failed.length };
+  const verdict = failed.length ? 'FAIL' : pending.length ? 'INCOMPLETE' : 'PASS';
+  const result = verdict === 'FAIL'
+    ? `Result: FAIL — stopped at "${failed[0].name}"; the steps after it did not run.`
+    : verdict === 'INCOMPLETE'
+      ? `Result: INCOMPLETE — nothing failed, but not a pass: pending ${pending.map((s) => `"${s.name}"`).join(', ')}.`
+      : 'Result: PASS — every step ran and passed.';
+  return { lines, verdict, result, passed: verdict === 'PASS', complete: pending.length === 0, failed: failed.length, pending: pending.map((s) => s.name) };
 }

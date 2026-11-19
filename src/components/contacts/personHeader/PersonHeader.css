@@ -172,7 +172,8 @@
 @container ph (min-width: 820px) {
   .ph-card {
     --ph-avatar: 112px;
-    grid-template-columns: auto minmax(0, 1fr) minmax(240px, 34%);
+    /* The sticker column is as wide as its stickers, up to a third of the card: a lone Add sticker chip no longer reserves room the name and subtitle could use, and several stickers still wrap in the same 34%. */
+    grid-template-columns: auto minmax(0, 1fr) fit-content(34%);
     grid-template-areas: "avatar identity stickers" "avatar contacts contacts";
     column-gap: 28px;
     padding: 28px 32px;

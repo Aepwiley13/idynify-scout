@@ -197,6 +197,32 @@ describe('layout', () => {
     expect(container('min-width: 820px')).toMatch(/grid-template-areas:\s*"avatar identity stickers" "avatar contacts contacts"/);
   });
 
+  it('sizes the desktop sticker column by its content, up to 34% of the card, and does not reserve a fixed share', () => {
+    const desktop = container('min-width: 820px');
+    expect(desktop).toMatch(/grid-template-columns:\s*auto minmax\(0, 1fr\) fit-content\(34%\)/);
+    // The old fixed reservation is gone: a lone Add sticker chip must not hold 240px or a third of the card.
+    expect(desktop).not.toMatch(/minmax\(240px, 34%\)/);
+    expect(desktop).not.toMatch(/minmax\(\d+px, \d+%\)/);
+    // No minimum was added (decided: not yet), and the identity column still takes whatever the stickers leave.
+    expect(rules('.ph-stickers').map((r) => r.match(/min-width:\s*([^;]+)/)?.[1]?.trim()).filter(Boolean)).toEqual(['0']);
+    expect(desktop).toMatch(/minmax\(0, 1fr\)/);
+  });
+
+  it('leaves the layouts without a sticker column as two columns, and the phone and tablet as they were', () => {
+    const desktop = container('min-width: 820px');
+    for (const layout of ['c1s0', 'c0s0']) {
+      expect(desktop).toMatch(new RegExp(`\\[data-layout="${layout}"\\]\\s*\\{\\s*grid-template-columns:\\s*auto minmax\\(0, 1fr\\);`));
+    }
+    // Phone: two columns, set once, on the card. Tablet: no column rule at all (it inherits the phone's two).
+    expect(decl('.ph-card')).toMatch(/grid-template-columns:\s*auto minmax\(0, 1fr\);/);
+    expect(container('min-width: 540px')).not.toMatch(/grid-template-columns/);
+    expect(container('min-width: 540px')).not.toMatch(/fit-content/);
+    // The only fit-content in the stylesheet is the desktop sticker column.
+    expect(css.match(/fit-content\(/g)).toHaveLength(1);
+    // The desktop areas and the touch-friendly row spacing are as approved: stickers top right, contacts across.
+    expect(desktop).toMatch(/grid-template-areas:\s*"avatar identity stickers" "avatar contacts contacts"/);
+  });
+
   it('puts the phone and email full width on a phone, and side by side where there is room', () => {
     expect(decl('.ph-contact:not(.ph-contact--social)')).toMatch(/flex:\s*1 1 100%/);
     expect(container('min-width: 540px')).toMatch(/\.ph-contact:not\(\.ph-contact--social\)\s*\{\s*flex:\s*0 1 auto/);

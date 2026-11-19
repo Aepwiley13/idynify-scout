@@ -19,7 +19,7 @@ import './stickers.css';
 // eslint-disable-next-line react-refresh/only-export-components
 export { UNDO_MS };
 
-export default function ContactStickersRow({ contact, onUpdate }) {
+export default function ContactStickersRow({ contact, onUpdate, onLateUpdate }) {
   const stickers = useStickers();
   if (!stickers.ready || !contact?.id) return null;
   // One Row per contact. The full-page profile keeps this component mounted
@@ -27,15 +27,15 @@ export default function ContactStickersRow({ contact, onUpdate }) {
   // (page-level, StickersProvider) can still be pressed. Keyed, that action
   // belongs to the old Row, which still points at the contact it was raised
   // for, so it can never write to the contact now on screen.
-  return <Row key={contact.id} contact={contact} onUpdate={onUpdate} stickers={stickers} />;
+  return <Row key={contact.id} contact={contact} onUpdate={onUpdate} onLateUpdate={onLateUpdate} stickers={stickers} />;
 }
 
-function Row({ contact, onUpdate, stickers }) {
+function Row({ contact, onUpdate, onLateUpdate, stickers }) {
   const T = useT();
   // The behaviour (state, writes, Undo, Retry, focus return) is in useContactStickers; this draws it.
   const {
     chips, assigned, recentIds, atLimit, active, open, setOpen, buttonRef, change, pick, create, closePicker,
-  } = useContactStickers({ contact, onUpdate, stickers });
+  } = useContactStickers({ contact, onUpdate, onLateUpdate, stickers });
 
   return (
     <div className="stk-section" data-testid="contact-stickers">

@@ -655,7 +655,7 @@ describe('switching between contacts: a stale action never touches the wrong con
     expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id]]);
   });
 
-  it('KNOWN: a result that arrives after the person has moved on is written but is not reported to the page, so the first contact looks unchanged until it is reloaded', async () => {
+  it('KNOWN (a caller with no onLateUpdate; see contactStickersLateUpdate.test.jsx for the callback that fixes it): a result that arrives after the person has moved on is written but is not reported to the page, so the first contact looks unchanged until it is reloaded', async () => {
     let resolve;
     fake.current.state.impl.add = () => new Promise((r) => { resolve = r; });
     const { user, changes } = await renderSwitching([PAT([]), SAM([DONOR.id])]);

@@ -104,6 +104,8 @@ npm ci
 ```bash
 npx playwright --version
 ```
+(`npm ci` installs Playwright with the checkout. The checks use its Chromium if installed, otherwise
+your Google Chrome; nothing else to install.)
 
 This is the CI-only integration branch (#808): every PR the journey needs, nothing merged. Run
 Part 0 step 5 again on it: **Preflight passed.**
@@ -213,8 +215,9 @@ Part 5. After Part 5 steps 1–2 it says **Preflight passed for a billing run (S
    ```
    **Pass:** "Preflight passed … Stripe in test mode, Apollo stand-in at http://127.0.0.1:8899 …
    serving only: … edge runtime off", then, usually within a minute (the first start is the
-   slowest), **"✓ http://localhost:8888 answered 200 after N s; 8 of 8 functions answer. Ready."**
-   The app is at http://localhost:8888.
+   slowest), **"✓ http://localhost:8888 answered 200 after N s; 8 of 8 functions answer; signup
+   401, checkout 401, webhook 400 (unauthenticated calls refused); the app renders in Chromium
+   (N s). Ready."** The app is at http://localhost:8888. Stop it with Ctrl-C: that stops all of it.
 
    `--only-billing-functions` serves just the functions this runbook and the journey call (signup,
    stickers, checkout, the webhook, plan change, the portal, Scout enrich and the Scout person page)
@@ -222,6 +225,15 @@ Part 5. After Part 5 steps 1–2 it says **Preflight passed for a billing run (S
    CLI holds every request on :8888 until all ~124 functions have bundled and the edge runtime has
    downloaded: minutes, so the browser times out. A ✗ line names what did not answer; any other
    function answers 404 in this mode, and the journey's report lists any the app asked for.
+
+   It also keeps the app from being served by anything it did not start. Vite runs on port 5199
+   (not 5173, which any other `npm run dev` on the machine uses), and before starting, 8888, 5199
+   and 8899 must be free. A leftover of an earlier run in this checkout is stopped, with a
+   "· stopped a leftover …" line. Anything else on those ports is named (command, pid, folder) and
+   the launcher refuses rather than share it: that is what made pages answer 500 "Could not proxy
+   request." after a passing check. Ready also needs the app to render in a fresh browser, so a ✓
+   means the browser loads it. In development the app no longer registers a service worker, and
+   removes one an earlier run left in your browser, with its caches, the first time it loads.
 4. **T3** — the checking shortcut (with Part 0 step 3's two exports):
    ```bash
    export PRODUCTION_FIREBASE_PROJECT_ID=idynify-scout-dev

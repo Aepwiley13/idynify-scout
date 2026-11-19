@@ -10,12 +10,16 @@
  * stickers. Nothing here reads or writes anything.
  */
 import '../../../src/index.css';
+import { useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import PersonHeader from '../../../src/components/contacts/personHeader/PersonHeader';
 import { buildPersonHeaderModel } from '../../../src/components/contacts/personHeader/personHeaderModel';
+import { addInertAddStickerMock } from './addStickerMock';
 
 const params = new URLSearchParams(window.location.search);
 document.documentElement.dataset.theme = params.get('theme') === 'mission' ? 'mission' : 'workspace';
+// ?mock=add-sticker adds an inert, clearly marked illustration of the proposed Add sticker chip (addStickerMock.js).
+const MOCK_ADD_STICKER = params.get('mock') === 'add-sticker';
 
 // The capture script answers this address with a drawn stand-in portrait, so no real image host is contacted.
 const PHOTO = 'https://images.fixture.test/jordan.svg';
@@ -31,6 +35,10 @@ const REGISTRY = new Map([
   sticker('supporter', 'Supporter', 'pink', '💜'),
   sticker('long', 'Community partner, school fundraiser and annual gala volunteer committee', 'teal'),
   sticker('cjk', '友達 · Amigos', 'coral', '🌎'),
+  sticker('volunteer', 'Volunteer', 'teal', '🙌'),
+  sticker('board', 'Board member', 'blue'),
+  sticker('mentor', 'Mentor', 'amber', '🧭'),
+  sticker('donor', 'Donor', 'green'),
 ]);
 
 const JORDAN = {
@@ -66,16 +74,18 @@ const SCENES = [
   { id: 'bad-links', label: 'An email and a phone that cannot be made into safe links: no pills (the values stay on the contact)', contact: { ...JORDAN, id: 'fx-9', name: 'Casey Brooks', photo_url: '', phones: [{ id: '1', value: 'call the front desk', label: 'work' }], emails: [{ id: '0', value: 'casey@@broken' }], email: 'also not an email', linkedin_url: 'javascript:alert(1)', social_profiles: [], sticker_ids: ['priority'] }, stickers: true },
   { id: 'stickers-unavailable', label: 'Stickers unavailable (no registry): no sticker area at all', contact: withStickers(JORDAN, ['partner', 'community']), stickers: false },
   { id: 'stickers-empty', label: 'Stickers available, none assigned (no add control yet): no sticker area', contact: withStickers({ ...JORDAN, id: 'fx-10' }, []), stickers: true },
+  { id: 'stickers-many', label: 'Stickers populated: enough to wrap on every size', contact: withStickers({ ...JORDAN, id: 'fx-12', name: 'Taylor Brooks', photo_url: '', title: 'Board Chair', company_name: 'Wasatch Youth Alliance' }, ['partner', 'community', 'priority', 'education', 'supporter', 'volunteer', 'board', 'mentor', 'donor']), stickers: true },
   { id: 'stickers-populated', label: 'Stickers populated', contact: withStickers({ ...JORDAN, id: 'fx-11', name: 'Riley Chen', photo_url: '' }, ['partner', 'community', 'priority', 'education', 'supporter', 'cjk']), stickers: true },
 ];
 
 // eslint-disable-next-line react-refresh/only-export-components
 function Review() {
+  useEffect(() => { if (MOCK_ADD_STICKER) addInertAddStickerMock(); }, []);
   return (
     <div className="fx-page">
       {SCENES.map((scene) => (
-        <section key={scene.id} className="fx-scene" data-scene={scene.id}>
-          <h2 className="fx-label">{scene.label}</h2>
+        <section key={scene.id} className="fx-scene" data-scene={scene.id} data-stickers={scene.stickers ? 'available' : 'unavailable'}>
+          <h2 className="fx-label">{scene.label}{MOCK_ADD_STICKER && scene.stickers ? ' — with an INERT mock of Add sticker (not a control)' : ''}</h2>
           <PersonHeader person={buildPersonHeaderModel(scene.contact, { stickersById: scene.stickers ? REGISTRY : null, now: NOW })} />
         </section>
       ))}

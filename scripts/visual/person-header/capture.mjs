@@ -16,6 +16,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const OUT = process.argv[2];
+// Optional third argument: mock (opens the page with ?mock=add-sticker: an inert illustration of the proposed chip).
+const MOCK = process.argv[3] === 'mock' ? '&mock=add-sticker' : '';
 if (!OUT) { console.error('usage: capture.mjs <output folder>'); process.exit(2); }
 const BASE = 'http://127.0.0.1:5199/scripts/visual/person-header/page.html';
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
@@ -104,6 +106,7 @@ const MEASURE = `(() => {
       contactsBelowIdentity: contacts ? contacts.getBoundingClientRect().top >= identity.bottom - 1 : null,
       stickersRight: stickers ? stickers.getBoundingClientRect().left > identity.right - 2 : null,
       stickersBelow: stickers ? stickers.getBoundingClientRect().top >= Math.max(identity.bottom, contacts ? contacts.getBoundingClientRect().bottom : 0) - 1 : null,
+      mock: (() => { const chip = card.querySelector('[data-inert-mock]'); if (!chip) return null; const c = chip.getBoundingClientRect(); const rows = [...card.querySelectorAll('.ph-sticker')].map((p) => p.getBoundingClientRect()); const above = rows.filter((r) => r.bottom <= c.top + 1); const gapAbove = above.length ? Math.round((c.top - Math.max(...above.map((r) => r.bottom))) * 10) / 10 : null; const rowTops = [...new Set(rows.map((r) => Math.round(r.top)))].sort((a, b) => a - b); return { height: Math.round(c.height), hitHeight: Math.round(c.height) + 8, width: Math.round(c.width), gapAbove, rows: rowTops.length, alone: rows.length === 0, inside: c.right <= box.right + 1 && c.left >= box.left - 1, focusable: chip.tabIndex >= 0 && chip.matches('button, a, input, [tabindex]') }; })(),
       nameGap: sub ? Math.round((sub.getBoundingClientRect().top - nameBox.bottom) * 10) / 10 : null,
       cardHeight: Math.round(box.height),
       buttons: card.querySelectorAll('button').length,
@@ -122,7 +125,7 @@ for (const [folder, theme] of THEMES) {
     mkdirSync(dir, { recursive: true });
     await send('Emulation.setDeviceMetricsOverride', { width: vp.width, height: vp.height, deviceScaleFactor: vp.dpr, mobile: vp.mobile });
     await send('Emulation.setTouchEmulationEnabled', { enabled: vp.mobile });
-    await send('Page.navigate', { url: `${BASE}?theme=${theme}&t=${Date.now()}` });
+    await send('Page.navigate', { url: `${BASE}?theme=${theme}${MOCK}&t=${Date.now()}` });
     for (let i = 0; i < 120; i += 1) { if (await evaluate('document.documentElement.dataset.ready === "1"').catch(() => false)) break; await wait(250); }
     await evaluate('Promise.all([...document.images].map((i) => i.complete ? 1 : new Promise((r) => { i.onload = r; i.onerror = r; })))');
     await wait(400);
@@ -135,6 +138,13 @@ for (const [folder, theme] of THEMES) {
       check(`${tag}/${id}: every link is at least 44px each way`, s.smallestTarget === null || s.smallestTarget >= 44, String(s.smallestTarget));
       check(`${tag}/${id}: no control without an action (no buttons)`, s.buttons === 0);
       check(`${tag}/${id}: the name stays within three lines`, s.nameLines <= 3, String(s.nameLines));
+    }
+    if (MOCK) {
+      for (const [id, s] of Object.entries(m.scenes)) {
+        if (!s.mock) continue;
+        check(`${tag}/${id}: the mock chip is 36px high with a 44px touch area, inside the card, and not focusable`, s.mock.height === 36 && s.mock.hitHeight >= 44 && s.mock.width >= 44 && s.mock.inside && !s.mock.focusable, JSON.stringify(s.mock));
+        check(`${tag}/${id}: 10px between sticker rows, so touch areas do not overlap`, s.mock.gapAbove === null || s.mock.gapAbove >= 10, String(s.mock.gapAbove));
+      }
     }
     const full = m.scenes.full;
     const wantGap = { desktop: 10, tablet: 8, phone: 4 }[vp.id];

@@ -41,9 +41,32 @@
  * @property {(kind: 'phone'|'email'|'social', detail: { platform?: string }) => void} [onContactAction]
  *           a contact pill was used; the link itself has already done its work
  *
+ * EDITING (H2-2). The header can draw an inline editor for the name, the title and the organization. It draws
+ * ONLY what it is handed and keeps no draft of its own: the text in the box is `active.value`, always.
+ *
+ * @typedef {object} PersonHeaderEditing
+ * @property {{ name?: boolean, title?: boolean, organization?: boolean }} [editable]
+ *           which lines may be edited right now. A line with no `true` here has no edit control (a read-only
+ *           session, or an organization that belongs to a linked company). Needs actions.onEdit too.
+ * @property {{ field: 'name'|'title'|'organization', value: string }|null} [active]
+ *           the open editor and its text
+ * @property {{ name?: boolean, title?: boolean, organization?: boolean }} [saving]
+ *           a save is in progress for that line (the new value is already shown)
+ * @property {{ field: string, message: string }|null} [problem]
+ *           the open editor's text was refused, and why, in words (the editor stays open)
+ * @property {{ field: string, message: string }|null} [failure]
+ *           a save failed, and why, in words (the editor has the text back)
+ * @property {(value: string) => void} [onChange]   the text changed
+ * @property {() => (void|Promise<unknown>)} [onSubmit]   Enter, or the editor lost focus, or "Try again"
+ * @property {() => void} [onCancel]   Escape, or "Cancel"
+ *
+ * The words are the parent's. Why a name was refused, or a save failed, is decided by the controller, which
+ * hands over text; the header only shows it. The editor is drawn only with all three handlers.
+ *
  * @typedef {object} PersonHeaderProps
  * @property {import('./personHeaderModel.js').PersonHeaderModel} person
  * @property {PersonHeaderActions} [actions]
+ * @property {PersonHeaderEditing} [editing]
  */
 
 /** The callbacks a parent may supply, by name. Anything else in `actions` is ignored. */
@@ -95,5 +118,60 @@ export function headerParts(person, actions) {
     stickers: stickers !== null && (stickers.length > 0 || controls.addSticker),
     addSticker: stickers !== null && controls.addSticker,
     controls,
+  });
+}
+
+// ─── Editing ─────────────────────────────────────────────────────────────────
+
+/** The lines that can be edited, and what each is called. */
+export const EDIT_FIELDS = Object.freeze(['name', 'title', 'organization']);
+export const EDIT_LABEL = Object.freeze({ name: 'name', title: 'title', organization: 'organization' });
+
+const messageOf = (item) => (item && typeof item.message === 'string' && item.message.trim() !== '' ? item.message : '');
+
+/**
+ * What the header may draw for editing, from the callbacks and the editing state it was handed. Pure.
+ *
+ *   canEdit  a control for each line: needs actions.onEdit AND editing.editable[line] === true
+ *   active   the open editor, only for a line that may be edited and only when all three handlers exist
+ *   problem  the refusal to show (for the open editor only)
+ *   failure  the failed save to show (for a line that may be edited, whether or not its editor is open)
+ *   saving   which lines are saving (only lines that may be edited)
+ *   message  one sentence for a polite live region: the refusal, else the failure, else "Saving …"
+ *
+ * Anything missing or malformed means "no": a control never appears without a way to use it.
+ *
+ * @param {PersonHeaderActions|null|undefined} actions
+ * @param {PersonHeaderEditing|null|undefined} editing
+ */
+export function editState(actions, editing) {
+  const controls = availableControls(actions);
+  const e = editing !== null && typeof editing === 'object' ? editing : {};
+  const canEdit = Object.freeze(Object.fromEntries(EDIT_FIELDS.map((f) => [f, controls.edit && e.editable?.[f] === true])));
+  const handlers = typeof e.onChange === 'function' && typeof e.onSubmit === 'function' && typeof e.onCancel === 'function';
+  const a = e.active;
+  const active = handlers && a && EDIT_FIELDS.includes(a.field) && canEdit[a.field] && typeof a.value === 'string'
+    ? Object.freeze({ field: a.field, value: a.value })
+    : null;
+  const problem = active && e.problem?.field === active.field && messageOf(e.problem)
+    ? Object.freeze({ field: active.field, message: messageOf(e.problem) })
+    : null;
+  const failure = e.failure && EDIT_FIELDS.includes(e.failure.field) && canEdit[e.failure.field] && messageOf(e.failure)
+    ? Object.freeze({ field: e.failure.field, message: messageOf(e.failure) })
+    : null;
+  const saving = Object.freeze(Object.fromEntries(EDIT_FIELDS.map((f) => [f, canEdit[f] && e.saving?.[f] === true])));
+  const savingField = EDIT_FIELDS.find((f) => saving[f]);
+  const message = problem?.message || failure?.message || (savingField ? `Saving ${EDIT_LABEL[savingField]}…` : '');
+  return Object.freeze({
+    canEdit,
+    anyEdit: EDIT_FIELDS.some((f) => canEdit[f]),
+    active,
+    problem,
+    failure,
+    saving,
+    message,
+    onChange: handlers ? e.onChange : null,
+    onSubmit: handlers ? e.onSubmit : null,
+    onCancel: handlers ? e.onCancel : null,
   });
 }

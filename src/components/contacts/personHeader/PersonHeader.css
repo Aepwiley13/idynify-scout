@@ -129,6 +129,8 @@
 .ph-pill:focus-visible, .ph-social:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 2px; background: var(--ph-tint); }
 @media (prefers-reduced-motion: no-preference) {
   .ph-pill, .ph-social { transition: background-color 0.15s ease, border-color 0.15s ease; }
+  /* The saving ring turns only for a person who has not asked for less motion; otherwise it stands still. */
+  .ph-spinner { animation: ph-spin 0.9s linear infinite; }
 }
 
 /* ── Stickers: soft pills in their own colours ── */
@@ -192,4 +194,78 @@
   .ph .ph-name { margin-bottom: 6px; }
   .ph-subtitle { font-size: 17px; }
   .ph-stickers { margin-top: 6px; }
+}
+
+/* ── Editing (H2-2). Drawn only when the parent makes editing usable; without it none of this is in the page.
+      Every control is 44px to hit. Colours are the theme variables and the accent, as above. ── */
+.ph-line { display: flex; align-items: flex-start; gap: 2px; min-width: 0; }
+.ph-line > .ph-name { flex: 0 1 auto; min-width: 0; align-self: center; }
+
+.ph-edit {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; padding: 0; border: 0; border-radius: 12px;
+  background: transparent; color: var(--ph-ink); cursor: pointer;
+}
+.ph-edit:hover { background: var(--ph-tint); }
+.ph-edit:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 2px; background: var(--ph-tint); }
+
+/* The title and the organization, each with its own control: one line where there is room, stacked on a phone. */
+.ph-subtitle--edit { display: flex; flex-direction: column; align-items: flex-start; overflow: visible; }
+/* The pencil follows its text and never wraps onto a line of its own; a long value is cut to one line, as the read-only header cuts it (the full text is its title, and the box shows all of it). */
+/* In a row the separator's spaces collapse, so it is spaced here. */
+.ph-subtitle--edit > .ph-sep { padding: 0 6px; }
+.ph-edit-part { display: flex; align-items: center; flex-wrap: nowrap; min-width: 0; max-width: 100%; }
+.ph-subtitle-text {
+  flex: 0 1 auto; min-width: 0; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; line-clamp: 1; overflow: hidden;
+}
+.ph-add-field {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px;
+  border: 1px dashed var(--border-2); border-radius: 12px; background: transparent;
+  color: var(--text-secondary); font: inherit; cursor: pointer;
+}
+.ph-add-field:hover { background: var(--ph-tint); border-color: var(--ph-ink); }
+.ph-add-field:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 2px; background: var(--ph-tint); }
+
+/* The box, and what it says. */
+.ph-editor { display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0; }
+.ph-input {
+  width: 100%; box-sizing: border-box; min-height: 44px; padding: 6px 12px;
+  border: 1.5px solid var(--ph-ink); border-radius: 12px;
+  background: var(--bg-card); color: var(--text-primary);
+  font: inherit; font-size: 16px; line-height: 1.3;
+}
+.ph-input--name { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; }
+.ph-input:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 2px; }
+.ph-input[aria-invalid="true"] { border-color: var(--status-error); }
+.ph-input[aria-invalid="true"]:focus-visible { outline-color: var(--status-error); }
+.ph-editor-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
+.ph-editor-msg { flex: 1 1 12ch; }
+.ph-editor-msg, .ph-field-msg { margin: 0; font-size: 13px; line-height: 1.35; color: var(--status-error-text); }
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  /* Mixed toward the theme's own text, so the red reads on a light theme and on a dark one. */
+  .ph-editor-msg, .ph-field-msg { color: color-mix(in srgb, var(--status-error) 50%, var(--text-primary)); }
+}
+.ph-field-msg { flex-basis: 100%; }
+.ph-editor-actions { display: inline-flex; gap: 8px; }
+.ph-editor-btn {
+  min-height: 44px; padding: 0 14px; border: 1px solid var(--border-2); border-radius: 12px;
+  background: var(--bg-card); color: var(--ph-ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.ph-editor-btn:hover { background: var(--ph-tint); border-color: var(--ph-ink); }
+.ph-editor-btn:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 2px; background: var(--ph-tint); }
+
+/* Saving: a small ring where the pencil was. The value on the line is already the new one. */
+.ph-spinner {
+  display: inline-block; flex: 0 0 auto; width: 16px; height: 16px; box-sizing: border-box;
+  border: 2px solid var(--ph-tint-strong); border-top-color: var(--ph-ink); border-radius: 50%;
+}
+@keyframes ph-spin { to { transform: rotate(360deg); } }
+
+@container ph (min-width: 540px) {
+  .ph-subtitle--edit { flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .ph-input--name { font-size: 28px; }
+}
+@container ph (min-width: 820px) {
+  .ph-input--name { font-size: 32px; }
 }

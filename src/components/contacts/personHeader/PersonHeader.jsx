@@ -16,10 +16,22 @@
  * A part the model has nothing for is left out, and the layout closes up around it.
  *
  * NO DEAD CONTROLS. Everything here that can be pressed is a link that really goes
- * somewhere (tel:, mailto:, the profile). There is no edit, photo, add-sticker or
- * remove-sticker control in this milestone, so none is drawn; the contract's callbacks
- * (personHeaderContract.js) arrive with the behaviour they belong to. The one callback
- * honoured now is onContactAction, which is only told that a link was used.
+ * somewhere (tel:, mailto:, the profile), or an edit control the parent has made usable.
+ * There is no photo, add-sticker or remove-sticker control yet, so none is drawn; the
+ * contract's callbacks (personHeaderContract.js) arrive with the behaviour they belong to.
+ * onContactAction is only told that a link was used.
+ *
+ * INLINE EDITING (H2-2). With actions.onEdit and an `editing` prop the name, title and
+ * organization each get an edit button (44px to hit), which opens a box in place. The box
+ * shows exactly `editing.active.value` and reports every change: the header keeps NO draft,
+ * reads and writes nothing, and imports no service. Enter submits, Escape cancels, leaving
+ * the box submits; each of those is reported ONCE (a leave after Enter or Escape, a held
+ * Enter and an Enter inside an input method's composition are not a second submit). Why a
+ * name was refused or a save failed is the parent's text, shown with aria-invalid and
+ * aria-describedby and announced in a polite live region. Focus: after Enter, Escape, Try
+ * again or Cancel it goes back to the line's edit button; after leaving the box it is NOT
+ * moved (the person is going somewhere); a box that reopens by itself after a failure takes
+ * focus only if the person is not using something else.
  *
  * LONG AND UNUSUAL TEXT. The model keeps every value complete; the stylesheet does the
  * fitting: words wrap anywhere they must, a name is clamped to three lines and the
@@ -32,11 +44,11 @@
  * own text colour, so it is deep on a light theme and light on a dark one; a sticker
  * keeps its own colour, in the same tint the existing sticker chips use.
  */
-import { useState } from 'react';
-import { Facebook, Instagram, Linkedin, Mail, MapPin, Phone } from 'lucide-react';
+import { Fragment, useEffect, useRef, useState } from 'react';
+import { Facebook, Instagram, Linkedin, Mail, MapPin, Pencil, Phone } from 'lucide-react';
 import { BRAND } from '../../../theme/tokens';
 import { hexOf, TINT_ALPHA, BORDER_ALPHA } from '../../stickers/stickerPalette';
-import { headerParts } from './personHeaderContract';
+import { EDIT_LABEL, editState, headerParts } from './personHeaderContract';
 import './PersonHeader.css';
 
 const SOCIAL_ICONS = Object.freeze({ linkedin: Linkedin, instagram: Instagram, facebook: Facebook });
@@ -103,13 +115,209 @@ function StickerPill({ sticker }) {
   );
 }
 
+// ─── Editing (H2-2): what the header draws when the parent has made editing usable ───
+
+const FIELD_NAME = Object.freeze({ name: 'Name', title: 'Title', organization: 'Organization' });
+/** An edit control the person pressed counts as "the person opened this" for this long (ms). */
+const OPENED_BY_PERSON_MS = 1500;
+
+/**
+ * Where focus goes, and where it must not. Holds refs and flags only, never text.
+ *   (the edit buttons and the box are found inside `root` by data-edit-trigger / data-edit-input)
+ *   noteOpened       the person pressed an edit button: focus the box that opens
+ *   returnTo         Enter, Escape, Try again or Cancel: put focus back on the button once the box has gone
+ *   settled/…        the guard against a second submit from the same box
+ */
+function useEditFocus(edit, root) {
+  const openedByPerson = useRef(null); // { field, at }
+  const returnTo = useRef(null);
+  const settled = useRef(false);
+  const lastActive = useRef(null);
+  const failureField = edit.failure?.field ?? null;
+  const activeField = edit.active?.field ?? null;
+
+  const trigger = (field) => root.current?.querySelector(`[data-edit-trigger="${field}"]`) ?? null;
+
+  useEffect(() => {
+    const was = lastActive.current;
+    lastActive.current = activeField;
+    if (activeField && was !== activeField) {
+      settled.current = false;
+      const mine = openedByPerson.current;
+      openedByPerson.current = null;
+      const byPerson = mine && mine.field === activeField && Date.now() - mine.at < OPENED_BY_PERSON_MS;
+      const resting = document.activeElement;
+      const idle = !resting || resting === document.body || resting === trigger(activeField);
+      // A box the person asked for takes focus. A box that reopens by itself (a failed save) takes it only from nothing.
+      const box = root.current?.querySelector('[data-edit-input]');
+      if ((byPerson || (failureField === activeField && idle)) && box) {
+        box.focus();
+        // A box the person opened selects its text, to replace it. One that comes back by itself after a failed save
+        // keeps the caret at the end, so the text they entered is not wiped by their next keystroke.
+        if (byPerson) box.select?.();
+        else box.setSelectionRange?.(box.value.length, box.value.length);
+      }
+    }
+    if (returnTo.current) {
+      const field = returnTo.current;
+      returnTo.current = null;
+      if (!activeField) trigger(field)?.focus();
+    }
+  });
+
+  return {
+    noteOpened: (field) => { openedByPerson.current = { field, at: Date.now() }; },
+    returnTo: (field) => { returnTo.current = field; },
+    settle: () => { settled.current = true; },
+    unsettle: () => { settled.current = false; },
+    isSettled: () => settled.current,
+  };
+}
+
+function EditButton({ field, label, edit, refs, onEdit }) {
+  const saving = edit.saving[field];
+  return (
+    <button
+      type="button"
+      className="ph-edit"
+      data-edit-trigger={field}
+      aria-label={label}
+      aria-busy={saving ? 'true' : undefined}
+      title={label}
+      onClick={() => { refs.noteOpened(field); onEdit(field); }}
+    >
+      {saving ? <span className="ph-spinner" aria-hidden="true" /> : <Pencil size={16} aria-hidden="true" />}
+    </button>
+  );
+}
+
+function FieldMessage({ message }) {
+  return <p className="ph-field-msg" data-kind="failure">{message}</p>;
+}
+
+function FieldEditor({ field, edit, refs }) {
+  const { value } = edit.active;
+  const message = edit.problem?.message || edit.failure?.field === field ? (edit.problem?.message ?? edit.failure.message) : '';
+  const kind = edit.problem ? 'problem' : message ? 'failure' : null;
+  const messageId = `ph-msg-${field}`;
+  const keep = (event) => event.preventDefault(); // pressing Try again or Cancel must not blur the box first
+
+  const submit = () => { refs.returnTo(field); refs.settle(); edit.onSubmit(); };
+  const cancel = () => { refs.returnTo(field); refs.settle(); edit.onCancel(); };
+
+  return (
+    <div className={`ph-editor ph-editor--${field}`}>
+      <input
+        data-edit-input=""
+        className={`ph-input ph-input--${field}`}
+        type="text"
+        value={value}
+        dir="auto"
+        aria-label={FIELD_NAME[field]}
+        aria-invalid={message ? 'true' : 'false'}
+        aria-describedby={message ? messageId : undefined}
+        autoComplete="off"
+        autoCapitalize={field === 'name' ? 'words' : 'sentences'}
+        enterKeyHint="done"
+        spellCheck={false}
+        onChange={(event) => { refs.unsettle(); edit.onChange(event.target.value); }}
+        onKeyDown={(event) => {
+          if (event.nativeEvent?.isComposing || event.keyCode === 229) return;
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            if (event.repeat) return;
+            refs.returnTo(field);
+            refs.settle();
+            edit.onSubmit();
+          } else if (event.key === 'Escape') {
+            event.preventDefault();
+            cancel();
+          }
+        }}
+        onBlur={(event) => {
+          if (refs.isSettled()) return;
+          if (event.relatedTarget && event.currentTarget.parentElement?.contains(event.relatedTarget)) return;
+          refs.settle();
+          edit.onSubmit(); // leaving the box saves; focus is not moved (the person is going somewhere)
+        }}
+      />
+      {message ? (
+        <div className="ph-editor-foot">
+          <p id={messageId} className="ph-editor-msg" data-kind={kind}>{message}</p>
+          <span className="ph-editor-actions">
+            {kind === 'failure' ? (
+              <button type="button" className="ph-editor-btn" onMouseDown={keep} onClick={submit}>Try again</button>
+            ) : null}
+            <button type="button" className="ph-editor-btn" onMouseDown={keep} onClick={cancel}>Cancel</button>
+          </span>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** The title and the organization, each with its own edit control, an "Add" control when empty, or its editor. */
+function SubtitleEditable({ person, edit, refs, onEdit }) {
+  const part = (field, value) => {
+    if (edit.active?.field === field) return <FieldEditor key={field} field={field} edit={edit} refs={refs} />;
+    // A failed save with no box open is said beside its line, not inside it, so it cannot squeeze the line.
+    const failed = edit.failure?.field === field ? <FieldMessage message={edit.failure.message} /> : null;
+    if (value) {
+      return (
+        <Fragment key={field}>
+          <span className="ph-subtitle-part ph-edit-part">
+            <span className="ph-subtitle-text" dir="auto" title={value}>{value}</span>
+            {edit.canEdit[field]
+              ? <EditButton field={field} label={`Edit ${EDIT_LABEL[field]}`} edit={edit} refs={refs} onEdit={onEdit} />
+              : null}
+          </span>
+          {failed}
+        </Fragment>
+      );
+    }
+    if (!edit.canEdit[field]) return null;
+    return (
+      <Fragment key={field}>
+        <span className="ph-subtitle-part ph-edit-part">
+          <button
+            type="button"
+            className="ph-add-field"
+            data-edit-trigger={field}
+            aria-label={`Add ${EDIT_LABEL[field]}`}
+            aria-busy={edit.saving[field] ? 'true' : undefined}
+            onClick={() => { refs.noteOpened(field); onEdit(field); }}
+          >
+            {edit.saving[field] ? <span className="ph-spinner" aria-hidden="true" /> : null}
+            Add {EDIT_LABEL[field]}
+          </button>
+        </span>
+        {failed}
+      </Fragment>
+    );
+  };
+  const title = part('title', person.title);
+  const organization = part('organization', person.organization);
+  const both = Boolean(person.title && person.organization) && edit.active?.field !== 'title' && edit.active?.field !== 'organization';
+  return (
+    <div className="ph-subtitle ph-subtitle--edit" dir="auto">
+      {title}
+      {both ? <span className="ph-sep" aria-hidden="true"> · </span> : null}
+      {organization}
+    </div>
+  );
+}
+
 /**
  * @param {object} props
  * @param {import('./personHeaderModel.js').PersonHeaderModel} props.person
  * @param {number} [props.headingLevel]  the name's heading level, 1 to 6 (default 2)
- * @param {import('./personHeaderContract.js').PersonHeaderActions} [props.actions]  only onContactAction is used in this milestone
+ * @param {import('./personHeaderContract.js').PersonHeaderActions} [props.actions]  onContactAction, and onEdit (begin an edit) when editing is offered
+ * @param {import('./personHeaderContract.js').PersonHeaderEditing} [props.editing]  the inline editing state, controlled by the parent
  */
-export default function PersonHeader({ person, headingLevel = 2, actions = undefined }) {
+export default function PersonHeader({ person, headingLevel = 2, actions = undefined, editing = undefined }) {
+  const edit = editState(actions, editing);
+  const root = useRef(null);
+  const refs = useEditFocus(edit, root);
   if (!person) return null;
   const parts = headerParts(person, actions);
   const Heading = `h${clampLevel(headingLevel)}`;
@@ -120,25 +328,40 @@ export default function PersonHeader({ person, headingLevel = 2, actions = undef
   const social = parts.social ? person.social.filter((link) => SOCIAL_ICONS[link.platform] && safe('social', link.url)) : [];
   const hasContacts = Boolean(phone || email || social.length > 0);
   const stickers = parts.stickers ? person.stickers : null;
+  const heading = <Heading className="ph-name" dir="auto" title={person.name}>{person.name}</Heading>;
+  const editable = edit.canEdit.title || edit.canEdit.organization || edit.active?.field === 'title' || edit.active?.field === 'organization';
+  const showSubtitle = parts.subtitle || editable;
 
   return (
-    <article className="ph" aria-label={`Contact: ${person.name}`} style={ACCENT}>
+    <article ref={root} className="ph" aria-label={`Contact: ${person.name}`} style={ACCENT}>
       {/* data-layout says which of the two optional rows exist (c: ways to reach them, s: stickers), so the layout closes up around a missing one. */}
       <div className="ph-card" data-layout={`${hasContacts ? 'c1' : 'c0'}${stickers ? 's1' : 's0'}`}>
         <Avatar person={person} />
 
         <div className="ph-identity">
-          <Heading className="ph-name" dir="auto" title={person.name}>{person.name}</Heading>
-          {parts.subtitle ? (
-            <p className="ph-subtitle" dir="auto" title={subtitle.join(' · ')}>
-              {subtitle.map((part, index) => (
-                <span key={index} className="ph-subtitle-part">
-                  {index > 0 ? <span className="ph-sep" aria-hidden="true"> · </span> : null}
-                  {index > 0 ? <span className="ph-sr">, </span> : null}
-                  {part}
-                </span>
-              ))}
-            </p>
+          {edit.active?.field === 'name' ? (
+            <FieldEditor field="name" edit={edit} refs={refs} />
+          ) : edit.canEdit.name ? (
+            <div className="ph-line ph-line--name">
+              {heading}
+              <EditButton field="name" label="Edit name" edit={edit} refs={refs} onEdit={actions.onEdit} />
+            </div>
+          ) : heading}
+          {edit.failure?.field === 'name' && edit.active?.field !== 'name' ? <FieldMessage message={edit.failure.message} /> : null}
+          {showSubtitle ? (
+            editable ? (
+              <SubtitleEditable person={person} edit={edit} refs={refs} onEdit={actions.onEdit} />
+            ) : parts.subtitle ? (
+              <p className="ph-subtitle" dir="auto" title={subtitle.join(' · ')}>
+                {subtitle.map((part, index) => (
+                  <span key={index} className="ph-subtitle-part">
+                    {index > 0 ? <span className="ph-sep" aria-hidden="true"> · </span> : null}
+                    {index > 0 ? <span className="ph-sr">, </span> : null}
+                    {part}
+                  </span>
+                ))}
+              </p>
+            ) : null
           ) : null}
           {parts.location ? (
             <p className="ph-location" dir="auto" title={person.location}>
@@ -206,6 +429,9 @@ export default function PersonHeader({ person, headingLevel = 2, actions = undef
           </ul>
         ) : null}
       </div>
+      {edit.anyEdit || edit.active ? (
+        <p className="ph-sr" role="status" aria-live="polite" aria-atomic="true">{edit.message}</p>
+      ) : null}
     </article>
   );
 }

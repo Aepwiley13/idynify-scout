@@ -28,6 +28,7 @@ import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import process from 'node:process';
 import { pathToFileURL } from 'node:url';
+import { launchChromium } from '../stagingBrowser.mjs';
 import { parseE2eArgs, JourneyRefusal, FIVE_PEOPLE_CSV, FOCUS_PERSON, isPaidRequest, functionName, compareAccount, summarize } from './journey.mjs';
 import { planSnapshot, readFirestore, readStripe, summarizeAccount, SnapshotRefusal } from '../billingAccountSnapshot.mjs';
 import { readStagingCredential, CredentialRefusal } from '../stagingCredentials.mjs';
@@ -88,8 +89,7 @@ async function run(args) {
     return summarizeAccount({ ...firestore, stripe: await readStripe(stripe, firestore.user?.stripeCustomerId ?? null) });
   };
 
-  const { chromium } = await import('playwright');
-  const browser = await chromium.launch({ headless: !args.headed });
+  const browser = await launchChromium({ headless: !args.headed });
   const context = await browser.newContext();
   const page = await context.newPage();
   page.setDefaultTimeout(STEP_TIMEOUT);

@@ -351,6 +351,14 @@ and the journey stopped there; **INCOMPLETE** (exit 3) nothing failed but a step
 is not a pass. **Expected now:** INCOMPLETE, with only step 2 (My Card, skipped) pending, and step
 4b too if staging does not offer stickers to new accounts. Send me the report.
 
+If a step fails, the journey also prints what the browser showed: the page URL, a full-page
+screenshot saved next to the report, the visible text, the last console errors and failed requests.
+For steps 7, 7b and 8, which expect the Scout contact page, it adds the likely cause: a redirect
+(Contact Hub, the Scout panel, `/scout`, checkout), a loading failure ("Loading contact
+profile...", "Contact Not Found"), a rendering error (the crash screen, or no Enrich button), or a
+selector issue (an Enrich button exists but was not matched), with signals such as a Firestore
+internal assertion. Send me those lines and the screenshot.
+
 ---
 
 ## Part 10 — Contacts and account data unchanged

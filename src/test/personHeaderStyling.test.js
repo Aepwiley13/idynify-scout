@@ -134,6 +134,35 @@ describe('controls', () => {
     expect(decl('.ph-social')).toMatch(/width:\s*44px/);
   });
 
+  it('gives the phone and email pills a slightly stronger lavender border, in every theme, without touching the profile links', () => {
+    const supported = css.match(/@supports \(color: color-mix\(in srgb, red 50%, blue\)\)\s*\{\s*\.ph-pill\s*\{\s*border-color:\s*([^;]+);\s*\}\s*\}/);
+    expect(supported?.[1].trim()).toBe('color-mix(in srgb, var(--ph-ink) 30%, var(--border-2))');
+    // The plain border is still the fallback, for a browser without color-mix, and is still the profile links' border.
+    expect(decl('.ph-pill, .ph-social')).toMatch(/border:\s*1px solid var\(--border-2\)/);
+    expect(css.match(/\.ph-social[^{]*\{[^}]*[;{\s]border-color:/g) ?? []).toHaveLength(1); // only the hover rule sets it
+    // The width, shape and size are the same: only the colour moves.
+    expect(decl('.ph-pill, .ph-social')).toMatch(/min-height:\s*44px/);
+    expect(decl('.ph-pill, .ph-social')).toMatch(/border-radius:\s*999px/);
+    expect(supported[0]).not.toMatch(/border-width|padding|border:/);
+    // Quietly stronger, in every theme: better than the plain border, still short of a heavy outline (about 2 to 3:1 against the card).
+    for (const id of THEME_IDS) {
+      const vars = THEMES[id];
+      const card = rgb(vars['--bg-card']);
+      const ink = mix(rgb(BRAND.purple), 60, rgb(vars['--text-primary']));
+      const border2 = vars['--border-2'].startsWith('#') && vars['--border-2'].length <= 7
+        ? [...rgb(vars['--border-2']), 1]
+        : (() => { const m = vars['--border-2'].match(/rgba?\(([^)]+)\)/); if (m) { const p = m[1].split(',').map(Number); return [p[0], p[1], p[2], p[3] ?? 1]; } const h = vars['--border-2'].replace('#', ''); return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16), h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1]; })();
+      const composite = ([r, g, b, a]) => [r * a + card[0] * (1 - a), g * a + card[1] * (1 - a), b * a + card[2] * (1 - a)];
+      // color-mix interpolates premultiplied: 30% accent (opaque) + 70% border colour (alpha a).
+      const a = border2[3]; const alpha = 0.3 + 0.7 * a;
+      const mixed = [0, 1, 2].map((i) => (ink[i] * 0.3 + border2[i] * a * 0.7) / alpha);
+      const before = contrast(composite(border2), card);
+      const after = contrast(composite([...mixed, alpha]), card);
+      expect(after, `${id}: stronger than before`).toBeGreaterThan(before + 0.3);
+      expect(after, `${id}: not a heavy outline`).toBeLessThan(3.3);
+    }
+  });
+
   it('shows where the keyboard is, and never removes an outline', () => {
     expect(decl('.ph-pill:focus-visible, .ph-social:focus-visible')).toMatch(/outline:\s*2px solid var\(--ph-ink\)/);
     expect(decl('.ph-pill:focus-visible, .ph-social:focus-visible')).toMatch(/outline-offset:\s*2px/);

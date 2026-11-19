@@ -116,6 +116,12 @@
   background: var(--bg-card); color: var(--text-primary); text-decoration: none;
 }
 .ph-pill { gap: 10px; width: 100%; max-width: 100%; padding: 0 18px 0 14px; font-size: 15px; font-weight: 600; }
+/* The phone and email pills' border: the theme's own border colour, a little more lavender (30% of the accent text colour), so the pill reads
+   as a pill on both a light and a dark card. The profile links (.ph-social) keep the plain border. Hover and focus are unchanged: both are
+   more specific than this rule. */
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .ph-pill { border-color: color-mix(in srgb, var(--ph-ink) 30%, var(--border-2)); }
+}
 .ph-pill-icon { flex: 0 0 auto; color: var(--ph-ink); }
 .ph-pill-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ph-social { justify-content: center; width: 44px; padding: 0; color: var(--ph-ink); }

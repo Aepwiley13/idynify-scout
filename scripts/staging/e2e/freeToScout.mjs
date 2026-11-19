@@ -38,8 +38,9 @@ import { pathToFileURL } from 'node:url';
 import { launchChromium } from '../stagingBrowser.mjs';
 import {
   parseE2eArgs, JourneyRefusal, FIVE_PEOPLE_CSV, FOCUS_PERSON, isPaidRequest, functionName, compareAccount, summarize,
-  stickerStepPlan, callsSince, verifyProUpgrade, appRecordsAdded,
+  stickerStepPlan, callsSince, verifyProUpgrade, appRecordsAdded, contactPageUrlPattern,
 } from './journey.mjs';
+import { captureDiagnostics, redact } from './diagnostics.mjs';
 import { planSnapshot, readFirestore, readStripe, summarizeAccount, SnapshotRefusal } from '../billingAccountSnapshot.mjs';
 import { readStagingCredential, CredentialRefusal } from '../stagingCredentials.mjs';
 import { RehearsalRefusal, assertClientProject, readClientProject } from '../billingRehearsal/guard.mjs';
@@ -73,14 +74,17 @@ async function mockCalls() {
 
 async function run(args) {
   const steps = [];
-  const step = async (name, fn) => {
+  // Set once the browser page exists: what the page showed when a step failed.
+  let diagnose = null;
+  const step = async (name, fn, { contactPage = false } = {}) => {
     const started = Date.now();
     try {
       const outcome = (await fn()) ?? {};
       steps.push({ name, status: outcome.pending ? 'pending' : 'pass', detail: outcome.detail ?? '', ms: Date.now() - started });
       return outcome;
     } catch (err) {
-      steps.push({ name, status: 'fail', detail: err?.message ?? String(err), ms: Date.now() - started });
+      const diagnostics = diagnose ? await diagnose(name, contactPage) : null;
+      steps.push({ name, status: 'fail', detail: redact(err?.message ?? String(err)), ms: Date.now() - started, ...(diagnostics ? { diagnostics } : {}) });
       throw err;
     }
   };
@@ -109,6 +113,22 @@ async function run(args) {
   // A function the launcher does not serve answers 404 (stagingDev --only-billing-functions).
   const notServed = new Set();
   page.on('response', (r) => { if (r.status() === 404 && r.url().includes('/.netlify/functions/')) notServed.add(functionName(r.url())); });
+  // Evidence for a failed step: console errors and warnings, uncaught page errors, failed requests.
+  const consoleLog = [];
+  const httpErrors = [];
+  page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') consoleLog.push({ type: m.type(), phase, text: m.text().slice(0, 600) }); });
+  page.on('pageerror', (e) => consoleLog.push({ type: 'pageerror', phase, text: String(e?.message ?? e).slice(0, 600) }));
+  page.on('response', (r) => {
+    if (r.status() < 400) return;
+    try {
+      const u = new URL(r.url());
+      httpErrors.push({ phase, status: r.status(), host: u.host, path: u.pathname });
+    } catch { /* not a URL */ }
+  });
+  diagnose = (stepName, contactPage) => captureDiagnostics(page, {
+    out: args.out, stepName, consoleLog, httpErrors, base: args.base,
+    contactId: personPath ? personPath.split('/')[1] : null, classify: contactPage,
+  });
   // The app's own answer on whether stickers are offered to this account (step 4b).
   let stickerAnswer = null;
   page.on('response', async (r) => {
@@ -239,7 +259,7 @@ async function run(args) {
 
     await step('7. Back on the same person in Scout, with Scout unlocked', async () => {
       const contactId = personPath.split('/')[1];
-      await page.waitForURL(new RegExp(`/contact/${encodeURIComponent(contactId)}(\\?|$)`), { timeout: 90_000 });
+      await page.waitForURL(contactPageUrlPattern(args.base, contactId), { timeout: 90_000 });
       await page.getByRole('button', { name: 'Enrich contact' }).waitFor();
       const summary = await billing(uid);
       const bad = summary.checks.filter((c) => !c.ok);
@@ -250,7 +270,7 @@ async function run(args) {
       const live = (summary.stripe?.subscriptions ?? []).filter((x) => !['canceled', 'incomplete_expired'].includes(x.status));
       starter = { subscriptionId: summary.account.stripeSubscriptionId, price: live[0]?.price ?? null, creditsTotal: summary.account.credits?.total ?? null };
       return { detail: `same uid; one customer, one subscription (${starter.subscriptionId}), ${starter.creditsTotal} credits, one grant` };
-    });
+    }, { contactPage: true });
 
     await step('7b. Scout is open with no second signup, import or onboarding', async () => {
       const personUrl = page.url();
@@ -263,7 +283,7 @@ async function run(args) {
       await page.goto(personUrl);
       await page.getByRole('button', { name: 'Enrich contact' }).waitFor();
       return { detail: 'home is Contact Hub; Scout opens; back on the person' };
-    });
+    }, { contactPage: true });
 
     await step(args.expectMetering ? '8. Enrich the person in Scout; credits charged once' : '8. Enrich the person in Scout (metering off: nothing charged)', async () => {
       phase = 'paid';
@@ -290,7 +310,7 @@ async function run(args) {
       if (again !== after) throw new Error(`A repeated enrichment within the retry window charged again (${after} → ${again}).`);
       if ((await mockCalls()).length !== callsBefore) throw new Error('A repeated enrichment within the retry window called Apollo again.');
       return { detail: `${charged} credit(s) charged once; a repeat within the window charged nothing; ${calls.length} mocked Apollo call(s)` };
-    });
+    }, { contactPage: true });
 
     await step('9. Nothing the customer made was lost or changed', async () => {
       const afterTree = await readTree(db, uid);
@@ -357,6 +377,16 @@ async function main() {
   console.log(`Free → Scout journey for ${result.email} (${result.uid ?? 'no account'}) on the staging project:`);
   for (const line of summary.lines) console.log(`  ${line}`);
   console.log(`\n${summary.result}`);
+  for (const s of result.steps.filter((x) => x.diagnostics)) {
+    const d = s.diagnostics;
+    console.log(`\nWhat the browser showed when "${s.name}" failed:`);
+    if (d.diagnosis) console.log(`  likely cause: ${d.diagnosis.category} (${d.diagnosis.kind}): ${d.diagnosis.reason}${d.diagnosis.signals.length ? ` Signals: ${d.diagnosis.signals.join(', ')}.` : ''}`);
+    console.log(`  page: ${d.url ?? 'unknown'}`);
+    if (d.screenshot) console.log(`  screenshot: ${d.screenshot}`);
+    console.log(`  visible text: ${d.visibleText ? `${d.visibleText.slice(0, 300)}${d.visibleText.length > 300 ? '…' : ''}` : '(none)'}`);
+    for (const c of d.console.filter((x) => x.type !== 'warning').slice(-5)) console.log(`  console ${c.type}: ${c.text.slice(0, 200)}`);
+    for (const h of d.httpErrors.slice(-5)) console.log(`  HTTP ${h.status} ${h.host}${h.path}`);
+  }
   if (result.notServed?.length) console.log(`  Functions the app asked for that were not served (404): ${result.notServed.join(', ')}`);
   writeFileSync(args.out, JSON.stringify({ ...result, summary }, null, 2));
   console.log(`Report: ${args.out}`);

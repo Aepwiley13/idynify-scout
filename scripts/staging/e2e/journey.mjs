@@ -142,6 +142,16 @@ export function compareAccount(before, after, { enrichedContactPath = null } = {
   return problems;
 }
 
+/**
+ * The Scout contact page for one contact, anchored to the app's origin: /contact/<id>, optionally
+ * with a query. Not /scout/contact/<id> (the side panel, which has no Enrich button in its
+ * header), and not any other host. Pure.
+ */
+export function contactPageUrlPattern(base, contactId) {
+  const origin = new URL(base).origin.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`^${origin}/contact/${encodeURIComponent(contactId)}/?(\\?.*)?$`);
+}
+
 /** The app records (APP_RECORD_COLLECTIONS) that appeared between two snapshots, for the report. Pure. */
 export function appRecordsAdded(before, after) {
   return Object.keys(after).filter((path) => !(path in before) && APP_RECORD_COLLECTIONS.has(path.split('/')[0])).sort();

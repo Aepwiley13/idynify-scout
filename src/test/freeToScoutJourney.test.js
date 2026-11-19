@@ -8,7 +8,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   parseE2eArgs, JourneyRefusal, FIVE_PEOPLE_CSV, isPaidRequest, functionName, compareAccount, summarize, BILLING_FIELDS,
+  stickerStepPlan, callsSince, verifyProUpgrade, appRecordsAdded, APP_RECORD_COLLECTIONS,
 } from '../../scripts/staging/e2e/journey.mjs';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import process from 'node:process';
 import { startApolloMock, answer, mockPerson, APOLLO_MOCK_KEY } from '../../scripts/staging/apolloMock.mjs';
 import { apolloBaseUrl, APOLLO_LIVE_BASE } from '../../netlify/functions/utils/apolloConstants.js';
 import { planDevRun } from '../../scripts/staging/stagingDev.mjs';
@@ -115,6 +119,153 @@ describe('compareAccount: nothing the customer made is lost or changed', () => {
     expect(summarize([{ name: 'a', status: 'pass' }]).passed).toBe(true);
     expect(summarize([{ name: 'a', status: 'pass' }, { name: 'b', status: 'pending', detail: 'My Card' }])).toMatchObject({ passed: false, complete: false, failed: 0 });
     expect(summarize([{ name: 'a', status: 'fail' }]).lines[0]).toBe('✗ a');
+  });
+});
+
+describe('fix 1: the sticker part (step 4b) follows the server\'s own answer', () => {
+  it('stickers offered: the sticker is added, and a failure there is a real FAIL', () => {
+    expect(stickerStepPlan({ status: 200, body: { enabled: true, mode: 'on', readOnly: false } })).toEqual({ action: 'do' });
+  });
+
+  it('stickers not offered on staging: PENDING, never a pass, and the reason names the setting', () => {
+    const plan = stickerStepPlan({ status: 200, body: { enabled: false, mode: 'beta', readOnly: false } });
+    expect(plan.action).toBe('pending');
+    expect(plan.reason).toContain('mode beta');
+    expect(plan.reason).toContain('the note was still checked');
+  });
+
+  it('no answer, an error, a malformed answer or a read-only answer: FAIL (unknown is not pending)', () => {
+    expect(stickerStepPlan(null).action).toBe('fail');
+    expect(stickerStepPlan({ status: 500, body: { error: 'internal_error' } })).toEqual({ action: 'fail', reason: 'stickersConfig answered 500.' });
+    expect(stickerStepPlan({ status: 200, body: {} }).action).toBe('fail');
+    expect(stickerStepPlan({ status: 200, body: null }).action).toBe('fail');
+    expect(stickerStepPlan({ status: 200, body: { enabled: true, readOnly: true } }).action).toBe('fail');
+  });
+});
+
+describe('PASS, FAIL and INCOMPLETE are distinct', () => {
+  const pass = (name) => ({ name, status: 'pass' });
+  it('PASS only when every step ran and passed', () => {
+    const r = summarize([pass('1'), pass('4'), pass('4b'), pass('10'), pass('10b')]);
+    expect(r).toMatchObject({ verdict: 'PASS', passed: true, complete: true, failed: 0, pending: [] });
+    expect(r.result).toBe('Result: PASS — every step ran and passed.');
+  });
+
+  it('a pending sticker part makes the run INCOMPLETE, not a pass, even when everything else passed', () => {
+    const r = summarize([pass('1'), pass('4'), { name: '4b. Organize: a sticker on the same person', status: 'pending', detail: 'not offered' }, pass('10'), pass('10b')]);
+    expect(r.verdict).toBe('INCOMPLETE');
+    expect(r.passed).toBe(false);
+    expect(r.result).toContain('not a pass');
+    expect(r.result).toContain('4b. Organize: a sticker');
+    expect(r.lines[2]).toBe('… 4b. Organize: a sticker on the same person — not offered');
+  });
+
+  it('a failure wins over pending, and says where the journey stopped', () => {
+    const r = summarize([pass('1'), { name: '2. My Card', status: 'pending' }, { name: '9. Nothing lost', status: 'fail', detail: 'contacts/ben: deleted' }]);
+    expect(r).toMatchObject({ verdict: 'FAIL', passed: false, failed: 1 });
+    expect(r.result).toBe('Result: FAIL — stopped at "9. Nothing lost"; the steps after it did not run.');
+  });
+});
+
+describe('fix 2: the app\'s own Barry records are expected; everything else stays strict', () => {
+  const BEFORE = {
+    '': { email: 'a@e2e.example.test' },
+    'contacts/ana': { name: 'Ana Lopez', notes: [{ id: 'n1', text: 'Met' }], sticker_ids: ['s1'] },
+    'contacts/ben': { name: 'Ben Okafor' },
+    'stickers/s1': { name: 'Friends' },
+  };
+  const after = (extra = {}) => ({ ...structuredClone(BEFORE), ...extra });
+
+  it('a Barry session and conversation created after the upgrade are allowed, and listed for the report', () => {
+    const a = after({ 'barry_sessions/7f2c': { module: 'mission-control', messages: [] }, 'barryConversations/missionControl': { mode: 'brief' } });
+    expect(compareAccount(BEFORE, a, { enrichedContactPath: 'contacts/ana' })).toEqual([]);
+    expect(appRecordsAdded(BEFORE, a)).toEqual(['barryConversations/missionControl', 'barry_sessions/7f2c']);
+    expect([...APP_RECORD_COLLECTIONS].sort()).toEqual(['barryConversations', 'barry_sessions']);
+  });
+
+  it('still fails on any other new document, any deletion, and any change to customer data', () => {
+    const a = after({ 'barry_sessions/7f2c': { m: 1 }, 'contacts/ghost': { name: 'Ghost' }, 'barryNotes/x': { a: 1 } });
+    delete a['stickers/s1'];
+    a['contacts/ben'] = { name: 'Ben Changed' };
+    a['contacts/ana'] = { ...a['contacts/ana'], notes: [] };
+    const problems = compareAccount(BEFORE, a, { enrichedContactPath: 'contacts/ana' });
+    expect(problems).toEqual(expect.arrayContaining([
+      { path: 'contacts/ghost', problem: 'unexpected new document' },
+      { path: 'barryNotes/x', problem: 'unexpected new document' },
+      { path: 'stickers/s1', problem: 'deleted' },
+      { path: 'contacts/ben', field: 'name', problem: 'changed' },
+      { path: 'contacts/ana', field: 'notes', problem: 'changed' },
+    ]));
+    expect(problems).toHaveLength(5);
+  });
+
+  it('a Barry record that existed before may not disappear', () => {
+    const withSession = { ...BEFORE, 'barry_sessions/old': { m: 1 } };
+    const a = structuredClone(withSession);
+    delete a['barry_sessions/old'];
+    expect(compareAccount(withSession, a)).toEqual([{ path: 'barry_sessions/old', problem: 'deleted' }]);
+  });
+});
+
+describe('fix 3: the Pro upgrade is checked in full', () => {
+  const SUB = 'sub_1', STARTER = 'price_starter', PRO = 'price_pro';
+  const starter = { subscriptionId: SUB, price: STARTER, creditsTotal: 400 };
+  const good = () => ({
+    plan: 'pro',
+    account: { subscriptionTier: 'pro', subscriptionStatus: 'active', stripeSubscriptionId: SUB, credits: { total: 1250, used: 0, remaining: 1250 } },
+    grants: [
+      { subscription: SUB, kind: 'checkout', priceId: STARTER, credits: null },
+      { subscription: `${SUB}__plan__${PRO}__1`, kind: 'plan_change', priceId: PRO, credits: 850 },
+    ],
+    stripe: { subscriptions: [{ id: SUB, status: 'active', price: PRO }] },
+    checks: [{ id: 'one-live-subscription', ok: true }, { id: 'plan-credits', ok: true }, { id: 'granted-once', ok: true }],
+  });
+  const broken = (fn) => { const s = good(); fn(s); return verifyProUpgrade({ starter, summary: s }); };
+
+  it('same subscription, active on Pro, 1,250 credits, one 400 checkout grant, one 850 plan-change grant, all checks: no problems', () => {
+    expect(verifyProUpgrade({ starter, summary: good() })).toEqual([]);
+  });
+
+  it.each([
+    ['a second subscription on the account', (s) => { s.account.stripeSubscriptionId = 'sub_2'; }, 'a second subscription'],
+    ['two live subscriptions in Stripe', (s) => { s.stripe.subscriptions.push({ id: 'sub_2', status: 'active', price: PRO }); }, 'not exactly one'],
+    ['the subscription not active', (s) => { s.stripe.subscriptions[0].status = 'past_due'; }, 'not active'],
+    ['still on the Starter price', (s) => { s.stripe.subscriptions[0].price = STARTER; }, 'still on the Starter price'],
+    ['the account not on Pro', (s) => { s.plan = 'starter'; s.account.subscriptionTier = 'starter'; }, 'not pro'],
+    ['credits other than 1,250', (s) => { s.account.credits.total = 1249; }, 'Credits total 1249'],
+    ['no plan-change grant', (s) => { s.grants.pop(); }, '0 plan-change grants'],
+    ['two plan-change grants', (s) => { s.grants.push({ ...s.grants[1], subscription: 'x' }); }, '2 plan-change grants'],
+    ['a plan-change grant of the wrong size', (s) => { s.grants[1].credits = 800; }, 'not 850'],
+    ['a plan-change grant for another price', (s) => { s.grants[1].priceId = 'price_other'; }, 'not for the Pro price'],
+    ['no checkout grant', (s) => { s.grants.shift(); }, '0 checkout grants'],
+    ['a checkout grant for another price', (s) => { s.grants[0].priceId = 'price_other'; }, 'not the 400-credit Starter grant'],
+    ['an extra grant', (s) => { s.grants.push({ subscription: 'r', kind: 'renewal', credits: 1250 }); }, 'Unexpected grants: renewal'],
+    ['a failing billing check', (s) => { s.checks[1].ok = false; }, 'Billing checks failing: plan-credits'],
+  ])('%s is a problem', (_, change, message) => {
+    expect(broken(change).join(' ')).toContain(message);
+  });
+
+  it('Starter must have shown 400 credits before the upgrade', () => {
+    expect(verifyProUpgrade({ starter: { ...starter, creditsTotal: 399 }, summary: good() }).join(' ')).toContain('not 400');
+  });
+});
+
+describe('the shared Apollo stand-in log is never cleared', () => {
+  it('callsSince keeps only the calls after the journey started', () => {
+    const calls = [{ path: 'a' }, { path: 'b' }, { path: 'c' }];
+    expect(callsSince(calls, 2)).toEqual([{ path: 'c' }]);
+    expect(callsSince(calls, 3)).toEqual([]);
+    expect(callsSince(calls, 0)).toEqual(calls);
+    expect(callsSince(calls, -1)).toEqual(calls);
+  });
+
+  it('the journey reads the log and never resets it; steps 4b and 10b are wired to the checks above', () => {
+    const source = readFileSync(resolve(process.cwd(), 'scripts/staging/e2e/freeToScout.mjs'), 'utf8');
+    expect(source).not.toContain('__reset');
+    expect(source).toContain('stickerStepPlan(stickerAnswer)');
+    expect(source).toContain('verifyProUpgrade({ starter, summary })');
+    expect(source).toContain("step('10b. Nothing the customer made was lost or changed, after Pro'");
+    expect(source).toContain('summary.result');
   });
 });
 

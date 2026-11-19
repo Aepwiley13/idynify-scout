@@ -332,16 +332,24 @@ Add `--headed` to watch. It creates a new account each run:
 | 1 | Sign up Free | Contact Hub; no billing fields |
 | 2 | My Card | **Pending** until the Contact Hub team's My Card is in (`--skip-my-card`) |
 | 3 | Import 5 contacts from the empty first screen, then add one person | "5 people added."; 6 people |
-| 4 | Sticker and note on one person | Visible |
+| 4 | A note on one person | Visible |
+| 4b | A sticker on the same person | Visible, if staging offers stickers to a new account (the app's `stickersConfig` answer). If it says they are not offered: **pending**, with the reason. No answer or an error: fail |
 | 5 | Scout preview | "Scout can fill in the rest"; **no paid request and no Apollo call**; account snapshot taken |
 | 6 | Upgrade to Scout → Starter → Stripe | Paid on Stripe's test page |
 | 7 | Back on the same person in Scout | One customer, one subscription, 400 credits, one grant; same uid |
 | 7b | No second signup, import or onboarding | `/` lands on Contact Hub; Scout opens without the upgrade screen |
 | 8 | Enrich the person (mocked Apollo) | Works; **metering off: nothing charged, nothing logged** |
-| 9 | Nothing lost (Part 10) | Every person, sticker, note and other document unchanged; only empty fields filled; only billing fields changed |
-| 10 | Starter → Pro | Same subscription id, Pro, one live subscription |
+| 9 | Nothing lost (Part 10) | Every person, sticker, note and other document unchanged; only empty fields filled; only billing fields changed. New documents only in the credit collections and the Barry panel's own records (`barry_sessions`, `barryConversations`), which are listed |
+| 10 | Starter → Pro | Same subscription id, active on the Pro price, exactly one live subscription; 1,250 credits; exactly one 400-credit checkout grant and one 850-credit plan-change grant; every billing check ✓ |
+| 10b | Nothing lost, after Pro | Step 9's comparison again, against the same Free snapshot |
 
-**Pass:** every line ✓ except step 2 (pending), exit code 3, and a report path. Send me the report.
+It never clears the Apollo stand-in's log: it counts the calls already there and checks only the
+ones after. Don't use the app by hand while it runs.
+
+The last line is the result: **PASS** (exit 0) every step passed; **FAIL** (exit 2) a step failed
+and the journey stopped there; **INCOMPLETE** (exit 3) nothing failed but a step is pending, which
+is not a pass. **Expected now:** INCOMPLETE, with only step 2 (My Card, skipped) pending, and step
+4b too if staging does not offer stickers to new accounts. Send me the report.
 
 ---
 

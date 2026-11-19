@@ -116,7 +116,15 @@ const PROBE = (scene) => `(() => {
   const controls = [...root.querySelectorAll('.ph-edit, .ph-add-field, .ph-editor-btn, .ph-input')].map((el) => { const r = el.getBoundingClientRect(); return { cls: el.className.split(' ')[0], w: Math.round(r.width), h: Math.round(r.height) }; });
   const escapes = [...card.querySelectorAll('*')].filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && (r.right > box.right + 1 || r.left < box.left - 1); }).length;
   const name = root.querySelector('.ph-name');
+  // Does the open editor's Cancel overlap anything else in the card? (the box and its own row are its neighbours, not obstacles)
+  const cancel = root.querySelector('.ph-editor-cancel');
+  const cr = cancel ? cancel.getBoundingClientRect() : null;
+  const others = cancel ? [...card.querySelectorAll('.ph-name, .ph-subtitle-text, .ph-add-field, .ph-edit, .ph-contacts a, .ph-sticker, .ph-stickers, .ph-location, .ph-avatar-wrap')].filter((el) => !el.closest('.ph-editor')) : [];
+  const overlaps = cr ? others.filter((el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.height > 0 && r.left < cr.right - 1 && r.right > cr.left + 1 && r.top < cr.bottom - 1 && r.bottom > cr.top + 1; }).map((el) => el.className.split(' ')[0]) : [];
+  const inputEl = root.querySelector('[data-edit-input]');
+  const br = inputEl ? inputEl.getBoundingClientRect() : null;
   return {
+    cancel: cr ? { w: Math.round(cr.width), h: Math.round(cr.height), text: cancel.textContent.trim(), overlaps, beside: br ? Math.abs(cr.top - br.top) < 2 && cr.left >= br.right - 1 : null, inCard: cr.right <= box.right + 1 } : null,
     cardHeight: Math.round(box.height),
     pageOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth + 1,
     escapes,
@@ -143,7 +151,7 @@ const check = (name, pass, detail = '') => { checks.push({ name, pass }); if (!p
 const report = {};
 const load = async (query, vp) => {
   await send('Page.navigate', { url: `${BASE}?${query}&t=${Date.now()}` });
-  for (let i = 0; i < 120; i += 1) { if (await evaluate('document.documentElement.dataset.ready === "1" && document.querySelectorAll(".ph-card").length >= 5').catch(() => false)) break; await wait(250); }
+  for (let i = 0; i < 120; i += 1) { if (await evaluate('document.documentElement.dataset.ready === "1" && document.querySelectorAll(".ph-card").length >= 6').catch(() => false)) break; await wait(250); }
   await wait(400);
 };
 
@@ -159,14 +167,14 @@ for (const [folder, theme] of THEMES) {
     // BEFORE: a read-only session draws what the header drew before editing existed.
     await load(`theme=${theme}&readonly=1`, vp);
     const before = {};
-    for (const id of ['full', 'long', 'csv', 'sparse', 'linked']) before[id] = await probe(id);
+    for (const id of ['full', 'long', 'csv', 'sparse', 'linked', 'stickers']) before[id] = await probe(id);
     await shot(join(dir, '00-before-readonly.png'), 'full');
     check(`${tag}: read-only draws no edit control at all`, Object.values(before).every((s) => s.controls.length === 0 && s.triggers.length === 0 && s.live === null));
 
     // AFTER: the same scenes, editing available.
     await load(`theme=${theme}&latency=3500`, vp);
     const after = {};
-    for (const id of ['full', 'long', 'csv', 'sparse', 'linked']) after[id] = await probe(id);
+    for (const id of ['full', 'long', 'csv', 'sparse', 'linked', 'stickers']) after[id] = await probe(id);
     await shot(join(dir, '01-after-default.png'), 'full');
     out.layoutChange = Object.fromEntries(Object.keys(after).map((id) => [id, after[id].cardHeight - before[id].cardHeight]));
     check(`${tag}: no sideways scrolling`, !after.full.pageOverflow);
@@ -184,6 +192,9 @@ for (const [folder, theme] of THEMES) {
     out.editingName = p;
     check(`${tag}: opening the name box focuses it, with the current name`, p.input?.focused && p.input.value === 'Jordan Lee' && p.input.label === 'Name');
     check(`${tag}: the box text is 16px or larger`, p.input.fontSize >= 16, String(p.input.fontSize));
+    check(`${tag}: the name editor shows a visible Cancel, 44px each way, beside the box`, p.cancel?.text === 'Cancel' && p.cancel.w >= 44 && p.cancel.h >= 44 && p.cancel.beside === true, JSON.stringify(p.cancel));
+    check(`${tag}: Cancel overlaps nothing in the card`, p.cancel.overlaps.length === 0, JSON.stringify(p.cancel.overlaps));
+    out.cancelHeightCost = p.cardHeight - after.full.cardHeight;
     await shot(join(dir, '02-editing-name.png'), 'full');
     await clearBox('full');
     await key('Enter');
@@ -197,6 +208,35 @@ for (const [folder, theme] of THEMES) {
     await key('Escape');
     p = await probe('full');
     check(`${tag}: Escape cancels, writes nothing, shows the old name and returns focus to Edit name`, p.input === null && p.name === 'Jordan Lee' && p.active === 'button:Edit name' && (await writes()) === 0, `${p.active} / ${p.name}`);
+
+    // The Cancel button, pressed with the pointer after typing: nothing is written, the old name stays, focus is back.
+    await click(sceneSel('full', '[data-edit-trigger="name"]'));
+    await replaceText('full', 'Changed By Mistake');
+    const writesBefore = await writes();
+    await click(sceneSel('full', '.ph-editor-cancel'));
+    p = await probe('full');
+    check(`${tag}: pressing Cancel closes the box without saving, keeps the old name and returns focus to Edit name`, p.input === null && p.name === 'Jordan Lee' && p.active === 'button:Edit name' && (await writes()) === writesBefore, `${p.active} / ${p.name}`);
+
+    // Each field's editor has a Cancel, with room and no overlap.
+    for (const [field, file] of [['title', '02b-editing-title.png'], ['organization', '02c-editing-organization.png']]) {
+      await click(sceneSel('full', `[data-edit-trigger="${field}"]`));
+      p = await probe('full');
+      check(`${tag}: the ${field} editor shows a visible Cancel, 44px each way, overlapping nothing`, p.cancel?.text === 'Cancel' && p.cancel.w >= 44 && p.cancel.h >= 44 && p.cancel.overlaps.length === 0, JSON.stringify(p.cancel));
+      check(`${tag}: the ${field} editor does not overflow`, !p.pageOverflow && p.escapes === 0);
+      await shot(join(dir, file), 'full');
+      await key('Escape');
+    }
+
+    // With stickers (the desktop puts them top right): no overlap, no overflow.
+    await click(sceneSel('stickers', '[data-edit-trigger="name"]'));
+    p = await probe('stickers');
+    check(`${tag}/stickers: Cancel overlaps neither the stickers nor the contact pills`, p.cancel?.overlaps.length === 0 && p.escapes === 0 && !p.pageOverflow, JSON.stringify(p.cancel));
+    await shot(join(dir, '08-stickers-editing.png'), 'stickers');
+    await key('Escape');
+    await click(sceneSel('stickers', '[data-edit-trigger="title"]'));
+    p = await probe('stickers');
+    check(`${tag}/stickers: the title editor's Cancel overlaps nothing`, p.cancel?.overlaps.length === 0 && p.escapes === 0, JSON.stringify(p.cancel));
+    await key('Escape');
 
     // Saving a title with Enter: the value shows at once, a quiet saving state, focus on the button.
     await click(sceneSel('full', '[data-edit-trigger="title"]'));
@@ -248,7 +288,7 @@ for (const [folder, theme] of THEMES) {
     check(`${tag}: the line shows the old title again, and Try again and Cancel are offered`, !p.subtitle.includes('Will Not Save') && p.buttons.includes('Try again') && p.buttons.includes('Cancel'));
     check(`${tag}: the failure is announced`, p.live === "Couldn't save title. Try again.");
     await shot(join(dir, '07-failed-save.png'), 'full');
-    await click(sceneSel('full', '.ph-editor-btn:last-child'));
+    await click(sceneSel('full', '.ph-editor-cancel'));
     p = await probe('full');
     check(`${tag}: Cancel closes the box and returns focus to Edit title`, p.input === null && p.active === 'button:Edit title', p.active);
     report[tag] = out;

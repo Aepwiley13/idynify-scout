@@ -179,6 +179,13 @@ describe('edit controls: visibility and names', () => {
     expect(screen.queryByRole('button', { name: /Add / })).toBeNull();
   });
 
+  it('draws no visible " · " between the title and the organization while they are editable (it could strand at a line end), and still reads them as separate for a screen reader', () => {
+    drawStateful();
+    const sub = document.querySelector('.ph-subtitle--edit');
+    expect(sub.querySelector('.ph-sep')).toBeNull();
+    expect(sub.querySelector('.ph-sr')).toHaveTextContent(',');
+  });
+
   it('only a name edit is offered when only the name is editable, and no empty subtitle is drawn', () => {
     drawStateful({ id: 'c2', name: 'Sam Okafor' }, { editable: { name: true, title: false, organization: false } });
     expect(editBtn('name')).toBeInTheDocument();
@@ -276,12 +283,14 @@ describe('Enter, Escape and blur', () => {
     expect(s.onSubmit).toHaveBeenCalledTimes(1);
   });
 
-  it('a blur after Escape does not submit', async () => {
-    const { s } = drawStateful(JORDAN, { initial: { field: 'title', value: 'Community Partner' } });
+  it('a blur after Escape does not submit (the parent here leaves the box open, so the blur really reaches it)', () => {
+    const onSubmit = vi.fn();
+    const onCancel = vi.fn();
+    render(<PersonHeader person={model(JORDAN)} actions={{ onEdit() {} }} editing={{ editable: ALL, active: { field: 'title', value: 'x' }, onChange() {}, onSubmit, onCancel }} />);
     fireEvent.keyDown(inputOf('Title'), { key: 'Escape' });
-    fireEvent.blur(screen.queryByRole('textbox') ?? document.body);
-    expect(s.onCancel).toHaveBeenCalledTimes(1);
-    expect(s.onSubmit).not.toHaveBeenCalled();
+    fireEvent.blur(inputOf('Title'));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('holding Enter down is one submit, not many (the box stays open here, as it does for a refused name)', () => {
@@ -315,6 +324,12 @@ describe('Enter, Escape and blur', () => {
     act(() => { control.current.setActive({ field: 'title', value: 'VP' }); control.current.setFailure({ field: 'title', message: 'Failed' }); });
     fireEvent.blur(inputOf('Title'), { relatedTarget: screen.getByRole('button', { name: 'Cancel' }) });
     expect(s.onSubmit).not.toHaveBeenCalled();
+    // Try again is in the message row under the box, not in the box's own row: it counts as inside the editor too.
+    fireEvent.blur(inputOf('Title'), { relatedTarget: screen.getByRole('button', { name: 'Try again' }) });
+    expect(s.onSubmit).not.toHaveBeenCalled();
+    // Anything outside the editor is leaving it.
+    fireEvent.blur(inputOf('Title'), { relatedTarget: screen.getByRole('button', { name: 'Elsewhere' }) });
+    expect(s.onSubmit).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -503,6 +518,145 @@ describe('focus', () => {
       act(() => { control.current.setActive({ field: 'title', value: 'VP' }); control.current.setFailure({ field: 'title', message: 'Failed' }); });
       expect(link).toHaveFocus();
     });
+  });
+});
+
+// ─── H2-2a: a visible Cancel on every open editor ────────────────────────────
+
+describe('Cancel (H2-2a)', () => {
+  const cancelBtn = () => screen.getByRole('button', { name: 'Cancel' });
+  const FIELDS = [['name', 'Name'], ['title', 'Title'], ['organization', 'Organization']];
+
+  it.each(FIELDS)('is visible on the %s editor, with nothing wrong with it (no message needed)', (field, label) => {
+    drawStateful(JORDAN, { initial: { field, value: 'x' } });
+    expect(inputOf(label)).toBeInTheDocument();
+    expect(cancelBtn()).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull();
+    expect(document.querySelector('.ph-editor-msg')).toBeNull();
+  });
+
+  it('is beside the box, on the same row, so it adds no height', () => {
+    drawStateful(JORDAN, { initial: { field: 'title', value: 'x' } });
+    expect(cancelBtn().parentElement).toBe(inputOf('Title').parentElement);
+    expect(cancelBtn().parentElement).toHaveClass('ph-editor-row');
+  });
+
+  it('is only on the open editor: none while nothing is being edited, and one per open editor', async () => {
+    const { user } = drawStateful();
+    expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
+    await user.click(editBtn('title'));
+    expect(screen.getAllByRole('button', { name: 'Cancel' })).toHaveLength(1);
+  });
+
+  it('is not drawn at all for a read-only session', () => {
+    render(<PersonHeader person={model(JORDAN)} actions={{ onEdit() {} }} editing={{ editable: { name: false, title: false, organization: false }, active: { field: 'name', value: 'x' }, onChange() {}, onSubmit() {}, onCancel() {} }} />);
+    expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('pressing it with the pointer calls onCancel once, never onSubmit, so the box\'s blur-save cannot write first', async () => {
+    const { s, user } = drawStateful();
+    await user.click(editBtn('title'));
+    await user.clear(inputOf('Title'));
+    await user.type(inputOf('Title'), 'Changed');
+    await user.click(cancelBtn());
+    expect(s.onCancel).toHaveBeenCalledTimes(1);
+    expect(s.onSubmit).not.toHaveBeenCalled();
+    expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('does not take focus from the box first (the press cannot blur it)', () => {
+    drawStateful(JORDAN, { initial: { field: 'title', value: 'x' } });
+    expect(fireEvent.mouseDown(cancelBtn())).toBe(false);
+  });
+
+  it('reaching it with the keyboard is not a blur-save, and Enter or Space on it cancels', async () => {
+    const { s, user } = drawStateful();
+    await user.click(editBtn('title'));
+    await user.type(inputOf('Title'), 'x');
+    await user.tab();
+    expect(cancelBtn()).toHaveFocus();
+    expect(s.onSubmit).not.toHaveBeenCalled();
+    await user.keyboard('{Enter}');
+    expect(s.onCancel).toHaveBeenCalledTimes(1);
+    expect(s.onSubmit).not.toHaveBeenCalled();
+    expect(editBtn('title')).toHaveFocus();
+  });
+
+  it('returns focus to the edit button of the line, from every field', async () => {
+    const { user } = drawStateful();
+    for (const [field, label] of FIELDS) {
+      await user.click(editBtn(field));
+      await user.type(inputOf(label), 'z');
+      await user.click(cancelBtn());
+      expect(editBtn(field)).toHaveFocus();
+    }
+  });
+
+  it('cancels from a refused blank name, with focus back on Edit name, and writes nothing', async () => {
+    const { s, user } = drawStateful({ id: 'c2', name: 'Sam Okafor' });
+    await user.click(editBtn('name'));
+    await user.clear(inputOf('Name'));
+    await user.keyboard('{Enter}');
+    expect(screen.getByText(BLANK_NAME, { selector: '.ph-editor-msg' })).toBeInTheDocument();
+    await user.click(cancelBtn());
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(editBtn('name')).toHaveFocus();
+    expect(s.onCancel).toHaveBeenCalledTimes(1);
+    expect(s.onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  it('cancels from a failed save, without a retry, with focus back on the button', async () => {
+    const { s, control, user } = drawStateful();
+    act(() => { control.current.setActive({ field: 'title', value: 'VP' }); control.current.setFailure({ field: 'title', message: 'Failed' }); });
+    await user.click(cancelBtn());
+    expect(s.onCancel).toHaveBeenCalledTimes(1);
+    expect(s.onSubmit).not.toHaveBeenCalled();
+    expect(editBtn('title')).toHaveFocus();
+  });
+
+  it('keeps the draft on screen until the parent confirms: a parent that does not close the editor still shows what was typed', async () => {
+    const onCancel = vi.fn();
+    const user = userEvent.setup();
+    render(<PersonHeader person={model(JORDAN)} actions={{ onEdit() {} }} editing={{ editable: ALL, active: { field: 'title', value: 'My draft' }, onChange() {}, onSubmit() {}, onCancel }} />);
+    await user.click(cancelBtn());
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(inputOf('Title')).toHaveValue('My draft');
+  });
+
+  it('a blur after the Cancel button does not submit either (the parent here leaves the box open)', async () => {
+    const onSubmit = vi.fn();
+    const onCancel = vi.fn();
+    const user = userEvent.setup();
+    render(<PersonHeader person={model(JORDAN)} actions={{ onEdit() {} }} editing={{ editable: ALL, active: { field: 'title', value: 'x' }, onChange() {}, onSubmit, onCancel }} />);
+    await user.click(cancelBtn());
+    fireEvent.blur(inputOf('Title'));
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('leaves Escape, Enter and blur-to-save working as before', async () => {
+    const { s, user } = drawStateful();
+    await user.click(editBtn('title'));
+    await user.type(inputOf('Title'), '{Escape}');
+    expect(s.onCancel).toHaveBeenCalledTimes(1);
+    await user.click(editBtn('title'));
+    await user.type(inputOf('Title'), '{Enter}');
+    expect(s.onSubmit).toHaveBeenCalledTimes(1);
+    await user.click(editBtn('organization'));
+    await user.click(screen.getByRole('button', { name: 'Elsewhere' }));
+    expect(s.onSubmit).toHaveBeenCalledTimes(2);
+  });
+
+  it('is a quiet control: the stylesheet gives it a 44px target both ways and the muted text colour', () => {
+    const css = readFileSync(resolve(process.cwd(), 'src/components/contacts/personHeader/PersonHeader.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = (sel) => [...css.matchAll(new RegExp(`(?:^|[};{])\\s*${sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'g'))].map((m) => m[1]).join(';');
+    drawStateful(JORDAN, { initial: { field: 'title', value: 'x' } });
+    expect(cancelBtn()).toHaveClass('ph-editor-btn', 'ph-editor-cancel');
+    expect(rule('.ph-editor-btn')).toMatch(/min-height:\s*44px/);
+    expect(rule('.ph-editor-btn')).toMatch(/min-width:\s*44px/);
+    expect(rule('.ph-editor-cancel')).toMatch(/color:\s*var\(--text-secondary\)/);
+    expect(rule('.ph-editor-row')).toMatch(/display:\s*flex/);
   });
 });
 

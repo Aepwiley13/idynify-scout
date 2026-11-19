@@ -207,49 +207,53 @@ function FieldEditor({ field, edit, refs }) {
 
   return (
     <div className={`ph-editor ph-editor--${field}`}>
-      <input
-        data-edit-input=""
-        className={`ph-input ph-input--${field}`}
-        type="text"
-        value={value}
-        dir="auto"
-        aria-label={FIELD_NAME[field]}
-        aria-invalid={message ? 'true' : 'false'}
-        aria-describedby={message ? messageId : undefined}
-        autoComplete="off"
-        autoCapitalize={field === 'name' ? 'words' : 'sentences'}
-        enterKeyHint="done"
-        spellCheck={false}
-        onChange={(event) => { refs.unsettle(); edit.onChange(event.target.value); }}
-        onKeyDown={(event) => {
-          if (event.nativeEvent?.isComposing || event.keyCode === 229) return;
-          if (event.key === 'Enter') {
-            event.preventDefault();
-            if (event.repeat) return;
-            refs.returnTo(field);
+      {/* The box, and beside it a Cancel that is always there: on a phone there is no Escape. Same row, so it adds no height. */}
+      <div className="ph-editor-row">
+        <input
+          data-edit-input=""
+          className={`ph-input ph-input--${field}`}
+          type="text"
+          value={value}
+          dir="auto"
+          aria-label={FIELD_NAME[field]}
+          aria-invalid={message ? 'true' : 'false'}
+          aria-describedby={message ? messageId : undefined}
+          autoComplete="off"
+          autoCapitalize={field === 'name' ? 'words' : 'sentences'}
+          enterKeyHint="done"
+          spellCheck={false}
+          onChange={(event) => { refs.unsettle(); edit.onChange(event.target.value); }}
+          onKeyDown={(event) => {
+            if (event.nativeEvent?.isComposing || event.keyCode === 229) return;
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              if (event.repeat) return;
+              refs.returnTo(field);
+              refs.settle();
+              edit.onSubmit();
+            } else if (event.key === 'Escape') {
+              event.preventDefault();
+              cancel();
+            }
+          }}
+          onBlur={(event) => {
+            if (refs.isSettled()) return;
+            // Moving onto the editor's own Cancel or Try again is not leaving the editor.
+            if (event.relatedTarget && event.currentTarget.closest('.ph-editor')?.contains(event.relatedTarget)) return;
             refs.settle();
-            edit.onSubmit();
-          } else if (event.key === 'Escape') {
-            event.preventDefault();
-            cancel();
-          }
-        }}
-        onBlur={(event) => {
-          if (refs.isSettled()) return;
-          if (event.relatedTarget && event.currentTarget.parentElement?.contains(event.relatedTarget)) return;
-          refs.settle();
-          edit.onSubmit(); // leaving the box saves; focus is not moved (the person is going somewhere)
-        }}
-      />
+            edit.onSubmit(); // leaving the box saves; focus is not moved (the person is going somewhere)
+          }}
+        />
+        <button type="button" className="ph-editor-btn ph-editor-cancel" onMouseDown={keep} onClick={cancel}>Cancel</button>
+      </div>
       {message ? (
         <div className="ph-editor-foot">
           <p id={messageId} className="ph-editor-msg" data-kind={kind}>{message}</p>
-          <span className="ph-editor-actions">
-            {kind === 'failure' ? (
+          {kind === 'failure' ? (
+            <span className="ph-editor-actions">
               <button type="button" className="ph-editor-btn" onMouseDown={keep} onClick={submit}>Try again</button>
-            ) : null}
-            <button type="button" className="ph-editor-btn" onMouseDown={keep} onClick={cancel}>Cancel</button>
-          </span>
+            </span>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -297,11 +301,12 @@ function SubtitleEditable({ person, edit, refs, onEdit }) {
   };
   const title = part('title', person.title);
   const organization = part('organization', person.organization);
+  // No visible " · " here: in a row that wraps it can be stranded at a line's end, and each value has its own pencil.
   const both = Boolean(person.title && person.organization) && edit.active?.field !== 'title' && edit.active?.field !== 'organization';
   return (
     <div className="ph-subtitle ph-subtitle--edit" dir="auto">
       {title}
-      {both ? <span className="ph-sep" aria-hidden="true"> · </span> : null}
+      {both ? <span className="ph-sr">, </span> : null}
       {organization}
     </div>
   );

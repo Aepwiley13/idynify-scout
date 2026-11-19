@@ -24,6 +24,16 @@
  * ends the session so the blur that follows Escape saves nothing. A session belongs to one contact: moving to
  * another contact ends it without saving.
  *
+ * TWO CASES KEEP THE PERSON'S TEXT (H2-1a). The hook says WHY in structured data; the words belong to the screen.
+ *   - A blank name is not saved and the editor STAYS OPEN with the draft as typed. `problem` is
+ *     { field, reason: 'blank_name' } until the value changes, the edit is cancelled, or a valid value is committed.
+ *     Repeated commits (Enter, then blur) are the same refusal: nothing is written.
+ *   - A failed save puts the field back (as above) and REOPENS the editor with the text that was entered, so it can
+ *     be corrected or retried; `error` says what failed. It reopens only when that is still safe: the same contact,
+ *     the same account, the field still editable, this was the newest save of that field, no edit session is open,
+ *     and no newer session has been started since (an older failure never reopens over a newer one, even one on the
+ *     same field, and even one that has already ended). A save made directly with save() never opens an editor.
+ *
  * ACCOUNT AND PERMISSION. The account the contact was shown under is remembered; every save compares it with the
  * live account (here and again at the write, in saveContactFields) and is refused, with nothing written, when there
  * is no user, the session is impersonated, or the account has changed. When a write fails after the account
@@ -55,11 +65,13 @@ export function useContactIdentityEdit({ contact, onPatch }) {
 
   const [editingState, setEditingState] = useState(null); // { contactId, field, value }
   const [errorState, setErrorState] = useState(null); // { contactId, field, code }
+  const [problemState, setProblemState] = useState(null); // { contactId, field, reason }
   const [savingKeys, setSavingKeys] = useState(() => new Set());
 
   const latest = useRef(contact);
   const patchRef = useRef(onPatch);
-  const session = useRef(null); // { contactId, field, value }: the synchronous guard behind commit/cancel
+  const session = useRef(null); // { contactId, field, value, gen }: the synchronous guard behind commit/cancel
+  const generation = useRef(0); // counts sessions started, so an older failure can tell a newer session began
   const entries = useRef(new Map()); // `${contactId}:${storeField}` → { confirmed, confirmedSeq, seq, inflight }
   const mounted = useRef(true);
   useEffect(() => { latest.current = contact; }, [contact]);
@@ -73,7 +85,9 @@ export function useContactIdentityEdit({ contact, onPatch }) {
   function start(field) {
     if (!editable(field)) return false;
     const value = startValue(contact, field);
-    session.current = { contactId, field, value };
+    generation.current += 1;
+    session.current = { contactId, field, value, gen: generation.current };
+    setProblemState(null);
     setEditingState({ contactId, field, value });
     return true;
   }
@@ -82,11 +96,13 @@ export function useContactIdentityEdit({ contact, onPatch }) {
     const s = session.current;
     if (!s) return;
     s.value = value;
+    setProblemState(null);
     setEditingState({ contactId: s.contactId, field: s.field, value });
   }
 
   function cancel() {
     session.current = null;
+    setProblemState(null);
     setEditingState(null);
   }
 
@@ -99,7 +115,7 @@ export function useContactIdentityEdit({ contact, onPatch }) {
     });
   }
 
-  async function run(field, raw, wantedContactId) {
+  async function run(field, raw, wantedContactId, origin = null) {
     const current = latest.current;
     const patch = patchRef.current;
     if (!current?.id || typeof patch !== 'function') return refused('no_contact');
@@ -143,6 +159,12 @@ export function useContactIdentityEdit({ contact, onPatch }) {
       if (seq === entry.seq) {
         patchRef.current?.(id, { [storeField]: entry.confirmed });
         if (mounted.current) setErrorState({ contactId: id, field, code });
+        // Give the person their text back, if (and only if) nothing has moved on since they pressed save.
+        const stillHere = latest.current?.id === id && isEditable(latest.current, field);
+        if (origin && mounted.current && stillHere && session.current === null && generation.current === origin.gen) {
+          session.current = { contactId: id, field, value: raw, gen: origin.gen };
+          setEditingState({ contactId: id, field, value: raw });
+        }
       }
       return { status: 'failed', reason: code };
     } finally {
@@ -159,9 +181,21 @@ export function useContactIdentityEdit({ contact, onPatch }) {
   function commit() {
     const s = session.current;
     if (!s) return Promise.resolve({ status: 'ignored' });
+    // A blank name is refused but NOT closed: the editor stays open with the draft. Only checked when the account
+    // and contact are in order; anything else falls through to run(), which refuses and closes (fail closed).
+    const account = liveAccount();
+    const inOrder = latest.current?.id === s.contactId && account.uid && !account.impersonated && account.uid === ownerUid;
+    if (inOrder) {
+      const plan = planEdit(latest.current, s.field, s.value);
+      if (!plan.ok && plan.reason === 'blank_name') {
+        setProblemState({ contactId: s.contactId, field: s.field, reason: 'blank_name' });
+        return Promise.resolve(refused('blank_name'));
+      }
+    }
     session.current = null;
+    setProblemState(null);
     setEditingState(null);
-    return run(s.field, s.value, s.contactId);
+    return run(s.field, s.value, s.contactId, { gen: s.gen });
   }
 
   const editing = editingState && editingState.contactId === contactId
@@ -170,9 +204,12 @@ export function useContactIdentityEdit({ contact, onPatch }) {
   const error = errorState && errorState.contactId === contactId
     ? { field: errorState.field, code: errorState.code }
     : null;
+  const problem = problemState && problemState.contactId === contactId
+    ? { field: problemState.field, reason: problemState.reason }
+    : null;
   const isSaving = (field) => savingKeys.has(`${contactId}:${STORE_FIELD[field]}`);
 
-  return { canEdit, editable, editing, error, isSaving, start, setValue, cancel, commit, save, clearError: () => setErrorState(null) };
+  return { canEdit, editable, editing, error, problem, isSaving, start, setValue, cancel, commit, save, clearError: () => setErrorState(null) };
 }
 
 export default useContactIdentityEdit;

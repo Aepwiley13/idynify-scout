@@ -39,7 +39,7 @@ function useHarness(initial, { withPatch = true } = {}) {
     setContacts((prev) => ({ ...prev, [id]: { ...prev[id], ...fields } }));
   }, []);
   const api = useContactIdentityEdit({ contact: contacts[currentId], onPatch: withPatch ? onPatch : undefined });
-  return { api, contacts, currentId, setCurrentId };
+  return { api, contacts, currentId, setCurrentId, onPatch };
 }
 const setup = (initial, options) => renderHook(() => useHarness(initial, options));
 const byId = (list) => Object.fromEntries(list.map((c) => [c.id, c]));
@@ -450,5 +450,266 @@ describe('the result of a save', () => {
     await fail(1, 'unavailable');
     expect(await p2).toEqual({ status: 'failed', reason: 'unavailable' });
     await waitFor(() => expect(result.current.api.isSaving('title')).toBe(false));
+  });
+});
+
+// ─── H2-1a: a blank name keeps the editor open; a failed save gives the draft back ──────────────────────────────
+
+const begin = (result, field, value) => {
+  act(() => { result.current.api.start(field); });
+  act(() => { result.current.api.setValue(value); });
+};
+const commitNow = (result) => act(async () => { result.current.api.commit(); await Promise.resolve(); });
+
+describe('H2-1a: a blank name keeps the editor open', () => {
+  it('refuses without writing, keeps the editor open with the draft as typed, and says why in a structured problem', async () => {
+    const { result } = setup(byId([ANA]));
+    begin(result, 'name', '   ');
+    let r;
+    await act(async () => { r = await result.current.api.commit(); });
+    expect(r).toEqual({ status: 'refused', reason: 'blank_name' });
+    expect(result.current.api.editing).toEqual({ field: 'name', value: '   ' });
+    expect(result.current.api.problem).toEqual({ field: 'name', reason: 'blank_name' });
+    expect(fake.writes).toEqual([]);
+    expect(patches).toEqual([]);
+    expect(result.current.contacts.c2.name).toBe('Ana Lopez');
+  });
+
+  it('an empty name is refused the same way', async () => {
+    const { result } = setup(byId([ANA]));
+    begin(result, 'name', '');
+    await act(async () => { await result.current.api.commit(); });
+    expect(result.current.api.editing).toEqual({ field: 'name', value: '' });
+    expect(result.current.api.problem).toEqual({ field: 'name', reason: 'blank_name' });
+  });
+
+  it('the problem clears when the value changes', async () => {
+    const { result } = setup(byId([ANA]));
+    begin(result, 'name', ' ');
+    await act(async () => { await result.current.api.commit(); });
+    expect(result.current.api.problem).not.toBeNull();
+    act(() => { result.current.api.setValue('A'); });
+    expect(result.current.api.problem).toBeNull();
+    expect(result.current.api.editing).toEqual({ field: 'name', value: 'A' });
+  });
+
+  it('the problem clears on cancel, and a new edit starts clean', async () => {
+    const { result } = setup(byId([ANA]));
+    begin(result, 'name', ' ');
+    await act(async () => { await result.current.api.commit(); });
+    act(() => { result.current.api.cancel(); });
+    expect(result.current.api.problem).toBeNull();
+    expect(result.current.api.editing).toBeNull();
+    act(() => { result.current.api.start('name'); });
+    expect(result.current.api.problem).toBeNull();
+    expect(result.current.api.editing).toEqual({ field: 'name', value: 'Ana Lopez' });
+  });
+
+  it('the problem clears when a valid value is committed, which then saves once', async () => {
+    const { result } = setup(byId([ANA]));
+    begin(result, 'name', ' ');
+    await act(async () => { await result.current.api.commit(); });
+    act(() => { result.current.api.setValue('Ana M. Lopez'); });
+    await commitNow(result);
+    expect(result.current.api.problem).toBeNull();
+    expect(result.current.api.editing).toBeNull();
+    expect(fake.writes).toHaveLength(1);
+    expect(fake.writes[0].data.name).toBe('Ana M. Lopez');
+  });
+
+  it('Enter followed by blur on a blank name writes nothing and leaves the editor open; then Enter and blur on a valid name write once', async () => {
+    const { result } = setup(byId([ANA]));
+    begin(result, 'name', '  ');
+    await act(async () => { await result.current.api.commit(); await result.current.api.commit(); });
+    expect(fake.writes).toEqual([]);
+    expect(result.current.api.editing).toEqual({ field: 'name', value: '  ' });
+    act(() => { result.current.api.setValue('Ana M. Lopez'); });
+    let second;
+    await act(async () => { result.current.api.commit(); second = result.current.api.commit(); await Promise.resolve(); });
+    expect(await second).toEqual({ status: 'ignored' });
+    expect(fake.writes).toHaveLength(1);
+  });
+
+  it('a blank TITLE is not a problem: clearing a title saves and closes the editor', async () => {
+    const { result } = setup(byId([ANA]));
+    begin(result, 'title', '');
+    await commitNow(result);
+    expect(result.current.api.problem).toBeNull();
+    expect(result.current.api.editing).toBeNull();
+    expect(fake.writes).toHaveLength(1);
+    expect(fake.writes[0].data.title).toBe('');
+  });
+
+  it('the problem belongs to the contact it was found on', async () => {
+    const { result } = setup(byId([ANA, CSV]));
+    begin(result, 'name', ' ');
+    await act(async () => { await result.current.api.commit(); });
+    act(() => { result.current.setCurrentId('c1'); });
+    expect(result.current.api.problem).toBeNull();
+    expect(result.current.api.editing).toBeNull();
+  });
+
+  it('after the account changed it is refused and closed, not kept open (fail closed)', async () => {
+    const { result } = setup(byId([ANA]));
+    begin(result, 'name', ' ');
+    viewer.value = { uid: 'u2' };
+    let r;
+    await act(async () => { r = await result.current.api.commit(); });
+    expect(r).toEqual({ status: 'refused', reason: 'account_changed' });
+    expect(result.current.api.editing).toBeNull();
+    expect(result.current.api.problem).toBeNull();
+  });
+});
+
+describe('H2-1a: a failed save gives the draft back', () => {
+  it('rolls back only the saved field, then reopens the editor with the attempted text and the error', async () => {
+    const { result } = setup(byId([ANA]));
+    await act(async () => { result.current.api.save('title', 'VP'); await Promise.resolve(); });
+    await ok(0);
+    begin(result, 'name', '  Ana M. Lopez ');
+    await commitNow(result);
+    expect(result.current.api.editing).toBeNull();
+    expect(result.current.contacts.c2.name).toBe('Ana M. Lopez');
+    await fail(1, 'unavailable');
+    expect(result.current.contacts.c2).toMatchObject({ name: 'Ana Lopez', title: 'VP' });
+    expect(result.current.api.editing).toEqual({ field: 'name', value: '  Ana M. Lopez ' });
+    expect(result.current.api.error).toEqual({ field: 'name', code: 'unavailable' });
+  });
+
+  it('a retry from the reopened editor submits the preserved draft, and succeeds', async () => {
+    const { result } = setup(byId([ANA]));
+    begin(result, 'title', 'VP');
+    await commitNow(result);
+    await fail(0);
+    expect(result.current.api.editing).toEqual({ field: 'title', value: 'VP' });
+    await commitNow(result);
+    expect(fake.writes).toHaveLength(2);
+    expect(fake.writes[1].data.title).toBe('VP');
+    expect(result.current.api.error).toBeNull();
+    await ok(1);
+    expect(result.current.api.editing).toBeNull();
+    expect(result.current.contacts.c2.title).toBe('VP');
+  });
+
+  it('a retry that fails again reopens it again, still with the draft', async () => {
+    const { result } = setup(byId([ANA]));
+    begin(result, 'title', 'VP');
+    await commitNow(result);
+    await fail(0);
+    await commitNow(result);
+    await fail(1, 'permission-denied');
+    expect(result.current.api.editing).toEqual({ field: 'title', value: 'VP' });
+    expect(result.current.api.error).toEqual({ field: 'title', code: 'permission-denied' });
+    expect(result.current.contacts.c2.title).toBe('Director');
+  });
+
+  it('the draft can be corrected before the retry', async () => {
+    const { result } = setup(byId([ANA]));
+    begin(result, 'title', 'VP');
+    await commitNow(result);
+    await fail(0);
+    act(() => { result.current.api.setValue('Vice President'); });
+    await commitNow(result);
+    expect(fake.writes[1].data.title).toBe('Vice President');
+  });
+
+  it('does not reopen after the person moved to another contact, even when they come back', async () => {
+    const { result } = setup(byId([ANA, CSV]));
+    begin(result, 'title', 'VP');
+    await commitNow(result);
+    act(() => { result.current.setCurrentId('c1'); });
+    await fail(0);
+    expect(result.current.api.editing).toBeNull();
+    expect(result.current.contacts.c2.title).toBe('Director');
+    act(() => { result.current.setCurrentId('c2'); });
+    expect(result.current.api.editing).toBeNull();
+  });
+
+  it('does not reopen, restore or report after the account changed', async () => {
+    const { result } = setup(byId([ANA]));
+    begin(result, 'title', 'VP');
+    await commitNow(result);
+    viewer.value = { uid: 'u2' };
+    await fail(0);
+    expect(result.current.api.editing).toBeNull();
+    expect(result.current.api.error).toBeNull();
+    expect(patches).toEqual([['c2', { title: 'VP' }]]);
+  });
+
+  it('does not interrupt an edit of a different field that is open', async () => {
+    const { result } = setup(byId([ANA]));
+    begin(result, 'title', 'VP');
+    await commitNow(result);
+    begin(result, 'name', 'Ana X');
+    await fail(0);
+    expect(result.current.api.editing).toEqual({ field: 'name', value: 'Ana X' });
+    expect(result.current.contacts.c2.title).toBe('Director');
+    expect(result.current.api.error).toEqual({ field: 'title', code: 'unavailable' });
+  });
+
+  it('does not reopen over a newer session that has already ended', async () => {
+    const { result } = setup(byId([ANA]));
+    begin(result, 'title', 'VP');
+    await commitNow(result);
+    begin(result, 'name', 'Ana X');
+    act(() => { result.current.api.cancel(); });
+    await fail(0);
+    expect(result.current.api.editing).toBeNull();
+    expect(result.current.contacts.c2.title).toBe('Director');
+  });
+
+  it('does not interrupt a newer session on the SAME field', async () => {
+    const { result } = setup(byId([ANA]));
+    begin(result, 'title', 'First');
+    await commitNow(result);
+    act(() => { result.current.api.start('title'); });
+    act(() => { result.current.api.setValue('Second'); });
+    await fail(0);
+    expect(result.current.api.editing).toEqual({ field: 'title', value: 'Second' });
+  });
+
+  it('an older failure neither rolls back nor reopens over a newer save that is still pending, and the newer value then stays', async () => {
+    const { result } = setup(byId([ANA]));
+    begin(result, 'title', 'First');
+    await commitNow(result);
+    begin(result, 'title', 'Second');
+    await commitNow(result);
+    await fail(0);
+    expect(result.current.api.editing).toBeNull();
+    expect(result.current.contacts.c2.title).toBe('Second');
+    await ok(1);
+    expect(result.current.contacts.c2.title).toBe('Second');
+    expect(result.current.api.error).toBeNull();
+  });
+
+  it('an older failure cannot overwrite a newer value that has already been saved', async () => {
+    const { result } = setup(byId([ANA]));
+    begin(result, 'title', 'First');
+    await commitNow(result);
+    begin(result, 'title', 'Second');
+    await commitNow(result);
+    await ok(1);
+    await fail(0);
+    expect(result.current.contacts.c2.title).toBe('Second');
+    expect(result.current.api.editing).toBeNull();
+    expect(result.current.api.error).toBeNull();
+  });
+
+  it('a save made directly (not from the editor) that fails does not open an editor', async () => {
+    const { result } = setup(byId([ANA]));
+    await act(async () => { result.current.api.save('title', 'VP'); await Promise.resolve(); });
+    await fail(0);
+    expect(result.current.api.editing).toBeNull();
+    expect(result.current.api.error).toEqual({ field: 'title', code: 'unavailable' });
+  });
+
+  it('does not reopen a field that has stopped being editable (the contact was linked to a company meanwhile), though it is still restored', async () => {
+    const { result } = setup(byId([ANA]));
+    begin(result, 'organization', 'Initech');
+    await commitNow(result);
+    act(() => { result.current.onPatch('c2', { company_id: 'co1' }); });
+    await fail(0);
+    expect(result.current.api.editing).toBeNull();
+    expect(result.current.contacts.c2.company_name).toBe('Globex');
   });
 });

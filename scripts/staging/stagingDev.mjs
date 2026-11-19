@@ -31,8 +31,14 @@
  *                       edge-function runtime (as --no-edge-functions, with its
  *                       refusal). Without this, every request on :8888 waits for
  *                       all ~124 functions to finish bundling (minutes) and for the
- *                       edge runtime's download. Once the app answers, the launcher
- *                       prints one line saying so and which functions answer.
+ *                       edge runtime's download. Also: Vite on its own port
+ *                       (BILLING_VITE_PORT, strict, so it never drifts), the ports
+ *                       checked first (stagingPorts.mjs: this checkout's leftovers are
+ *                       stopped, anything else is named and refused), the app in its
+ *                       own process group so stopping the launcher stops all of it,
+ *                       and, once it answers, one line from the readiness check: GET /,
+ *                       every function, unauthenticated signup/checkout/webhook calls
+ *                       refused as they should be, and the app rendered in Chromium.
  *   (optional) --apollo-mock
  *                       start the local Apollo stand-in (apolloMock.mjs, 127.0.0.1 only) and
  *                       point the functions at it with its fixed key. For the end-to-end test.
@@ -55,6 +61,8 @@ import { pathToFileURL } from 'node:url';
 import process from 'node:process';
 import { checkStagingEnv, parseEnvFile, committable, repoRoot, checkoutInputs, INTEGRATION_KEYS } from './stagingPreflight.mjs';
 import { startApolloMock, APOLLO_MOCK_KEY, DEFAULT_APOLLO_MOCK_PORT } from './apolloMock.mjs';
+import { claimPorts, BILLING_VITE_PORT } from './stagingPorts.mjs';
+import { browserCheck } from './stagingBrowser.mjs';
 import {
   readStagingCredential, withCredential, checkCredential, CredentialRefusal, KEY_VARIABLE, FILE_VARIABLE,
 } from './stagingCredentials.mjs';
@@ -116,11 +124,25 @@ export function functionsFolder(root, names, { dir = tmpdir() } = {}) {
 export const stickerFunctionsFolder = (root, options) => functionsFolder(root, STICKER_QA_FUNCTIONS, options);
 
 /**
- * Waits until the app answers GET / with 200, then asks each function for OPTIONS (a CORS
- * preflight: no body, no token, nothing written). 404 means the CLI does not serve it; any
- * other answer means it is mounted. Returns { ok, ms, status, functions: [{ name, status }] }.
+ * Unauthenticated calls each of these must refuse: proof that its code loads and runs (a missing
+ * Stripe setting, for example, answers 500), with nothing written and nothing contacted. Signup
+ * and checkout refuse without a token (401), the webhook without a Stripe signature (400).
  */
-export async function probeReady({ base = 'http://localhost:8888', functions = [], fetchImpl = fetch, timeoutMs = 180_000, intervalMs = 1_000, now = Date.now, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), stopped = () => false } = {}) {
+export const BILLING_ENDPOINT_CHECKS = Object.freeze([
+  { label: 'signup', name: 'send-welcome-email' },
+  { label: 'checkout', name: 'create-checkout-session' },
+  { label: 'webhook', name: 'stripe-webhook' },
+]);
+
+const refusedAsExpected = (status) => status !== null && status >= 400 && status < 500 && status !== 404;
+
+/**
+ * Waits until the app answers GET / with 200, then asks each function for OPTIONS (a CORS
+ * preflight: no body, no token, nothing written; 404 means the CLI does not serve it), then makes
+ * the endpoint checks above. Returns { ok, ms, status, functions: [{ name, status }],
+ * endpoints: [{ label, name, status }] }.
+ */
+export async function probeReady({ base = 'http://localhost:8888', functions = [], endpoints = [], fetchImpl = fetch, timeoutMs = 180_000, intervalMs = 1_000, now = Date.now, sleep = (ms) => new Promise((r) => setTimeout(r, ms)), stopped = () => false } = {}) {
   const started = now();
   let status = null;
   while (now() - started < timeoutMs && !stopped()) {
@@ -132,34 +154,50 @@ export async function probeReady({ base = 'http://localhost:8888', functions = [
     }
     await sleep(intervalMs);
   }
-  if (status !== 200) return { ok: false, ms: now() - started, status, functions: [] };
-  const answers = [];
-  for (const name of functions) {
-    let answer = null;
+  if (status !== 200) return { ok: false, ms: now() - started, status, functions: [], endpoints: [] };
+  const ask = async (name, init) => {
     try {
-      answer = (await fetchImpl(`${base}/.netlify/functions/${name}`, { method: 'OPTIONS', signal: AbortSignal.timeout(30_000) })).status;
+      return (await fetchImpl(`${base}/.netlify/functions/${name}`, { ...init, signal: AbortSignal.timeout(30_000) })).status;
     } catch {
-      answer = null;
+      return null;
     }
-    answers.push({ name, status: answer });
+  };
+  const answers = [];
+  for (const name of functions) answers.push({ name, status: await ask(name, { method: 'OPTIONS' }) });
+  const refusals = [];
+  for (const { label, name } of endpoints) {
+    refusals.push({ label, name, status: await ask(name, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }) });
   }
-  return { ok: answers.every((a) => a.status !== null && a.status !== 404), ms: now() - started, status, functions: answers };
+  const ok = answers.every((a) => a.status !== null && a.status !== 404) && refusals.every((e) => refusedAsExpected(e.status));
+  return { ok, ms: now() - started, status, functions: answers, endpoints: refusals };
 }
 
-/** The one line the launcher prints once the app answers. Pure. */
-export function readyLine(result, base = 'http://localhost:8888') {
+/** The one line the launcher prints once the checks are done. Pure. `browser` is browserCheck's result. */
+export function readyLine(result, browser = null, base = 'http://localhost:8888') {
   if (result.status !== 200) return `✗ ${base} did not answer 200 within ${Math.round(result.ms / 1000)} s (last: ${result.status ?? 'no answer'}).`;
   const missing = result.functions.filter((f) => f.status === null || f.status === 404).map((f) => f.name);
-  const head = `${base} answered 200 after ${Math.round(result.ms / 1000)} s; ${result.functions.length - missing.length} of ${result.functions.length} functions answer`;
-  return missing.length ? `✗ ${head}. Not answering: ${missing.join(', ')}.` : `✓ ${head}. Ready.`;
+  const endpoints = result.endpoints ?? [];
+  const wrong = endpoints.filter((e) => !refusedAsExpected(e.status));
+  const parts = [`${base} answered 200 after ${Math.round(result.ms / 1000)} s`, `${result.functions.length - missing.length} of ${result.functions.length} functions answer`];
+  if (endpoints.length) parts.push(`${endpoints.map((e) => `${e.label} ${e.status ?? 'no answer'}`).join(', ')} (unauthenticated calls refused)`);
+  if (browser) parts.push(browser.ok ? `the app renders in Chromium (${Math.round(browser.ms / 1000)} s)` : 'the app does not render in Chromium');
+  const faults = [
+    ...(missing.length ? [`not answering: ${missing.join(', ')}`] : []),
+    ...wrong.map((e) => `${e.label} (${e.name}) answered ${e.status ?? 'nothing'}, expected a refusal`),
+    ...(browser && !browser.ok ? browser.problems : []),
+  ];
+  return faults.length ? `✗ ${parts.join('; ')}. ${faults.join('; ')}.` : `✓ ${parts.join('; ')}. Ready.`;
 }
 
 /** The CLI arguments: `netlify dev --offline`, plus the switches asked for. */
-export function devArgs({ noEdgeFunctions = false, functionsDir = null } = {}) {
+export function devArgs({ noEdgeFunctions = false, functionsDir = null, vitePort = null } = {}) {
   return [
     'netlify', 'dev', '--offline',
     ...(noEdgeFunctions ? ['--internal-disable-edge-functions'] : []),
     ...(functionsDir ? ['--functions', functionsDir] : []),
+    // Vite on a port of its own, strict: if it cannot have it, it stops instead of moving to the
+    // next port while netlify dev keeps proxying to whatever holds this one.
+    ...(vitePort ? ['--target-port', String(vitePort), '--command', `npm run dev -- --port ${vitePort} --strictPort`] : []),
   ];
 }
 
@@ -222,7 +260,21 @@ async function main() {
     return 1;
   }
   const noEdgeFunctions = onlyBilling || argv.includes('--no-edge-functions');
-  const apolloMock = argv.includes('--apollo-mock') ? await startApolloMock({ port: DEFAULT_APOLLO_MOCK_PORT }) : null;
+  const wantsMock = argv.includes('--apollo-mock');
+  if (onlyBilling) {
+    // Refuse on the preflight before stopping anything; then make the ports this run's own.
+    const early = planDevRun({ fileEnv, credential, checks, noEdgeFunctions, edgeFunctionsDeclared: hasEdgeFunctions(repoRoot()) });
+    if (early.ok) {
+      const ports = await claimPorts([8888, BILLING_VITE_PORT, ...(wantsMock ? [DEFAULT_APOLLO_MOCK_PORT] : [])], repoRoot());
+      for (const line of ports.stopped) console.log(`  · ${line}`);
+      if (!ports.ok) {
+        for (const p of ports.problems) console.error(`  ✗ ${p}`);
+        console.error('\nRefused: the app was not started, so it cannot be proxied to a server this launcher did not start.');
+        return 1;
+      }
+    }
+  }
+  const apolloMock = wantsMock ? await startApolloMock({ port: DEFAULT_APOLLO_MOCK_PORT }) : null;
   const plan = planDevRun({
     fileEnv, credential, shellEnv: process.env, checks, rest: argv.includes('--rest'),
     noEdgeFunctions, edgeFunctionsDeclared: hasEdgeFunctions(repoRoot()), apolloMockUrl: apolloMock?.url ?? null,
@@ -243,14 +295,27 @@ async function main() {
     return 1;
   }
   console.log(`Preflight passed. Starting the app against ${fileEnv.VITE_FIREBASE_PROJECT_ID} (browser, functions and sign-in)${billing ? ', Stripe in test mode' : ''}${apolloMock ? `, Apollo stand-in at ${apolloMock.url}` : ''}, credential from ${credential.source}${served ? `, serving only: ${served.join(', ')}` : ''}${noEdgeFunctions ? ', edge runtime off' : ''}.`);
-  const child = spawn('npx', devArgs({ noEdgeFunctions, functionsDir: functions?.path }), { cwd: repoRoot(), stdio: 'inherit', env: plan.childEnv });
+  // Billing runs: the CLI, npm and Vite in a process group of their own, stopped together, so no
+  // Vite or netlify is left holding a port for the next run. No stdin: a background group that
+  // reads the terminal is suspended.
+  const child = spawn('npx', devArgs({ noEdgeFunctions, functionsDir: functions?.path, vitePort: onlyBilling ? BILLING_VITE_PORT : null }), {
+    cwd: repoRoot(), env: plan.childEnv, ...(onlyBilling ? { stdio: ['ignore', 'inherit', 'inherit'], detached: true } : { stdio: 'inherit' }),
+  });
   let exited = false;
   if (onlyBilling) {
-    probeReady({ functions: BILLING_JOURNEY_FUNCTIONS, stopped: () => exited }).then((result) => { if (!exited) console.log(`\n${readyLine(result)}\n`); });
+    probeReady({ functions: BILLING_JOURNEY_FUNCTIONS, endpoints: BILLING_ENDPOINT_CHECKS, stopped: () => exited })
+      .then(async (result) => (result.status === 200 && !exited ? { result, browser: await browserCheck() } : { result, browser: null }))
+      .then(({ result, browser }) => { if (!exited) console.log(`\n${readyLine(result, browser)}\n`); });
   }
   const stop = () => { functions?.remove(); apolloMock?.close(); };
-  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(signal, () => { child.kill(signal); stop(); process.exit(130); });
-  child.on('exit', (code) => { exited = true; stop(); process.exitCode = code ?? 1; });
+  const signalApp = (signal) => {
+    try {
+      if (onlyBilling) process.kill(-child.pid, signal);
+      else child.kill(signal);
+    } catch { /* already stopped */ }
+  };
+  for (const signal of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.once(signal, () => { signalApp(signal); stop(); process.exit(130); });
+  child.on('exit', (code) => { exited = true; if (onlyBilling) signalApp('SIGTERM'); stop(); process.exitCode = code ?? 1; });
   return undefined;
 }
 

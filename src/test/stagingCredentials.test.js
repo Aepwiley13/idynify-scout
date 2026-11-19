@@ -21,6 +21,7 @@ import {
 } from '../../scripts/staging/stagingCredentials.mjs';
 import {
   planDevRun, devArgs, hasEdgeFunctions, stickerFunctionsFolder, STICKER_QA_FUNCTIONS, functionsFolder, BILLING_JOURNEY_FUNCTIONS, probeReady, readyLine,
+  BILLING_ENDPOINT_CHECKS,
 } from '../../scripts/staging/stagingDev.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -292,7 +293,53 @@ describe('serving only the billing journey functions (--only-billing-functions)'
     };
     const result = await probeReady({ functions: ['change-plan', 'barryEnrich', 'stripe-webhook'], fetchImpl, ...clock() });
     expect(result.ok).toBe(false);
-    expect(readyLine(result)).toBe('✗ http://localhost:8888 answered 200 after 0 s; 1 of 3 functions answer. Not answering: change-plan, barryEnrich.');
+    expect(readyLine(result)).toBe('✗ http://localhost:8888 answered 200 after 0 s; 1 of 3 functions answer. not answering: change-plan, barryEnrich.');
+  });
+
+  it('readiness: signup, checkout and the webhook must refuse an unauthenticated call (code ran, nothing written)', async () => {
+    expect(BILLING_ENDPOINT_CHECKS.map((e) => [e.label, e.name])).toEqual([
+      ['signup', 'send-welcome-email'], ['checkout', 'create-checkout-session'], ['webhook', 'stripe-webhook'],
+    ]);
+    const posts = [];
+    const fetchImpl = async (url, init = {}) => {
+      if (url.endsWith(':8888/')) return { status: 200 };
+      if (init.method === 'POST') {
+        posts.push([url.split('/').pop(), init.body, init.headers]);
+        return { status: url.endsWith('stripe-webhook') ? 400 : 401 };
+      }
+      return { status: 204 };
+    };
+    const result = await probeReady({ functions: ['stripe-webhook'], endpoints: BILLING_ENDPOINT_CHECKS, fetchImpl, ...clock() });
+    expect(result.ok).toBe(true);
+    // No token, no Stripe signature, an empty body: nothing that could act for an account or pass as Stripe.
+    expect(posts).toEqual(BILLING_ENDPOINT_CHECKS.map((e) => [e.name, '{}', { 'Content-Type': 'application/json' }]));
+    expect(readyLine(result, { ok: true, ms: 4200, problems: [] })).toBe(
+      '✓ http://localhost:8888 answered 200 after 0 s; 1 of 1 functions answer; signup 401, checkout 401, webhook 400 (unauthenticated calls refused); the app renders in Chromium (4 s). Ready.',
+    );
+  });
+
+  it('readiness: a crashed endpoint (500) or a page that does not render in the browser is not Ready', async () => {
+    const fetchImpl = async (url, init = {}) => {
+      if (url.endsWith(':8888/')) return { status: 200 };
+      if (init.method === 'POST') return { status: url.endsWith('stripe-webhook') ? 500 : 401 };
+      return { status: 204 };
+    };
+    const result = await probeReady({ functions: [], endpoints: BILLING_ENDPOINT_CHECKS, fetchImpl, ...clock() });
+    expect(result.ok).toBe(false);
+    expect(readyLine(result)).toContain('webhook (stripe-webhook) answered 500, expected a refusal');
+    const fine = await probeReady({ functions: [], endpoints: [], fetchImpl, ...clock() });
+    const line = readyLine(fine, { ok: false, ms: 90_000, problems: ['500 for /signup'] });
+    expect(line.startsWith('✗')).toBe(true);
+    expect(line).toContain('the app does not render in Chromium');
+    expect(line).toContain('500 for /signup');
+    expect(line).not.toContain('Ready');
+  });
+
+  it('billing runs give Vite its own strict port, so it can never drift while netlify dev proxies the old one', () => {
+    expect(devArgs({ noEdgeFunctions: true, functionsDir: '/x', vitePort: 5199 })).toEqual([
+      'netlify', 'dev', '--offline', '--internal-disable-edge-functions', '--functions', '/x',
+      '--target-port', '5199', '--command', 'npm run dev -- --port 5199 --strictPort',
+    ]);
   });
 
   it('readiness: a page that never answers 200 is reported, and it stops when the app exits', async () => {

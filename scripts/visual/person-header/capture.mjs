@@ -92,6 +92,8 @@ const MEASURE = `(() => {
     const name = card.querySelector('.ph-name');
     const avatar = card.querySelector('.ph-avatar').getBoundingClientRect();
     const identity = card.querySelector('.ph-identity').getBoundingClientRect();
+    const sub = card.querySelector('.ph-subtitle');
+    const nameBox = name.getBoundingClientRect();
     const stickers = card.querySelector('.ph-stickers');
     const contacts = card.querySelector('.ph-contacts');
     out.scenes[id] = {
@@ -102,6 +104,8 @@ const MEASURE = `(() => {
       contactsBelowIdentity: contacts ? contacts.getBoundingClientRect().top >= identity.bottom - 1 : null,
       stickersRight: stickers ? stickers.getBoundingClientRect().left > identity.right - 2 : null,
       stickersBelow: stickers ? stickers.getBoundingClientRect().top >= Math.max(identity.bottom, contacts ? contacts.getBoundingClientRect().bottom : 0) - 1 : null,
+      nameGap: sub ? Math.round((sub.getBoundingClientRect().top - nameBox.bottom) * 10) / 10 : null,
+      cardHeight: Math.round(box.height),
       buttons: card.querySelectorAll('button').length,
     };
   }
@@ -133,6 +137,8 @@ for (const [folder, theme] of THEMES) {
       check(`${tag}/${id}: the name stays within three lines`, s.nameLines <= 3, String(s.nameLines));
     }
     const full = m.scenes.full;
+    const wantGap = { desktop: 10, tablet: 8, phone: 4 }[vp.id];
+    check(`${tag}: the name sits ${wantGap}px above the subtitle`, full.nameGap === wantGap, String(full.nameGap));
     if (vp.id === 'desktop') {
       check(`${tag}: avatar 112px, name 32px, identity beside the photo, stickers on the right`, full.avatar === 112 && full.nameSize === 32 && full.identityBesideAvatar && full.stickersRight === true, JSON.stringify(full));
     } else if (vp.id === 'tablet') {

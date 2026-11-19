@@ -74,7 +74,7 @@ describe('colour', () => {
 
   it('names only the colours it has to: white initials, the activity dots, the brand glow, and the fallbacks for a browser without color-mix', () => {
     const literals = [...css.matchAll(/#[0-9a-fA-F]{3,8}\b|rgba?\([^)]*\)/g)].map((m) => m[0].replace(/\s+/g, ''));
-    const allowed = new Set(['#fff', '#1d9e75', '#8a8a98', '#5b21b6', 'rgba(124,58,237,0.10)', 'rgba(124,58,237,0.16)', 'rgba(124,58,237,0.18)', 'rgba(124,58,237,0.07)']);
+    const allowed = new Set(['#fff', '#1d9e75', '#8a8a98', '#5b21b6', 'rgba(124,58,237,0.10)', 'rgba(124,58,237,0.16)', 'rgba(124,58,237,0.18)', 'rgba(124,58,237,0.04)']);
     for (const literal of literals) expect(allowed.has(literal), literal).toBe(true);
     expect(css).not.toMatch(/:\s*(?:white|black|red|blue|green|gray|grey|pink|purple)\b/i);
   });
@@ -233,6 +233,27 @@ describe('layout', () => {
 
   it('keeps text left-aligned whatever its direction, so a right-to-left name sits with the rest of the card', () => {
     for (const selector of ['.ph-name', '.ph-subtitle', '.ph-location-text']) expect(decl(selector), selector).toMatch(/text-align:\s*left/);
+  });
+
+  it('gives the name a little more room above the subtitle on a tablet (4px) and a desktop (6px), and leaves a phone as it was', () => {
+    // The phone's rule (the first, outside any container query) has no margin.
+    expect(rules('.ph-name')[0]).not.toMatch(/margin/);
+    expect(rules('.ph-name')[0]).toMatch(/font-size:\s*24px/);
+    // Written as `.ph .ph-name`: the reset `.ph h2 { margin: 0 }` has higher specificity than a bare class and would win.
+    expect(css).toMatch(/\.ph h1, \.ph h2[^{]*\{\s*margin:\s*0/);
+    expect(container('min-width: 540px')).toMatch(/\.ph \.ph-name\s*\{\s*margin-bottom:\s*4px/);
+    expect(container('min-width: 820px')).toMatch(/\.ph \.ph-name\s*\{\s*margin-bottom:\s*6px/);
+    expect(decl('.ph-identity')).toMatch(/gap:\s*4px/);
+  });
+
+  it('lifts the card quietly: the theme\'s own shadow and a faint, close brand glow', () => {
+    const shadow = decl('.ph-card').match(/box-shadow:\s*([^;]+)/)[1];
+    expect(shadow).toMatch(/^var\(--shadow-card\), 0 6px 22px rgba\(124, 58, 237, 0\.04\)$/);
+    const [, y, blur, alpha] = shadow.match(/0 (\d+)px (\d+)px rgba\(124, 58, 237, ([\d.]+)\)/);
+    // Softer than H1-B's glow (0 10px 30px at 0.07): closer, tighter, fainter.
+    expect(Number(y)).toBeLessThan(10);
+    expect(Number(blur)).toBeLessThan(30);
+    expect(Number(alpha)).toBeLessThan(0.07);
   });
 
   it('is a card: rounded, bordered and softly lifted', () => {

@@ -25,7 +25,7 @@
  *   - A write is made for the contact this component was made for, and only that one.
  *   - A denied write re-checks availability (recheck), and the notice lives on the page, not here.
  *   - Removing offers Undo for UNDO_MS; only the latest removal's offer stays.
- *   - KNOWN: an add that is still pending can be chosen again and is sent a second time.
+ *   - An add that is still pending for a contact and sticker is not sent a second time (M2-A); a failed add can be tried again.
  *   - KNOWN: a result that arrives after the component has been replaced (the person moved to another
  *     contact) is saved but is not reported through onUpdate.
  *   - KNOWN: a creation that finishes after the component has been replaced creates the sticker but does
@@ -58,6 +58,8 @@ export function useContactStickers({ contact, onUpdate, stickers }) {
   const latest = useRef(contact);
   const registry = useRef(byId);
   const mounted = useRef(true);
+  // Adds in flight, by "contactId:stickerId". A ref, not state, so two presses before a re-render still see it.
+  const adding = useRef(new Set());
 
   useEffect(() => { latest.current = contact; }, [contact]);
   useEffect(() => { registry.current = byId; }, [byId]);
@@ -94,6 +96,12 @@ export function useContactStickers({ contact, onUpdate, stickers }) {
 
   async function change(op, sticker) {
     const contactId = latest.current.id;
+    // One add at a time for a given contact and sticker: a second request while the first is in flight is refused.
+    const addKey = op === 'add' ? `${contactId}:${sticker.id}` : null;
+    if (addKey) {
+      if (adding.current.has(addKey)) return;
+      adding.current.add(addKey);
+    }
     setBusy(sticker, op);
     try {
       if (op === 'add') await addSticker(uid, contactId, sticker.id);
@@ -112,6 +120,7 @@ export function useContactStickers({ contact, onUpdate, stickers }) {
     } catch (error) {
       if (mounted.current) fail(op, error, () => change(op, sticker));
     } finally {
+      if (addKey) adding.current.delete(addKey);
       if (mounted.current) setBusy(sticker, null);
     }
   }

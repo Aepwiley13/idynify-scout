@@ -398,16 +398,88 @@ describe('pending states', () => {
     expect(fake.current.callsOf('addSticker')).toHaveLength(1);
   });
 
-  it('KNOWN: a sticker whose add is still pending can be chosen again, and the add is sent a second time', async () => {
+  // M2-A: a second identical add while the first is in flight is refused (this used to be a KNOWN duplicate write;
+  // the People card has always refused it).
+  it('M2-A: a sticker whose add is still pending can be chosen again, but only one add is sent', async () => {
     // The picker marks only the stickers already on the contact as chosen; a pending add is not on the contact yet.
-    // (The card version, ContactCardStickersInteractive, refuses a second identical write while one is in flight.)
     fake.current.state.impl.add = () => new Promise(() => {});
     const { user } = await renderRow(PAT([]));
     await pickOption(user, 'Board');
     await user.click(addButton());
     expect(screen.getByRole('option', { name: 'Board' })).toHaveAttribute('aria-selected', 'false');
     await user.click(screen.getByRole('option', { name: 'Board' }));
-    expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id], ['u1', 'c1', BOARD.id]]);
+    expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id]]);
+    expect(chip('Board')).toHaveAttribute('aria-busy', 'true');
+    expect(screen.queryByRole('combobox')).toBeNull();
+    expect(addButton()).toHaveFocus();
+  });
+
+  it('M2-A: two rapid picks of the same sticker, made before React re-renders, still send one add', async () => {
+    fake.current.state.impl.add = () => new Promise(() => {});
+    const { user } = await renderRow(PAT([]));
+    await user.click(addButton());
+    const option = screen.getByRole('option', { name: 'Board' });
+    await act(async () => { option.click(); option.click(); });
+    expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id]]);
+  });
+
+  it('M2-A: different stickers are added independently while another add is pending', async () => {
+    fake.current.state.impl.add = () => new Promise(() => {});
+    const { user } = await renderRow(PAT([]));
+    await pickOption(user, 'Board');
+    await pickOption(user, 'Donor');
+    await pickOption(user, 'Gala');
+    expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id], ['u1', 'c1', DONOR.id], ['u1', 'c1', GALA.id]]);
+    expect(chipNames()).toEqual(['Board', 'Donor', 'Gala']);
+  });
+
+  it('M2-A: once the first add has finished, the same sticker is not re-added (it is on the contact, and the picker marks it chosen)', async () => {
+    const { user } = await renderRow(PAT([]));
+    await pickOption(user, 'Board');
+    await waitFor(() => expect(chip('Board')).not.toHaveAttribute('aria-busy'));
+    await user.click(addButton());
+    expect(screen.getByRole('option', { name: 'Board' })).toHaveAttribute('aria-selected', 'true');
+    await user.click(screen.getByRole('option', { name: 'Board' }));
+    expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id]]);
+  });
+
+  it('M2-A: a failed add can be tried again, by Retry and by choosing the sticker again, and each is one write', async () => {
+    let attempts = 0;
+    fake.current.state.impl.add = async () => { attempts += 1; if (attempts <= 2) throw stickerError('write_failed'); return { status: 'added' }; };
+    const { user } = await renderRow(PAT([]));
+    await pickOption(user, 'Board');
+    expect(await screen.findByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(chipNames()).toEqual([]);
+    await pickOption(user, 'Board');
+    await waitFor(() => expect(attempts).toBe(2));
+    await user.click(await screen.findByRole('button', { name: 'Retry' }));
+    await waitFor(() => expect(chipNames()).toEqual(['Board']));
+    expect(fake.current.callsOf('addSticker')).toHaveLength(3);
+  });
+
+  it('M2-A: an Undo (an add) is refused while an add of that same sticker is still pending, and works once it is not', async () => {
+    const { user } = await renderRow(PAT([BOARD.id]));
+    await user.click(within(chip('Board')).getByRole('button', { name: 'Remove sticker Board' }));
+    const undo = await screen.findByRole('button', { name: 'Undo' });
+    fake.current.state.impl.add = () => new Promise(() => {});
+    await user.click(undo);
+    await user.click(addButton());
+    await user.click(screen.getByRole('option', { name: 'Board' }));
+    expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id]]);
+  });
+
+  it('M2-A: a pending add for one contact does not stop the same sticker being added to the next contact', async () => {
+    fake.current.state.impl.add = () => new Promise(() => {});
+    const { user } = await renderSwitching([PAT([]), SAM([])]);
+    await pickOption(user, 'Board');
+    await user.click(screen.getByRole('button', { name: 'Open Sam' }));
+    await waitFor(() => expect(chipNames()).toEqual([]));
+    await pickOption(user, 'Board');
+    await pickOption(user, 'Board');
+    expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id], ['u1', 'c2', BOARD.id]]);
+    await user.click(screen.getByRole('button', { name: 'Open Pat' }));
+    await pickOption(user, 'Board');
+    expect(fake.current.callsOf('addSticker')).toHaveLength(3);
   });
 });
 

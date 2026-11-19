@@ -177,7 +177,7 @@ describe('pending states', () => {
     expect(chipOf('c1', 'Board')).not.toHaveAttribute('aria-busy');
   });
 
-  it('KNOWN DIFFERENCE from the profile row: a second identical write while one is in flight is refused (the row sends it twice)', async () => {
+  it('a second identical write while one is in flight is refused (the profile row does the same since M2-A)', async () => {
     fake.current.state.impl.add = () => new Promise(() => {});
     const { user } = await renderCards([pat([])]);
     await pickFor(user, 'Pat', 'Board');

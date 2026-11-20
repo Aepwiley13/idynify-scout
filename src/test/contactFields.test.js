@@ -35,12 +35,12 @@ describe('saveContactFields', () => {
     expect(Number.isNaN(Date.parse(data.updated_at))).toBe(false);
   });
 
-  it('allows exactly name, title and company_name in this milestone', () => {
-    expect([...CONTACT_FIELD_WRITES].sort()).toEqual(['company_name', 'name', 'title']);
+  it('allows exactly the identity lines and the photo fields (the photo values are checked in photoEdit.test.js)', () => {
+    expect([...CONTACT_FIELD_WRITES].sort()).toEqual(['company_name', 'name', 'photo_source', 'photo_url', 'title']);
   });
 
   it.each([
-    ['first_name'], ['last_name'], ['email'], ['company_id'], ['sticker_ids'], ['sticker_assignments'], ['photo_url'], ['id'], ['updated_at'],
+    ['first_name'], ['last_name'], ['email'], ['company_id'], ['sticker_ids'], ['sticker_assignments'], ['photo_thumb'], ['id'], ['updated_at'],
   ])('refuses %s, writing nothing', async (field) => {
     expect(await codeOf(saveContactFields('c1', { [field]: 'x' }, { expectUid: 'u1' }))).toBe('invalid_write');
     expect(await codeOf(saveContactFields('c1', { title: 'ok', [field]: 'x' }, { expectUid: 'u1' }))).toBe('invalid_write');

@@ -17,9 +17,20 @@
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { getEffectiveUser } from '../context/ImpersonationContext';
+import { isHttpsPhotoUrl } from '../utils/photoUrl';
 
-/** The fields this helper may write. Widened only by a later, reviewed milestone. */
-export const CONTACT_FIELD_WRITES = Object.freeze(['name', 'title', 'company_name']);
+/**
+ * The fields this helper may write. Widened only by a reviewed milestone.
+ *   name, title, company_name   any text (the identity lines)
+ *   photo_url                   '' (remove) or a plain https address
+ *   photo_source                only "manual_url", the value the card's own "Paste photo URL" writes
+ */
+export const CONTACT_FIELD_WRITES = Object.freeze(['name', 'title', 'company_name', 'photo_url', 'photo_source']);
+
+const VALID_VALUE = Object.freeze({
+  photo_url: (value) => value === '' || isHttpsPhotoUrl(value),
+  photo_source: (value) => value === 'manual_url',
+});
 
 export class ContactFieldsError extends Error {
   constructor(code) {
@@ -34,7 +45,7 @@ const validId = (id) => typeof id === 'string' && id !== '' && id !== '.' && id 
 function validPatch(patch) {
   if (!patch || typeof patch !== 'object') return false;
   const keys = Object.keys(patch);
-  return keys.length > 0 && keys.every((k) => CONTACT_FIELD_WRITES.includes(k) && typeof patch[k] === 'string');
+  return keys.length > 0 && keys.every((k) => CONTACT_FIELD_WRITES.includes(k) && typeof patch[k] === 'string' && (VALID_VALUE[k]?.(patch[k]) ?? true));
 }
 
 /**

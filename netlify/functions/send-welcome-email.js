@@ -1,6 +1,41 @@
 // Welcome Email for New Signups
 // Sends personal welcome email from Aaron with getting started guide
 
+/**
+ * The Free plan's welcome (billing Phase 1a). A Free signup has no Scout access, so the Scout
+ * walkthrough below would send them to a paid page; theirs points to their Contact Hub instead.
+ * `plan` comes from the signup page and decides only which copy is sent, nothing else.
+ * COPY FOR OWNER REVIEW before the Free plan launches.
+ */
+export function freeWelcomeEmail(baseUrl) {
+  return {
+    subject: 'Welcome to Idynify — your Contact Hub is ready',
+    html: `
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            </head>
+            <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #374151; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9fafb;">
+              <div style="background: #ffffff; padding: 32px 30px; border-radius: 12px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+                <p style="font-size: 16px; margin: 0 0 16px 0;">Hi — I'm Aaron, the founder of Idynify. Thanks for joining.</p>
+                <p style="font-size: 16px; margin: 0 0 16px 0;">Your Contact Hub is ready. It's free: add the people you know, organize them with stickers, and keep notes on each of them. Your contacts stay yours.</p>
+                <p style="font-size: 16px; margin: 0 0 24px 0;">When you want prospecting and outreach, Scout is one click away inside the app.</p>
+                <div style="text-align: center; margin: 24px 0;">
+                  <a href="${baseUrl}/contact-hub"
+                     style="display: inline-block; background: #2563eb; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 600; font-size: 16px;">
+                    Open your Contact Hub
+                  </a>
+                </div>
+                <p style="font-size: 14px; color: #6b7280; margin: 24px 0 0 0;">Reply to this email any time. It comes straight to me.</p>
+              </div>
+            </body>
+          </html>
+        `,
+  };
+}
+
 export const handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return {
@@ -10,7 +45,7 @@ export const handler = async (event) => {
   }
 
   try {
-    const { email, userId } = JSON.parse(event.body);
+    const { email, userId, plan } = JSON.parse(event.body);
 
     if (!email || !userId) {
       throw new Error('Email and userId are required');
@@ -32,7 +67,11 @@ export const handler = async (event) => {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${resendApiKey}`
       },
-      body: JSON.stringify({
+      body: JSON.stringify(plan === 'free' ? {
+        from: 'Aaron Wiley <aaron@idynify.com>',
+        to: email,
+        ...freeWelcomeEmail(process.env.URL),
+      } : {
         from: 'Aaron Wiley <aaron@idynify.com>',
         to: email,
         subject: 'Hi — I\'m Aaron, the founder of Idynify 👋',

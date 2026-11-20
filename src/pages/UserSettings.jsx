@@ -55,6 +55,11 @@ import ModuleSubNav from '../components/layout/ModuleSubNav';
 import { displayNameFor } from '../utils/userIdentity';
 import { useShell } from '../context/ShellContext';
 import ServiceProfileSetup from '../components/serviceProfiles/ServiceProfileSetup';
+import { classifySnapshot } from '../utils/accountVerification';
+import { planOf, PLAN, isPaidPlan } from '../utils/accountPlan';
+import { PLAN_DETAILS } from '../constants/plans';
+import { supportMailto } from '../constants/support';
+import { UPGRADES_OPEN } from '../constants/upgradeHold';
 import './UserSettings.css';
 
 /* ─── accent ─────────────────────────────────────────────────────────────── */
@@ -90,8 +95,8 @@ const SETTINGS_SECTIONS = [
   { id: 'appearance',   label: 'Appearance',   Icon: Palette,    desc: 'Themes and mission sounds' },
 ];
 
-const PLAN_LABELS  = { starter: 'Starter', pro: 'Pro' };
-const PLAN_PRICES  = { starter: '$20 / mo', pro: '$50 / mo' };
+const PLAN_LABELS  = { free: 'Free', starter: 'Starter', pro: 'Pro' };
+const PLAN_PRICES  = { free: '$0', starter: '$20 / mo', pro: '$50 / mo' };
 const PLAN_CREDITS = { starter: 400, pro: 1250 };
 
 const INTEGRATION_STUBS = [
@@ -554,10 +559,16 @@ export default function UserSettings() {
     if (!user) return;
     try {
       const snap = await getDoc(doc(db, 'users', user.uid));
-      if (snap.exists()) {
+      // The plan comes from the same classification the gates use: Free only on
+      // the server's own answer, 'unknown' for a cache-only read (accountPlan.js).
+      const plan = planOf(classifySnapshot(snap));
+      if (!snap.exists() || !isPaidPlan(plan)) {
+        setBilling({ plan });
+      } else {
         const d = snap.data();
         const creditsIsNumber = typeof d.credits === 'number';
         setBilling({
+          plan,
           tier:              d.subscriptionTier  || 'starter',
           creditsTotal:      creditsIsNumber ? null : (d.credits?.total ?? d.monthlyCredits ?? PLAN_CREDITS[d.subscriptionTier] ?? 400),
           creditsUsed:       creditsIsNumber ? null : (d.credits?.used ?? null),
@@ -572,10 +583,17 @@ export default function UserSettings() {
       }
     } catch (err) {
       console.error('[UserSettings] loadBilling error:', err);
+      // A failed read is not a plan. Nothing is offered until it can be read.
+      setBilling({ plan: PLAN.UNKNOWN });
     } finally {
       setBillingLoading(false);
     }
   }
+
+  const retryBilling = () => {
+    setBillingLoading(true);
+    loadBilling();
+  };
 
   async function loadGmailStatus() {
     if (!user) return;
@@ -1066,18 +1084,79 @@ export default function UserSettings() {
               <>
                 <section className="us-section">
                   <h2 className="us-section-title">Current plan</h2>
-                  <div className="us-billing-plan-card">
-                    <div className="us-billing-plan-left">
-                      <div className="us-billing-plan-badge">{PLAN_LABELS[billing?.tier] || 'Starter'}</div>
-                      <span className="us-billing-plan-price">{PLAN_PRICES[billing?.tier] || '$20 / mo'}</span>
+                  {!billing || billing.plan === PLAN.UNKNOWN ? (
+                    /* Not Free, not paid: unknown. No purchase is offered while
+                       the plan cannot be read, so a paying customer is never
+                       invited to buy again because a read failed. */
+                    <div className="us-card" role="status">
+                      <div className="us-card-icon" style={{ background: 'rgba(251,191,36,0.1)', borderColor: 'rgba(251,191,36,0.18)', color: '#fde68a' }}>
+                        <AlertTriangle className="w-4 h-4" />
+                      </div>
+                      <div className="us-card-body">
+                        <span className="us-card-label">We couldn’t confirm your plan right now</span>
+                        <span className="us-card-value us-card-value--muted">Nothing on your account has changed. Try again in a moment.</span>
+                      </div>
+                      <button type="button" className="us-action-btn" onClick={retryBilling}>
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        Try again
+                      </button>
                     </div>
-                    <a href="/checkout" className="us-action-btn us-action-btn--primary">
-                      <ExternalLink className="w-3.5 h-3.5" />
-                      {billing?.tier === 'pro' ? 'Manage plan' : 'Upgrade to Pro'}
-                    </a>
-                  </div>
+                  ) : (
+                    <div className="us-billing-plan-card">
+                      <div className="us-billing-plan-left">
+                        <div className="us-billing-plan-badge">{PLAN_LABELS[billing.plan]}</div>
+                        <span className="us-billing-plan-price">{PLAN_PRICES[billing.plan]}</span>
+                      </div>
+                      {billing.plan === PLAN.FREE && UPGRADES_OPEN ? (
+                        <div className="us-billing-plan-actions">
+                          <a href="/checkout?tier=starter" className="us-action-btn us-action-btn--primary">
+                            Upgrade to Starter
+                          </a>
+                          <a href="/checkout?tier=pro" className="us-action-btn">
+                            Upgrade to Pro
+                          </a>
+                        </div>
+                      ) : billing.plan === PLAN.FREE ? (
+                        /* Upgrades on hold (constants/upgradeHold.js): support starts
+                           the plan in Stripe, on this account's own customer. */
+                        <a href={supportMailto()} className="us-action-btn us-action-btn--primary">
+                          <Mail className="w-3.5 h-3.5" />
+                          Contact us to start Scout
+                        </a>
+                      ) : (
+                        /* Plan changes and cancellation move to the Stripe
+                           Customer Portal in billing Phase 2. Until then they go
+                           through support, never through a second checkout. */
+                        <a href={supportMailto()} className="us-action-btn">
+                          <Mail className="w-3.5 h-3.5" />
+                          Change or cancel plan
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  {billing?.plan === PLAN.FREE && (
+                    <p className="us-billing-plan-note">
+                      {PLAN_DETAILS.free.summary} Your contacts, stickers and notes are yours to keep on every plan.
+                      {!UPGRADES_OPEN && ' Upgrading from here opens soon; until then we set up Scout for you.'}
+                    </p>
+                  )}
                 </section>
 
+                {billing?.plan === PLAN.FREE && (
+                  <section className="us-section">
+                    <h2 className="us-section-title">Enrichment credits</h2>
+                    <div className="us-card us-card--muted">
+                      <div className="us-card-body">
+                        <span className="us-card-label">The Free plan has no enrichment credits</span>
+                        <span className="us-card-value us-card-value--muted">
+                          Scout Starter includes {PLAN_DETAILS.starter.credits.toLocaleString()} a month, Scout Pro {PLAN_DETAILS.pro.credits.toLocaleString()}.
+                        </span>
+                      </div>
+                    </div>
+                  </section>
+                )}
+
+                {isPaidPlan(billing?.plan) && (<>
                 <section className="us-section">
                   <h2 className="us-section-title">Credit usage</h2>
                   <div className="us-credit-card">
@@ -1152,6 +1231,7 @@ export default function UserSettings() {
                     <span className="us-coming-chip">Coming soon</span>
                   </div>
                 </section>
+                </>)}
               </>
             )}
           </div>

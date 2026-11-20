@@ -58,7 +58,7 @@ async function fill() {
 }
 
 beforeEach(() => {
-  createUser.mockReset().mockResolvedValue({ user: { uid: 'uid-1' } });
+  createUser.mockReset().mockResolvedValue({ user: { uid: 'uid-1', getIdToken: async () => 'good-token' } });
   setDocMock.mockReset().mockResolvedValue(undefined);
   globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true }));
 });
@@ -72,9 +72,11 @@ describe('signup with the Free plan on', () => {
     expect(ref.__doc).toBe('users/uid-1');
     expect(Object.keys(payload).sort()).toEqual(['createdAt', 'email']);
     expect(await screen.findByText('MY PEOPLE')).toBeInTheDocument();
-    // The welcome email is told the account is Free, so it points to Contact Hub.
+    // Email and plan are chosen on the server, not trusted from the client.
+    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
     const welcome = globalThis.fetch.mock.calls.find(([url]) => String(url).includes('send-welcome-email'));
-    expect(JSON.parse(welcome[1].body).plan).toBe('free');
+    expect(welcome[1].headers.Authorization).toBe('Bearer good-token');
+    expect(JSON.parse(welcome[1].body)).toEqual({});
   });
 
   it('?tier=pro: a Pro account, then its checkout, as before', async () => {

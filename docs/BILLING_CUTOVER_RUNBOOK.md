@@ -86,6 +86,8 @@ includes secret values; do not paste it anywhere.) Check the `production`-contex
 | `BILLING_LEDGER_EPOCH_UNIX` | **New this PR.** Must be **unset** right now (§1 arms it later) |
 | `VITE_STRIPE_CHECKOUT_MODE` | Build-time, frontend. **Leave as-is — do not set to `'session'`.** Flipping to the new authenticated-checkout flow is a separate decision outside this PR's scope; the legacy Payment Link flow stays the live default throughout |
 
+> **Superseded by billing Phase 1b** (`create-checkout-session` for every purchase): once that release is published, `VITE_STRIPE_CHECKOUT_MODE` no longer exists, and with `VITE_STRIPE_ENABLED=true` checkout always uses the authenticated Checkout Session. The Payment Links are no longer used. The row above records the first cutover.
+
 **Expected result:** every pre-existing variable is present; `BILLING_LEDGER_EPOCH_UNIX` is
 absent; `VITE_STRIPE_CHECKOUT_MODE` is absent or not `'session'`.
 

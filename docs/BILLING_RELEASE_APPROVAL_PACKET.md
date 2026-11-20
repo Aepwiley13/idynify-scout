@@ -621,6 +621,8 @@ row marked below:
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO`, `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | **No change.** Confirm still present (runbook §0.2). |
 | `STRIPE_PRICE_SCOUT_STARTER_FREE` | **Previously confirmed UNSET. No production environment change has been authorized yet — do not assume an earlier round of this work applied it.** Re-check at step 2 below; if still absent, **set it to `price_1T3UsqJEdYAFEzC36VCvIZ90`** (the live $0/mo Scout Starter Free price — see `src/test/stripeWebhookScoutStarterFreePrice.test.js`) as part of step 2, before proceeding. Required for this PR's price-recognition logic, or `knownPriceIds()` silently narrows to the two paid prices. |
 | `VITE_STRIPE_CHECKOUT_MODE` | **No change.** Leave absent or anything other than `'session'` — flipping the checkout flow is an explicit, separate decision outside this release. |
+
+> **Superseded by billing Phase 1b:** that release removes `VITE_STRIPE_CHECKOUT_MODE`; checkout always uses the authenticated Checkout Session when `VITE_STRIPE_ENABLED=true`. Publishing it is the checkout switch this row deferred, and needs Stripe test-mode validation first ([FREE_CONTACT_HUB_LAUNCH_CHECKLIST.md](billing/FREE_CONTACT_HUB_LAUNCH_CHECKLIST.md) §B).
 | `BILLING_LEDGER_EPOCH_UNIX` | **Must be absent going into step 3 below.** This is the one variable this release ever touches, and only in step 5, only after step 4's verification passes. Absent = automatic allocation is OFF — every unmarked purchase is flagged for manual review, not auto-granted and not lost. |
 
 **Firestore:** one rules deployment (step 3). **No data migration and no bulk/direct repair

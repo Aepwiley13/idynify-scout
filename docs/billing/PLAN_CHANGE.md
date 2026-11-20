@@ -1,0 +1,51 @@
+# Starter → Pro on the existing subscription (W3)
+
+**Status:** code and tests in the W3 PR. Validated in Stripe test mode: not yet (scenarios below).
+Nothing here changes production Stripe, Firebase or Netlify by itself.
+
+## What the customer sees
+
+Settings → Billing, for a Starter customer:
+
+1. **Upgrade to Pro.** Idynify asks Stripe for its own preview of what is due today: the rest of the
+   current period at Pro's price, less the unused Starter time.
+2. The page shows that amount, the renewal date and price, and the extra credits
+   (1,250 − 400 = 850). **Confirm upgrade** or **Not now**.
+3. On Confirm, the **same subscription** moves to the Pro price. Pro access and the credits arrive
+   once Stripe reports the paid change; the page waits for that (usually seconds).
+4. If the bank wants confirmation (3-D Secure) or the card fails, the customer is on Starter until
+   the invoice is paid on Stripe's invoice page. Nothing else changes.
+
+A Scout "Upgrade to Pro" link for a Starter customer goes to this screen with the preview open,
+never to a checkout. **Manage billing** opens Stripe's Customer Portal: payment methods, invoices,
+billing details and cancelling at the end of the period. Plan switching is off in the portal.
+Pro → Starter goes through support for now.
+
+## How it is made safe
+
+| Risk | Safeguard |
+|---|---|
+| A second subscription | `change-plan.js` only calls `subscriptions.update` on the subscription on file, after checking customer, status, single Starter item, no pending update, no schedule, not set to cancel. It never creates a session, customer or subscription (asserted by tests) |
+| Pro access before payment | `payment_behavior: 'pending_if_incomplete'`: Stripe keeps Starter until the prorated invoice is paid. Access and credits come only from the webhook seeing the paid Pro price |
+| A different amount from the one shown | The preview's `proration_date` is passed to the update (Stripe's documented way to match them). A preview older than 30 minutes is refused |
+| A double click or a resent request | Stripe idempotency key: subscription, Pro price and proration date |
+| Credits granted twice | `billingAllocations` marker per subscription, price and period; the event ledger; the account lock. A switch back and forth in one period grants once |
+| Credits taken on a downgrade | None are taken back |
+| An unknown portal | `create-portal-session.js` uses only Idynify's configuration (`STRIPE_PORTAL_CONFIGURATION_ID`), never the default |
+
+The webhook change also corrects a gap that existed before W3: a plan change made in the Stripe
+Dashboard (for example by support) is now reflected in the account's tier, limits and features.
+
+## Testing it in Stripe test mode
+
+The scenarios (P1–P6) and the extra test-key permissions are in
+[STAGING_VALIDATION_RUNBOOK.md](STAGING_VALIDATION_RUNBOOK.md) Parts 2 and 7, the single source of
+truth for staging validation.
+
+## Production configuration (owner approval, each separately)
+
+1. In live Stripe, create a portal configuration with the same settings as
+   `scripts/staging/stripeTestModeSetup.mjs` (payment methods, invoices, billing details, cancel at
+   period end; **plan switching off**). Set its id as `STRIPE_PORTAL_CONFIGURATION_ID` in Netlify.
+   Without it, Manage billing says it is not available yet and nothing else is affected.
+2. The live webhook endpoint already receives `customer.subscription.updated`; nothing to add.

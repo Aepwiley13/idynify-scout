@@ -90,7 +90,10 @@ describe('Settings → Billing', () => {
     expect(await screen.findByText('Starter')).toBeInTheDocument();
     expect(screen.getByText('Credit usage')).toBeInTheDocument();
     expect(checkoutLinks()).toEqual([]);
-    expect(screen.getByRole('link', { name: /change or cancel plan/i }).getAttribute('href')).toMatch(/^mailto:/);
+    // W3: the plan is changed on the existing subscription, and billing is managed in the
+    // Customer Portal. Neither is a second checkout.
+    expect(screen.getByRole('button', { name: 'Upgrade to Pro' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Manage billing' })).toBeInTheDocument();
   });
 
   it('a Pro customer: Pro, and no link to a second checkout', async () => {

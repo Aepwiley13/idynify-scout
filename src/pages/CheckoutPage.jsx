@@ -97,7 +97,10 @@ export default function CheckoutPage({ account = null }) {
   // Settings → Billing. The /checkout route already requires the server's own
   // answer about the account, so this is never decided from a saved copy.
   if (isPaidPlan(planOf(account))) {
-    return <Navigate to="/settings?tab=billing" replace />;
+    // A Starter customer who chose Pro goes straight to the in-app upgrade (W3): same
+    // subscription, payment first. Never a second checkout.
+    const upgrading = planOf(account) === 'starter' && tier === 'pro';
+    return <Navigate to={upgrading ? '/settings?tab=billing&upgrade=pro' : '/settings?tab=billing'} replace />;
   }
   // A subscription on file without paid access (a failed payment, or one still
   // being confirmed): the server would refuse a new one, so say so up front.

@@ -39,9 +39,10 @@ import {
   AlertTriangle, CalendarCheck, Inbox, Sparkles, Target, Activity, BookOpen,
   BarChart3, HeartPulse, LayoutDashboard, Lightbulb, Award, PenLine, Heart,
   FileText, MessageSquare, Shield, Swords, Brain, Mail, Crosshair, Archive,
-  CreditCard, Plug, Briefcase, Palette,
+  CreditCard, Plug, Briefcase, Palette, LayoutGrid, IdCard,
 } from 'lucide-react';
 import { BRAND, STATUS } from '../theme/tokens';
+import { CONTACT_HUB_MY_CARD_PATH, CONTACT_HUB_PATH, CONTACT_HUB_STICKERS_PATH } from './contactHub.js';
 
 /**
  * The colour the active bottom-bar item takes, so the user always knows which
@@ -166,19 +167,30 @@ export const MODULE_BOTTOM_NAV = {
   },
 
   /**
-   * Contact Hub has NO bottom bar in Phase 1A (`hidden`). It has one view, My
-   * People, and a bar with one cell is navigation with nowhere to go. The
-   * three-cell bar (My People · Connect · My Card) arrives with the views it
-   * would switch between: drop `hidden` and fill in `primary` then.
+   * Contact Hub: My Card · My People · Sticker Wall.
    *
-   * `hidden` rather than no entry at all: with no entry the bar falls back to
-   * the global list of modules (Scout, Hunter, …), which is the opposite of
-   * what a Contact Hub screen should offer. The hamburger still moves between
-   * workspaces. Inert while the Contact Hub switch is off.
+   * Path-based, not `?tab=`: the three are addresses of their own. My Card's
+   * path (/contact-hub/my-card) is longer than My People's, so BottomNav's
+   * longest-match rule lights My Card there and not My People. A person's
+   * page (/contact-hub/person/:id) and a filtered list (?sticker=) are both
+   * inside My People, so My People stays lit there; the Sticker Wall's longer
+   * path wins on the wall (BottomNav's longest-match rule).
+   *
+   * IMPORT IS NOT HERE YET, ON PURPOSE. It is the approved third cell, and it
+   * is added when its screen exists: a cell that leads nowhere is worse than
+   * no cell. No overflow, so there is no More: the hamburger moves between
+   * workspaces, as in every module.
+   *
+   * Inert while the Contact Hub switch is off: /contact-hub then belongs to no
+   * module and this entry is never looked up.
    */
   'contact-hub': {
-    hidden: true,
-    primary: [],
+    primary: [
+      { id: 'my-card',  label: 'My Card',      Icon: IdCard,     to: CONTACT_HUB_MY_CARD_PATH },
+      { id: 'people',   label: 'My People',    Icon: Users,      to: CONTACT_HUB_PATH },
+      { id: 'stickers', label: 'Sticker Wall', Icon: LayoutGrid, to: CONTACT_HUB_STICKERS_PATH },
+    ],
+    overflow: [],
   },
 
   'command-center': {

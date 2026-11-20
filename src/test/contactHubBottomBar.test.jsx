@@ -1,37 +1,98 @@
 /**
- * Contact Hub has no mobile bottom bar in Phase 1A.
+ * Contact Hub's mobile bottom bar: My Card · My People · Sticker Wall.
  *
- * It has one view, so a bar would be navigation with nowhere to go, and the
- * fallback (the global list of modules) would put Scout and Hunter under a
- * Contact Hub screen. The real BottomNav is rendered here, with the switch on,
- * to show it draws nothing on both Contact Hub paths and is untouched
- * everywhere else.
+ * The shell's own BottomNav, driven by Contact Hub's entry in the mobile
+ * navigation table, so Contact Hub has no bar of its own making. The real
+ * BottomNav is rendered here, with the switch on, to show which cell is lit
+ * at each Contact Hub address, that there is no More and no Import yet, that
+ * it never falls back to the global list of modules (Scout, Hunter, …), and
+ * that every other module's bar is untouched.
  *
  * The switch is read at module load, so each case loads fresh modules.
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 
-async function renderBarAt(url, switchValue = 'on') {
+/**
+ * `availability` is the server's answer as the bar sees it ('available' by default: the Sticker
+ * Wall's cell is there only for people stickers are available to; how that answer is reached is
+ * contactHubSidebarNav.test.jsx's business, with the real hook).
+ */
+async function renderBarAt(url, switchValue = 'on', availability = 'available') {
   vi.resetModules();
   vi.stubEnv('VITE_CONTACT_HUB', switchValue);
-  const { render, screen, cleanup } = await import('@testing-library/react');
-  const { MemoryRouter } = await import('react-router-dom');
+  vi.doMock('../components/stickers/useStickersAvailability.js', () => ({ useStickersAvailability: () => availability }));
+  const { render, screen, cleanup, fireEvent } = await import('@testing-library/react');
+  const { MemoryRouter, useLocation } = await import('react-router-dom');
   const { default: BottomNav } = await import('../components/layout/BottomNav');
-  render(<MemoryRouter initialEntries={[url]}><BottomNav onOpenMore={() => {}} /></MemoryRouter>);
-  return { screen, cleanup };
+  // Where the app is, so a tap on a cell can be followed.
+  function At() { const l = useLocation(); return <span data-testid="at">{l.pathname + l.search}</span>; }
+  render(<MemoryRouter initialEntries={[url]}><At /><BottomNav onOpenMore={() => {}} /></MemoryRouter>);
+  return { screen, cleanup, fireEvent };
 }
 
 let cleanupLast = null;
-afterEach(() => { cleanupLast?.(); cleanupLast = null; vi.unstubAllEnvs(); vi.resetModules(); });
+afterEach(() => { cleanupLast?.(); cleanupLast = null; vi.unstubAllEnvs(); vi.doUnmock('../components/stickers/useStickersAvailability.js'); vi.resetModules(); });
 
 const labels = (screen) => screen.getAllByRole('button').map((b) => b.getAttribute('aria-label'));
 
 describe('switch ON', () => {
-  it.each([['/contact-hub'], ['/contact-hub/person/c1']])('%s draws no bottom bar at all', async (url) => {
+  const current = (screen) => screen.getAllByRole('button').filter((b) => b.getAttribute('aria-current') === 'page').map((b) => b.getAttribute('aria-label'));
+
+  it.each([
+    ['/contact-hub/my-card', 'My Card'],
+    ['/contact-hub/my-card/', 'My Card'],
+    ['/contact-hub', 'My People'],
+    // A filtered list and a person are both inside My People.
+    ['/contact-hub?sticker=abc', 'My People'],
+    ['/contact-hub/person/c1', 'My People'],
+    ['/contact-hub/stickers', 'Sticker Wall'],
+    ['/contact-hub/stickers/', 'Sticker Wall'],
+  ])('%s: the bar is My Card, My People and Sticker Wall, with %s lit and nothing else', async (url, lit) => {
     const { screen, cleanup } = await renderBarAt(url);
     cleanupLast = cleanup;
-    expect(screen.queryByRole('navigation')).toBeNull();
-    expect(screen.queryByRole('button')).toBeNull();
+    expect(screen.getByRole('navigation', { name: 'Contact Hub sections' })).toBeInTheDocument();
+    expect(labels(screen)).toEqual(['My Card', 'My People', 'Sticker Wall']);
+    expect(current(screen)).toEqual([lit]);
+  });
+
+  it.each(['checking', 'unavailable'])('stickers %s: the bar is My Card and My People only, and each still goes where it did', async (availability) => {
+    const { screen, cleanup, fireEvent } = await renderBarAt('/contact-hub/stickers', 'on', availability);
+    cleanupLast = cleanup;
+    expect(labels(screen)).toEqual(['My Card', 'My People']);
+    expect(screen.queryByRole('button', { name: 'Sticker Wall' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'My Card' }));
+    expect(screen.getByTestId('at').textContent).toBe('/contact-hub/my-card');
+    expect(current(screen)).toEqual(['My Card']);
+  });
+
+  it('has no More and no Import: Import is added when its screen exists', async () => {
+    const { screen, cleanup } = await renderBarAt('/contact-hub');
+    cleanupLast = cleanup;
+    expect(screen.queryByRole('button', { name: 'More' })).toBeNull();
+    expect(screen.queryByText(/import/i)).toBeNull();
+  });
+
+  it('a cell goes to its own address: Sticker Wall, then My People', async () => {
+    const { screen, cleanup, fireEvent } = await renderBarAt('/contact-hub/person/c1');
+    cleanupLast = cleanup;
+    fireEvent.click(screen.getByRole('button', { name: 'Sticker Wall' }));
+    expect(screen.getByTestId('at')).toHaveTextContent('/contact-hub/stickers');
+    expect(current(screen)).toEqual(['Sticker Wall']);
+    fireEvent.click(screen.getByRole('button', { name: 'My People' }));
+    expect(screen.getByTestId('at').textContent).toBe('/contact-hub');
+    expect(current(screen)).toEqual(['My People']);
+  });
+
+  it('My Card is lit on My Card and My People is not; going to My People and back moves the light', async () => {
+    const { screen, cleanup, fireEvent } = await renderBarAt('/contact-hub/my-card');
+    cleanupLast = cleanup;
+    expect(current(screen)).toEqual(['My Card']);
+    fireEvent.click(screen.getByRole('button', { name: 'My People' }));
+    expect(screen.getByTestId('at').textContent).toBe('/contact-hub');
+    expect(current(screen)).toEqual(['My People']);
+    fireEvent.click(screen.getByRole('button', { name: 'My Card' }));
+    expect(screen.getByTestId('at').textContent).toBe('/contact-hub/my-card');
+    expect(current(screen)).toEqual(['My Card']);
   });
 
   it('never offers Scout or Hunter under a Contact Hub screen', async () => {

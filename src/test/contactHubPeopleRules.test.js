@@ -6,6 +6,7 @@ import { describe, it, expect } from 'vitest';
 import {
   isListedInMyPeople, listMyPeople, addedAtOf, sortNewestFirst, addedLabel,
   personSubtitle, emailOf, phoneOf, matchesSearch, visiblePeople,
+  addedShort, pageOf, PAGE_SIZE, stickersFailedToLoad,
 } from '../pages/ContactHub/peopleRules';
 
 const person = (id, extra = {}) => ({ id, name: `Person ${id}`, ...extra });
@@ -123,5 +124,50 @@ describe('the list as shown', () => {
   it('search and sticker combine', () => {
     expect(visiblePeople(contacts, { stickerId: 'S1', term: 'ana' }).map((c) => c.id)).toEqual(['a']);
     expect(visiblePeople(contacts, { stickerId: 'S2', term: 'ana' })).toEqual([]);
+  });
+});
+
+describe('the Added column', () => {
+  const now = new Date('2026-11-16T12:00:00Z');
+  it('is the short date, with the year once it is not this one', () => {
+    expect(addedShort({ addedAt: '2026-11-12T18:00:00Z' }, now)).toBe('Nov 12');
+    expect(addedShort({ addedAt: '2025-03-04T18:00:00Z' }, now)).toBe('Mar 4, 2025');
+  });
+  it('is empty when the record has no date or a bad one', () => {
+    expect(addedShort({}, now)).toBe('');
+    expect(addedShort({ addedAt: 'not a date' }, now)).toBe('');
+  });
+});
+
+describe('display paging', () => {
+  const list = Array.from({ length: 120 }, (_, i) => ({ id: String(i) }));
+  it('draws 50 at a time', () => {
+    expect(PAGE_SIZE).toBe(50);
+    expect(pageOf(list, PAGE_SIZE)).toMatchObject({ total: 120, remaining: 70, next: 50 });
+    expect(pageOf(list, PAGE_SIZE).drawn).toHaveLength(50);
+  });
+  it('the last step is whatever is left, then there is nothing more', () => {
+    expect(pageOf(list, 100)).toMatchObject({ remaining: 20, next: 20 });
+    expect(pageOf(list, 150)).toMatchObject({ remaining: 0, next: 0 });
+    expect(pageOf(list, 150).drawn).toHaveLength(120);
+  });
+  it('keeps the order it was given and never changes the list', () => {
+    const before = [...list];
+    expect(pageOf(list, 3).drawn.map((p) => p.id)).toEqual(['0', '1', '2']);
+    expect(list).toEqual(before);
+  });
+  it('copes with nothing', () => {
+    expect(pageOf(undefined, PAGE_SIZE)).toMatchObject({ total: 0, remaining: 0, next: 0, drawn: [] });
+  });
+});
+
+describe('a failed sticker load is not "no stickers"', () => {
+  it('is true only when stickers are on for the user and their list could not be read', () => {
+    expect(stickersFailedToLoad({ availability: 'available', status: 'error' })).toBe(true);
+    expect(stickersFailedToLoad({ availability: 'available', status: 'ready' })).toBe(false);
+    expect(stickersFailedToLoad({ availability: 'available', status: 'loading' })).toBe(false);
+    expect(stickersFailedToLoad({ availability: 'unavailable', status: 'idle' })).toBe(false);
+    expect(stickersFailedToLoad({ availability: 'checking', status: 'idle' })).toBe(false);
+    expect(stickersFailedToLoad(undefined)).toBe(false);
   });
 });

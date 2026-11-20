@@ -22,6 +22,12 @@ No production project, no credentials, no access to real data.
   (`resolveStickersConfig`) and the app's availability hook
   (`availabilityFromConfig`) agree for every row of the rollout table, on the
   same stored documents; viewing as another user is read-only on all three.
+- `my-card.mjs` — My Card (`users/{uid}/card/main`): the card rules (owner only,
+  exactly the known fields within their limits, sharing off, the next revision,
+  no delete, no other document, nothing nested, legacy cards still savable) and
+  the app's own service (`myCardCore.js`) through them, including two saves
+  racing. CI's rules step runs it with the others; to run it on its own:
+  `emulators:exec --only firestore --project demo-my-card "node scripts/rules-check/my-card.mjs"`.
 - `write-semantics.mjs` — **what a write does** to the fields it was not told
   about. Guards the rediscovery `updateMask`.
 

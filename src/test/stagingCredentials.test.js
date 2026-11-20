@@ -19,7 +19,10 @@ import {
   parseServiceAccountKey, parseCredentialFile, readStagingCredential, withCredential, checkCredential, temporaryKeyFile, redactKeys,
   CredentialRefusal, KEY_VARIABLE, FILE_VARIABLE, ADC_MODE,
 } from '../../scripts/staging/stagingCredentials.mjs';
-import { planDevRun, devArgs, hasEdgeFunctions, stickerFunctionsFolder, STICKER_QA_FUNCTIONS } from '../../scripts/staging/stagingDev.mjs';
+import {
+  planDevRun, devArgs, hasEdgeFunctions, stickerFunctionsFolder, STICKER_QA_FUNCTIONS, functionsFolder, BILLING_JOURNEY_FUNCTIONS, probeReady, readyLine,
+  BILLING_ENDPOINT_CHECKS,
+} from '../../scripts/staging/stagingDev.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO = resolve(here, '../..');
@@ -216,6 +219,140 @@ describe('serving only the sticker QA functions', () => {
   });
 });
 
+describe('serving only the billing journey functions (--only-billing-functions)', () => {
+  const fakeRoot = (names) => {
+    const root = mkdtempSync(join(tmpdir(), 'billing-root-'));
+    mkdirSync(join(root, 'netlify', 'functions'), { recursive: true });
+    for (const n of names) writeFileSync(join(root, 'netlify', 'functions', `${n}.js`), 'export const handler = () => ({ statusCode: 200 });');
+    return root;
+  };
+
+  it('names the signup, checkout, webhook, plan-change, portal and Scout functions, and nothing else', () => {
+    expect([...BILLING_JOURNEY_FUNCTIONS].sort()).toEqual([
+      'barryEnrich', 'barryGenerateContext', 'change-plan', 'create-checkout-session', 'create-portal-session',
+      'send-welcome-email', 'stickersConfig', 'stripe-webhook',
+    ]);
+  });
+
+  it('links exactly those from a private temporary folder, and removes it', () => {
+    const root = fakeRoot([...BILLING_JOURNEY_FUNCTIONS, 'search-companies', 'generate-section-1']);
+    const folder = functionsFolder(root, BILLING_JOURNEY_FUNCTIONS);
+    expect(statSync(folder.path).mode & 0o777).toBe(0o700);
+    expect(readdirSync(folder.path).sort()).toEqual(BILLING_JOURNEY_FUNCTIONS.map((n) => `${n}.js`).sort());
+    folder.remove();
+    expect(existsSync(folder.path)).toBe(false);
+  });
+
+  it('refuses a checkout that lacks one, naming it, and leaves no folder behind', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'billing-links-'));
+    const root = fakeRoot(BILLING_JOURNEY_FUNCTIONS.filter((n) => n !== 'change-plan'));
+    expect(() => functionsFolder(root, BILLING_JOURNEY_FUNCTIONS, { dir })).toThrow('netlify/functions/change-plan.js is missing.');
+    expect(readdirSync(dir)).toEqual([]);
+  });
+
+  it('every one present in this checkout runs on short-lived credentials (the shared init)', () => {
+    for (const name of BILLING_JOURNEY_FUNCTIONS) {
+      const file = join(REPO, 'netlify/functions', `${name}.js`);
+      if (!existsSync(file)) continue; // W3/W4a functions: on the integration branch, where this runs in full
+      const source = readFileSync(file, 'utf8');
+      const sharedInit = source.includes("from './firebase-admin.js'") || source.includes("import('./firebase-admin.js')");
+      const usesAdmin = /firebase-admin|initializeApp\(/.test(source);
+      expect(sharedInit || !usesAdmin, name).toBe(true);
+    }
+  });
+
+  const clock = () => {
+    let t = 0;
+    return { now: () => t, sleep: async (ms) => { t += ms; } };
+  };
+
+  it('readiness: waits for 200 on /, then asks each function for OPTIONS (no body, no token)', async () => {
+    const asked = [];
+    let gets = 0;
+    const fetchImpl = async (url, init = {}) => {
+      asked.push([init.method ?? 'GET', url, init.body, init.headers]);
+      if (url.endsWith(':8888/')) {
+        gets += 1;
+        if (gets < 3) throw new Error('ECONNREFUSED');
+        return { status: 200 };
+      }
+      return { status: url.endsWith('/stripe-webhook') ? 405 : 401 };
+    };
+    const result = await probeReady({ functions: ['create-checkout-session', 'stripe-webhook'], fetchImpl, ...clock() });
+    expect(result).toMatchObject({ ok: true, status: 200, functions: [{ name: 'create-checkout-session', status: 401 }, { name: 'stripe-webhook', status: 405 }] });
+    expect(asked.filter(([m]) => m === 'OPTIONS').every(([, , body, headers]) => body === undefined && headers === undefined)).toBe(true);
+    expect(readyLine(result)).toMatch(/^✓ http:\/\/localhost:8888 answered 200 after \d+ s; 2 of 2 functions answer\. Ready\.$/);
+  });
+
+  it('readiness: a function the CLI does not serve (404) or that does not answer is named', async () => {
+    const fetchImpl = async (url) => {
+      if (url.endsWith('/')) return { status: 200 };
+      if (url.endsWith('/change-plan')) return { status: 404 };
+      if (url.endsWith('/barryEnrich')) throw new Error('timeout');
+      return { status: 405 };
+    };
+    const result = await probeReady({ functions: ['change-plan', 'barryEnrich', 'stripe-webhook'], fetchImpl, ...clock() });
+    expect(result.ok).toBe(false);
+    expect(readyLine(result)).toBe('✗ http://localhost:8888 answered 200 after 0 s; 1 of 3 functions answer. not answering: change-plan, barryEnrich.');
+  });
+
+  it('readiness: signup, checkout and the webhook must refuse an unauthenticated call (code ran, nothing written)', async () => {
+    expect(BILLING_ENDPOINT_CHECKS.map((e) => [e.label, e.name])).toEqual([
+      ['signup', 'send-welcome-email'], ['checkout', 'create-checkout-session'], ['webhook', 'stripe-webhook'],
+    ]);
+    const posts = [];
+    const fetchImpl = async (url, init = {}) => {
+      if (url.endsWith(':8888/')) return { status: 200 };
+      if (init.method === 'POST') {
+        posts.push([url.split('/').pop(), init.body, init.headers]);
+        return { status: url.endsWith('stripe-webhook') ? 400 : 401 };
+      }
+      return { status: 204 };
+    };
+    const result = await probeReady({ functions: ['stripe-webhook'], endpoints: BILLING_ENDPOINT_CHECKS, fetchImpl, ...clock() });
+    expect(result.ok).toBe(true);
+    // No token, no Stripe signature, an empty body: nothing that could act for an account or pass as Stripe.
+    expect(posts).toEqual(BILLING_ENDPOINT_CHECKS.map((e) => [e.name, '{}', { 'Content-Type': 'application/json' }]));
+    expect(readyLine(result, { ok: true, ms: 4200, problems: [] })).toBe(
+      '✓ http://localhost:8888 answered 200 after 0 s; 1 of 1 functions answer; signup 401, checkout 401, webhook 400 (unauthenticated calls refused); the app renders in Chromium (4 s). Ready.',
+    );
+  });
+
+  it('readiness: a crashed endpoint (500) or a page that does not render in the browser is not Ready', async () => {
+    const fetchImpl = async (url, init = {}) => {
+      if (url.endsWith(':8888/')) return { status: 200 };
+      if (init.method === 'POST') return { status: url.endsWith('stripe-webhook') ? 500 : 401 };
+      return { status: 204 };
+    };
+    const result = await probeReady({ functions: [], endpoints: BILLING_ENDPOINT_CHECKS, fetchImpl, ...clock() });
+    expect(result.ok).toBe(false);
+    expect(readyLine(result)).toContain('webhook (stripe-webhook) answered 500, expected a refusal');
+    const fine = await probeReady({ functions: [], endpoints: [], fetchImpl, ...clock() });
+    const line = readyLine(fine, { ok: false, ms: 90_000, problems: ['500 for /signup'] });
+    expect(line.startsWith('✗')).toBe(true);
+    expect(line).toContain('the app does not render in Chromium');
+    expect(line).toContain('500 for /signup');
+    expect(line).not.toContain('Ready');
+  });
+
+  it('billing runs give Vite its own strict port, so it can never drift while netlify dev proxies the old one', () => {
+    expect(devArgs({ noEdgeFunctions: true, functionsDir: '/x', vitePort: 5199 })).toEqual([
+      'netlify', 'dev', '--offline', '--internal-disable-edge-functions', '--functions', '/x',
+      '--target-port', '5199', '--command', 'npm run dev -- --port 5199 --strictPort',
+    ]);
+  });
+
+  it('readiness: a page that never answers 200 is reported, and it stops when the app exits', async () => {
+    const never = await probeReady({ fetchImpl: async () => { throw new Error('timeout'); }, timeoutMs: 5_000, ...clock() });
+    expect(never).toMatchObject({ ok: false, status: null });
+    expect(readyLine(never)).toBe('✗ http://localhost:8888 did not answer 200 within 5 s (last: no answer).');
+    let calls = 0;
+    const stoppedEarly = await probeReady({ fetchImpl: async () => { calls += 1; return { status: 502 }; }, stopped: () => calls >= 2, ...clock() });
+    expect(stoppedEarly).toMatchObject({ ok: false, status: 502 });
+    expect(calls).toBe(2);
+  });
+});
+
 describe('the tools, with the key in STAGING_SERVICE_ACCOUNT_KEY', () => {
   const run = (name, args, env = {}) => {
     try {
@@ -237,6 +374,13 @@ describe('the tools, with the key in STAGING_SERVICE_ACCOUNT_KEY', () => {
     expect(status).toBe(0);
     expect(out).toContain('✓ credential-project');
     expect(out).toContain('✓ private-key');
+    expect(out).not.toContain(KEY_LINE);
+  });
+
+  it('the launcher refuses both function modes together, before starting anything', () => {
+    const { status, out } = run('stagingDev.mjs', [`--env=${envFile()}`, '--only-billing-functions', '--only-sticker-functions'], { PRODUCTION_FIREBASE_PROJECT_ID: PROD, [KEY_VARIABLE]: b64() });
+    expect(status).toBe(1);
+    expect(out).toContain('not both');
     expect(out).not.toContain(KEY_LINE);
   });
 

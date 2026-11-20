@@ -298,8 +298,8 @@
   box-shadow: var(--shadow-card), 0 12px 32px color-mix(in srgb, var(--text-primary) 18%, transparent);
 }
 
-/* Remove: 32px to see, 44px to hit. The row gap grows so the touch areas of neighbouring rows never overlap. */
-.ph-stickers--editable { row-gap: 12px; }
+/* Remove: 32px to see, 44px to hit. The row gap grows (14px) so the touch areas of neighbouring rows never overlap. */
+.ph-stickers--editable { row-gap: 14px; }
 .ph-sticker-remove {
   position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
   width: 32px; height: 32px; margin: -8px -10px -8px -4px; padding: 0; border: 0; border-radius: 50%;
@@ -321,7 +321,8 @@
   background: transparent; color: var(--ph-ink); cursor: pointer;
   font: inherit; font-size: 14px; font-weight: 600; line-height: 1.25;
 }
-.ph-add-sticker::after { content: ""; position: absolute; inset: -4px 0; border-radius: 999px; }
+/* The 1.5px border sits outside the box this is measured from, so -5.5px makes the touch area 44px, not 42. */
+.ph-add-sticker::after { content: ""; position: absolute; inset: -5.5px 0; border-radius: 999px; }
 .ph-add-sticker:hover { background: var(--ph-tint); border-color: var(--ph-ink); }
 .ph-add-sticker:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 2px; background: var(--ph-tint); }
 .ph-add-sticker[aria-expanded="true"] { background: var(--ph-tint); border-style: solid; border-color: var(--ph-ink); }

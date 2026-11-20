@@ -183,11 +183,11 @@ describe('the stylesheet for photo and stickers', () => {
     expect(rule('.ph-sticker-remove::after')).toMatch(/inset:\s*-6px/);
     // Add sticker is a 36px chip whose touch area is 44px high.
     expect(rule('.ph-add-sticker')).toMatch(/min-height:\s*36px/);
-    expect(rule('.ph-add-sticker::after')).toMatch(/inset:\s*-4px\s+0/);
+    expect(rule('.ph-add-sticker::after')).toMatch(/inset:\s*-5\.5px\s+0/);
   });
 
-  it('touch areas of neighbouring rows never overlap: a 12px row gap when stickers can be changed', () => {
-    expect(rule('.ph-stickers--editable')).toMatch(/row-gap:\s*12px/);
+  it('touch areas of neighbouring rows never overlap: a 14px row gap when stickers can be changed', () => {
+    expect(rule('.ph-stickers--editable')).toMatch(/row-gap:\s*14px/);
   });
 
   it('every focused control has a visible outline', () => {

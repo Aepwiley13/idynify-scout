@@ -71,7 +71,7 @@ const safe = (kind, href) => typeof href === 'string' && SAFE_HREF[kind].test(hr
 
 const clampLevel = (level) => Math.min(6, Math.max(1, Number.isInteger(level) ? level : 2));
 
-function Avatar({ person, onPhotoClick, photoButtonRef, photoEdit }) {
+function Avatar({ person, onPhotoClick, photoButtonRef, photoEdit, photoEditButtonRef }) {
   const { initials, photoUrl } = person.avatar;
   // A photo that does not load falls back to the initials, for that address only.
   const [failedUrl, setFailedUrl] = useState(null);
@@ -117,6 +117,7 @@ function Avatar({ person, onPhotoClick, photoButtonRef, photoEdit }) {
       {showPhoto && typeof photoEdit?.onEdit === 'function' ? (
         <button
           type="button"
+          ref={photoEditButtonRef}
           className="ph-photo-edit"
           aria-label="Change photo"
           aria-haspopup="true"
@@ -367,7 +368,7 @@ function SubtitleEditable({ person, edit, refs, onEdit }) {
  */
 export default function PersonHeader({
   person, headingLevel = 2, actions = undefined, editing = undefined,
-  photoButtonRef = undefined, photoEdit = undefined,
+  photoButtonRef = undefined, photoEdit = undefined, photoEditButtonRef = undefined,
   addStickerRef = undefined, addStickerOpen = false, addStickerPanel = null,
 }) {
   const edit = editState(actions, editing);
@@ -391,7 +392,7 @@ export default function PersonHeader({
     <article ref={root} className="ph" aria-label={`Contact: ${person.name}`} style={ACCENT}>
       {/* data-layout says which of the two optional rows exist (c: ways to reach them, s: stickers), so the layout closes up around a missing one. */}
       <div className="ph-card" data-layout={`${hasContacts ? 'c1' : 'c0'}${stickers ? 's1' : 's0'}`}>
-        <Avatar person={person} onPhotoClick={actions?.onPhotoClick} photoButtonRef={photoButtonRef} photoEdit={photoEdit} />
+        <Avatar person={person} onPhotoClick={actions?.onPhotoClick} photoButtonRef={photoButtonRef} photoEdit={photoEdit} photoEditButtonRef={photoEditButtonRef} />
 
         <div className="ph-identity">
           {edit.active?.field === 'name' ? (

@@ -330,3 +330,10 @@
 @container ph (min-width: 820px) {
   .ph-add-sticker-item .stk-picker--popover { right: 0; left: auto; }
 }
+
+/* The photo panel's own rows (PhotoPanel draws them; the panel box is above). */
+.ph-photo-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ph-editor-btn--primary { background: var(--ph-ink); border-color: var(--ph-ink); color: var(--bg-card); font-weight: 600; }
+.ph-editor-btn--primary:hover:not(:disabled) { background: var(--ph-ink); filter: brightness(1.08); }
+.ph-editor-btn:disabled { opacity: 0.6; cursor: default; }
+.ph-photo-confirm { color: var(--text-secondary); }

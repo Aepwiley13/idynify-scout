@@ -69,6 +69,12 @@ describe('the photo', () => {
     expect(screen.queryByRole('button', { name: 'Change photo' })).toBeNull();
   });
 
+  it('keeps a ref on the Change photo button for the parent, to return focus to it', () => {
+    const buttonRef = createRef();
+    render(<PersonHeader person={model(WITH_PHOTO)} actions={{ onPhotoClick() {} }} photoEdit={{ onEdit() {} }} photoEditButtonRef={buttonRef} />);
+    expect(buttonRef.current).toBe(screen.getByRole('button', { name: 'Change photo' }));
+  });
+
   it('draws no Change photo control without onEdit', () => {
     render(<PersonHeader person={model(WITH_PHOTO)} actions={{ onPhotoClick() {} }} photoEdit={{ panel: null }} />);
     expect(screen.queryByRole('button', { name: 'Change photo' })).toBeNull();

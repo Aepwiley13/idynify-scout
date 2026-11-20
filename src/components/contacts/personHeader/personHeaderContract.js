@@ -70,6 +70,7 @@
  *   photoEdit              { onEdit, saving, panel }: a 44px Change photo control (only when there is a photo)
  *                          and a panel the parent draws under the photo (the URL form)
  *   actions.onAddSticker   the "Add sticker" chip is the last item of the sticker list
+ *   photoEditButtonRef     a ref the parent keeps on the Change photo button (to return focus to it)
  *   addStickerRef          a ref the parent keeps on that button (focus return; the picker's "outside" test)
  *   addStickerOpen         whether the picker is open (aria-expanded)
  *   addStickerPanel        the picker, drawn INSIDE the chip's own list item (it places itself against its parent)
@@ -82,6 +83,7 @@
  * @property {PersonHeaderEditing} [editing]
  * @property {{ current: HTMLButtonElement|null }} [photoButtonRef]
  * @property {{ onEdit?: () => void, saving?: boolean, panel?: import('react').ReactNode }} [photoEdit]
+ * @property {{ current: HTMLButtonElement|null }} [photoEditButtonRef]
  * @property {{ current: HTMLButtonElement|null }} [addStickerRef]
  * @property {boolean} [addStickerOpen]
  * @property {import('react').ReactNode} [addStickerPanel]

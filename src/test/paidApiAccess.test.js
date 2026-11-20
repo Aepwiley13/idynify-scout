@@ -223,14 +223,19 @@ describe('captureLinkedIn (Relationship Capture)', () => {
   beforeEach(seedAccounts);
   const capture = (uid) => post({ userId: uid, person: { name: 'Ada Lovelace', company: 'Acme' } }, { authorization: `Bearer tok:${uid}` });
 
-  it('a Free account: the Apollo lookup is skipped, never attempted', async () => {
-    await call('captureLinkedIn', capture(FREE));
+  // #822: the Google search is a paid service too, so capture now refuses outright
+  // (paidGoogleAccess.test.js checks that no search is made either).
+  it('a Free account is refused with 402, and the Apollo lookup is never attempted', async () => {
+    const res = await call('captureLinkedIn', capture(FREE));
+    expect(res.statusCode).toBe(402);
+    expect(JSON.parse(res.body).error).toBe('paid_plan_required');
     expect(apolloCalls).toEqual([]);
   });
 
-  it('an unreadable account: skipped too', async () => {
+  it('an unreadable account is refused with 503, and nothing is looked up', async () => {
     state.failUserReads = true;
-    await call('captureLinkedIn', capture(PAID));
+    const res = await call('captureLinkedIn', capture(PAID));
+    expect(res.statusCode).toBe(503);
     expect(apolloCalls).toEqual([]);
   });
 

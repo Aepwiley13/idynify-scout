@@ -17,6 +17,12 @@
  * URLs matching the current broken photo are skipped.
  *
  * Rate limited: max 3 retries per lead per hour.
+ *
+ * Paid accounts only (#822): the Google searches are a paid service. Paid access is checked on
+ * the server after the caller is verified, before any search or rate-limit bookkeeping:
+ * 402 `paid_plan_required` without it, 503 `entitlement_unavailable` if the account cannot be
+ * read. The check (utils/paidApiAccess.js, which needs the Admin SDK) is loaded on the first
+ * request, as Phase 1d does, so a start-up failure there is a 503, not a function that fails to load.
  */
 
 import { logApiUsage } from './utils/logApiUsage.js';
@@ -24,6 +30,21 @@ import { searchLinkedInPhoto, searchLinkedInProfile } from './utils/linkedinSear
 import { requireProjectId } from './utils/firebaseEnv.js';
 
 const MAX_RETRIES_PER_HOUR = 3;
+
+const PAID_DENIAL_MESSAGES = {
+  paid_plan_required: 'LinkedIn photo search is part of a paid Scout plan.',
+  entitlement_unavailable: 'Your plan could not be confirmed right now. Nothing was searched. Please try again shortly.',
+};
+
+/** May this account use the paid searches? Never throws: an unreadable account is a 503. */
+async function paidSearchAccess(userId) {
+  try {
+    const { checkPaidApiAccess } = await import('./utils/paidApiAccess.js');
+    return await checkPaidApiAccess({ userId });
+  } catch {
+    return { allowed: false, statusCode: 503, error: 'entitlement_unavailable' };
+  }
+}
 const PHOTO_VALIDATE_TIMEOUT = 5000;
 const LINKEDIN_FETCH_TIMEOUT = 8000;
 
@@ -179,6 +200,17 @@ export const handler = async (event) => {
     const verifyData = await verifyResponse.json();
     if (verifyData.users[0].localId !== userId) {
       return { statusCode: 401, body: JSON.stringify({ success: false, error: 'Token mismatch' }) };
+    }
+
+    // ─── Paid access (#822): no Google search for an account without it ───
+    const paidAccess = await paidSearchAccess(userId);
+    if (!paidAccess.allowed) {
+      const error = paidAccess.statusCode === 402 ? 'paid_plan_required' : 'entitlement_unavailable';
+      return {
+        statusCode: paidAccess.statusCode === 402 ? 402 : 503,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+        body: JSON.stringify({ success: false, error, message: PAID_DENIAL_MESSAGES[error], failure_reason: error }),
+      };
     }
 
     console.log(`📷 Photo retry for contact ${contactId} | LinkedIn: ${linkedinUrl || 'NONE'} | Name: ${contactName}`);

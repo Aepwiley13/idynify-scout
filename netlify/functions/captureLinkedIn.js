@@ -19,6 +19,12 @@
  * Gated like captureExtract: the token's own user only, and only when the
  * capture mode covers them. Logs through captureLog only: outcome codes,
  * counts and source names, never a name, email, company, title or URL.
+ *
+ * Both sources are paid services (Apollo, and Google's search API), so both
+ * need paid access, checked on the server before either is attempted: 402
+ * `paid_plan_required` without it, 503 `unavailable` (`entitlement_unavailable`)
+ * when the account cannot be read. Capture's extraction (captureExtract) has
+ * the same rule, so an account without paid access never reaches this step.
  */
 import process from 'node:process';
 import { admin, db } from './firebase-admin.js';
@@ -49,6 +55,7 @@ export const STATUS = Object.freeze({
   unauthorized: 401,
   forbidden: 403,
   capture_disabled: 404,
+  paid_plan_required: 402,
   unavailable: 503,
   internal_error: 500,
 });
@@ -71,9 +78,6 @@ export { readPerson };
 async function isCaptureAdmin(uid) {
   return (await checkAdminAccess(uid)) || (await checkSuperAdminAccess(uid));
 }
-
-/** What the Apollo lookup reports when it is not run for this account (no paid access). */
-const APOLLO_SKIPPED = Object.freeze({ ran: false, failed: false, found: [] });
 
 /**
  * Apollo's one best person record for this name with the email, company or
@@ -134,11 +138,16 @@ export const handler = async (event) => {
     });
     if (!config.enabled) return failure('capture_disabled');
 
-    // Billing Phase 1c: the Apollo lookup is a paid service. Without verified paid access it is
-    // skipped (never attempted), and capture carries on with the search alone.
+    // Billing (Phase 1c, #822): both lookups are paid services, the Apollo match and Google's
+    // search API. Without verified paid access neither is attempted.
     const paidAccess = await checkPaidApiAccess({ userId: uid });
+    if (!paidAccess.allowed) {
+      return paidAccess.statusCode === 402
+        ? failure('paid_plan_required')
+        : failure('unavailable', { reason: 'entitlement_unavailable' });
+    }
     const [apollo, search] = await Promise.all([
-      paidAccess.allowed ? apolloProfile(person) : Promise.resolve(APOLLO_SKIPPED),
+      apolloProfile(person),
       searchLinkedInCandidates({ name: person.name, company: person.company, title: person.title, domain: person.domain, env: process.env }),
     ]);
     const sources = [...(apollo.ran ? ['apollo'] : []), ...(search.configured ? ['search'] : [])];

@@ -38,6 +38,11 @@ vi.mock('../../netlify/functions/firebase-admin.js', () => ({
   },
 }));
 vi.mock('../../netlify/functions/utils/logApiUsage.js', () => ({ logApiUsage }));
+// The paid-access check (#822) is passed here: these tests are about a paid caller. Free,
+// lapsed and unreadable accounts are tested against the real check in paidGoogleAccess.test.js.
+vi.mock('../../netlify/functions/utils/paidApiAccess.js', () => ({
+  checkPaidApiAccess: async () => ({ allowed: true, basis: 'paid' }),
+}));
 
 import {
   handler, CODES, SUCCESS, STAGES, LOG_EVENT, KILL_SWITCH_ENV, DEPRECATION_HEADER, ALERT_JOBS, ALERT_BUDGET_MS,

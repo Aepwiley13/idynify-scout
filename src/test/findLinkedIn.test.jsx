@@ -157,6 +157,13 @@ describe('the likely profiles', () => {
     expect(screen.queryByRole('button', { name: /Try again/ })).toBeNull();
   });
 
+  it('no paid access (402): told the same, with no retry (#822)', async () => {
+    renderFind({ search: vi.fn(async () => ({ status: 402, body: { error: 'paid_plan_required' } })) });
+    fireEvent.click(await screen.findByRole('button', { name: /Find LinkedIn/ }));
+    expect((await screen.findByRole('alert')).textContent).toBe('LinkedIn search is not available for this account.');
+    expect(screen.queryByRole('button', { name: /Try again/ })).toBeNull();
+  });
+
   it('logs nothing', async () => {
     renderFind();
     fireEvent.click(await screen.findByRole('button', { name: /Find LinkedIn/ }));

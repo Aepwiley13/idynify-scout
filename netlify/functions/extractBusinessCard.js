@@ -44,6 +44,7 @@ import { admin, db } from './firebase-admin.js';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { extractAuthToken } from './utils/extractAuthToken.js';
 import { alertOps } from './utils/alertOps.js';
+import { checkPaidApiAccess } from './utils/paidApiAccess.js';
 
 const OPERATION = 'extractBusinessCard';
 const ENDPOINT_PATH = '/.netlify/functions/extractBusinessCard';
@@ -69,6 +70,8 @@ export const CODES = Object.freeze({
   INVALID_REQUEST: 'INVALID_REQUEST',
   UNAUTHORIZED: 'UNAUTHORIZED',
   USER_MISMATCH: 'USER_MISMATCH',
+  PAID_PLAN_REQUIRED: 'PAID_PLAN_REQUIRED',
+  ENTITLEMENT_UNAVAILABLE: 'ENTITLEMENT_UNAVAILABLE',
   METHOD_NOT_ALLOWED: 'METHOD_NOT_ALLOWED',
   NO_TEXT_FOUND: 'NO_TEXT_FOUND',
   UPSTREAM_OCR_FAILURE: 'UPSTREAM_OCR_FAILURE',
@@ -82,7 +85,7 @@ export const SUCCESS = 'SUCCESS';
 /** The steps a request passes through, in order. Telemetry records the last one reached. */
 export const STAGES = Object.freeze({
   REQUEST: 'request',   // kill switch, method, body validation
-  AUTH: 'auth',         // token present and verified, user match
+  AUTH: 'auth',         // token present and verified, user match, paid access
   CONFIG: 'config',     // Vision key present
   OCR: 'ocr',           // the Vision call
   PARSE: 'parse',       // parseBusinessCardText
@@ -96,6 +99,8 @@ const FAILURES = {
   [CODES.INVALID_REQUEST]:          { status: 400, message: 'Invalid request.' },
   [CODES.UNAUTHORIZED]:             { status: 401, message: 'Authentication required.' },
   [CODES.USER_MISMATCH]:            { status: 403, message: 'Not permitted.' },
+  [CODES.PAID_PLAN_REQUIRED]:       { status: 402, message: 'This is part of a paid Scout plan.' },
+  [CODES.ENTITLEMENT_UNAVAILABLE]:  { status: 503, message: 'Your plan could not be confirmed right now. Please try again shortly.' },
   [CODES.METHOD_NOT_ALLOWED]:       { status: 405, message: 'Method not allowed.' },
   [CODES.LEGACY_ENDPOINT_DISABLED]: { status: 410, message: 'This endpoint is no longer available.' },
   [CODES.NO_TEXT_FOUND]:            { status: 422, message: 'No text found in image. Please try a clearer photo.' },
@@ -279,6 +284,13 @@ export const handler = async (event, context) => {
     if (tokenUid !== userId) {
       telemetry.userMismatch = true;
       return settle(CODES.USER_MISMATCH);
+    }
+
+    // Billing (#822): Google Vision is a paid service. Paid access is checked on the server,
+    // from server-written fields only, before any Vision call.
+    const paidAccess = await checkPaidApiAccess({ userId: tokenUid });
+    if (!paidAccess.allowed) {
+      return settle(paidAccess.statusCode === 402 ? CODES.PAID_PLAN_REQUIRED : CODES.ENTITLEMENT_UNAVAILABLE);
     }
 
     telemetry.stage = STAGES.CONFIG;

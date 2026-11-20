@@ -247,7 +247,8 @@ export default function FindLinkedIn({
       setStep(found.length ? 'results' : 'none');
       return;
     }
-    setError(result.body?.error === 'capture_disabled' ? 'disabled' : 'failed');
+    // Capture switched off for this account, or no paid access (#822): retrying cannot help.
+    setError(['capture_disabled', 'paid_plan_required'].includes(result.body?.error) ? 'disabled' : 'failed');
     setStep('error');
   };
 

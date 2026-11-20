@@ -4,6 +4,7 @@ import { logApolloError } from './utils/apolloErrorLogger.js';
 import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } from './utils/scoutContactContract.js';
 import { expandTitlesWithSynonyms } from './utils/titleSynonyms.js';
 import { verifyAuthToken } from './utils/verifyAuthToken.js';
+import { checkPaidApiAccess, paidApiDeniedResponse } from './utils/paidApiAccess.js';
 
 export const handler = async (event) => {
   const startTime = Date.now();
@@ -26,8 +27,12 @@ export const handler = async (event) => {
     console.log('📋 Target titles:', titles);
 
     // Verify auth token — supports admin impersonation
-    await verifyAuthToken(authToken, userId);
+    const { tokenUserId } = await verifyAuthToken(authToken, userId);
     console.log('✅ Auth token verified');
+
+    // Billing Phase 1c: paid Apollo services need paid access, checked on the server before any Apollo call.
+    const paidAccess = await checkPaidApiAccess({ userId, actorUserId: tokenUserId });
+    if (!paidAccess.allowed) return paidApiDeniedResponse(paidAccess);
 
     // Get Apollo API key (throws if not configured)
     const apolloApiKey = getApolloApiKey();

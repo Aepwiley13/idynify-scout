@@ -86,6 +86,16 @@ vi.mock('../context/ImpersonationContext', () => ({
 import { enrichmentFromProfile, profileUrl, PROVENANCE } from '../components/capture/linkedinEnrichment.js';
 import { confirmLinkedIn, acceptLinkedInSuggestion, fetchLinkedInProfile } from '../components/capture/linkedinConfirm.js';
 
+// Billing Phase 1c: this file covers a paid account's behaviour. The paid-access guard itself,
+// including Free, lapsed and unverifiable accounts, is tested in paidApiAccess.test.js.
+vi.mock('../../netlify/functions/utils/paidApiAccess.js', () => ({
+  checkPaidApiAccess: async () => ({ allowed: true, basis: 'paid' }),
+  paidApiDeniedResponse: () => { throw new Error('paid-access guard refused in a paid-account test'); },
+  isPaidApiEligible: () => true,
+  isAdminAccount: () => false,
+  PAID_API_DENIAL: { NOT_PAID: 'paid_plan_required', UNVERIFIED: 'entitlement_unavailable' },
+}));
+
 const UID = 'u1';
 const ID = 'cap_3f2a9c1e_p1';
 const path = id => `users/${UID}/contacts/${id}`;

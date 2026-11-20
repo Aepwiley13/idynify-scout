@@ -7,6 +7,7 @@ import { schedule } from '@netlify/functions';
 /** Cron for this worker, exported so tests can assert it. */
 export const REFRESH_SCHEDULE = '0 9 * * 1-5';
 import { admin, db } from './firebase-admin.js';
+import { isPaidApiEligible } from './utils/paidApiAccess.js';
 import { alertOps } from './utils/alertOps.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 
@@ -76,6 +77,13 @@ export const refreshDailyLeads = async (event) => {
     for (const user of activeUsers) {
       try {
         results.processed++;
+
+        // Billing Phase 1c: no paid access, no Apollo search (search-companies refuses it too).
+        if (!user.paidApi) {
+          results.skipped++;
+          results.skippedReasons.not_paid = (results.skippedReasons.not_paid || 0) + 1;
+          continue;
+        }
 
         const authToken = await mintUserIdToken(user.userId);
 
@@ -253,7 +261,10 @@ async function getActiveUsers() {
   //   "Found 0 active users with ICP profiles"
   // and it never reached the token bug below it. Enumeration must use the Admin
   // SDK, which bypasses rules legitimately and is already used by 20+ functions.
-  const usersSnap = await db.collection('users').select('email').get();
+  // Billing Phase 1c: the refresh spends Apollo company search, so it runs only for accounts with
+  // paid access (or admins), read from the server-written fields. Free and lapsed accounts keep
+  // their ICP and everything else; they are skipped here and counted as `not_paid`.
+  const usersSnap = await db.collection('users').select('email', 'hasCompletedPayment', 'role').get();
   const active = [];
 
   for (const userDoc of usersSnap.docs) {
@@ -269,7 +280,12 @@ async function getActiveUsers() {
       skipRevenue: !!p.skipRevenue,
     };
     if (profile.industries.length || profile.companySizes.length || profile.locations.length) {
-      active.push({ userId: userDoc.id, email: userDoc.get('email') ?? null, profile });
+      active.push({
+        userId: userDoc.id,
+        email: userDoc.get('email') ?? null,
+        profile,
+        paidApi: isPaidApiEligible(userDoc.id, { hasCompletedPayment: userDoc.get('hasCompletedPayment'), role: userDoc.get('role') }),
+      });
     }
   }
   return active;   // throws on real infrastructure failure — the handler reports it

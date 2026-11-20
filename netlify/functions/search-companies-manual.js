@@ -1,4 +1,5 @@
 import { logApiUsage } from './utils/logApiUsage.js';
+import { checkPaidApiAccess, paidApiDeniedResponse } from './utils/paidApiAccess.js';
 import { APOLLO_ENDPOINTS, getApolloHeaders } from './utils/apolloConstants.js';
 import { logApolloError } from './utils/apolloErrorLogger.js';
 
@@ -85,6 +86,10 @@ export async function handler(event, context) {
         body: JSON.stringify({ success: false, error: 'Token does not match user ID' })
       };
     }
+
+    // Billing Phase 1c: paid Apollo services need paid access, checked on the server before any Apollo call.
+    const paidAccess = await checkPaidApiAccess({ userId });
+    if (!paidAccess.allowed) return paidApiDeniedResponse(paidAccess, headers);
 
     // Build Apollo query - mixed search endpoint does NOT support sorting
     const trimmedName = companyName.trim();

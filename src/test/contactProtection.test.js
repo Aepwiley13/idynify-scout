@@ -20,6 +20,16 @@ import process from 'node:process';
 import { enrichmentPatch, differenceSuggestions, sameText, mergeFoundPhones } from '../utils/contactProtection';
 import { readContactPhones, buildPhoneWrite } from '../utils/contactPhones';
 
+// Billing Phase 1c: this file covers a paid account's behaviour. The paid-access guard itself,
+// including Free, lapsed and unverifiable accounts, is tested in paidApiAccess.test.js.
+vi.mock('../../netlify/functions/utils/paidApiAccess.js', () => ({
+  checkPaidApiAccess: async () => ({ allowed: true, basis: 'paid' }),
+  paidApiDeniedResponse: () => { throw new Error('paid-access guard refused in a paid-account test'); },
+  isPaidApiEligible: () => true,
+  isAdminAccount: () => false,
+  PAID_API_DENIAL: { NOT_PAID: 'paid_plan_required', UNVERIFIED: 'entitlement_unavailable' },
+}));
+
 const APOLLO_PERSON = {
   id: 'apollo-1',
   name: 'Jimmy Choi',

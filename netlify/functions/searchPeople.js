@@ -5,8 +5,9 @@ import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } fr
 import { expandTitlesWithSynonyms } from './utils/titleSynonyms.js';
 import { verifyAuthToken } from './utils/verifyAuthToken.js';
 import { checkPaidApiAccess, paidApiDeniedResponse } from './utils/paidApiAccess.js';
+import { withCreditMetering, SEARCH_PEOPLE_MAX } from './utils/creditMetering.js';
 
-export const handler = async (event) => {
+const unmeteredHandler = async (event) => {
   const startTime = Date.now();
 
   if (event.httpMethod !== 'POST') {
@@ -38,7 +39,9 @@ export const handler = async (event) => {
     const apolloApiKey = getApolloApiKey();
 
     // Step 1: Search Apollo API for contact candidates
-    const limit = maxResults || 10;
+    // Billing W4: one request enriches at most SEARCH_PEOPLE_MAX people (each is a paid Apollo
+    // match). The app asks for 3; the browser's number is never trusted beyond the cap.
+    const limit = Math.min(Math.max(1, Number.parseInt(maxResults, 10) || SEARCH_PEOPLE_MAX), SEARCH_PEOPLE_MAX);
 
     // Expand titles with synonyms to improve Apollo match coverage.
     // e.g. 'CEO' → ['CEO', 'Chief Executive Officer', 'Chief Executive', 'Co-CEO']
@@ -182,3 +185,6 @@ export const handler = async (event) => {
     };
   }
 };
+
+// Billing W4: credit metering, off until CREDIT_METERING=on (utils/creditMetering.js).
+export const handler = withCreditMetering(unmeteredHandler, { action: 'searchPeople' });

@@ -6,6 +6,7 @@ import { logApolloError } from './utils/apolloErrorLogger.js';
 import { ensureCriteriaVersion, recordDiscoveryEncounter } from './utils/icpRelationshipWriter.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 import { extractVerifiedCompanyFields, buildBarryIntel, VERIFICATION_NEEDED_MESSAGE } from './utils/companyFacts.js';
+import { withCreditMetering } from './utils/creditMetering.js';
 
 // ---------------------------------------------------------------------------
 // Post-fetch age filter helpers
@@ -54,7 +55,7 @@ function formatStatesForApollo(states) {
   return states.map(state => `${state}, United States`);
 }
 
-export const handler = async (event) => {
+const unmeteredHandler = async (event) => {
   const startTime = Date.now();
 
   if (event.httpMethod !== 'POST') {
@@ -1578,3 +1579,6 @@ function formatRevenueNumber(amount) {
   if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K`;
   return amount.toString();
 }
+
+// Billing W4: credit metering, off until CREDIT_METERING=on (utils/creditMetering.js).
+export const handler = withCreditMetering(unmeteredHandler, { action: 'search-companies' });

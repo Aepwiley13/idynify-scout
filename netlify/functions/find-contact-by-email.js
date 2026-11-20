@@ -10,6 +10,7 @@
 
 import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
 import { checkPaidApiAccess, paidApiDeniedResponse } from './utils/paidApiAccess.js';
+import { withCreditMetering } from './utils/creditMetering.js';
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -18,7 +19,7 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-export const handler = async (event) => {
+const unmeteredHandler = async (event) => {
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: CORS_HEADERS, body: '' };
   }
@@ -125,3 +126,6 @@ export const handler = async (event) => {
     };
   }
 };
+
+// Billing W4: credit metering, off until CREDIT_METERING=on (utils/creditMetering.js).
+export const handler = withCreditMetering(unmeteredHandler, { action: 'find-contact-by-email' });

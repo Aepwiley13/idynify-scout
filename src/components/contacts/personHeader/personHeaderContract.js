@@ -63,10 +63,28 @@
  * The words are the parent's. Why a name was refused, or a save failed, is decided by the controller, which
  * hands over text; the header only shows it. The editor is drawn only with all three handlers.
  *
+ * PHOTO AND STICKER CONTROLS (H2-3, H3). Like editing, drawn only from what the parent supplies; the header reads
+ * and writes nothing and imports no service.
+ *   actions.onPhotoClick   the photo becomes a button (View photo of …, or Add photo for … when there is none)
+ *   photoButtonRef         a ref the parent keeps on that button, to return focus to it from its viewer
+ *   photoEdit              { onEdit, saving, panel }: a 44px Change photo control (only when there is a photo)
+ *                          and a panel the parent draws under the photo (the URL form)
+ *   actions.onAddSticker   the "Add sticker" chip is the last item of the sticker list
+ *   addStickerRef          a ref the parent keeps on that button (focus return; the picker's "outside" test)
+ *   addStickerOpen         whether the picker is open (aria-expanded)
+ *   addStickerPanel        the picker, drawn INSIDE the chip's own list item (it places itself against its parent)
+ *   actions.onRemoveSticker  every pill gets a Remove button (32px, 44px to hit); a sticker with busy: true is
+ *                          marked busy, shows a ring and cannot be removed again until it settles
+ *
  * @typedef {object} PersonHeaderProps
  * @property {import('./personHeaderModel.js').PersonHeaderModel} person
  * @property {PersonHeaderActions} [actions]
  * @property {PersonHeaderEditing} [editing]
+ * @property {{ current: HTMLButtonElement|null }} [photoButtonRef]
+ * @property {{ onEdit?: () => void, saving?: boolean, panel?: import('react').ReactNode }} [photoEdit]
+ * @property {{ current: HTMLButtonElement|null }} [addStickerRef]
+ * @property {boolean} [addStickerOpen]
+ * @property {import('react').ReactNode} [addStickerPanel]
  */
 
 /** The callbacks a parent may supply, by name. Anything else in `actions` is ignored. */

@@ -273,3 +273,60 @@
 @container ph (min-width: 820px) {
   .ph-input--name { font-size: 32px; }
 }
+
+/* ── The photo as a control (H2-3) and the sticker controls (H3). Drawn only when the parent supplies the callbacks. ── */
+.ph-avatar-btn {
+  display: block; width: var(--ph-avatar); height: var(--ph-avatar); padding: 0; border: 0; border-radius: 50%;
+  background: transparent; cursor: pointer; font: inherit; color: inherit;
+}
+.ph-avatar-btn:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 4px; }
+/* Change photo: 44px, at the photo's lower left (the activity dot is at the lower right). */
+.ph-photo-edit {
+  position: absolute; left: -6px; bottom: -6px; z-index: 2;
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  width: 44px; height: 44px; padding: 0; border: 1px solid var(--border-2); border-radius: 50%;
+  background: var(--bg-card); color: var(--ph-ink); cursor: pointer;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--ph-ink) 20%, transparent);
+}
+.ph-photo-edit:hover { background: var(--ph-tint); border-color: var(--ph-ink); }
+.ph-photo-edit:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 2px; background: var(--ph-tint); }
+.ph-photo-panel {
+  position: absolute; top: calc(100% + 10px); left: 0; z-index: 40;
+  box-sizing: border-box; width: 320px; max-width: calc(100cqw - 32px);
+  display: flex; flex-direction: column; gap: 8px; padding: 12px;
+  border: 1px solid var(--border-2); border-radius: 16px; background: var(--bg-card); color: var(--text-primary);
+  box-shadow: var(--shadow-card), 0 12px 32px color-mix(in srgb, var(--text-primary) 18%, transparent);
+}
+
+/* Remove: 32px to see, 44px to hit. The row gap grows so the touch areas of neighbouring rows never overlap. */
+.ph-stickers--editable { row-gap: 12px; }
+.ph-sticker-remove {
+  position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  width: 32px; height: 32px; margin: -8px -10px -8px -4px; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; color: var(--text-secondary); cursor: pointer;
+}
+.ph-sticker-remove::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; }
+.ph-sticker-remove:hover:not(:disabled) { background: var(--ph-tint); color: var(--text-primary); }
+.ph-sticker-remove:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 0; }
+.ph-sticker-remove:disabled { cursor: default; }
+.ph-sticker[aria-busy="true"] { opacity: 0.75; }
+
+/* Add sticker: a soft dashed chip, 36px to see and 44px to hit. The picker opens against this item. */
+.ph-add-sticker-item { position: relative; display: flex; }
+.ph-add-sticker-item:has(.stk-picker--popover) { z-index: 61; }
+.ph-add-sticker {
+  position: relative; display: inline-flex; align-items: center; gap: 6px; box-sizing: border-box;
+  min-height: 36px; padding: 0 14px 0 10px; border-radius: 999px;
+  border: 1.5px dashed color-mix(in srgb, var(--ph-ink) 70%, transparent);
+  background: transparent; color: var(--ph-ink); cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 600; line-height: 1.25;
+}
+.ph-add-sticker::after { content: ""; position: absolute; inset: -4px 0; border-radius: 999px; }
+.ph-add-sticker:hover { background: var(--ph-tint); border-color: var(--ph-ink); }
+.ph-add-sticker:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 2px; background: var(--ph-tint); }
+.ph-add-sticker[aria-expanded="true"] { background: var(--ph-tint); border-style: solid; border-color: var(--ph-ink); }
+
+/* From the desktop layout the stickers are at the top right: the picker opens from the right edge of the chip, towards the page. */
+@container ph (min-width: 820px) {
+  .ph-add-sticker-item .stk-picker--popover { right: 0; left: auto; }
+}

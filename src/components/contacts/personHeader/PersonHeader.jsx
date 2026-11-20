@@ -45,7 +45,7 @@
  * keeps its own colour, in the same tint the existing sticker chips use.
  */
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { Facebook, Instagram, Linkedin, Mail, MapPin, Pencil, Phone } from 'lucide-react';
+import { Camera, Facebook, Instagram, Linkedin, Mail, MapPin, Pencil, Phone, Plus, X } from 'lucide-react';
 import { BRAND } from '../../../theme/tokens';
 import { hexOf, TINT_ALPHA, BORDER_ALPHA } from '../../stickers/stickerPalette';
 import { EDIT_LABEL, editState, headerParts } from './personHeaderContract';
@@ -71,46 +71,92 @@ const safe = (kind, href) => typeof href === 'string' && SAFE_HREF[kind].test(hr
 
 const clampLevel = (level) => Math.min(6, Math.max(1, Number.isInteger(level) ? level : 2));
 
-function Avatar({ person }) {
+function Avatar({ person, onPhotoClick, photoButtonRef, photoEdit }) {
   const { initials, photoUrl } = person.avatar;
   // A photo that does not load falls back to the initials, for that address only.
   const [failedUrl, setFailedUrl] = useState(null);
   const showPhoto = Boolean(photoUrl) && failedUrl !== photoUrl;
   const { active } = person.activity;
+  const picture = (
+    <span className="ph-avatar" aria-hidden="true">
+      {showPhoto ? (
+        <img
+          className="ph-avatar-img"
+          src={photoUrl}
+          alt=""
+          // A signed profile-picture address does not load when the page names itself as the referrer.
+          referrerPolicy="no-referrer"
+          onError={() => setFailedUrl(photoUrl)}
+        />
+      ) : (
+        <span className="ph-avatar-initials" dir="auto">{initials}</span>
+      )}
+    </span>
+  );
   return (
     <div className="ph-avatar-wrap">
-      <span className="ph-avatar" aria-hidden="true">
-        {showPhoto ? (
-          <img
-            className="ph-avatar-img"
-            src={photoUrl}
-            alt=""
-            // A signed profile-picture address does not load when the page names itself as the referrer.
-            referrerPolicy="no-referrer"
-            onError={() => setFailedUrl(photoUrl)}
-          />
-        ) : (
-          <span className="ph-avatar-initials" dir="auto">{initials}</span>
-        )}
-      </span>
+      {typeof onPhotoClick === 'function' ? (
+        // A button only when the parent can do something with a press: view the photo, or add one.
+        <button
+          type="button"
+          ref={photoButtonRef}
+          className="ph-avatar-btn"
+          aria-label={showPhoto ? `View photo of ${person.name}` : `Add photo for ${person.name}`}
+          aria-haspopup={showPhoto ? 'dialog' : 'true'}
+          onClick={onPhotoClick}
+        >
+          {picture}
+        </button>
+      ) : picture}
       <span
         className={`ph-activity ph-activity--${active ? 'on' : 'off'}`}
         role="img"
         aria-label={active ? 'Active in the last 30 days' : 'No recent activity'}
         title={active ? 'Active in the last 30 days' : 'No recent activity'}
       />
+      {showPhoto && typeof photoEdit?.onEdit === 'function' ? (
+        <button
+          type="button"
+          className="ph-photo-edit"
+          aria-label="Change photo"
+          aria-haspopup="true"
+          aria-busy={photoEdit.saving ? 'true' : undefined}
+          onClick={photoEdit.onEdit}
+        >
+          {photoEdit.saving ? <span className="ph-spinner" aria-hidden="true" /> : <Camera size={16} aria-hidden="true" />}
+        </button>
+      ) : null}
+      {photoEdit?.panel ?? null}
     </div>
   );
 }
 
-function StickerPill({ sticker }) {
+function StickerPill({ sticker, onRemove }) {
   const hex = hexOf(sticker.color);
+  const busy = sticker.busy === true;
   return (
-    <li className="ph-sticker" style={{ '--ph-sticker-tint': `${hex}${TINT_ALPHA}`, '--ph-sticker-border': `${hex}${BORDER_ALPHA}`, '--ph-sticker-dot': hex }} title={sticker.name}>
+    <li
+      className="ph-sticker"
+      style={{ '--ph-sticker-tint': `${hex}${TINT_ALPHA}`, '--ph-sticker-border': `${hex}${BORDER_ALPHA}`, '--ph-sticker-dot': hex }}
+      title={sticker.name}
+      aria-busy={busy ? 'true' : undefined}
+    >
       {sticker.emoji
         ? <span className="ph-sticker-emoji" aria-hidden="true">{sticker.emoji}</span>
         : <span className="ph-sticker-dot" aria-hidden="true" />}
       <span className="ph-sticker-name" dir="auto">{sticker.name}</span>
+      {onRemove ? (
+        // 32px to see, 44px to hit (the ::after). Not available while this sticker is being added or removed.
+        <button
+          type="button"
+          className="ph-sticker-remove"
+          aria-label={`Remove sticker ${sticker.name}`}
+          disabled={busy}
+          onClick={() => onRemove({ id: sticker.id, name: sticker.name })}
+        >
+          {busy ? <span className="ph-spinner" aria-hidden="true" /> : <X size={14} aria-hidden="true" />}
+        </button>
+      ) : null}
     </li>
   );
 }
@@ -319,7 +365,11 @@ function SubtitleEditable({ person, edit, refs, onEdit }) {
  * @param {import('./personHeaderContract.js').PersonHeaderActions} [props.actions]  onContactAction, and onEdit (begin an edit) when editing is offered
  * @param {import('./personHeaderContract.js').PersonHeaderEditing} [props.editing]  the inline editing state, controlled by the parent
  */
-export default function PersonHeader({ person, headingLevel = 2, actions = undefined, editing = undefined }) {
+export default function PersonHeader({
+  person, headingLevel = 2, actions = undefined, editing = undefined,
+  photoButtonRef = undefined, photoEdit = undefined,
+  addStickerRef = undefined, addStickerOpen = false, addStickerPanel = null,
+}) {
   const edit = editState(actions, editing);
   const root = useRef(null);
   const refs = useEditFocus(edit, root);
@@ -341,7 +391,7 @@ export default function PersonHeader({ person, headingLevel = 2, actions = undef
     <article ref={root} className="ph" aria-label={`Contact: ${person.name}`} style={ACCENT}>
       {/* data-layout says which of the two optional rows exist (c: ways to reach them, s: stickers), so the layout closes up around a missing one. */}
       <div className="ph-card" data-layout={`${hasContacts ? 'c1' : 'c0'}${stickers ? 's1' : 's0'}`}>
-        <Avatar person={person} />
+        <Avatar person={person} onPhotoClick={actions?.onPhotoClick} photoButtonRef={photoButtonRef} photoEdit={photoEdit} />
 
         <div className="ph-identity">
           {edit.active?.field === 'name' ? (
@@ -429,8 +479,28 @@ export default function PersonHeader({ person, headingLevel = 2, actions = undef
         ) : null}
 
         {stickers ? (
-          <ul className="ph-stickers" aria-label="Stickers">
-            {stickers.map((sticker) => <StickerPill key={sticker.id} sticker={sticker} />)}
+          <ul className={`ph-stickers${parts.controls.addSticker || parts.controls.removeSticker ? ' ph-stickers--editable' : ''}`} aria-label="Stickers">
+            {stickers.map((sticker) => (
+              <StickerPill key={sticker.id} sticker={sticker} onRemove={parts.controls.removeSticker ? actions.onRemoveSticker : null} />
+            ))}
+            {parts.addSticker ? (
+              // The picker is drawn INSIDE this item: it places itself against its parent, which is the chip's own box.
+              <li className="ph-add-sticker-item">
+                <button
+                  type="button"
+                  ref={addStickerRef}
+                  className="ph-add-sticker"
+                  aria-label="Add sticker"
+                  aria-haspopup="listbox"
+                  aria-expanded={addStickerOpen ? 'true' : 'false'}
+                  onClick={actions.onAddSticker}
+                >
+                  <Plus size={14} aria-hidden="true" />
+                  <span>Add sticker</span>
+                </button>
+                {addStickerPanel}
+              </li>
+            ) : null}
           </ul>
         ) : null}
       </div>

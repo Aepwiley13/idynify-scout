@@ -187,12 +187,21 @@ describe('no control without an action', () => {
     }
   });
 
-  it('draws no edit, photo, add-sticker or remove-sticker control even when a parent supplies those callbacks (they arrive with their behaviour, later)', () => {
+  it('draws no control for a callback it does not use: onContactAction alone makes no button, and nothing is called by drawing', () => {
     const noop = vi.fn();
-    const { container } = draw(JORDAN, { actions: { onEdit: noop, onPhotoClick: noop, onAddSticker: noop, onRemoveSticker: noop } });
+    const { container } = draw(JORDAN, { actions: { onContactAction: noop } });
     expect(container.querySelectorAll('button, [role="button"]')).toHaveLength(0);
-    expect(screen.queryByText(/add sticker/i)).toBeNull();
-    expect(screen.queryByLabelText(/remove|edit/i)).toBeNull();
+    expect(noop).not.toHaveBeenCalled();
+  });
+
+  it('draws the edit, photo, add-sticker and remove-sticker controls only for the callbacks a parent supplies (their behaviour is held in personHeaderEditing and personHeaderStickersPhoto)', () => {
+    const noop = vi.fn();
+    draw(JORDAN, { actions: { onPhotoClick: noop, onAddSticker: noop, onRemoveSticker: noop } });
+    expect(screen.getByRole('button', { name: /View photo of Jordan Lee/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add sticker' })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /^Remove sticker / }).length).toBeGreaterThan(0);
+    // onEdit alone, with nothing said to be editable, draws no edit control.
+    expect(screen.queryByRole('button', { name: /^(Edit|Add) (name|title|organization)/ })).toBeNull();
     expect(noop).not.toHaveBeenCalled();
   });
 });

@@ -5,6 +5,7 @@ import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { loadCompanyFactsForBarry, formatCompanyFactsBlock, resolveDisplayCompanyFields } from './utils/barryCompanyFacts.js';
 import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
 import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
 /**
  * A minimal RECON-shaped messaging block built from JUST the deciding ICP's
@@ -21,7 +22,7 @@ function formatIcpMessagingOnly(icpMessaging) {
   return `\nMESSAGING & VALUE PROPOSITION (the deciding ICP's own voice):\n${lines.join('\n')}\n`;
 }
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   const startTime = Date.now();
 
   if (event.httpMethod !== 'POST') {
@@ -355,3 +356,6 @@ Generate the contextual layer now. Respond ONLY with valid JSON.`;
     };
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'barryGenerateContext' });

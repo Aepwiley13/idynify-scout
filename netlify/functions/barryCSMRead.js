@@ -23,8 +23,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { MODEL_DEEP } from './utils/models.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   const startTime = Date.now();
 
   // CORS preflight
@@ -217,3 +218,6 @@ Respond with ONLY the assessment and recommendation. No labels, no headers.`;
     };
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'barryCSMRead' });

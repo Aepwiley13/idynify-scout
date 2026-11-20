@@ -21,8 +21,9 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { LEGACY_HAIKU_4_5 } from './utils/models.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   const startTime = Date.now();
 
   if (event.httpMethod !== 'POST') {
@@ -187,3 +188,6 @@ Respond with ONLY the one sentence. No quotes. No explanation. Just the sentence
     };
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'barryHunterCardRead' });

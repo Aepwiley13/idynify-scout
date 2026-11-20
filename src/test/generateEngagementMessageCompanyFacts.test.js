@@ -19,6 +19,10 @@ const CALLS = [];
 // Only createMessageWithRetry is mocked for the actual call, but the handler
 // still constructs `new Anthropic(...)` first — the real SDK refuses to
 // construct in a browser-like (jsdom) environment, so it needs a stand-in too.
+// Billing Phase 1d: this file covers a paid account's use of the function. The paid-plan check
+// itself, including Free, lapsed and unverifiable accounts, is tested in paidAiAccess.test.js.
+vi.mock('../../netlify/functions/utils/paidAiAccess.js', () => ({ withPaidAiAccess: (handler) => handler }));
+
 vi.mock('@anthropic-ai/sdk', () => ({ default: class { constructor() {} } }));
 
 vi.mock('../../netlify/functions/utils/anthropicRetry.js', () => ({

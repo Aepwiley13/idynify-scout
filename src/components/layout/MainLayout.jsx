@@ -38,6 +38,7 @@ import ModuleMoreSheet from './ModuleMoreSheet';
 import ModuleErrorBoundary from './ModuleErrorBoundary';
 import BarrySessionHistoryPanel from '../barry/BarrySessionHistoryPanel';
 import BarryChatPanel from '../dashboard/BarryChatPanel';
+import { barryAvailableFor } from '../../utils/barryAccess';
 import NotificationCenter from '../notifications/NotificationCenter';
 import QuickEngageDrawer from '../engage/QuickEngageDrawer';
 import ShellAnnouncements from './ShellAnnouncements';
@@ -100,7 +101,7 @@ function Breadcrumb({ module, entityLabel, onNavigate }) {
 
 // ─── ShellChrome — consumes the shell it is rendered inside ──────────────────
 
-function ShellChrome({ children, user }) {
+function ShellChrome({ children, user, barryAvailable = true }) {
   const location = useLocation();
   const navigate = useNavigate();
   const T = useT();
@@ -207,6 +208,7 @@ function ShellChrome({ children, user }) {
         onToggleBarry={() => toggleBarry({ returnFocusTo: barryButtonRef.current })}
         barryOpen={barryOpen}
         barryButtonRef={barryButtonRef}
+        barryAvailable={barryAvailable}
         user={shellUser ?? user}
         onLogout={handleLogout}
       />
@@ -339,6 +341,7 @@ function ShellChrome({ children, user }) {
           isOpen={moreSheetOpen}
           onClose={() => setMoreSheetOpen(false)}
           onOpenBarry={() => openBarry({ returnFocusTo: moreButtonRef.current })}
+          barryAvailable={barryAvailable}
         />
       )}
 
@@ -381,8 +384,11 @@ function ShellChrome({ children, user }) {
           panel is suppressed entirely — two Barry surfaces on one screen would
           confuse people and fight for the canonical conversation. The panel
           stays mounted (preserving state) but forced inert/hidden regardless
-          of barryOpen. */}
-      {(() => {
+          of barryOpen.
+
+          Billing Phase 1d: not mounted at all for an account without paid access
+          (utils/barryAccess.js); the server refuses those accounts anyway. */}
+      {barryAvailable && (() => {
         const onBarryPage = location.pathname === '/barry';
 
         // During First Experience, redirect sidecar opens to /barry instead
@@ -431,7 +437,7 @@ function ShellChrome({ children, user }) {
 
 const MainLayout = ({ children, user, userData }) => (
   <ShellProvider user={user} userData={userData}>
-    <ShellChrome user={user}>{children}</ShellChrome>
+    <ShellChrome user={user} barryAvailable={barryAvailableFor(userData)}>{children}</ShellChrome>
   </ShellProvider>
 );
 

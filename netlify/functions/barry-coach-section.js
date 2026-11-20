@@ -10,6 +10,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { db } from './firebase-admin.js';
 import { MODEL_DEEP } from './utils/models.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
 // ─── Section metadata ─────────────────────────────────────────────────────────
 
@@ -88,7 +89,7 @@ RULES Barry never breaks:
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   const startTime = Date.now();
 
   if (event.httpMethod !== 'POST') {
@@ -235,3 +236,6 @@ export const handler = async (event) => {
     };
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'barry-coach-section' });

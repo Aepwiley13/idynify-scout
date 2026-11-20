@@ -400,7 +400,7 @@ describe('pending states', () => {
 
   // M2-A: a second identical add while the first is in flight is refused (this used to be a KNOWN duplicate write;
   // the People card has always refused it).
-  it('M2-A: a sticker whose add is still pending can be chosen again, but only one add is sent', async () => {
+  it('M2-A: a sticker whose add is still pending is disabled in the picker', async () => {
     // The picker marks only the stickers already on the contact as chosen; a pending add is not on the contact yet.
     fake.current.state.impl.add = () => new Promise(() => {});
     const { user } = await renderRow(PAT([]));
@@ -410,8 +410,8 @@ describe('pending states', () => {
     await user.click(screen.getByRole('option', { name: 'Board' }));
     expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id]]);
     expect(chip('Board')).toHaveAttribute('aria-busy', 'true');
-    expect(screen.queryByRole('combobox')).toBeNull();
-    expect(addButton()).toHaveFocus();
+    expect(screen.getByRole('combobox')).toBeVisible();
+    expect(screen.getByRole('option', { name: 'Board' })).toHaveAttribute('aria-disabled', 'true');
   });
 
   it('M2-A: two rapid picks of the same sticker, made before React re-renders, still send one add', async () => {
@@ -477,9 +477,10 @@ describe('pending states', () => {
     await pickOption(user, 'Board');
     await pickOption(user, 'Board');
     expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id], ['u1', 'c2', BOARD.id]]);
+    // Back on the first contact the add is STILL in flight: the guard is the page's, so the fresh row knows (this used to send a third write).
     await user.click(screen.getByRole('button', { name: 'Open Pat' }));
     await pickOption(user, 'Board');
-    expect(fake.current.callsOf('addSticker')).toHaveLength(3);
+    expect(fake.current.callsOf('addSticker')).toHaveLength(2);
   });
 });
 
@@ -713,14 +714,15 @@ describe('switching between contacts: a stale action never touches the wrong con
     expect(fake.current.state.calls.map(([name, , id]) => `${name}:${id}`)).toEqual(['removeSticker:c1', 'addSticker:c2', 'addSticker:c1']);
   });
 
-  it('moving to another contact and back starts clean: no busy chip, no open picker', async () => {
+  it('returning restores the pending chip and starts with the picker closed', async () => {
     fake.current.state.impl.add = () => new Promise(() => {});
     const { user } = await renderSwitching([PAT([]), SAM([])]);
     await pickOption(user, 'Board');
     await user.click(screen.getByRole('button', { name: 'Open Sam' }));
     await user.click(screen.getByRole('button', { name: 'Open Pat' }));
     await screen.findByRole('list', { name: 'Stickers' });
-    expect(chipNames()).toEqual([]);
+    expect(chipNames()).toEqual(['Board']);
+    expect(chip('Board')).toHaveAttribute('aria-busy', 'true');
     expect(screen.queryByRole('combobox')).toBeNull();
   });
 

@@ -136,6 +136,7 @@ function Connected({ contact, onPatch, onLateStickerChange, headingLevel, sticke
           <StickerPicker
             stickers={st.active}
             assignedIds={st.assigned}
+            pendingIds={st.pendingIds}
             recentIds={st.recentIds}
             atLimit={st.atLimit}
             onPick={st.pick}

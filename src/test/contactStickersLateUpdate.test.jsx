@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useState } from 'react';
-import { render, screen, within, waitFor, act, configure } from '@testing-library/react';
+import { render, renderHook, screen, within, waitFor, act, configure } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createFakeStickers, sticker, config, stickerError } from './helpers/stickersUi';
 import { withMembershipChange } from '../services/stickers/stickerCore';
@@ -38,6 +38,7 @@ vi.mock('../context/ImpersonationContext', () => ({
 
 import { StickersProvider } from '../components/stickers/StickersContext';
 import ContactStickersRow from '../components/stickers/ContactStickersRow';
+import { useContactStickers } from '../components/stickers/useContactStickers';
 
 configure({ asyncUtilTimeout: 5000 });
 
@@ -232,14 +233,81 @@ describe('the M2-A duplicate-write guard', () => {
     expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id]]);
   });
 
-  it('KNOWN LIMITATION: the guard belongs to one row, so after leaving and returning to the contact, the same sticker can be sent again while the first add is still in flight', async () => {
+  // The guard is held by the page's StickersProvider (one per account and page), not by a row, so a row that
+  // is made fresh (the person left the contact and came back) still knows an add is in flight.
+  it('refuses the same sticker again after leaving the contact and coming back while the first add is still in flight', async () => {
     fake.current.state.impl.add = () => new Promise(() => {});
     const { user } = await renderPage([PAT(), SAM()]);
     await pick(user, 'Board');
     await open(user, 'Sam');
     await open(user, 'Pat');
     await pick(user, 'Board');
-    expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id], ['u1', 'c1', BOARD.id]]);
+    expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id]]);
+  });
+
+  it('lets the same sticker be sent again once the first add has failed, from a fresh row', async () => {
+    let first = true;
+    let reject;
+    fake.current.state.impl.add = () => (first ? new Promise((_r, rej) => { first = false; reject = rej; }) : Promise.resolve({ status: 'added' }));
+    const { user } = await renderPage([PAT(), SAM()]);
+    await pick(user, 'Board');
+    await open(user, 'Sam');
+    await open(user, 'Pat');
+    await act(async () => reject(stickerError('write_failed')));
+    await pick(user, 'Board');
+    expect(fake.current.callsOf('addSticker')).toHaveLength(2);
+    await waitFor(() => expect(chipNames()).toEqual(['Board']));
+  });
+
+  it('frees the guard when the first add succeeds after the row was gone (the sticker is on the contact, so it is shown as chosen)', async () => {
+    let finish;
+    fake.current.state.impl.add = () => new Promise((r) => { finish = r; });
+    const { user } = await renderPage([PAT(), SAM()]);
+    await pick(user, 'Board');
+    await open(user, 'Sam');
+    await act(async () => finish({ status: 'added' }));
+    await open(user, 'Pat');
+    await waitFor(() => expect(chipNames()).toEqual(['Board']));
+    await user.click(addButton());
+    expect(screen.getByRole('option', { name: 'Board' })).toHaveAttribute('aria-selected', 'true');
+    expect(fake.current.callsOf('addSticker')).toHaveLength(1);
+  });
+
+  it('does not stop the same sticker being added to a DIFFERENT contact while the first is in flight', async () => {
+    fake.current.state.impl.add = () => new Promise(() => {});
+    const { user } = await renderPage([PAT(), SAM()]);
+    await pick(user, 'Board');
+    await open(user, 'Sam');
+    await pick(user, 'Board');
+    expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id], ['u1', 'c2', BOARD.id]]);
+  });
+
+  it('is per account: another account\'s page (its own provider) is not held up by this one\'s pending add', async () => {
+    fake.current.state.impl.add = () => new Promise(() => {});
+    fake.current.state.registry = [BOARD, DONOR, GALA];
+    fake.current.state.config = config();
+    const user = userEvent.setup();
+    const both = render(
+      <>
+        <div data-testid="a"><StickersProvider uid="u1"><ContactStickersRow contact={PAT()} /></StickersProvider></div>
+        <div data-testid="b"><StickersProvider uid="u2"><ContactStickersRow contact={PAT()} /></StickersProvider></div>
+      </>,
+    );
+    const first = await within(both.getByTestId('a')).findByRole('button', { name: 'Add sticker' });
+    await user.click(first);
+    await user.click(screen.getByRole('option', { name: 'Board' }));
+    const second = await within(both.getByTestId('b')).findByRole('button', { name: 'Add sticker' });
+    await user.click(second);
+    await user.click(screen.getByRole('option', { name: 'Board' }));
+    expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id], ['u2', 'c1', BOARD.id]]);
+  });
+
+  it('with a sticker value that carries no registry of its own (no provider), the guard is still per instance', async () => {
+    fake.current.state.impl.add = () => new Promise(() => {});
+    const bare = { uid: 'u1', byId: new Map(), active: [], all: [], recheck() {}, notify() {} };
+    const { result } = renderHook(() => useContactStickers({ contact: PAT(), stickers: bare }));
+    await act(async () => { result.current.change('add', BOARD); result.current.change('add', BOARD); });
+    expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id]]);
   });
 });
 

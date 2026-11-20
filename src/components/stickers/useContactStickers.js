@@ -25,7 +25,8 @@
  *   - A write is made for the contact this component was made for, and only that one.
  *   - A denied write re-checks availability (recheck), and the notice lives on the page, not here.
  *   - Removing offers Undo for UNDO_MS; only the latest removal's offer stays.
- *   - An add that is still pending for a contact and sticker is not sent a second time (M2-A); a failed add can be tried again.
+ *   - An add that is still pending for a contact and sticker is not sent a second time (M2-A), even from a row made fresh by
+ *     leaving the contact and coming back (the guard is the provider's, per account); a failed add can be tried again.
  *   - A result that arrives after the component has been replaced (the person moved to another contact) is saved and,
  *     if the caller passed onLateUpdate(contactId, stickerId, op), reported through THAT, by contact id, and only if the
  *     same account is still the effective one (M2-B1). It is never reported through onUpdate(next): that carries a
@@ -55,7 +56,7 @@ import { nextStickerColor } from './stickerPalette';
 export const UNDO_MS = 6000;
 
 export function useContactStickers({ contact, onUpdate, onLateUpdate, stickers }) {
-  const { uid, byId, active, all, recheck, notify } = stickers;
+  const { uid, byId, active, all, recheck, notify, pendingAdds: sharedAdds, startAdd, finishAdd } = stickers;
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(() => new Map());
   const [recentIds, setRecentIds] = useState(() => readRecentStickerIds(uid));
@@ -65,8 +66,10 @@ export function useContactStickers({ contact, onUpdate, onLateUpdate, stickers }
   const mounted = useRef(true);
   // The caller's late-report callback as of this component's last render (it is frozen once the component is gone).
   const lateUpdate = useRef(onLateUpdate);
-  // Adds in flight, by "contactId:stickerId". A ref, not state, so two presses before a re-render still see it.
-  const adding = useRef(new Set());
+  // Adds in flight. A set, not state, so two presses before a re-render still see it. It is the PAGE's (the provider's:
+  // one per account), keyed by account, contact and sticker, so a row made fresh by leaving the contact and coming back still
+  // knows an add is in flight. Without a provider's set (a bare value) it is this instance's own.
+  const ownAdding = useRef(new Set());
 
   useEffect(() => { latest.current = contact; }, [contact]);
   useEffect(() => { registry.current = byId; }, [byId]);
@@ -78,7 +81,11 @@ export function useContactStickers({ contact, onUpdate, onLateUpdate, stickers }
 
   const stored = storedStickerIds(contact);
   const assigned = new Set(stored);
-  const pendingAdds = [...pending.values()].filter((p) => p.op === 'add' && !assigned.has(p.sticker.id));
+  const adds = sharedAdds
+    ? sharedAdds.filter((entry) => entry.uid === uid && entry.contactId === contact.id)
+    : [...pending.values()].filter((entry) => entry.op === 'add');
+  const pendingIds = new Set(adds.map(({ sticker }) => sticker.id));
+  const pendingAdds = adds.filter(({ sticker }) => !assigned.has(sticker.id));
   const atLimit = stored.length + pendingAdds.length >= STICKER_LIMIT;
 
   function setBusy(sticker, op) {
@@ -120,12 +127,16 @@ export function useContactStickers({ contact, onUpdate, onLateUpdate, stickers }
   async function change(op, sticker) {
     const contactId = latest.current.id;
     // One add at a time for a given contact and sticker: a second request while the first is in flight is refused.
-    const addKey = op === 'add' ? `${contactId}:${sticker.id}` : null;
+    const addKey = op === 'add' ? JSON.stringify([uid, contactId, sticker.id]) : null;
     if (addKey) {
-      if (adding.current.has(addKey)) return;
-      adding.current.add(addKey);
+      if (startAdd) {
+        if (!startAdd(addKey, { uid, contactId, sticker })) return;
+      } else {
+        if (ownAdding.current.has(addKey)) return;
+        ownAdding.current.add(addKey);
+      }
     }
-    setBusy(sticker, op);
+    if (op !== 'add' || !startAdd) setBusy(sticker, op);
     try {
       if (op === 'add') await addSticker(uid, contactId, sticker.id);
       else await removeSticker(uid, contactId, sticker.id);
@@ -146,8 +157,11 @@ export function useContactStickers({ contact, onUpdate, onLateUpdate, stickers }
     } catch (error) {
       if (mounted.current) fail(op, error, () => change(op, sticker));
     } finally {
-      if (addKey) adding.current.delete(addKey);
-      if (mounted.current) setBusy(sticker, null);
+      if (addKey) {
+        if (finishAdd) finishAdd(addKey);
+        else ownAdding.current.delete(addKey);
+      }
+      if (mounted.current && (op !== 'add' || !startAdd)) setBusy(sticker, null);
     }
   }
 
@@ -178,12 +192,12 @@ export function useContactStickers({ contact, onUpdate, onLateUpdate, stickers }
   }
 
   const chips = [
-    ...visibleStickers(contact, byId).map((sticker) => ({ sticker, busy: pending.has(sticker.id) })),
+    ...visibleStickers(contact, byId).map((sticker) => ({ sticker, busy: pending.has(sticker.id) || pendingIds.has(sticker.id) })),
     ...pendingAdds.map(({ sticker }) => ({ sticker, busy: true })),
   ];
 
   return {
-    chips, assigned, recentIds, atLimit, active, open, setOpen, buttonRef, change, pick, create, closePicker,
+    chips, assigned, pendingIds, recentIds, atLimit, active, open, setOpen, buttonRef, change, pick, create, closePicker,
   };
 }
 

@@ -309,18 +309,28 @@ for (const [folder, theme] of THEMES) {
     await pickContact('avery');
     check(`${tag}: no photo: Add photo control, and Add title/Add organization where empty`, Boolean(await evaluate(byLabel('Add photo for Avery Quinn'))) && Boolean(await evaluate(byLabel('Add organization'))));
 
-    // ── 13. A save in flight when the person moves to another contact ───────
-    await load(`theme=${theme}&latency=2500`);
+    // ── 13. Keep an add pending while leaving and returning to its contact ──
+    await load(`theme=${theme}`);
     await resetWrites();
+    await evaluate(`(() => {
+      window.__fixture.stickerWriteGate = new Promise((resolve) => { window.__fixture.finishStickerWrite = resolve; });
+    })()`);
     await click(byLabel('Add sticker'));
     await until(`Boolean(document.querySelector('.stk-picker'))`);
-    await click(pickerOption('Priority'));
+    await click(pickerOption('Donor'));
     await pickContact('avery');
-    check(`${tag}: switching: the next contact shows nothing pending`, !(await pills()).some((p) => p.endsWith('*')) && !(await evaluate("document.querySelector('.ph-sticker[aria-busy=\"true\"]')")));
-    await until(`window.__writes.length >= 1`);
-    await wait(2800);
+    check(`${tag}: switching: the next contact shows nothing pending`, !(await pills()).some((p) => p.endsWith('*')));
     await pickContact('jordan');
-    check(`${tag}: switching: the sticker finished while away is on the first contact when the person comes back, and was written to that contact`, (await pills()).some((p) => p.startsWith('Priority')) && (await writeRows()).every((w) => w.path.endsWith('/jordan')), `${JSON.stringify(await pills())} ${JSON.stringify(await writeRows())}`);
+    check(`${tag}: switching: returning shows the original add still pending`, (await pills()).includes('Donor*'));
+    await click(byLabel('Add sticker'));
+    await until(`Boolean(document.querySelector('.stk-picker'))`);
+    check(`${tag}: switching: the pending sticker is disabled in the picker`, await evaluate(`${pickerOption('Donor')}?.getAttribute('aria-disabled') === 'true'`));
+    await click(pickerOption('Donor'));
+    await evaluate('window.__fixture.finishStickerWrite()');
+    await until(`!document.querySelector('.ph-sticker[aria-busy="true"]')`);
+    const writes = (await writeRows()).filter((w) => w.kind === 'sticker');
+    check(`${tag}: switching: the add writes exactly once, to the original contact`, writes.length === 1 && writes[0].path.endsWith('/jordan'), JSON.stringify(writes));
+    check(`${tag}: switching: the original contact shows the confirmed sticker`, (await pills()).includes('Donor'));
     await wait(300);
 
     report[tag] = out;

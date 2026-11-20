@@ -1,7 +1,7 @@
 import { fixture, wait, log } from './fixture.js';
 const write = (name) => async (uid, contactId, stickerId) => {
   log({ kind: 'sticker', path: `users/${uid}/contacts/${contactId}`, fields: `${name} ${stickerId}` });
-  await wait();
+  await (fixture.stickerWriteGate ?? wait());
   if (fixture.failNextSticker) {
     fixture.failNextSticker = false;
     const error = new Error('fixture failure');

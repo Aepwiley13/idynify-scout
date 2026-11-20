@@ -408,6 +408,39 @@ describe('one contact at a time', () => {
   });
 });
 
+it('shows the pending add after remount, counts it toward the limit, and allows another add after removal', async () => {
+  const stored = Array.from({ length: 49 }, (_, i) => sticker(`Stored ${i}`));
+  let settle;
+  fake.current.state.impl.add = () => new Promise((resolveAdd) => { settle = resolveAdd; });
+  const { user } = await draw(
+    [{ ...WITH_PHOTO, sticker_ids: stored.map(({ id }) => id) }, NO_PHOTO],
+    { registry: [...stored, BOARD, DONOR] },
+  );
+  const openPicker = () => user.click(screen.getByRole('button', { name: 'Add sticker' }));
+  const board = () => screen.getByRole('option', { name: 'Board' });
+  await openPicker();
+  await user.click(board());
+  await user.click(screen.getByRole('button', { name: 'Open c2' }));
+  expect(pillNames()).not.toContain('Board');
+  await user.click(screen.getByRole('button', { name: 'Open c1' }));
+  expect(screen.getByText('Board', { selector: '.ph-sticker-name' }).closest('li')).toHaveAttribute('aria-busy', 'true');
+  await openPicker();
+  expect(board()).toHaveAttribute('aria-busy', 'true');
+  expect(board()).toHaveAttribute('aria-disabled', 'true');
+  expect(screen.getByRole('option', { name: 'Donor' })).toHaveAttribute('aria-disabled', 'true');
+  await user.click(board());
+  expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id]]);
+
+  await act(async () => settle({ status: 'added' }));
+  expect(board()).toHaveAttribute('aria-selected', 'true');
+  expect(board()).not.toHaveAttribute('aria-busy');
+  await user.keyboard('{Escape}');
+  await user.click(screen.getByRole('button', { name: 'Remove sticker Board' }));
+  await user.click(await screen.findByRole('button', { name: 'Undo' }));
+  expect(fake.current.callsOf('addSticker')).toEqual([['u1', 'c1', BOARD.id], ['u1', 'c1', BOARD.id]]);
+  await act(async () => settle({ status: 'added' }));
+});
+
 describe('ConnectedPersonHeader stays thin', () => {
   const strip = (text) => text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   const source = strip(readFileSync(resolve(process.cwd(), 'src/components/contacts/personHeader/ConnectedPersonHeader.jsx'), 'utf8'));

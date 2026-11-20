@@ -34,7 +34,7 @@ function Row({ contact, onUpdate, onLateUpdate, stickers }) {
   const T = useT();
   // The behaviour (state, writes, Undo, Retry, focus return) is in useContactStickers; this draws it.
   const {
-    chips, assigned, recentIds, atLimit, active, open, setOpen, buttonRef, change, pick, create, closePicker,
+    chips, assigned, pendingIds, recentIds, atLimit, active, open, setOpen, buttonRef, change, pick, create, closePicker,
   } = useContactStickers({ contact, onUpdate, onLateUpdate, stickers });
 
   return (
@@ -63,6 +63,7 @@ function Row({ contact, onUpdate, onLateUpdate, stickers }) {
             <StickerPicker
               stickers={active}
               assignedIds={assigned}
+              pendingIds={pendingIds}
               recentIds={recentIds}
               atLimit={atLimit}
               onPick={pick}

@@ -10,17 +10,21 @@
  * the server's own answer about the account before it offers a purchase, and
  * the server refuses a second subscription for anyone who already has one.
  */
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { ArrowLeft, Check } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { FREE_PLAN_HOME } from '../../constants/freePlan';
 import { PLAN_DETAILS } from '../../constants/plans';
+import { checkoutPath } from '../../utils/checkoutReturn';
 import './UpgradeRequired.css';
 
 const PAID = ['starter', 'pro'];
 
 export default function UpgradeRequired() {
   const T = useT();
+  // After paying, the customer comes back to the Scout page they tried to open (W1).
+  const { pathname, search } = useLocation();
+  const here = `${pathname}${search}`;
   return (
     <section className="upgrade-required" aria-labelledby="upgrade-required-title" style={{ color: T.text }}>
       <h1 id="upgrade-required-title" className="upgrade-required-title">This is part of Scout</h1>
@@ -40,7 +44,7 @@ export default function UpgradeRequired() {
               </p>
               <Link
                 className="upgrade-required-cta"
-                to={`/checkout?tier=${id}`}
+                to={checkoutPath(id, here)}
                 style={{ background: T.accent, color: '#fff' }}
               >
                 Choose {plan.name}

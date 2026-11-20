@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { auth, db } from '../firebase/config';
 import { doc, updateDoc } from 'firebase/firestore';
@@ -7,6 +7,7 @@ import { planOf, isPaidPlan } from '../utils/accountPlan';
 import { blocksNewSubscription } from '../utils/billingEntitlement';
 import { FREE_PLAN, FREE_PLAN_HOME } from '../constants/freePlan';
 import { supportMailto } from '../constants/support';
+import { rememberCheckoutReturn, safeReturnPath } from '../utils/checkoutReturn';
 
 /**
  * Billing Phase 1b. Every purchase goes through the authenticated Checkout
@@ -46,6 +47,13 @@ export default function CheckoutPage({ account = null }) {
 
   // Only the two paid tiers exist; anything else in the link is Starter.
   const tier = searchParams.get('tier') === 'pro' ? 'pro' : 'starter';
+
+  // Where the upgrade started (W1): kept for this tab while the customer is on Stripe's page,
+  // so the success page can bring them back to it. A missing or unsafe path forgets an older one.
+  const returnTo = safeReturnPath(searchParams.get('returnTo'));
+  useEffect(() => {
+    rememberCheckoutReturn(returnTo, tier);
+  }, [returnTo, tier]);
 
   // Tier configuration
   const tierConfig = {
@@ -202,11 +210,11 @@ export default function CheckoutPage({ account = null }) {
       <div className="absolute top-6 left-6 z-20">
         {FREE_PLAN.enabled ? (
           <Link
-            to={FREE_PLAN_HOME}
+            to={returnTo ?? FREE_PLAN_HOME}
             className="flex items-center gap-2 px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 rounded-lg text-cyan-400 font-mono text-sm transition-all hover:scale-105"
           >
             <span aria-hidden="true">←</span>
-            <span>BACK TO CONTACT HUB</span>
+            <span>{returnTo ? 'BACK' : 'BACK TO CONTACT HUB'}</span>
           </Link>
         ) : (
           <button

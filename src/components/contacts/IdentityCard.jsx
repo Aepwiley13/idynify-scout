@@ -378,7 +378,11 @@ export default function IdentityCard({
   variant = 'full',
 }) {
   const T = useT();
-  const simple = variant === 'simple';
+  // variant="details" (the redesigned profile): ONLY the contact details below the header (email, phones, social
+  // profiles). The photo, name, title, company and stickers belong to the header above it, which edits them, and it has
+  // no sales layer (stage, brigade, tags), so it is "simple" everywhere simple matters.
+  const details = variant === 'details';
+  const simple = variant === 'simple' || details;
   const [imgBroken, setImgBroken] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(false);
   const photoButtonRef = useRef(null);
@@ -765,9 +769,10 @@ export default function IdentityCard({
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <>
-    <div className="idc-card" style={{ background: T.cardBg, border: `1px solid ${T.border}` }}>
+    <div className={`idc-card${details ? ' idc-card--details' : ''}`} style={{ background: T.cardBg, border: `1px solid ${T.border}` }}>
 
       {/* ── Banner ── */}
+      {!details && (
       <div className="idc-banner" style={{ background: bannerGradient }}>
         {hasRealPhoto && (
           <img src={contact.photo_url} alt="" className="idc-banner-blur" />
@@ -793,8 +798,10 @@ export default function IdentityCard({
           </div>
         )}
       </div>
+      )}
 
       {/* ── Avatar row ── */}
+      {!details && (
       <div className="idc-avatar-row">
         {/* Avatar */}
         <div className="idc-photo-wrap" ref={photoMenuRef}>
@@ -939,10 +946,12 @@ export default function IdentityCard({
           )}
         </div>
       </div>
+      )}
 
       {/* ── Identity body ── */}
       <div className="idc-body">
 
+        {!details && (<>
         {/* Name */}
         {editingField === 'name' ? (
           <input
@@ -1038,6 +1047,8 @@ export default function IdentityCard({
               )}
           </div>
         )}
+
+        </>)}
 
         {/* ── Classification chips row ── */}
         {!simple && (
@@ -1148,7 +1159,7 @@ export default function IdentityCard({
         )}
 
         {/* ── Stickers (ADR-007): renders nothing unless available ── */}
-        <ContactStickersRow contact={contact} onUpdate={onUpdate} />
+        {!details && <ContactStickersRow contact={contact} onUpdate={onUpdate} />}
 
         {/* ── Tags section ── */}
         {!simple && (
@@ -1226,7 +1237,7 @@ export default function IdentityCard({
         )}
 
         {/* ── Divider ── */}
-        <div className="idc-divider" style={{ background: T.border }} />
+        {!details && <div className="idc-divider" style={{ background: T.border }} />}
 
         {/* ── Contact details ── */}
         <div className="idc-contact-details">

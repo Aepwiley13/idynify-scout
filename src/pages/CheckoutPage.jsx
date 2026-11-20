@@ -1,16 +1,59 @@
-import { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { auth, db } from '../firebase/config';
 import { doc, updateDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
+import { planOf, isPaidPlan } from '../utils/accountPlan';
+import { blocksNewSubscription } from '../utils/billingEntitlement';
+import { FREE_PLAN, FREE_PLAN_HOME } from '../constants/freePlan';
+import { supportMailto } from '../constants/support';
+import { rememberCheckoutReturn, safeReturnPath } from '../utils/checkoutReturn';
 
-export default function CheckoutPage() {
+/**
+ * Billing Phase 1b. Every purchase goes through the authenticated Checkout
+ * Session (netlify/functions/create-checkout-session.js): it reuses the
+ * account's existing Stripe customer and refuses a second subscription. The
+ * Stripe Payment Links this page used to redirect to are retired: they could
+ * not attach to an existing customer, so an existing subscriber who used one
+ * was charged for a second subscription the webhook then refused to honour.
+ *
+ * What a server error means to the customer. None of these charged anything:
+ * a checkout session that never opened cannot take a payment.
+ */
+export function checkoutErrorMessage(status, code) {
+  if (status === 401) return 'Your session has expired. Sign in again to continue.';
+  switch (code) {
+    case 'already_subscribed':
+      return 'You already have a subscription, so a new one can’t be started. You can see it in Settings → Billing.';
+    case 'subscription_needs_recovery':
+      return 'Your existing subscription needs attention — a payment may not have gone through. Contact support and we’ll sort it out. You have not been charged.';
+    case 'checkout_in_progress':
+      return 'A checkout is already being prepared for your account. Wait a moment, then try again.';
+    case 'checkout_needs_manual_reconciliation':
+    case 'checkout_operation_superseded':
+    case 'customer_binding_conflict':
+    case 'contact_support':
+      return 'We couldn’t start checkout for your account. Contact support and we’ll sort it out. You have not been charged.';
+    default:
+      return 'We couldn’t start checkout. Please try again in a moment. You have not been charged.';
+  }
+}
+
+export default function CheckoutPage({ account = null }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Read tier from URL parameter (default to 'starter')
-  const tier = searchParams.get('tier') || 'starter';
+  // Only the two paid tiers exist; anything else in the link is Starter.
+  const tier = searchParams.get('tier') === 'pro' ? 'pro' : 'starter';
+
+  // Where the upgrade started (W1): kept for this tab while the customer is on Stripe's page,
+  // so the success page can bring them back to it. A missing or unsafe path forgets an older one.
+  const returnTo = safeReturnPath(searchParams.get('returnTo'));
+  useEffect(() => {
+    rememberCheckoutReturn(returnTo, tier);
+  }, [returnTo, tier]);
 
   // Tier configuration
   const tierConfig = {
@@ -50,8 +93,23 @@ export default function CheckoutPage() {
 
   const selectedTier = tierConfig[tier];
 
+  // An existing subscriber never sees a purchase here: their plan lives in
+  // Settings → Billing. The /checkout route already requires the server's own
+  // answer about the account, so this is never decided from a saved copy.
+  if (isPaidPlan(planOf(account))) {
+    // A Starter customer who chose Pro goes straight to the in-app upgrade (W3): same
+    // subscription, payment first. Never a second checkout.
+    const upgrading = planOf(account) === 'starter' && tier === 'pro';
+    return <Navigate to={upgrading ? '/settings?tab=billing&upgrade=pro' : '/settings?tab=billing'} replace />;
+  }
+  // A subscription on file without paid access (a failed payment, or one still
+  // being confirmed): the server would refuse a new one, so say so up front.
+  const subscriptionOnFile = blocksNewSubscription(account?.data);
+
   const handleCheckout = async () => {
+    if (processing) return;
     setProcessing(true);
+    setError(null);
 
     try {
       const user = auth.currentUser;
@@ -62,44 +120,21 @@ export default function CheckoutPage() {
 
       // Check if Stripe is configured (production mode)
       const isStripeConfigured = import.meta.env.VITE_STRIPE_ENABLED === 'true';
-      // Billing hardening PR 1: the new authenticated checkout endpoint ships dark behind this
-      // flag. Default (unset, or anything other than 'session') keeps today's live Payment Link
-      // path unchanged — merging this does not change production checkout behavior by itself.
-      const useSessionCheckout = import.meta.env.VITE_STRIPE_CHECKOUT_MODE === 'session';
 
-      if (isStripeConfigured && useSessionCheckout) {
-        console.log('🔐 Starting authenticated Checkout Session...');
+      if (isStripeConfigured) {
         const idToken = await user.getIdToken();
         const response = await fetch('/.netlify/functions/create-checkout-session', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
           body: JSON.stringify({ tier }),
         });
-        const result = await response.json();
+        const result = await response.json().catch(() => ({}));
         if (!response.ok || !result.url) {
-          throw new Error(result.error || 'Failed to start checkout');
+          setError(checkoutErrorMessage(response.status, result.error));
+          setProcessing(false);
+          return;
         }
         window.location.href = result.url;
-      } else if (isStripeConfigured) {
-        // PRODUCTION MODE (default): Redirect to Stripe Payment Link
-        console.log('🔐 Redirecting to Stripe Payment Link...');
-
-        const paymentLinks = {
-          starter: 'https://buy.stripe.com/8x2bJ2bXtdZGcnmgbQ1gs04',
-          pro: 'https://buy.stripe.com/5kQdRa7Hdg7OafecZE1gs05'
-        };
-
-        const baseUrl = paymentLinks[tier];
-        if (!baseUrl) {
-          throw new Error(`No payment link configured for tier: ${tier}`);
-        }
-
-        const params = new URLSearchParams({
-          client_reference_id: user.uid,
-          prefilled_email: user.email || ''
-        });
-
-        window.location.href = `${baseUrl}?${params.toString()}`;
       } else {
         // DEVELOPMENT MODE: Simulate payment (for testing without Stripe)
         console.log('⚠️ DEV MODE: Simulating payment (Stripe not configured)');
@@ -134,9 +169,9 @@ export default function CheckoutPage() {
         // Redirect to success page
         navigate('/checkout/success');
       }
-    } catch (error) {
-      console.error('Payment error:', error);
-      alert(`Payment failed: ${error.message}\n\nPlease try again or contact support.`);
+    } catch (err) {
+      console.error('Checkout could not start:', err);
+      setError(checkoutErrorMessage(null, null));
       setProcessing(false);
     }
   };
@@ -172,15 +207,27 @@ export default function CheckoutPage() {
         ))}
       </div>
 
-      {/* Back to Homepage Button */}
+      {/* Back. With the Free plan on, a free customer goes back to their
+          Contact Hub, still signed in. Without it there is nothing an unpaid
+          account can open, so this signs out, as it always has. */}
       <div className="absolute top-6 left-6 z-20">
-        <button
-          onClick={handleBackToHome}
-          className="flex items-center gap-2 px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 rounded-lg text-cyan-400 font-mono text-sm transition-all hover:scale-105"
-        >
-          <span className="text-xl">🚀</span>
-          <span>BACK TO HOME</span>
-        </button>
+        {FREE_PLAN.enabled ? (
+          <Link
+            to={returnTo ?? FREE_PLAN_HOME}
+            className="flex items-center gap-2 px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 rounded-lg text-cyan-400 font-mono text-sm transition-all hover:scale-105"
+          >
+            <span aria-hidden="true">←</span>
+            <span>{returnTo ? 'BACK' : 'BACK TO CONTACT HUB'}</span>
+          </Link>
+        ) : (
+          <button
+            onClick={handleBackToHome}
+            className="flex items-center gap-2 px-4 py-2 bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-500/50 rounded-lg text-cyan-400 font-mono text-sm transition-all hover:scale-105"
+          >
+            <span className="text-xl">🚀</span>
+            <span>BACK TO HOME</span>
+          </button>
+        )}
       </div>
 
       {/* Main Content */}
@@ -223,12 +270,33 @@ export default function CheckoutPage() {
               ))}
             </div>
 
+            {subscriptionOnFile && (
+              <div role="status" className="mb-6 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-amber-100 text-sm">
+                <p className="font-semibold mb-1">You already have a subscription on file</p>
+                <p>
+                  A new one can’t be started while it’s there. It may be waiting on a payment, or still being
+                  confirmed. <a className="underline" href={supportMailto()}>Contact support</a> and we’ll sort it out.
+                </p>
+              </div>
+            )}
+
+            {error && (
+              <div role="alert" className="mb-6 rounded-xl border border-red-500/40 bg-red-500/10 p-4 text-red-100 text-sm">
+                <p>{error}</p>
+                <p className="mt-2">
+                  <Link className="underline" to="/settings?tab=billing">Settings → Billing</Link>
+                  {' · '}
+                  <a className="underline" href={supportMailto()}>Contact support</a>
+                </p>
+              </div>
+            )}
+
             {/* Checkout Button */}
             <button
               onClick={handleCheckout}
-              disabled={processing}
+              disabled={processing || subscriptionOnFile}
               className={`w-full py-4 px-8 rounded-xl font-bold text-lg font-mono transition-all ${
-                processing
+                processing || subscriptionOnFile
                   ? 'bg-gray-600 cursor-not-allowed'
                   : 'bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 shadow-2xl shadow-cyan-500/50'
               } text-white`}

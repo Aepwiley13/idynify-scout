@@ -7,6 +7,8 @@ import { ImpersonationProvider } from './context/ImpersonationContext';
 import { useVersionCheck } from './hooks/useVersionCheck';
 import { useAccountVerification } from './utils/accountVerification';
 import { AccountGate } from './components/AccountUnverified';
+import { ShellAccountGate, SignedInSignupRedirect } from './components/billing/freePlanRouting';
+import { freePlanHomeFor, SMART_REDIRECT_REQUIRES_PAYMENT } from './constants/freePlan';
 
 // Pages
 import Homepage from './pages/Homepage';
@@ -128,11 +130,13 @@ import WithTheForce from './components/WithTheForce';
  * in-render; that is pre-existing and out of scope, but this one cannot be.
  *
  * Authorization semantics are identical to ProtectedRoute: same auth check,
- * same payment gate, same redirects. Only presentation moved.
+ * same payment gate, same redirects. Only presentation moved. The Free plan's
+ * free routes are decided in components/billing/freePlanRouting.jsx.
  */
 function ShellRoute({ loading, user, userData, account, recovery, requirePayment = true }) {
   return (
-    <AccountGate
+    <ShellAccountGate
+      layout={(content) => <MainLayout user={user} userData={userData}>{content}</MainLayout>}
       loading={loading}
       user={user}
       account={account}
@@ -143,7 +147,7 @@ function ShellRoute({ loading, user, userData, account, recovery, requirePayment
       <MainLayout user={user} userData={userData}>
         <Outlet />
       </MainLayout>
-    </AccountGate>
+    </ShellAccountGate>
   );
 }
 
@@ -279,6 +283,8 @@ function App() {
   const SmartRedirect = () => {
     // Return users skip onboarding; new users go through Barry Workspace
     const destination = () => {
+      const freeHome = freePlanHomeFor(account);
+      if (freeHome) return <Navigate to={freeHome} />;
       if (userData?.onboardingComplete || userData?.onboarding?.completed) {
         return <Navigate to="/mission-control-v2" />;
       }
@@ -288,7 +294,7 @@ function App() {
     // Payment first: a server-confirmed unpaid account goes to checkout, and
     // an account that could not be checked goes nowhere.
     return (
-      <AccountGate loading={loading} user={user} account={account} recovery={recovery} loadingScreen={<LoadingScreen />}>
+      <AccountGate loading={loading} user={user} account={account} requirePayment={SMART_REDIRECT_REQUIRES_PAYMENT} recovery={recovery} loadingScreen={<LoadingScreen />}>
         {destination()}
       </AccountGate>
     );
@@ -315,15 +321,15 @@ function App() {
         {/* Public Routes */}
         <Route path="/" element={!user ? <Homepage /> : <SmartRedirect />} />
         <Route path="/login" element={!user ? <Login /> : <SmartRedirect />} />
-        <Route path="/signup" element={!user ? <Signup /> : <Navigate to="/checkout" />} />
+        <Route path="/signup" element={!user ? <Signup /> : <SignedInSignupRedirect />} />
         <Route path="/forgot-password" element={!user ? <ForgotPassword /> : <SmartRedirect />} />
 
         {/* Getting Started (Auth Required) */}
         <Route path="/getting-started" element={<ProtectedRoute><GettingStarted /></ProtectedRoute>} />
 
         {/* Payment Routes - Auth required but payment NOT required (to avoid redirect loop) */}
-        <Route path="/checkout" element={<ProtectedRoute requirePayment={false} purchase><CheckoutPage /></ProtectedRoute>} />
-        <Route path="/checkout/success" element={<ProtectedRoute requirePayment={false} purchase><CheckoutSuccessPage /></ProtectedRoute>} />
+        <Route path="/checkout" element={<ProtectedRoute requirePayment={false} purchase><CheckoutPage account={account} /></ProtectedRoute>} />
+        <Route path="/checkout/success" element={<ProtectedRoute requirePayment={false} purchase><CheckoutSuccessPage account={account} onRecheckAccount={retry} /></ProtectedRoute>} />
         <Route path="/checkout/cancel" element={<ProtectedRoute requirePayment={false} purchase><CheckoutCancelPage /></ProtectedRoute>} />
 
         {/* ── Legacy onboarding routes → /barry ─────────────────────────────

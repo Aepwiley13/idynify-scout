@@ -138,6 +138,16 @@ import { handler } from '../../netlify/functions/barryEnrich.js';
 import { writeBarryEnrichment } from '../services/barryEnrichment';
 import FindLinkedIn from '../components/capture/FindLinkedIn.jsx';
 
+// Billing Phase 1c: this file covers a paid account's behaviour. The paid-access guard itself,
+// including Free, lapsed and unverifiable accounts, is tested in paidApiAccess.test.js.
+vi.mock('../../netlify/functions/utils/paidApiAccess.js', () => ({
+  checkPaidApiAccess: async () => ({ allowed: true, basis: 'paid' }),
+  paidApiDeniedResponse: () => { throw new Error('paid-access guard refused in a paid-account test'); },
+  isPaidApiEligible: () => true,
+  isAdminAccount: () => false,
+  PAID_API_DENIAL: { NOT_PAID: 'paid_plan_required', UNVERIFIED: 'entitlement_unavailable' },
+}));
+
 const UID = 'u1';
 const ID = 'cap_x_p1';
 const contactPath = id => `users/${UID}/contacts/${id}`;

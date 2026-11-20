@@ -43,6 +43,7 @@ await env.withSecurityRulesDisabled(async (ctx) => {
     [`users/${U}/notifications/n1`, { seen: false }],
     [`users/${U}/companies/c2`, { status: 'pending' }],
     ['ops_alerts/daily-leads-refresh', { lastAlertAtMs: 1, job: 'daily-leads-refresh' }],
+    [`users/${U}/creditTransactions/t1`, { action: 'enrichContact', cost: 1 }],
   ]) await setDoc(doc(db, p[0]), p[1]);
 });
 
@@ -82,6 +83,14 @@ const CASES = [
   ['22  ops_alerts create a new job doc', 'DENY',
       () => setDoc(doc(me, 'ops_alerts/gmail-sync-worker'), { lastAlertAtMs: 9e15 })],
   ['23  ops_alerts delete', 'DENY', () => deleteDoc(doc(me, 'ops_alerts/daily-leads-refresh'))],
+  // Billing W4: credit records are the server's. The owner reads; nobody writes.
+  ['24  get    creditTransactions/t1', 'ALLOW', () => getDoc(doc(me, `users/${U}/creditTransactions/t1`))],
+  ['25  create creditTransactions/t2 (a fake refund)', 'DENY', () => setDoc(doc(me, `users/${U}/creditTransactions/t2`), { action: 'refund', cost: -500 })],
+  ['26  update creditTransactions/t1', 'DENY', () => updateDoc(doc(me, `users/${U}/creditTransactions/t1`), { cost: 0 })],
+  ['27  delete creditTransactions/t1', 'DENY', () => deleteDoc(doc(me, `users/${U}/creditTransactions/t1`))],
+  ['28  create creditCharges/k1 (pretend a lookup was charged)', 'DENY', () => setDoc(doc(me, `users/${U}/creditCharges/k1`), { status: 'settled', response: '{}' })],
+  ['29  create creditUsage/2026-11-18 (reset the daily count)', 'DENY', () => setDoc(doc(me, `users/${U}/creditUsage/2026-11-18`), { searches: 0 })],
+  ['30  create creditTransactions/t1/x/y (3-deep)', 'DENY', () => setDoc(doc(me, `users/${U}/creditTransactions/t1/x/y`), { a: 1 })],
 ];
 
 // ── users/{uid}: server-controlled fields ──────────────────────────────────
@@ -190,6 +199,13 @@ const USER_DOC_CASES = [
   ['new  signup with status active', 'DENY', create({ ...signup('starter'), status: 'active' })],
   ['new  signup tier differs from selected tier', 'DENY', create({ ...signup('starter'), subscriptionTier: 'pro' })],
   ['new  only some signup billing fields', 'DENY', create({ email: 'x@example.test', credits: 400 })],
+  // The Free plan's signup (Signup.jsx, no tier, VITE_FREE_PLAN on): no billing fields at all.
+  // Allowed by the existing rules; these pin that, and that a free signup still cannot grant itself
+  // paid access or credits.
+  ['new  free signup, no billing fields', 'ALLOW', create({ email: 'new@example.test', createdAt: new Date(0) })],
+  ['new  free signup claiming paid access', 'DENY', create({ email: 'new@example.test', createdAt: new Date(0), hasCompletedPayment: true })],
+  ['new  free signup claiming credits', 'DENY', create({ email: 'new@example.test', createdAt: new Date(0), credits: { total: 400, used: 0, remaining: 400, resetDate: null } })],
+  ['new  free signup claiming a Stripe customer', 'DENY', create({ email: 'new@example.test', createdAt: new Date(0), stripeCustomerId: 'cus_x' })],
   ['new  signup plus role admin', 'DENY', create({ ...signup('starter'), role: 'admin' })],
   ['new  signup plus role super_admin', 'DENY', create({ ...signup('starter'), role: 'super_admin' })],
   ['new  role user, nothing else', 'DENY', create({ role: 'user' })],

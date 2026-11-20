@@ -107,4 +107,20 @@ export function isBlockingStatus(normalizedState) {
   return BLOCKING_STATES.has(normalizedState);
 }
 
+/**
+ * Would create-checkout-session refuse a new subscription for this account, on the account's own
+ * mirrored fields? The same test the server makes before it touches Stripe (it also lists the
+ * customer's live subscriptions from Stripe, which this cannot). Lets the checkout page say so up
+ * front instead of offering a purchase the server will refuse.
+ */
+export function blocksNewSubscription(userData) {
+  if (!userData?.subscriptionStatus) return false;
+  const { normalizedState } = describeSubscription({
+    status: userData.subscriptionStatus,
+    cancelAtPeriodEnd: userData.cancelAtPeriodEnd === true,
+    pauseCollection: Boolean(userData.pauseCollection),
+  });
+  return isBlockingStatus(normalizedState);
+}
+
 export const BILLING_NORMALIZED_STATES = NORMALIZED_STATES;

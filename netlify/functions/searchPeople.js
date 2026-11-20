@@ -4,8 +4,10 @@ import { logApolloError } from './utils/apolloErrorLogger.js';
 import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } from './utils/scoutContactContract.js';
 import { expandTitlesWithSynonyms } from './utils/titleSynonyms.js';
 import { verifyAuthToken } from './utils/verifyAuthToken.js';
+import { checkPaidApiAccess, paidApiDeniedResponse } from './utils/paidApiAccess.js';
+import { withCreditMetering, SEARCH_PEOPLE_MAX } from './utils/creditMetering.js';
 
-export const handler = async (event) => {
+const unmeteredHandler = async (event) => {
   const startTime = Date.now();
 
   if (event.httpMethod !== 'POST') {
@@ -26,14 +28,20 @@ export const handler = async (event) => {
     console.log('📋 Target titles:', titles);
 
     // Verify auth token — supports admin impersonation
-    await verifyAuthToken(authToken, userId);
+    const { tokenUserId } = await verifyAuthToken(authToken, userId);
     console.log('✅ Auth token verified');
+
+    // Billing Phase 1c: paid Apollo services need paid access, checked on the server before any Apollo call.
+    const paidAccess = await checkPaidApiAccess({ userId, actorUserId: tokenUserId });
+    if (!paidAccess.allowed) return paidApiDeniedResponse(paidAccess);
 
     // Get Apollo API key (throws if not configured)
     const apolloApiKey = getApolloApiKey();
 
     // Step 1: Search Apollo API for contact candidates
-    const limit = maxResults || 10;
+    // Billing W4: one request enriches at most SEARCH_PEOPLE_MAX people (each is a paid Apollo
+    // match). The app asks for 3; the browser's number is never trusted beyond the cap.
+    const limit = Math.min(Math.max(1, Number.parseInt(maxResults, 10) || SEARCH_PEOPLE_MAX), SEARCH_PEOPLE_MAX);
 
     // Expand titles with synonyms to improve Apollo match coverage.
     // e.g. 'CEO' → ['CEO', 'Chief Executive Officer', 'Chief Executive', 'Co-CEO']
@@ -177,3 +185,6 @@ export const handler = async (event) => {
     };
   }
 };
+
+// Billing W4: credit metering, off until CREDIT_METERING=on (utils/creditMetering.js).
+export const handler = withCreditMetering(unmeteredHandler, { action: 'searchPeople' });

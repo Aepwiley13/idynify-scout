@@ -13,6 +13,10 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 const CALLS = [];
 
+// Billing Phase 1d: this file covers a paid account's use of the function. The paid-plan check
+// itself, including Free, lapsed and unverifiable accounts, is tested in paidAiAccess.test.js.
+vi.mock('../../netlify/functions/utils/paidAiAccess.js', () => ({ withPaidAiAccess: (handler) => handler }));
+
 vi.mock('@anthropic-ai/sdk', () => ({
   default: class {
     constructor() {

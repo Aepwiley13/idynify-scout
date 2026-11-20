@@ -51,6 +51,7 @@
  */
 
 import process from 'node:process';
+import { checkPaidApiAccess, paidApiDeniedResponse } from './utils/paidApiAccess.js';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
 import { logApolloError } from './utils/apolloErrorLogger.js';
@@ -60,8 +61,9 @@ import { searchLinkedInCandidates, searchLinkedInPhoto } from './utils/linkedinS
 import { rankLinkedInCandidates, readPerson, candidateFromApolloPerson } from './utils/capture/linkedinCandidates.js';
 import { enrichmentPatch } from '../../src/utils/contactProtection.js';
 import { load } from 'cheerio';
+import { withCreditMetering } from './utils/creditMetering.js';
 
-export const handler = async (event) => {
+const unmeteredHandler = async (event) => {
   const startTime = Date.now();
 
   if (event.httpMethod !== 'POST') {
@@ -112,6 +114,10 @@ export const handler = async (event) => {
     }
 
     console.log('✅ Auth verified');
+
+    // Billing Phase 1c: paid Apollo services need paid access, checked on the server before any Apollo call.
+    const paidAccess = await checkPaidApiAccess({ userId });
+    if (!paidAccess.allowed) return paidApiDeniedResponse(paidAccess);
 
     // ─── Assess what's missing before we start ───
     const initialMissing = assessMissingData(contact);
@@ -961,3 +967,6 @@ function inferDecisionMaker(seniority, title) {
 
   return false;
 }
+
+// Billing W4: credit metering, off until CREDIT_METERING=on (utils/creditMetering.js).
+export const handler = withCreditMetering(unmeteredHandler, { action: 'barryEnrich' });

@@ -17,6 +17,7 @@ import { CONTACT_HUB_PATH } from '../../constants/contactHub';
 import IdentityCard from '../../components/contacts/IdentityCard';
 import StickyNotes from '../../components/contacts/StickyNotes';
 import { HUB_STATUS, isListedInMyPeople } from './peopleRules';
+import ScoutOpportunity from '../../components/billing/ScoutOpportunity';
 
 function BackLink() {
   const T = useT();
@@ -71,6 +72,8 @@ export default function HubPerson() {
       <BackLink />
       {/* Keyed by person: the card and the notes hold edit state of their own. */}
       <IdentityCard key={`card-${contact.id}`} contact={contact} onUpdate={updateContact} variant="simple" />
+      {/* Billing W1: what Scout could add for this person (no request is made). */}
+      <ScoutOpportunity contact={contact} />
       <section className="hub-card hub-notes" aria-label="Notes" style={{ background: T.cardBg, borderColor: T.border }}>
         <StickyNotes key={`notes-${contact.id}`} contact={contact} onUpdate={updateContact} />
       </section>

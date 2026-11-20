@@ -36,6 +36,7 @@ import { logApiUsage } from './utils/logApiUsage.js';
 import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 import { finalizeBarryOpening, displayNameCase } from '../../src/utils/emailGreeting.js';
 import { cleanNamePart } from '../../src/utils/contactDisplayName.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
 const MODEL = LEGACY_HAIKU_4_5;
 const MAX_CONTACTS = 25;
@@ -323,7 +324,7 @@ async function generateForContact(anthropic, contact, sharedBody, reconBlock, us
   }
 }
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return respond(405, { error: 'Method not allowed' });
   }
@@ -427,3 +428,6 @@ export const handler = async (event) => {
     return respond(500, { error: error.message });
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'barryBulkPersonalize' });

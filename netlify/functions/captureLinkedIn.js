@@ -28,9 +28,11 @@ import { checkSuperAdminAccess } from './utils/superAdminAuth.js';
 import { resolveCaptureConfig, isEnrolled } from './utils/captureFlags.js';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { APOLLO_ENDPOINTS, getApolloHeaders } from './utils/apolloConstants.js';
+import { checkPaidApiAccess } from './utils/paidApiAccess.js';
 import { searchLinkedInCandidates } from './utils/linkedinSearch.js';
 import { rankLinkedInCandidates, readPerson, candidateFromApolloPerson } from './utils/capture/linkedinCandidates.js';
 import { captureLog } from './utils/capture/captureLog.js';
+import { withCreditMetering } from './utils/creditMetering.js';
 
 export const OPERATION = 'captureLinkedIn';
 
@@ -71,6 +73,9 @@ async function isCaptureAdmin(uid) {
   return (await checkAdminAccess(uid)) || (await checkSuperAdminAccess(uid));
 }
 
+/** What the Apollo lookup reports when it is not run for this account (no paid access). */
+const APOLLO_SKIPPED = Object.freeze({ ran: false, failed: false, found: [] });
+
 /**
  * Apollo's one best person record for this name with the email, company or
  * domain. Only a record with a LinkedIn URL is a profile to offer.
@@ -96,7 +101,7 @@ async function apolloProfile(person) {
   }
 }
 
-export const handler = async (event) => {
+const unmeteredHandler = async (event) => {
   const startedAt = Date.now();
   if (event.httpMethod === 'OPTIONS') return { statusCode: 204, headers: { ...HEADERS }, body: '' };
   if (event.httpMethod !== 'POST') return failure('method_not_allowed');
@@ -130,8 +135,11 @@ export const handler = async (event) => {
     });
     if (!config.enabled) return failure('capture_disabled');
 
+    // Billing Phase 1c: the Apollo lookup is a paid service. Without verified paid access it is
+    // skipped (never attempted), and capture carries on with the search alone.
+    const paidAccess = await checkPaidApiAccess({ userId: uid });
     const [apollo, search] = await Promise.all([
-      apolloProfile(person),
+      paidAccess.allowed ? apolloProfile(person) : Promise.resolve(APOLLO_SKIPPED),
       searchLinkedInCandidates({ name: person.name, company: person.company, title: person.title, domain: person.domain, env: process.env }),
     ]);
     const sources = [...(apollo.ran ? ['apollo'] : []), ...(search.configured ? ['search'] : [])];
@@ -155,4 +163,7 @@ export const handler = async (event) => {
   }
 };
 
+
+// Billing W4: credit metering, off until CREDIT_METERING=on (utils/creditMetering.js).
+export const handler = withCreditMetering(unmeteredHandler, { action: 'captureLinkedIn' });
 export default { handler };

@@ -24,6 +24,7 @@ import { checkRelationshipGuardrail, getGuardrailPromptModifier } from './utils/
 import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 import { LEGACY_HAIKU_4_5 } from './utils/models.js';
 import { engagementPromotionPatch } from './utils/engagementPromotion.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
 /**
  * User scope — the one line of it these surfaces need.
@@ -244,7 +245,7 @@ async function verifyAuthToken(authToken, userId) {
 }
 
 // ── Main handler ─────────────────────────────────────────────────────────────
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
@@ -484,3 +485,6 @@ export const handler = async (event) => {
     };
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'barryHunterProcessEngage' });

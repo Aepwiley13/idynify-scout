@@ -1,10 +1,12 @@
 import { createHash } from 'crypto';
+import { checkPaidApiAccess, paidApiDeniedResponse } from './utils/paidApiAccess.js';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
 import { logApolloError } from './utils/apolloErrorLogger.js';
 import { ensureCriteriaVersion, recordDiscoveryEncounter } from './utils/icpRelationshipWriter.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 import { extractVerifiedCompanyFields, buildBarryIntel, VERIFICATION_NEEDED_MESSAGE } from './utils/companyFacts.js';
+import { withCreditMetering } from './utils/creditMetering.js';
 
 // ---------------------------------------------------------------------------
 // Post-fetch age filter helpers
@@ -53,7 +55,7 @@ function formatStatesForApollo(states) {
   return states.map(state => `${state}, United States`);
 }
 
-export const handler = async (event) => {
+const unmeteredHandler = async (event) => {
   const startTime = Date.now();
 
   if (event.httpMethod !== 'POST') {
@@ -134,6 +136,10 @@ export const handler = async (event) => {
     }
 
     console.log('✅ Auth token verified');
+
+    // Billing Phase 1c: paid Apollo services need paid access, checked on the server before any Apollo call.
+    const paidAccess = await checkPaidApiAccess({ userId });
+    if (!paidAccess.allowed) return paidApiDeniedResponse(paidAccess);
 
     // Map company profile to Apollo API format
     const apolloQuery = buildApolloQuery(companyProfile, adaptiveSignals);
@@ -1573,3 +1579,6 @@ function formatRevenueNumber(amount) {
   if (amount >= 1000) return `${(amount / 1000).toFixed(0)}K`;
   return amount.toString();
 }
+
+// Billing W4: credit metering, off until CREDIT_METERING=on (utils/creditMetering.js).
+export const handler = withCreditMetering(unmeteredHandler, { action: 'search-companies' });

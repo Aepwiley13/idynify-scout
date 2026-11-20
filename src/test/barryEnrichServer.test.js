@@ -19,6 +19,16 @@ vi.mock('../../netlify/functions/utils/logApiUsage.js', () => ({ logApiUsage }))
 
 import { handler } from '../../netlify/functions/barryEnrich.js';
 
+// Billing Phase 1c: this file covers a paid account's behaviour. The paid-access guard itself,
+// including Free, lapsed and unverifiable accounts, is tested in paidApiAccess.test.js.
+vi.mock('../../netlify/functions/utils/paidApiAccess.js', () => ({
+  checkPaidApiAccess: async () => ({ allowed: true, basis: 'paid' }),
+  paidApiDeniedResponse: () => { throw new Error('paid-access guard refused in a paid-account test'); },
+  isPaidApiEligible: () => true,
+  isAdminAccount: () => false,
+  PAID_API_DENIAL: { NOT_PAID: 'paid_plan_required', UNVERIFIED: 'entitlement_unavailable' },
+}));
+
 const PEOPLE_MATCH = 'https://api.apollo.io/v1/people/match';
 const PEOPLE_SEARCH = 'https://api.apollo.io/v1/mixed_people/api_search';
 

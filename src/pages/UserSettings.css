@@ -524,6 +524,26 @@
   color: #f9fafb;
 }
 
+.us-billing-plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.us-billing-plan-note {
+  margin: 0.625rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #a1a1aa);
+}
+
+@media (max-width: 480px) {
+  .us-billing-plan-card { flex-wrap: wrap; }
+  .us-billing-plan-actions { width: 100%; justify-content: stretch; }
+  .us-billing-plan-actions .us-action-btn { flex: 1; justify-content: center; }
+}
+
 /* ── credit card ── */
 .us-credit-card {
   padding: 1.125rem;
@@ -766,3 +786,10 @@ html[data-theme="lightSide"] .us-mfa-input {
 html[data-theme="workspace"] .us-mfa-input::placeholder,
 html[data-theme="sand"] .us-mfa-input::placeholder,
 html[data-theme="lightSide"] .us-mfa-input::placeholder { color: var(--text-faint); }
+
+/* W3: plan actions for paying customers (components/billing/PlanActions.jsx). */
+.us-plan-actions { display: flex; flex-direction: column; gap: 10px; align-items: flex-end; }
+.us-plan-confirm { display: flex; flex-direction: column; gap: 8px; max-width: 440px; }
+@media (max-width: 640px) {
+  .us-plan-actions { align-items: stretch; width: 100%; }
+}

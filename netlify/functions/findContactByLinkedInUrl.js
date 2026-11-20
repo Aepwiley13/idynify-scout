@@ -1,6 +1,8 @@
 import { logApiUsage } from './utils/logApiUsage.js';
+import { checkPaidApiAccess, paidApiDeniedResponse } from './utils/paidApiAccess.js';
 import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
 import { logApolloError } from './utils/apolloErrorLogger.js';
+import { withCreditMetering } from './utils/creditMetering.js';
 
 /**
  * LINKEDIN URL EXACT MATCH LOOKUP
@@ -26,7 +28,7 @@ import { logApolloError } from './utils/apolloErrorLogger.js';
  * person confirms which profile is them. Its log lines and usage record carry
  * no name or URL.
  */
-export const handler = async (event) => {
+const unmeteredHandler = async (event) => {
   const startTime = Date.now();
 
   if (event.httpMethod !== 'POST') {
@@ -79,6 +81,10 @@ export const handler = async (event) => {
     }
 
     console.log('✅ Auth token verified');
+
+    // Billing Phase 1c: paid Apollo services need paid access, checked on the server before any Apollo call.
+    const paidAccess = await checkPaidApiAccess({ userId });
+    if (!paidAccess.allowed) return paidApiDeniedResponse(paidAccess);
 
     // Call Apollo Person Match API with LinkedIn URL as exact identifier
     // Apollo requires X-Api-Key in header, not in body
@@ -215,3 +221,6 @@ export const handler = async (event) => {
     };
   }
 };
+
+// Billing W4: credit metering, off until CREDIT_METERING=on (utils/creditMetering.js).
+export const handler = withCreditMetering(unmeteredHandler, { action: 'findContactByLinkedInUrl' });

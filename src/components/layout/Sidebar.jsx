@@ -177,6 +177,7 @@ const Sidebar = ({
   onToggleBarry,
   barryOpen = false,
   barryButtonRef,
+  barryAvailable = true,
   user,
   onLogout,
 }) => {
@@ -339,14 +340,16 @@ const Sidebar = ({
         </button>
       </div>
 
-      <div className="sidebar-footer">
-        <BarryControl
-          compact={compact}
-          buttonRef={barryButtonRef}
-          barryOpen={barryOpen}
-          onOpen={() => (onToggleBarry ? onToggleBarry() : openBarry())}
-        />
-      </div>
+      {barryAvailable && (
+        <div className="sidebar-footer">
+          <BarryControl
+            compact={compact}
+            buttonRef={barryButtonRef}
+            barryOpen={barryOpen}
+            onOpen={() => (onToggleBarry ? onToggleBarry() : openBarry())}
+          />
+        </div>
+      )}
     </div>
   );
 };

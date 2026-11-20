@@ -26,6 +26,10 @@ const CALLS = [];
 let classifierReply = { intent: 'UNCLEAR', confidence: 0, restatement: null, clarifyingQuestion: null, subject: null };
 let extractionReply = null;
 
+// Billing Phase 1d: this file covers a paid account's use of the function. The paid-plan check
+// itself, including Free, lapsed and unverifiable accounts, is tested in paidAiAccess.test.js.
+vi.mock('../../netlify/functions/utils/paidAiAccess.js', () => ({ withPaidAiAccess: (handler) => handler }));
+
 vi.mock('@anthropic-ai/sdk', () => ({
   default: class {
     constructor() {

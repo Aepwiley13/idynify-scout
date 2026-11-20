@@ -3,7 +3,7 @@ import Stripe from 'stripe';
 import { db } from './firebase-admin.js';
 import { isKnownIdynifyPrice, isCreditGrantingPrice, priceIdOfSession, priceIdOfSubscription, knownPriceIds } from './utils/billingPrices.js';
 import { describeSubscription, isBlockingStatus } from '../../src/utils/billingEntitlement.js';
-import { tierForPrice, creditGrantFields } from './utils/creditGrantFields.js';
+import { tierForPrice, creditGrantFields, TIER_CREDITS } from './utils/creditGrantFields.js';
 
 // IMPORTANT Firestore constraint that shapes every transaction in this file: the Admin SDK
 // requires every tx.get() to happen before any tx.set()/tx.update() in the same transaction —
@@ -294,6 +294,187 @@ function decideAllocationEligibility({ userData, customerId, priceId, replacemen
   return { ok: true };
 }
 
+// ── W3: a plan change on the account's own subscription (Starter ⇄ Pro) ─────────────────────
+
+const LIVE_PLAN_STATUSES = new Set(['active', 'trialing']);
+
+/** The marker that makes an upgrade's extra credits a one-time grant per subscription, price and period. */
+export function planChangeMarkerId(subscription, priceId) {
+  return `${subscription.id}__plan__${priceId}__${subscription.current_period_start ?? 'none'}`;
+}
+
+/** The credits object after adding `extra`, in the account's own stored shape. Pure. */
+function addCredits(credits, extra) {
+  if (typeof credits === 'number') return credits + extra;
+  const current = credits ?? {};
+  return {
+    ...current,
+    total: (Number(current.total) || 0) + extra,
+    remaining: (Number(current.remaining) || 0) + extra,
+  };
+}
+
+/**
+ * Pure. Mirrors a plan change made on the account's EXISTING subscription: by Idynify's
+ * in-app upgrade (change-plan.js: a payment-confirmed update of the same subscription), or in
+ * the Stripe Dashboard. Never a second subscription.
+ *
+ * Only for a subscription that already gave this account paid access at checkout (it is the one
+ * on file and hasCompletedPayment is true) and is live (active or trialing). When its price's
+ * tier differs from the account's:
+ *   - subscriptionTier, tierLimits and features follow the price;
+ *   - Starter → Pro also adds the difference in monthly credits (Pro's minus Starter's) once:
+ *     the billingAllocations marker (planChangeMarkerId) keys it by subscription, price and
+ *     period, so a replay, a second event for the same change, or a switch back and forth within
+ *     the period never grants twice;
+ *   - Pro → Starter takes no credits back.
+ * Automatic grants need the ledger epoch configured, as checkout's do.
+ */
+export function decidePlanChange({ userData, subscription, priceId, markerExists, epochConfigured }) {
+  if (!userData || !isCreditGrantingPrice(priceId)) return { kind: 'none' };
+  if (userData.stripeSubscriptionId !== subscription.id || userData.hasCompletedPayment !== true) return { kind: 'none' };
+  if (!LIVE_PLAN_STATUSES.has(subscription.status)) return { kind: 'none' };
+  const tier = tierForPrice(priceId);
+  if (userData.subscriptionTier === tier) return { kind: 'none' };
+
+  const { fields } = creditGrantFields(priceId);
+  const planFields = { subscriptionTier: tier, tierLimits: fields.tierLimits, features: fields.features };
+  const upgrade = userData.subscriptionTier === 'starter' && tier === 'pro';
+  if (!upgrade) return { kind: 'change', fields: planFields, grant: 0 };
+  if (markerExists) return { kind: 'change', fields: planFields, grant: 0, alreadyGranted: true };
+  if (!epochConfigured) return { kind: 'change', fields: planFields, grant: 0, flag: 'epoch_unset' };
+
+  const grant = TIER_CREDITS.pro.credits - TIER_CREDITS.starter.credits;
+  return { kind: 'change', fields: { ...planFields, credits: addCredits(userData.credits, grant) }, grant };
+}
+
+// ── W4b: invoice.paid — the monthly renewal allocation ───────────────────────────────────────
+
+/** The subscription an invoice belongs to, in either payload shape (acacia, and basil/clover). Pure. */
+export function subscriptionIdOfInvoice(invoice) {
+  const s = invoice?.subscription ?? invoice?.parent?.subscription_details?.subscription ?? null;
+  return typeof s === 'string' ? s : s?.id ?? null;
+}
+
+export const renewalMarkerId = (subscriptionId, invoiceId) => `${subscriptionId}__renewal__${invoiceId}`;
+
+/**
+ * Pure. A paid renewal invoice resets the plan's monthly allowance, once per invoice:
+ *   - only `billing_reason: 'subscription_cycle'` (checkout grants the first period; a plan
+ *     change's proration invoice is W3's, granted from customer.subscription.updated);
+ *   - only for the subscription on file, of the same customer, live, on a credit-granting price,
+ *     for an account that already has paid access;
+ *   - never twice (the billingAllocations marker per invoice) and never for an invoice created
+ *     before the ledger epoch, or with no epoch configured.
+ * The allowance follows the price the subscription renews on, so a downgrade at period end
+ * renews at Starter's. Unused credits do not carry over.
+ */
+export function decideRenewal({ invoice, subscription, userData, markerExists, epoch }) {
+  if (invoice?.billing_reason !== 'subscription_cycle') return { kind: 'ignore', reason: 'not_a_renewal' };
+  if (markerExists) return { kind: 'ignore', reason: 'already_granted' };
+  if (epoch == null) return { kind: 'flag', reason: 'epoch_unset' };
+  if (!(invoice.created >= epoch)) return { kind: 'ignore', reason: 'pre_epoch' };
+  if (!userData || userData.hasCompletedPayment !== true) return { kind: 'ignore', reason: 'no_paid_access' };
+  if (userData.stripeSubscriptionId !== subscription.id) return { kind: 'flag', reason: 'renewal_not_subscription_on_file' };
+  if (userData.stripeCustomerId && userData.stripeCustomerId !== subscription.customer) return { kind: 'flag', reason: 'customer_mismatch' };
+  if (!LIVE_PLAN_STATUSES.has(subscription.status)) return { kind: 'ignore', reason: 'subscription_not_live' };
+  const priceId = priceIdOfSubscription(subscription);
+  if (!isCreditGrantingPrice(priceId)) return { kind: 'ignore', reason: 'not_credit_granting_price' };
+
+  const { tier, fields } = creditGrantFields(priceId);
+  const allowance = TIER_CREDITS[tier].credits;
+  const periodEnd = subscription.current_period_end ?? invoice.period_end ?? null;
+  return {
+    kind: 'grant',
+    tier,
+    allowance,
+    fields: {
+      subscriptionTier: tier,
+      tierLimits: fields.tierLimits,
+      features: fields.features,
+      credits: { total: allowance, used: 0, remaining: allowance, resetDate: periodEnd != null ? new Date(periodEnd * 1000).toISOString() : null },
+      lastRenewalAt: new Date().toISOString(),
+    },
+  };
+}
+
+async function handleInvoicePaid(stripe, stripeEvent) {
+  const invoice = stripeEvent.data.object;
+  const eventId = stripeEvent.id;
+  const preCheck = await db.collection('stripeWebhookEvents').doc(eventId).get();
+  if (preCheck.exists) return ok();
+
+  const subscriptionId = subscriptionIdOfInvoice(invoice);
+  if (!subscriptionId || invoice.billing_reason !== 'subscription_cycle') {
+    await db.collection('stripeWebhookEvents').doc(eventId).set({ type: stripeEvent.type, appliedAt: new Date().toISOString(), ignored: 'not_a_renewal' });
+    return ok();
+  }
+
+  let subscription;
+  try {
+    subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  } catch (err) {
+    return retryable(err);
+  }
+  const resolvedUid = await resolveCandidateUid(subscription);
+  if (!resolvedUid) {
+    await db.runTransaction(async (tx) => {
+      const eventRef = db.collection('stripeWebhookEvents').doc(eventId);
+      if ((await tx.get(eventRef)).exists) return;
+      const { ref, data } = ambiguousWriteFor({ uid: null, reason: 'renewal_user_not_found', details: { invoiceId: invoice.id, subscriptionId } });
+      tx.set(ref, data);
+      tx.set(eventRef, { type: stripeEvent.type, appliedAt: new Date().toISOString() });
+    });
+    return ok();
+  }
+
+  const lockOperationId = await acquireAccountLock(resolvedUid);
+  if (!lockOperationId) return retryable(new Error(`account lock contention for ${resolvedUid}`));
+
+  try {
+    await db.runTransaction(async (tx) => {
+      // ── READ PHASE ──
+      const userRef = db.collection('users').doc(resolvedUid);
+      const eventRef = db.collection('stripeWebhookEvents').doc(eventId);
+      const markerRef = db.collection('billingAllocations').doc(renewalMarkerId(subscriptionId, invoice.id));
+      const userSnap = await tx.get(userRef);
+      const eventSnap = await tx.get(eventRef);
+      const markerSnap = await tx.get(markerRef);
+      if (userSnap.data()?.billingLock?.operationId !== lockOperationId) {
+        throw new RetryableWebhookError(new Error(`billing lock lost for ${resolvedUid} before commit (${stripeEvent.type})`));
+      }
+      if (eventSnap.exists) {
+        tx.set(userRef, { billingLock: null }, { merge: true });
+        return;
+      }
+
+      // ── DECIDE PHASE (pure) ──
+      const epochRaw = process.env.BILLING_LEDGER_EPOCH_UNIX;
+      const decision = decideRenewal({
+        invoice, subscription, userData: userSnap.exists ? userSnap.data() : null,
+        markerExists: markerSnap.exists, epoch: epochRaw ? Number(epochRaw) : null,
+      });
+
+      // ── WRITE PHASE ──
+      tx.update(userRef, { billingLock: null, ...(decision.kind === 'grant' ? decision.fields : {}) });
+      if (decision.kind === 'grant') {
+        tx.set(markerRef, {
+          uid: resolvedUid, kind: 'renewal', invoiceId: invoice.id, subscriptionId, tier: decision.tier,
+          credits: decision.allowance, grantedAt: new Date().toISOString(),
+        });
+      } else if (decision.kind === 'flag') {
+        const { ref, data } = ambiguousWriteFor({ uid: resolvedUid, reason: decision.reason, details: { invoiceId: invoice.id, subscriptionId } });
+        tx.set(ref, data);
+      }
+      tx.set(eventRef, { type: stripeEvent.type, appliedAt: new Date().toISOString(), ...(decision.kind === 'grant' ? {} : { ignored: decision.reason }) });
+    });
+  } catch (err) {
+    if (err instanceof RetryableWebhookError) return retryable(err.cause);
+    throw err;
+  }
+  return ok();
+}
+
 // ── 6c: checkout.session.completed ────────────────────────────────────────────────────────────
 
 async function handleCheckoutCompleted(stripe, stripeEvent) {
@@ -535,6 +716,13 @@ async function applySubscriptionLifecycleEvent(stripe, { eventType, eventId, sub
 
     const userData = userSnap.exists ? userSnap.data() : null;
 
+    // W3: the one-time marker for an upgrade's extra credits on this subscription and price.
+    const subscriptionPriceId = priceIdOfSubscription(subscription);
+    const planMarkerRef = isCreditGrantingPrice(subscriptionPriceId)
+      ? db.collection('billingAllocations').doc(planChangeMarkerId(subscription, subscriptionPriceId))
+      : null;
+    const planMarkerSnap = planMarkerRef ? await tx.get(planMarkerRef) : null;
+
     let onFile = null;
     const differentSubOnFile = userData?.stripeSubscriptionId && userData.stripeSubscriptionId !== subscription.id;
     if (differentSubOnFile) {
@@ -561,13 +749,31 @@ async function applySubscriptionLifecycleEvent(stripe, { eventType, eventId, sub
       });
       if (replacementStatus.kind === 'retry_error') throw new RetryableWebhookError(new Error('on-file subscription retrieval failed'));
       const recon = decideReconciliation({ userData, subscription, replacementStatus, resolvedUid });
-      if (recon.action === 'apply') writes.push({ ref: userRef, type: 'update', data: recon.fields });
-      else if (recon.action === 'flagAmbiguous') ambiguous.push({ uid: resolvedUid, reason: recon.reason, details: recon.details });
+      if (recon.action === 'apply') {
+        writes.push({ ref: userRef, type: 'update', data: recon.fields });
+        // W3: only on the reconciled, account-owned subscription.
+        const plan = decidePlanChange({
+          userData, subscription, priceId: subscriptionPriceId,
+          markerExists: Boolean(planMarkerSnap?.exists),
+          epochConfigured: Boolean(process.env.BILLING_LEDGER_EPOCH_UNIX),
+        });
+        if (plan.kind === 'change') {
+          writes.push({ ref: userRef, type: 'update', data: plan.fields });
+          if (plan.grant > 0) {
+            writes.push({ ref: planMarkerRef, type: 'set', data: {
+              uid: resolvedUid, kind: 'plan_change', priceId: subscriptionPriceId, credits: plan.grant,
+              subscriptionId: subscription.id, periodStart: subscription.current_period_start ?? null, grantedAt: new Date().toISOString(),
+            } });
+          }
+          if (plan.flag) ambiguous.push({ uid: resolvedUid, reason: plan.flag, details: { subscriptionId: subscription.id, priceId: subscriptionPriceId } });
+        }
+      } else if (recon.action === 'flagAmbiguous') ambiguous.push({ uid: resolvedUid, reason: recon.reason, details: recon.details });
     }
 
     // ── WRITE PHASE ──
     if (opRef && opDecision.updateFields) tx.update(opRef, opDecision.updateFields);
-    for (const { ref, data } of mergeWritesByRef(writes)) tx.update(ref, data);
+    for (const { ref, data } of mergeWritesByRef(writes.filter((w) => w.type === 'update'))) tx.update(ref, data);
+    for (const w of writes.filter((w) => w.type === 'set')) tx.set(w.ref, w.data);
     for (const flag of ambiguous) {
       const { ref, data } = ambiguousWriteFor(flag);
       tx.set(ref, data);
@@ -667,6 +873,8 @@ export const handler = async (event) => {
       case 'customer.subscription.updated':
       case 'customer.subscription.deleted':
         return await handleSubscriptionLifecycle(stripe, stripeEvent);
+      case 'invoice.paid':
+        return await handleInvoicePaid(stripe, stripeEvent);
       default:
         console.log(`ℹ️ Unhandled event type: ${stripeEvent.type}`);
         return ok();
@@ -682,4 +890,5 @@ export const __internal = {
   decideOperationRecord, decideReconciliation, decideAllocationEligibility, decideReplacementAuthorized,
   decideReplacementStatus, buildNormalizedFields, resolvePeriod, tierForPrice, resolveCandidateUid,
   drainPendingEvents, applySubscriptionLifecycleEvent, acquireAccountLock, RetryableWebhookError,
+  decidePlanChange, planChangeMarkerId, decideRenewal, renewalMarkerId, subscriptionIdOfInvoice,
 };

@@ -32,6 +32,16 @@ import { handler } from '../../netlify/functions/captureLinkedIn.js';
 import { rankLinkedInCandidates, canonicalProfileUrl, evidence } from '../../netlify/functions/utils/capture/linkedinCandidates.js';
 import { searchLinkedInCandidates, describeSearchResult } from '../../netlify/functions/utils/linkedinSearch.js';
 
+// Billing Phase 1c: this file covers a paid account's behaviour. The paid-access guard itself,
+// including Free, lapsed and unverifiable accounts, is tested in paidApiAccess.test.js.
+vi.mock('../../netlify/functions/utils/paidApiAccess.js', () => ({
+  checkPaidApiAccess: async () => ({ allowed: true, basis: 'paid' }),
+  paidApiDeniedResponse: () => { throw new Error('paid-access guard refused in a paid-account test'); },
+  isPaidApiEligible: () => true,
+  isAdminAccount: () => false,
+  PAID_API_DENIAL: { NOT_PAID: 'paid_plan_required', UNVERIFIED: 'entitlement_unavailable' },
+}));
+
 const ADMIN = 'uid_admin_7g5g';
 const MEMBER = 'uid_member_2k';
 const TOKENS = { tok_admin: ADMIN, tok_member: MEMBER };

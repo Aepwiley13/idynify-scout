@@ -17,6 +17,7 @@ import { logApiUsage } from './utils/logApiUsage.js';
 import { compileReconForPrompt } from './utils/reconCompiler.js';
 import { resolveActiveIcp, isResolved } from './utils/resolveActiveIcp.js';
 import { LEGACY_HAIKU_4_5 } from './utils/models.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
 async function verifyAuthToken(authToken, userId) {
   const firebaseApiKey = process.env.FIREBASE_API_KEY;
@@ -59,7 +60,7 @@ function getSection(dashboardData, sectionId) {
   return typeof s.data === 'object' ? s.data : null;
 }
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
   }
@@ -263,3 +264,6 @@ Return valid JSON only:
     };
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'barryFirstTouch' });

@@ -9,6 +9,7 @@ import AuthField from '../components/auth/AuthField';
 import PasswordField from '../components/auth/PasswordField';
 import PasswordRequirements from '../components/auth/PasswordRequirements';
 import BrandMark from '../components/auth/BrandMark';
+import { signupPlanFor, signupLandingPath, freeSignupDocument } from '../constants/freePlan';
 import {
   SIGNUP_EVENTS,
   beginSignupSession,
@@ -53,7 +54,7 @@ export default function Signup() {
    * nothing on screen would look wrong if it stopped flowing, and a customer
    * who chose Pro would quietly become Starter. Tests 10 and 11 pin it.
    */
-  const tier = searchParams.get('tier') || 'starter';
+  const tier = signupPlanFor(searchParams.get('tier')); // 'free' only with the Free plan on (constants/freePlan.js)
 
   useEffect(() => {
     beginSignupSession();
@@ -115,7 +116,7 @@ export default function Signup() {
       // any already-open tab still running the previous bundle).
       const initialCredits = tier === 'pro' ? 1250 : 400;
 
-      await setDoc(doc(db, 'users', userCredential.user.uid), {
+      await setDoc(doc(db, 'users', userCredential.user.uid), tier === 'free' ? freeSignupDocument(email) : {
         email: email,
         createdAt: new Date(),
         selectedTier: tier,
@@ -130,18 +131,28 @@ export default function Signup() {
       // a comment promising it did not, so a slow Resend call sat between the
       // user pressing the button and reaching checkout. Failures still surface
       // in logs; they just no longer cost the user time.
-      fetch('/.netlify/functions/send-welcome-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email, userId: userCredential.user.uid }),
-      }).catch((emailError) => {
+      // Fire-and-forget: a welcome email must never block registration.
+      // The server derives the recipient and plan from the Firebase account,
+      // never from the request body. Use the newly created user's ID token.
+      void (async () => {
+        const idToken = await userCredential.user.getIdToken();
+        const response = await fetch('/.netlify/functions/send-welcome-email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + idToken,
+          },
+          body: JSON.stringify({}),
+        });
+        if (!response.ok) console.warn('[signup] welcome email could not be sent');
+      })().catch((emailError) => {
         console.error('[signup] welcome email failed to send', emailError);
       });
 
       // A uid exists from here on, so the buffered funnel can be written.
       flushSignupEvents(SIGNUP_EVENTS.SUCCEEDED, { tier });
 
-      navigate(`/checkout?tier=${tier}`);
+      navigate(signupLandingPath(tier));
     } catch (error) {
       // Error type only — never the email, never the password.
       bufferSignupEvent(SIGNUP_EVENTS.FAILED, { code: error?.code || 'unknown' });

@@ -3,7 +3,9 @@ import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apo
 import { logApolloError } from './utils/apolloErrorLogger.js';
 import { mapApolloToScoutContact, validateScoutContact, logValidationErrors } from './utils/scoutContactContract.js';
 import { verifyAuthToken } from './utils/verifyAuthToken.js';
+import { checkPaidApiAccess, paidApiDeniedResponse } from './utils/paidApiAccess.js';
 import { canonicalCompanyFields, buildBarryIntel } from './utils/companyFacts.js';
+import { withCreditMetering } from './utils/creditMetering.js';
 
 // `mode: 'company'` runs the organization lookup only: one Apollo call, no
 // decision-maker search and no person matches. Used after a user accepts a
@@ -11,7 +13,7 @@ import { canonicalCompanyFields, buildBarryIntel } from './utils/companyFacts.js
 // is the full enrichment the company detail views use.
 export const ENRICH_MODE = Object.freeze({ FULL: 'full', COMPANY: 'company' });
 
-export const handler = async (event) => {
+const unmeteredHandler = async (event) => {
   const startTime = Date.now();
 
   if (event.httpMethod !== 'POST') {
@@ -32,8 +34,12 @@ export const handler = async (event) => {
     console.log('🔄 Enriching company:', domain || `(by org ID: ${organizationId})`);
 
     // Verify auth token — supports admin impersonation
-    await verifyAuthToken(authToken, userId);
+    const { tokenUserId } = await verifyAuthToken(authToken, userId);
     console.log('✅ Auth token verified');
+
+    // Billing Phase 1c: paid Apollo services need paid access, checked on the server before any Apollo call.
+    const paidAccess = await checkPaidApiAccess({ userId, actorUserId: tokenUserId });
+    if (!paidAccess.allowed) return paidApiDeniedResponse(paidAccess);
 
     // Get Apollo API key (throws if not configured)
     const apolloApiKey = getApolloApiKey();
@@ -398,3 +404,6 @@ function filterTechStack(technologies) {
     uid: tech.uid
   }));
 }
+
+// Billing W4: credit metering, off until CREDIT_METERING=on (utils/creditMetering.js).
+export const handler = withCreditMetering(unmeteredHandler, { action: 'enrichCompany' });

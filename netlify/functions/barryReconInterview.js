@@ -11,6 +11,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { LEGACY_HAIKU_4_5 } from './utils/models.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
 // ─── Section context map ───────────────────────────────────────────────────────
 
@@ -147,7 +148,7 @@ Respond with ONLY the answer text, no JSON wrapper.`;
 
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   const startTime = Date.now();
 
   if (event.httpMethod !== 'POST') {
@@ -231,3 +232,6 @@ export const handler = async (event) => {
     };
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'barryReconInterview' });

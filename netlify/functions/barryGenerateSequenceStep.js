@@ -7,6 +7,7 @@ import { recommendStrategy } from './utils/barryStrategyRecommender.js';
 import { MODEL_BARRY_SONNET, barrySonnetOptions } from './utils/models.js';
 import { readClaudeText, claudeErrorCode } from './utils/claudeResponse.js';
 import { OUTBOUND_COPY_RULES } from './utils/outboundCopyRules.js';
+import { withPaidAiAccess } from './utils/paidAiAccess.js';
 
 /**
  * User scope — the one line of it these surfaces need.
@@ -50,7 +51,7 @@ function userStyleBlock(dashboardData) {
  * The user reviews, edits if desired, and explicitly sends.
  */
 
-export const handler = async (event) => {
+const unguardedHandler = async (event) => {
   const startTime = Date.now();
 
   if (event.httpMethod !== 'POST') {
@@ -407,3 +408,6 @@ Respond ONLY with valid JSON.`;
     };
   }
 };
+
+// Billing Phase 1d: paid accounts and admins only (utils/paidAiAccess.js).
+export const handler = withPaidAiAccess(unguardedHandler, { feature: 'barryGenerateSequenceStep' });

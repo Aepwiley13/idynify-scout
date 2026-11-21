@@ -426,14 +426,41 @@ export const STATUS_COLORS = {
 };
 
 // ─── TYPOGRAPHY ───────────────────────────────────────────────────────────────
+// MIRROR, NOT SOURCE. The source of truth is the custom properties on :root in
+// src/index.css — see the note there for why. This exists for the JSX that
+// still styles inline and cannot reach a var() without a refactor we are not
+// doing; prefer a CSS class and the vars whenever there is a choice.
+//
+// Keep the numbers here identical to index.css. scripts/checkTypography.mjs
+// fails the build if they drift.
 export const TYPE = {
   fontFamily: "Inter, system-ui, sans-serif",
+  // px, because inline styles in this codebase are written in px.
+  size: {
+    '2xs':  11,   // the floor — micro-labels, badges, metadata
+    xs:     12,   // supporting labels, timestamps
+    sm:     13,   // dense UI, secondary body
+    base:   14,   // DEFAULT body
+    md:     16,   // emphasised body, and every form control
+    lg:     18,   // card titles
+    xl:     20,   // section headings
+    '2xl':  24,   // page headings
+    '3xl':  32,   // display / hero
+  },
   weights: {
     regular:   400,
     medium:    500,
     semibold:  600,
     bold:      700,
+    // Brand exception only — the wordmark fallback and Contact Hub's titles.
+    // Not a weight role; do not reach for it for ordinary emphasis.
     extrabold: 800,
+  },
+  leading: {
+    tight:   1.2,    // display and page headings
+    snug:    1.35,   // card/section headings, nav
+    normal:  1.5,    // body
+    relaxed: 1.65,   // long-form: Barry, help text
   },
 };
 

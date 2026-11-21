@@ -103,6 +103,11 @@ times (clips descenders).
 `<h3>` in JSX, plus ~90 divs styled as headings inline. 92 CSS rules do target
 headings — but all are *scoped descendants* (`.modal-header h2`).
 
+**Tailwind preflight is enabled**, so headings are already reset to
+`font-size: inherit; font-weight: inherit; margin: 0`. An unstyled `<h2>`
+therefore renders today at body size and body weight — it is not a heading at
+all, visually. That is why so many are styled inline.
+
 This cuts both ways, and it matters for sequencing: a new global `h1–h4`
 baseline is **safe to add** (every one of those 92 scoped rules outranks it on
 specificity, so nothing visually changes), but it **will not fix them either**.
@@ -117,8 +122,8 @@ They need individual migration.
 | **BottomNav (mobile)** | 10px labels. |
 | **Barry** | Fragmented across 8+ CSS files with half-pixel sizes (11.5, 12.5, 13.5px). One file uses rem, the rest px. **Barry has no consistent typographic voice** — his structured turns, coaching responses, reply cards and session history are each styled independently. |
 | **Contact Hub** | **The cleanest surface in the codebase.** 24 CSS declarations, **zero inline `fontSize`**, no font-family override. Newest code, already doing the right thing. |
-| **Scout** | The worst. `AllLeads.css` alone carries 11 font-family overrides; `DailyLeads.jsx` 202 type decisions. |
-| **All five themes** | Carry **colour only**. No theme varies type, so a single scale serves all five with no per-theme work. |
+| **Scout** | The worst — but see the correction below: `AllLeads.css` and `DailyLeads.css` are **never imported**, so their 115 declarations are dead. Scout's live type is `DailyLeads.jsx`'s 202 inline styles. |
+| **All seven themes** | Carry **colour only**. No theme varies type, so a single scale serves all of them with no per-theme work. *(Correction to the brief's "five": `tokens.js` and `index.css` agree on **seven** — workspace, mission, navy, sand, plus the darkSide / lightSide / theForce easter-egg themes behind `WithTheForce`.)* |
 
 ### Mobile
 
@@ -127,6 +132,46 @@ They need individual migration.
 - **113 form-control rules set font-size below 16px.** iOS zooms the viewport
   on focus for every one of them. Only one explicit 16px input rule exists.
   This is a live mobile defect with a typographic cause.
+
+---
+
+## Correction — found during Phase 2A, and it moves the priorities
+
+The inventory above counts declarations as they appear in the tree. Two of the
+files it names loudest never reach the browser.
+
+**Five CSS files are never imported by any module** — no `import './x.css'`, no
+glob, no bundler magic. Between them they carry **137 font-size declarations
+that render nothing**:
+
+| File | Dead font-size declarations |
+|---|---|
+| `src/pages/Scout/DailyLeads.css` | 66 |
+| `src/pages/Scout/AllLeads.css` | 49 |
+| `src/pages/Hunter/sections/CompaniesSection.css` | 14 |
+| `src/components/contacts/ActivityHistory.css` | 8 |
+
+`DailyLeads.css` defines 93 classes; its own component references **two**. The
+"Daily Discoveries" title it styles as `.discovery-title` does not exist in the
+DOM — the real title is an inline-styled `<h2>` on line 3296 of the JSX.
+
+Three consequences:
+
+1. **Of the 37 font-family overrides, 25 are live and 12 are not.** The 12 in
+   `AllLeads.css` and `DailyLeads.css` were still removed, but as tidy-up, not
+   as a visual fix. The real visual win is in `TotalMarket.css` (7),
+   `ICPSettings.css` (6), Recon (4 files) and Hunter (2).
+2. **Phase 2A changes nothing on the Daily Discoveries screen.** Its CSS is not
+   loaded, its one `<h2>` is inline-styled so the heading defaults cannot reach
+   it, and its other 202 sizes are inline — excluded from scope by decision. A
+   before/after of that screen would show two identical images.
+3. **The live corpus is smaller than the audit implied** — 2,154 CSS
+   declarations rather than 2,284. The inline-style total is unchanged and is
+   now, unambiguously, the larger half of the problem.
+
+None of this changes the recommended scale or the font decision. It changes
+*where* the remaining work pays, which is the point of finding it before Phase
+2B rather than after.
 
 ---
 
@@ -304,8 +349,8 @@ The initiative is complete when:
 - `font-weight: 400` appears more often than 700 — the clearest single signal
   that hierarchy has moved from weight to scale.
 - Every form control is ≥16px; no iOS zoom on focus, verified at 375px.
-- All five themes verified, and mobile verified at 375px for every file in the
-  74-file media-query set that was touched.
+- All **seven** themes verified, and mobile verified at 375px for every file in
+  the 74-file media-query set that was touched.
 - Barry renders at one consistent scale across all eight of his surfaces.
 
 ---
@@ -318,3 +363,76 @@ No code has been changed. The three decisions needed before Phase 2:
 2. **Approve the nine-step scale**, or adjust the steps.
 3. **Rule on the 11px floor** for dense tables — the one change that can cost
    layout.
+
+---
+
+## Phase 2A — implemented
+
+Approved 2026-11-21. Scope held to what was approved; 2B not started.
+
+| Item | Done |
+|---|---|
+| Centralized typography tokens | 9 sizes, 4 weights, 4 line-heights as custom properties on bare `:root` in `src/index.css`. Mirrored in `TYPE` for inline-styled JSX; a test fails if the two drift. |
+| Remove the 37 system-font overrides | All 37 gone from 13 files. 25 were live; 12 were in never-imported files. |
+| Global heading defaults | `h1`–`h6` given size, weight and line-height. **No margins** — preflight zeroed them and 441 headings were laid out on that basis. |
+| Font loading | Inter `300;400;500;600;700;800` → `400;500;600;700;800`; Orbitron `400;500;600;700;800;900` → `700;800`. **12 font files → 7, nothing renders differently.** |
+| Safeguard | `scripts/checkTypography.mjs` + `src/test/typographyGuard.test.js`. |
+
+### The brand exceptions, verified before trimming
+
+- **Inter 800 stays.** 58 uses — the sidebar wordmark fallback, Contact Hub's
+  `.hub-title` / `.hub-section-title` / `.hub-dialog-title`, Mission Control's
+  figures, auth. Dropping it would have broken all of them.
+- **Inter 300 went.** Loaded since the beginning, used zero times.
+- **Orbitron stays, at 700 and 800 only.** Five call sites across
+  `WithTheForce` and `UserSettings`; every one resolves to 700 or 800. The
+  other four weights were dead payload. The `.font-orbitron` utility has no
+  JSX consumer and was left in place rather than widen the diff.
+- **Weight 650** (`Sidebar.css`, `MainLayout.css`) is not loaded and snaps to
+  700. Both files belong to Phase 2B; left alone rather than touch 2B surfaces
+  early.
+
+### The safeguard
+
+A ratchet, not a gate. 1,023 existing violations across 74 files are recorded
+in `scripts/typography-baseline.json` and are **not** failures — rewriting them
+was explicitly out of scope. The suite fails only when a file's count rises, or
+a clean file stops being clean. Legacy stays legacy; new work uses the tokens.
+
+It checks five things: non-Inter font stacks, px font-sizes, sizes below the
+11px floor, weights off the scale, and `line-height: 1`. Contact Hub is
+excluded by path. It runs in CI already, since the workflow runs the whole
+vitest corpus. Zero new dependencies — node's `fs` and five regexes.
+
+Its own test proves it still bites: it writes a probe file containing one of
+each violation and asserts every rule fires. That test caught a real bug on
+first run — the `TYPE` mirror check matched `xs` inside `'2xs'`.
+
+### What the specimen caught
+
+The first attempt set `font-size: var(--text-base)` on the `html, body` rule.
+`--text-*` are rem values, so this redefined what `1rem` means and silently
+rescaled **every rem font-size in the codebase** — and because the rule covers
+both elements, the 0.875 applied twice and inherited text resolved to
+**12.25px** instead of 16px.
+
+Nothing in the diff looked wrong. It was caught by measuring the rendered
+result, which is the whole argument for building the specimen before the
+screenshot. The root now stays at the browser's 16px: `--text-base` is what a
+component asks for, never what the document defaults to.
+
+### Deliberately not done
+
+- No button or badge architecture.
+- No migration of the 1,918 inline sizes.
+- No mobile changes — the 74 media-query files are untouched.
+- No Contact Hub files touched; it is excluded from the guard by path.
+- Weight 650 left in the two Phase 2B files.
+- The 113 sub-16px form controls are **not** fixed. It is on the 2B list and
+  the iOS zoom defect is still live.
+
+### Phase 2B — not started, awaiting the weight/hierarchy decision
+
+Desktop primary sidebar · module secondary navigation · shared page headers ·
+Barry's typography. The 2A heading defaults are the first real hierarchy
+change, and the specimen is what there is to approve or reject.

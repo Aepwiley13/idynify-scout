@@ -27,6 +27,8 @@ vi.mock('firebase/firestore', async (importOriginal) => ({
   ...(await importOriginal()),
   collection: vi.fn((_db, ...path) => path.join('/')),
   doc: (_db, ...path) => ({ path: path.join('/') }),
+  query: (ref) => ref,
+  onSnapshot: (_ref, next) => { next({ docs: [] }); return () => {}; },
   // The header's own saves (name, title, organization, photo): recorded, and they succeed.
   updateDoc: vi.fn(async (ref, data) => { contactsData.writes.push({ path: ref.path, data }); }),
   getDocs: vi.fn(async (path) => {
@@ -495,12 +497,15 @@ describe('the simple profile', () => {
     const link = screen.getByRole('link', { name: 'Wes Clark' });
     expect(link).toHaveAttribute('href', '/contact-hub/person/p2');
     await user.click(link);
+    expect(screen.getByRole('tab', { name: 'Action Center', selected: true })).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Details' }));
     expect(screen.getByTestId('identity-card')).toHaveTextContent('Wes Clark');
     expect(screen.queryByTestId('full-profile')).toBeNull();
   });
 
-  it('draws the redesigned header and the card\'s contact details (no photo lookup), and the notes; nothing else', async () => {
+  it('keeps the redesigned header and puts the existing details and notes in their tab', async () => {
     renderHub('/contact-hub/person/p2');
+    await userEvent.setup().click(await screen.findByRole('tab', { name: 'Details' }));
     const card = await screen.findByTestId('identity-card');
     // The existing card is now the DETAILS card: email, phones and social profiles only; the header above it draws the rest.
     expect(card).toHaveAttribute('data-variant', 'details');
@@ -569,7 +574,7 @@ describe('the simple profile', () => {
     await user.click(screen.getByRole('link', { name: 'My People' }));
     await user.click(await screen.findByRole('link', { name: 'Tom Green' }));
     expect(await screen.findByRole('heading', { level: 1, name: 'Tom Green' })).toBeInTheDocument();
-    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Name' })).toBeNull();
     expect(contactsData.writes).toEqual([]);
   });
 
@@ -579,6 +584,7 @@ describe('the simple profile', () => {
     await screen.findByRole('list', { name: 'My People' });
     await user.type(screen.getByRole('searchbox', { name: 'Search people' }), 'e');
     await user.click(screen.getByRole('link', { name: 'Wes Clark' }));
+    await user.click(screen.getByRole('tab', { name: 'Details' }));
     await user.click(screen.getByRole('button', { name: 'rename' }));
     await user.click(screen.getByRole('link', { name: 'My People' }));
     expect(screen.getByRole('searchbox', { name: 'Search people' })).toHaveValue('e');
@@ -725,7 +731,7 @@ describe('addresses: the Sticker Wall and a sticker filter each have one', () =>
     const user = userEvent.setup();
     renderHub('/contact-hub/person/p2');
     // Once the person has loaded: the link shown while loading is replaced.
-    await screen.findByTestId('notes');
+    await screen.findByRole('tab', { name: 'Details' });
     await user.click(screen.getByRole('link', { name: 'My People' }));
     expect(router.at).toBe('/contact-hub');
     expect(names()).toHaveLength(4);
@@ -801,12 +807,12 @@ describe('the shell is told who is open', () => {
   });
   const NOBODY = { type: null, id: null, label: null, stage: null };
 
-  function renderHubInShell(url) {
+  function renderHubInShell(url, shellUser = { id: 'u1' }) {
     shellSeen.context = null;
     return render(
       <MemoryRouter initialEntries={[url]}>
         <RouterProbe />
-        <ShellProvider user={{ uid: 'u1' }} userData={{}}>
+        <ShellProvider user={shellUser} userData={{}}>
           <ShellProbe />
           <Routes>
             <Route path="/contact-hub" element={<ContactHubMain />}>
@@ -820,15 +826,26 @@ describe('the shell is told who is open', () => {
     );
   }
 
+  it.each([
+    [{ id: 'u1', hasCompletedPayment: false }, false],
+    [{ id: 'u1', hasCompletedPayment: true }, true],
+    [{ id: 'other', hasCompletedPayment: true }, false],
+  ])('gates Emails and Barry to the entitled profile account (%j)', async (shellUser, allowed) => {
+    renderHubInShell('/contact-hub/person/p2', shellUser);
+    await screen.findByRole('tab', { name: 'Action Center' });
+    expect(Boolean(screen.queryByRole('tab', { name: 'Emails' }))).toBe(allowed);
+    expect(Boolean(screen.queryByRole('button', { name: 'Open Barry' }))).toBe(allowed);
+  });
+
   it('opening a person reports their name and id, and no pipeline stage', async () => {
     renderHubInShell('/contact-hub/person/p2');
-    await screen.findByTestId('notes');
+    await screen.findByRole('tab', { name: 'Action Center' });
     await waitFor(() => expect(open()).toEqual({ type: 'contact', id: 'p2', label: 'Wes Clark', stage: null }));
   });
 
   it('a person in a sales stage is reported the same way: Contact Hub passes no stage', async () => {
     renderHubInShell('/contact-hub/person/p5');
-    await screen.findByTestId('notes');
+    await screen.findByRole('tab', { name: 'Action Center' });
     await waitFor(() => expect(open()).toEqual({ type: 'contact', id: 'p5', label: 'Hunter Stage', stage: null }));
   });
 
@@ -846,8 +863,9 @@ describe('the shell is told who is open', () => {
   it('renaming the person updates what the shell holds, for the same id', async () => {
     const user = userEvent.setup();
     renderHubInShell('/contact-hub/person/p2');
-    await screen.findByTestId('notes');
+    await screen.findByRole('tab', { name: 'Action Center' });
     await waitFor(() => expect(open().label).toBe('Wes Clark'));
+    await user.click(screen.getByRole('tab', { name: 'Details' }));
     await user.click(screen.getByRole('button', { name: 'rename' }));
     await waitFor(() => expect(open()).toEqual({ type: 'contact', id: 'p2', label: 'Renamed Person', stage: null }));
   });
@@ -871,7 +889,7 @@ describe('the shell is told who is open', () => {
   it('returning to My People clears the person; opening another reports the new one', async () => {
     const user = userEvent.setup();
     renderHubInShell('/contact-hub/person/p2');
-    await screen.findByTestId('notes');
+    await screen.findByRole('tab', { name: 'Action Center' });
     await waitFor(() => expect(open().id).toBe('p2'));
 
     await user.click(screen.getByRole('link', { name: 'My People' }));

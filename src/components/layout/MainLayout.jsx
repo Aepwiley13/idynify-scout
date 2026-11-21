@@ -46,6 +46,7 @@ import { auth } from '../../firebase/config';
 import { useActiveUserId } from '../../context/ImpersonationContext';
 import { ShellProvider, useShell } from '../../context/ShellContext';
 import { resolveModule, resolveDestination, MISSION_CONTROL } from '../../constants/navigationModel';
+import { canUseContactHubScout, isContactHubPath } from '../../constants/contactHub';
 import { supportMailto } from '../../constants/support';
 
 const LinkedInQuickAdd = lazy(() => import('../scout/LinkedInQuickAdd'));
@@ -149,16 +150,17 @@ function ShellChrome({ children, user }) {
 
   // Route-aware Barry readiness. Only Mission Control reports KPI context
   // upward, so gate on the real signal there and treat every other route as
-  // ready immediately — Barry initialises with empty context rather than
-  // hanging on a skeleton. Deterministic; no timer.
+  // ready immediately, except Contact Hub, which waits for an explicit open.
   const isMissionControl = location.pathname === MISSION_CONTROL.path;
+  const inContactHub = isContactHubPath(location.pathname);
+  const canOpenBarry = !inContactHub || canUseContactHubScout(activeUserId, shellUser);
   const effectiveKpiContextReady = isMissionControl
     ? barryPageContext.kpiContextReady
-    : true;
+    : !inContactHub || (canOpenBarry && barryOpen);
 
   // Focus trap while Barry is open. Hand-rolled — no dependency.
   useEffect(() => {
-    if (!barryOpen) return undefined;
+    if (!barryOpen || !canOpenBarry) return undefined;
     const host = barryHostRef.current;
     if (!host) return undefined;
 
@@ -184,7 +186,7 @@ function ShellChrome({ children, user }) {
     };
     host.addEventListener('keydown', onKeyDown);
     return () => host.removeEventListener('keydown', onKeyDown);
-  }, [barryOpen]);
+  }, [barryOpen, canOpenBarry]);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -204,8 +206,9 @@ function ShellChrome({ children, user }) {
       <Sidebar
         mobileMenuOpen={mobileMenuOpen}
         onCloseMobileMenu={() => setMobileMenuOpen(false)}
-        onToggleBarry={() => toggleBarry({ returnFocusTo: barryButtonRef.current })}
-        barryOpen={barryOpen}
+        onToggleBarry={() => { if (canOpenBarry) toggleBarry({ returnFocusTo: barryButtonRef.current }); }}
+        barryOpen={canOpenBarry && barryOpen}
+        hideBarry={!canOpenBarry}
         barryButtonRef={barryButtonRef}
         user={shellUser ?? user}
         onLogout={handleLogout}
@@ -338,7 +341,7 @@ function ShellChrome({ children, user }) {
         <MoreSheet
           isOpen={moreSheetOpen}
           onClose={() => setMoreSheetOpen(false)}
-          onOpenBarry={() => openBarry({ returnFocusTo: moreButtonRef.current })}
+          onOpenBarry={canOpenBarry ? () => openBarry({ returnFocusTo: moreButtonRef.current }) : undefined}
         />
       )}
 
@@ -383,6 +386,7 @@ function ShellChrome({ children, user }) {
           stays mounted (preserving state) but forced inert/hidden regardless
           of barryOpen. */}
       {(() => {
+        if (!canOpenBarry) return null;
         const onBarryPage = location.pathname === '/barry';
 
         // During First Experience, redirect sidecar opens to /barry instead

@@ -36,6 +36,7 @@ import UnifiedDashboard from './pages/UnifiedDashboard';
 import ScoutDashboardPage from './pages/ScoutDashboardPage';
 import ScoutMain from './pages/Scout/ScoutMain';
 import PeopleMain from './pages/Scout/PeopleMain';
+import { isContactHubPath } from './constants/contactHub';
 import { contactHubRoutes } from './pages/ContactHub/contactHubRoutes';
 import { withMyCardDraftClear } from './pages/ContactHub/myCard/state/clearDraftsOnSignOut';
 import AllLeads from './pages/Scout/AllLeads';
@@ -128,16 +129,17 @@ import WithTheForce from './components/WithTheForce';
  * exists to fix. The surrounding ProtectedRoute helpers are still declared
  * in-render; that is pre-existing and out of scope, but this one cannot be.
  *
- * Authorization semantics are identical to ProtectedRoute: same auth check,
- * same payment gate, same redirects. Only presentation moved.
+ * All shell routes use the same account verification. Contact Hub also
+ * admits verified free accounts when its route switch is on.
  */
 function ShellRoute({ loading, user, userData, account, recovery, requirePayment = true }) {
+  const { pathname } = useLocation();
   return (
     <AccountGate
       loading={loading}
       user={user}
       account={account}
-      requirePayment={requirePayment}
+      requirePayment={requirePayment && !isContactHubPath(pathname)}
       recovery={recovery}
       loadingScreen={<LoadingScreen />}
     >
@@ -441,8 +443,8 @@ function App() {
                 When it is off these routes do not exist, so /contact-hub
                 falls through to the catch-all like any unknown URL, and the
                 sidebar has no entry for it either (navigationModel reads the
-                same switch). Inside ShellRoute, so the standard payment gate
-                applies unchanged. */}
+                same switch). Inside the authenticated shell. Contact Hub is
+                available to verified free accounts. */}
             {contactHubRoutes()}
 
             {/* Settings. Not a module and not in the sidebar — reached from

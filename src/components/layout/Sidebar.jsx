@@ -189,6 +189,7 @@ const Sidebar = ({
   onCloseMobileMenu = () => {},
   onToggleBarry,
   barryOpen = false,
+  hideBarry = false,
   barryButtonRef,
   user,
   onLogout,
@@ -356,14 +357,14 @@ const Sidebar = ({
         </button>
       </div>
 
-      <div className="sidebar-footer">
+      {!hideBarry && <div className="sidebar-footer">
         <BarryControl
           compact={compact}
           buttonRef={barryButtonRef}
           barryOpen={barryOpen}
           onOpen={() => (onToggleBarry ? onToggleBarry() : openBarry())}
         />
-      </div>
+      </div>}
     </div>
   );
 };

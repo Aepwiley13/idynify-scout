@@ -84,9 +84,9 @@ export default function ContactHubMain() {
   const reload = useCallback(() => setAttempt((n) => n + 1), []);
 
   /** A person changed on their card (name, phone, notes, stickers…). */
-  const updateContact = useCallback((next) => {
+  const updateContact = useCallback((next, patch = next) => {
     if (!next?.id) return;
-    setContacts((prev) => prev.map((c) => (c.id === next.id ? { ...c, ...next } : c)));
+    setContacts((prev) => prev.map((c) => (c.id === next.id ? { ...c, ...(typeof patch === 'function' ? patch(c) : patch) } : c)));
   }, []);
 
   /** People the add form just saved. */

@@ -147,6 +147,17 @@ describe('App.jsx takes its Contact Hub routes from the switch-guarded function 
     expect(app).not.toMatch(/<ContactHubMain|<HubPeople|<HubPerson/);
   });
 
+  it('scopes free route access to the enabled Contact Hub only', async () => {
+    const { hub } = await loadWith('on');
+    expect(hub.isContactHubPath('/contact-hub')).toBe(true);
+    expect(hub.isContactHubPath('/contact-hub/person/abc')).toBe(true);
+    expect(hub.isContactHubPath('/contact-hub-elsewhere')).toBe(false);
+    expect(hub.isContactHubPath('/scout')).toBe(false);
+    expect(app).toContain('requirePayment={requirePayment && !isContactHubPath(pathname)}');
+    const off = await loadWith('off');
+    expect(off.hub.isContactHubPath('/contact-hub')).toBe(false);
+  });
+
   it('has no hand-written route or redirect to /contact-hub', () => {
     expect(app).not.toMatch(/path="\/contact-hub/);
     expect(app).not.toMatch(/to="\/contact-hub/);

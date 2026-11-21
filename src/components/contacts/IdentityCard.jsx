@@ -136,7 +136,7 @@ const FIELD_LABEL_COLORS = {
 
 // ─── ContactFieldEntry — one row in the multi-field list ─────────────────────
 
-function ContactFieldEntry({ entry, type, onUpdate, onDelete, T }) {
+function ContactFieldEntry({ entry, type, onUpdate, onDelete, T, readOnly }) {
   const [editing, setEditing]   = useState(!entry.value);
   const [editVal, setEditVal]   = useState(entry.value || '');
   const [labelOpen, setLabelOpen] = useState(false);
@@ -187,6 +187,7 @@ function ContactFieldEntry({ entry, type, onUpdate, onDelete, T }) {
         <button
           className="idc-label-btn"
           style={{ color: labelColor.color, background: labelColor.bg }}
+          disabled={readOnly}
           onClick={() => setLabelOpen(v => !v)}
         >
           {entry.label}
@@ -229,7 +230,7 @@ function ContactFieldEntry({ entry, type, onUpdate, onDelete, T }) {
           href={href}
           className="idc-entry-val"
           style={{ color: T.text }}
-          onDoubleClick={e => { e.preventDefault(); setEditing(true); }}
+          onDoubleClick={readOnly ? undefined : e => { e.preventDefault(); setEditing(true); }}
         >
           {entry.value}
         </a>
@@ -241,12 +242,14 @@ function ContactFieldEntry({ entry, type, onUpdate, onDelete, T }) {
           <button className="idc-icon-btn" onClick={copyValue} title="Copy">
             {copied ? <Check size={12} color="#10b981" /> : <Copy size={12} color={T.textFaint} />}
           </button>
-          <button className="idc-icon-btn" onClick={() => setEditing(true)} title="Edit">
-            <Pencil size={11} color={T.textFaint} />
-          </button>
-          <button className="idc-entry-delete" onClick={onDelete} title="Remove">
-            <X size={11} />
-          </button>
+          {!readOnly && <>
+            <button className="idc-icon-btn" onClick={() => setEditing(true)} title="Edit">
+              <Pencil size={11} color={T.textFaint} />
+            </button>
+            <button className="idc-entry-delete" onClick={onDelete} title="Remove">
+              <X size={11} />
+            </button>
+          </>}
         </div>
       )}
     </div>
@@ -376,6 +379,7 @@ export default function IdentityCard({
   photoRefreshError,
   onUpdate,
   variant = 'full',
+  readOnly = false,
 }) {
   const T = useT();
   // variant="details" (the redesigned profile): ONLY the contact details below the header (email, phones, social
@@ -1258,23 +1262,24 @@ export default function IdentityCard({
                   key={entry.id}
                   entry={entry}
                   type="email"
+                  readOnly={readOnly}
                   onUpdate={handleEmailUpdate}
                   onDelete={() => handleEmailDelete(entry.id)}
                   T={T}
                 />
               ))}
             </div>
-            <button
+            {!readOnly && <button
               className="idc-add-entry"
               style={{ color: T.textFaint }}
               onClick={handleAddEmail}
             >
               <Plus size={12} /><span>add email</span>
-            </button>
+            </button>}
           </div>
 
           {/* Phones — each with its type: Mobile, Direct, Main, Work… */}
-          <ContactPhones contact={contact} onSave={savePhones} T={T} />
+          <ContactPhones contact={contact} onSave={savePhones} T={T} readOnly={readOnly} />
 
           {/* LinkedIn, Instagram, Facebook — display only */}
           <SocialProfileRows contact={contact} T={T} />

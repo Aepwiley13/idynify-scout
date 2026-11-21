@@ -17,6 +17,10 @@
  * come from.
  */
 
+import { hasActiveAccess } from '../utils/billingEntitlement';
+
+export const canUseContactHubScout = (uid, account) => Boolean(uid && account?.id === uid && hasActiveAccess(account));
+
 /** Pure: is this raw variable value an explicit "on"? Anything else is off. */
 export function contactHubEnabledFrom(value) {
   return value === 'on' || value === 'true' || value === '1';
@@ -60,5 +64,10 @@ export const CONTACT_HUB_SIDEBAR_SLOT = 'contact-hub';
 
 /** The same path with any trailing slash removed, for comparing. */
 const trimmed = (pathname) => String(pathname ?? '').replace(/\/+$/, '');
+export function isContactHubPath(pathname) {
+  const path = trimmed(pathname);
+  return CONTACT_HUB.enabled && (path === CONTACT_HUB_PATH || path.startsWith(CONTACT_HUB_PATH + '/'));
+}
+
 export const isContactHubListPath = (pathname) => trimmed(pathname) === CONTACT_HUB_PATH;
 export const isContactHubStickersPath = (pathname) => trimmed(pathname) === CONTACT_HUB_STICKERS_PATH;

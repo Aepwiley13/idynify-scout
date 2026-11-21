@@ -436,3 +436,82 @@ component asks for, never what the document defaults to.
 Desktop primary sidebar · module secondary navigation · shared page headers ·
 Barry's typography. The 2A heading defaults are the first real hierarchy
 change, and the specimen is what there is to approve or reject.
+
+---
+
+## Phase 2B — implemented
+
+Authorized 2026-11-21. Five priorities, in order, plus the iOS defect.
+
+| # | Surface | What changed |
+|---|---|---|
+| 1 | Desktop sidebar | Nav items 13/500, active pill 600 (was the unloaded 650). Compact rail labels 7px → 11px. Barry's card name 700 → 600. Drawer group label tracking 0.14em → 0.06em. |
+| 2 | Module sub-nav | Header 9px/700 at 0.2em → 11px/600 at 0.06em. Item labels 12/400 → 13/500, active 600. Descriptions and badges 9px → 11px. |
+| 3 | Shared page headings | `.page-title` → `--text-3xl`/bold across five live pages; subtitles settle on regular. Shell breadcrumb loses its 650. |
+| 4 | Card titles | `.card-title` 15/500 → 16/600; detail modals 700 → 600. |
+| 5 | Barry | 178 declarations across 14 live stylesheets; 28 distinct sizes → 16; 8 sub-floor → 0. |
+| — | Daily Discoveries | 45 sub-floor inline sizes raised; 13 hierarchy declarations retokenised. |
+| — | iOS input zoom | One mobile-only rule. |
+
+### Measured
+
+| | Before 2B | After |
+|---|---|---|
+| Guard baseline violations | 1,023 | **937** |
+| Files carrying violations | 74 | **64** |
+| CSS declarations below the 11px floor (touched files) | 23 | **10** (all inside restored media queries) |
+| Daily Discoveries inline sizes below floor | 45 | **0** |
+| Barry distinct size values | 28 | **16** |
+| `font-weight: 650` anywhere | 2 | **0** |
+| Form controls that zoom iOS | 81 | **0** |
+
+262 tests pass across the 14 affected files. Production build clean. Typography
+is **identical across all seven themes** — verified by switching
+`html[data-theme]` through every one and comparing computed styles.
+
+### The Daily Discoveries card
+
+Its stylesheet is never imported, so this edited what renders. The hierarchy
+went from a pile of bold — company name, match chip and score all at weight 800,
+the brand exception — to a ladder:
+
+`28/700` name → `16/600` buttons → `14/700` match chip → `14/400` industry →
+`13/400` meta → `11/600` confidence pill.
+
+The confidence pill was uppercase *and* 700 *and* tracked 1px: three emphases
+for one word. It keeps the caps and drops the rest.
+
+### The one regression, stated plainly
+
+**Compact rail labels: four of nine now ellipsis where two did before.** 11px is
+the approved floor and they are legible for the first time, but REINFORCEMENTS
+needs 104px and COMMAND CENTER 110px in a 64px rail — no legible size fits
+those. Reclaiming the rail's side padding (10px → 3px, compact only) bought 6px
+per label and softened it without solving it. Compact items already carry the
+full name as a title tooltip.
+
+If complete labels matter more than legible ones, the fix is shorter `railLabel`
+values in `navigationModel.js` — an IA change, covered by the locked-IA test,
+and not this initiative's to make.
+
+### Scope held
+
+No Contact Hub, website or billing file is in the diff. No dead CSS deleted. No
+buttons or badges rebuilt. No dependencies. No business logic. The 1,918 legacy
+inline sizes are untouched except on Daily Discoveries, which was named
+specifically.
+
+**Mobile:** the only intentional mobile change is the iOS guard. The Barry sweep
+initially reached inside seven media queries in BarryContext and BarryWorkspace;
+those blocks were restored verbatim from HEAD and are byte-identical.
+
+**The iOS guard is global by nature.** It is one rule at the platform level, so
+it also fixes Contact Hub's inputs on mobile without editing their files. Worth
+knowing before that team sees a 16px field they did not write.
+
+### Still open after #002
+
+- 937 legacy violations remain, recorded and forgiven by the ratchet.
+- The 1,918 inline sizes outside Daily Discoveries.
+- Five never-imported stylesheets, left in place as instructed.
+- No test asserts rendered typography; the guard checks source, not pixels.

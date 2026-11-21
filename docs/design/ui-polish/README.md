@@ -20,4 +20,4 @@ project, and it belongs somewhere else.
 | # | Title | Area | Status |
 |---|-------|------|--------|
 | [001](001-global-brand-identity.md) | Global Brand Identity | Shared sidebar — brand mark | Ready for PR |
-| [002](002-global-typography.md) | Global Typography & Visual Hierarchy | Platform-wide type system | Phase 2A implemented — 2B awaiting visual approval |
+| [002](002-global-typography.md) | Global Typography & Visual Hierarchy | Platform-wide type system | Phases 2A + 2B implemented — ready to close |

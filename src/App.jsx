@@ -447,8 +447,8 @@ function App() {
                 When it is off these routes do not exist, so /contact-hub
                 falls through to the catch-all like any unknown URL, and the
                 sidebar has no entry for it either (navigationModel reads the
-                same switch). Inside ShellRoute, so the standard payment gate
-                applies unchanged. */}
+                same switch). Inside the authenticated shell. Contact Hub is
+                available to verified Free accounts through the shell Free-plan gate. */}
             {contactHubRoutes()}
 
             {/* Settings. Not a module and not in the sidebar — reached from

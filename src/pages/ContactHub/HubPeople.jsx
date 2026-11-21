@@ -31,7 +31,7 @@ import { useIsMobile } from '../../hooks/useIsMobile';
 import {
   CONTACT_HUB_PATH, CONTACT_HUB_SIDEBAR_SLOT, CONTACT_HUB_STICKERS_PATH, contactHubPersonPath, isContactHubStickersPath,
 } from '../../constants/contactHub';
-import { hasRealContactPhoto, resolveContactPhotoSources, getInitials } from '../../utils/contactPhoto';
+import { resolveContactPhotoSources, getInitials } from '../../utils/contactPhoto';
 import { useStickers } from '../../components/stickers/stickersRegistry';
 import { resolveStickerFilter } from '../../components/stickers/peopleStickers';
 import ContactCardStickersInteractive from '../../components/stickers/ContactCardStickersInteractive';
@@ -124,11 +124,12 @@ const ADD_COPY = Object.freeze({
 const softFill = (T) => (T.isDark ? T.border2 ?? T.surface2 ?? T.surface : T.surface);
 
 function Avatar({ contact, name }) {
-  const [broken, setBroken] = useState(false);
+  const [broken, setBroken] = useState(null);
   const T = useT();
-  const src = hasRealContactPhoto(contact) && !broken ? resolveContactPhotoSources(contact).thumbnail : null;
+  const thumbnail = contact.contact_hub_photo ? null : resolveContactPhotoSources(contact).thumbnail;
+  const src = broken === thumbnail ? null : thumbnail;
   return src ? (
-    <img className="hub-avatar" src={src} alt="" loading="lazy" onError={() => setBroken(true)} />
+    <img className="hub-avatar" src={src} alt="" loading="lazy" onError={() => setBroken(src)} />
   ) : (
     <span className="hub-avatar hub-avatar--initials" style={{ background: softFill(T), color: T.text }} aria-hidden="true">
       {getInitials(name)}

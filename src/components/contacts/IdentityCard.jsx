@@ -136,7 +136,7 @@ const FIELD_LABEL_COLORS = {
 
 // ─── ContactFieldEntry — one row in the multi-field list ─────────────────────
 
-function ContactFieldEntry({ entry, type, onUpdate, onDelete, T }) {
+function ContactFieldEntry({ entry, type, onUpdate, onDelete, T, readOnly }) {
   const [editing, setEditing]   = useState(!entry.value);
   const [editVal, setEditVal]   = useState(entry.value || '');
   const [labelOpen, setLabelOpen] = useState(false);
@@ -187,6 +187,7 @@ function ContactFieldEntry({ entry, type, onUpdate, onDelete, T }) {
         <button
           className="idc-label-btn"
           style={{ color: labelColor.color, background: labelColor.bg }}
+          disabled={readOnly}
           onClick={() => setLabelOpen(v => !v)}
         >
           {entry.label}
@@ -229,7 +230,7 @@ function ContactFieldEntry({ entry, type, onUpdate, onDelete, T }) {
           href={href}
           className="idc-entry-val"
           style={{ color: T.text }}
-          onDoubleClick={e => { e.preventDefault(); setEditing(true); }}
+          onDoubleClick={readOnly ? undefined : e => { e.preventDefault(); setEditing(true); }}
         >
           {entry.value}
         </a>
@@ -241,12 +242,14 @@ function ContactFieldEntry({ entry, type, onUpdate, onDelete, T }) {
           <button className="idc-icon-btn" onClick={copyValue} title="Copy">
             {copied ? <Check size={12} color="#10b981" /> : <Copy size={12} color={T.textFaint} />}
           </button>
-          <button className="idc-icon-btn" onClick={() => setEditing(true)} title="Edit">
-            <Pencil size={11} color={T.textFaint} />
-          </button>
-          <button className="idc-entry-delete" onClick={onDelete} title="Remove">
-            <X size={11} />
-          </button>
+          {!readOnly && <>
+            <button className="idc-icon-btn" onClick={() => setEditing(true)} title="Edit">
+              <Pencil size={11} color={T.textFaint} />
+            </button>
+            <button className="idc-entry-delete" onClick={onDelete} title="Remove">
+              <X size={11} />
+            </button>
+          </>}
         </div>
       )}
     </div>
@@ -376,9 +379,14 @@ export default function IdentityCard({
   photoRefreshError,
   onUpdate,
   variant = 'full',
+  readOnly = false,
 }) {
   const T = useT();
-  const simple = variant === 'simple';
+  // variant="details" (the redesigned profile): ONLY the contact details below the header (email, phones, social
+  // profiles). The photo, name, title, company and stickers belong to the header above it, which edits them, and it has
+  // no sales layer (stage, brigade, tags), so it is "simple" everywhere simple matters.
+  const details = variant === 'details';
+  const simple = variant === 'simple' || details;
   const [imgBroken, setImgBroken] = useState(false);
   const [identityOpen, setIdentityOpen] = useState(false);
   const photoButtonRef = useRef(null);
@@ -765,9 +773,10 @@ export default function IdentityCard({
   // ── Render ───────────────────────────────────────────────────────────────────
   return (
     <>
-    <div className="idc-card" style={{ background: T.cardBg, border: `1px solid ${T.border}` }}>
+    <div className={`idc-card${details ? ' idc-card--details' : ''}`} style={{ background: T.cardBg, border: `1px solid ${T.border}` }}>
 
       {/* ── Banner ── */}
+      {!details && (
       <div className="idc-banner" style={{ background: bannerGradient }}>
         {hasRealPhoto && (
           <img src={contact.photo_url} alt="" className="idc-banner-blur" />
@@ -793,8 +802,10 @@ export default function IdentityCard({
           </div>
         )}
       </div>
+      )}
 
       {/* ── Avatar row ── */}
+      {!details && (
       <div className="idc-avatar-row">
         {/* Avatar */}
         <div className="idc-photo-wrap" ref={photoMenuRef}>
@@ -939,10 +950,12 @@ export default function IdentityCard({
           )}
         </div>
       </div>
+      )}
 
       {/* ── Identity body ── */}
       <div className="idc-body">
 
+        {!details && (<>
         {/* Name */}
         {editingField === 'name' ? (
           <input
@@ -1038,6 +1051,8 @@ export default function IdentityCard({
               )}
           </div>
         )}
+
+        </>)}
 
         {/* ── Classification chips row ── */}
         {!simple && (
@@ -1148,7 +1163,7 @@ export default function IdentityCard({
         )}
 
         {/* ── Stickers (ADR-007): renders nothing unless available ── */}
-        <ContactStickersRow contact={contact} onUpdate={onUpdate} />
+        {!details && <ContactStickersRow contact={contact} onUpdate={onUpdate} />}
 
         {/* ── Tags section ── */}
         {!simple && (
@@ -1226,7 +1241,7 @@ export default function IdentityCard({
         )}
 
         {/* ── Divider ── */}
-        <div className="idc-divider" style={{ background: T.border }} />
+        {!details && <div className="idc-divider" style={{ background: T.border }} />}
 
         {/* ── Contact details ── */}
         <div className="idc-contact-details">
@@ -1247,23 +1262,24 @@ export default function IdentityCard({
                   key={entry.id}
                   entry={entry}
                   type="email"
+                  readOnly={readOnly}
                   onUpdate={handleEmailUpdate}
                   onDelete={() => handleEmailDelete(entry.id)}
                   T={T}
                 />
               ))}
             </div>
-            <button
+            {!readOnly && <button
               className="idc-add-entry"
               style={{ color: T.textFaint }}
               onClick={handleAddEmail}
             >
               <Plus size={12} /><span>add email</span>
-            </button>
+            </button>}
           </div>
 
           {/* Phones — each with its type: Mobile, Direct, Main, Work… */}
-          <ContactPhones contact={contact} onSave={savePhones} T={T} />
+          <ContactPhones contact={contact} onSave={savePhones} T={T} readOnly={readOnly} />
 
           {/* LinkedIn, Instagram, Facebook — display only */}
           <SocialProfileRows contact={contact} T={T} />

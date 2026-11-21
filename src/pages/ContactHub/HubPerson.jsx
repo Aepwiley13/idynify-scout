@@ -1,22 +1,22 @@
 /**
  * HubPerson — one person, in Contact Hub.
  *
- * The existing contact card in its simple form (photo, name, title, company,
- * emails, phones, links, stickers) and their notes. No stages, engagement,
- * outreach or lookups: the full profile at /contact/:id is untouched and is
- * not linked from here.
+ * The approved profile header stays above the relationship workspace.
+ * Edits and late sticker completions are merged by contact ID.
  *
  * The person comes from the list ContactHubMain already loaded. A link opened
  * cold (a refresh, a bookmark) waits for that load; a person who is not in My
  * People, or does not exist, gets a plain "not here" with a way back.
  */
+import { useCallback } from 'react';
 import { Link, useOutletContext, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
-import { CONTACT_HUB_PATH } from '../../constants/contactHub';
-import IdentityCard from '../../components/contacts/IdentityCard';
-import StickyNotes from '../../components/contacts/StickyNotes';
-import { useShellEntity } from '../../context/ShellContext';
+import { canUseContactHubScout, CONTACT_HUB_PATH } from '../../constants/contactHub';
+import ContactHubGmailHeader from './ContactHubGmailHeader';
+import ContactActionCenter from './actionCenter/ContactActionCenter';
+import { useImpersonation } from '../../context/ImpersonationContext';
+import { useShell, useShellEntity } from '../../context/ShellContext';
 import { HUB_STATUS, isListedInMyPeople, personName } from './peopleRules';
 import ScoutOpportunity from '../../components/billing/ScoutOpportunity';
 
@@ -35,8 +35,14 @@ function BackLink() {
 export default function HubPerson() {
   const T = useT();
   const { contactId } = useParams();
-  const { status, contacts, updateContact, reload } = useOutletContext();
+  const { uid, status, contacts, updateContact, applyStickerChange, reload } = useOutletContext();
+  const { isImpersonating, isReadOnly } = useImpersonation();
+  const { shellUser, openBarry } = useShell();
+  const readOnly = Boolean(isImpersonating || isReadOnly);
+  const scout = !readOnly && canUseContactHubScout(uid, shellUser);
   const contact = contacts.find((c) => c.id === contactId);
+  // updateContact merges what it is given into the contact with that id, so a patch changes only its fields, on that contact.
+  const patchContact = useCallback((id, fields) => updateContact({ id, ...fields }), [updateContact]);
 
   // Tell the shell who is open, as every other profile does: the top bar then
   // names the person, and Barry (if opened) knows who is on screen. Only for a
@@ -82,15 +88,14 @@ export default function HubPerson() {
   }
 
   return (
-    <div className="hub-person">
+    <div className="hub-person hub-person--action">
       <BackLink />
-      {/* Keyed by person: the card and the notes hold edit state of their own. */}
-      <IdentityCard key={`card-${contact.id}`} contact={contact} onUpdate={updateContact} variant="simple" />
-      {/* Billing W1: what Scout could add for this person (no request is made). */}
-      <ScoutOpportunity contact={contact} />
-      <section className="hub-card hub-notes" aria-label="Notes" style={{ background: T.cardBg, borderColor: T.border }}>
-        <StickyNotes key={`notes-${contact.id}`} contact={contact} onUpdate={updateContact} />
-      </section>
+      {/* Keep transient editing state scoped to this person and session. */}
+      <ContactHubGmailHeader key={JSON.stringify([uid, contact.id, readOnly])} uid={uid} readOnly={readOnly} contact={contact}
+        onPatch={patchContact} onLateStickerChange={applyStickerChange} />
+      <ContactActionCenter key={JSON.stringify([uid, contact.id, readOnly])} uid={uid} contact={contact}
+        readOnly={readOnly} scout={scout} openBarry={openBarry} onUpdate={updateContact} onLateStickerChange={applyStickerChange} />
+      <ScoutOpportunity key={contact.id} contact={contact} />
     </div>
   );
 }

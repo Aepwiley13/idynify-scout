@@ -19,13 +19,18 @@ import { ShellProvider, useShell } from '../context/ShellContext';
 import { createFakeStickers, sticker, config } from './helpers/stickersUi';
 import { setViewportWidth } from './helpers/matchMedia';
 
-const contactsData = vi.hoisted(() => ({ list: [], fail: false, loads: 0, paths: [] }));
+const contactsData = vi.hoisted(() => ({ list: [], fail: false, loads: 0, paths: [], writes: [] }));
 const fake = vi.hoisted(() => ({ current: null }));
 const seen = vi.hoisted(() => ({ card: null, notes: null, form: null }));
 
 vi.mock('firebase/firestore', async (importOriginal) => ({
   ...(await importOriginal()),
   collection: vi.fn((_db, ...path) => path.join('/')),
+  doc: (_db, ...path) => ({ path: path.join('/') }),
+  query: (ref) => ref,
+  onSnapshot: (_ref, next) => { next({ docs: [] }); return () => {}; },
+  // The header's own saves (name, title, organization, photo): recorded, and they succeed.
+  updateDoc: vi.fn(async (ref, data) => { contactsData.writes.push({ path: ref.path, data }); }),
   getDocs: vi.fn(async (path) => {
     contactsData.loads += 1;
     contactsData.paths.push(String(path));
@@ -100,6 +105,7 @@ beforeEach(() => {
   contactsData.fail = false;
   contactsData.loads = 0;
   contactsData.paths = [];
+  contactsData.writes = [];
   contactsData.list = [
     person('p1', 'Nakaiya Wiley', { title: 'Community Leader', email: 'nakaiya@x.test', phone_mobile: '+1 555 010 0001', addedAt: '2026-11-12T12:00:00Z', sticker_ids: [VIP.id] }),
     person('p2', 'Wes Clark', { title: 'Program Director', company_name: 'UAC', email: 'wes@uac.test', addedAt: '2026-11-10T12:00:00Z', sticker_ids: [PARTNER.id] }),
@@ -493,21 +499,84 @@ describe('the simple profile', () => {
     const link = screen.getByRole('link', { name: 'Wes Clark' });
     expect(link).toHaveAttribute('href', '/contact-hub/person/p2');
     await user.click(link);
+    expect(screen.getByRole('tab', { name: 'Action Center', selected: true })).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Details' }));
     expect(screen.getByTestId('identity-card')).toHaveTextContent('Wes Clark');
     expect(screen.queryByTestId('full-profile')).toBeNull();
   });
 
-  it('asks for the simple card, gives it no photo lookup, and shows notes; nothing else', async () => {
+  it('keeps the redesigned header and puts the contact information in Details', async () => {
     renderHub('/contact-hub/person/p2');
+    await userEvent.setup().click(await screen.findByRole('tab', { name: 'Details' }));
     const card = await screen.findByTestId('identity-card');
-    expect(card).toHaveAttribute('data-variant', 'simple');
+    // The existing card is now the DETAILS card: email, phones and social profiles only; the header above it draws the rest.
+    expect(card).toHaveAttribute('data-variant', 'details');
     expect(seen.card.onRefreshPhoto).toBeUndefined();
     expect(seen.card.contact.id).toBe('p2');
-    expect(screen.getByTestId('notes')).toBeInTheDocument();
-    expect(seen.notes.contact.id).toBe('p2');
+    expect(screen.getByRole('article', { name: 'Contact: Wes Clark' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Wes Clark' })).toBeInTheDocument();
+    expect(screen.queryByTestId('notes')).toBeNull();
     // No link out to the advanced profile, and no second load for the person.
     expect(screen.queryByRole('link', { name: /full profile|open in/i })).toBeNull();
     expect(contactsData.loads).toBe(1);
+  });
+
+  it('the header edits the person: a save goes to that contact\'s own document, and the list shows it when you go back; nobody else changes', async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await screen.findByRole('list', { name: 'My People' });
+    await user.click(screen.getByRole('link', { name: 'Wes Clark' }));
+    await user.click(await screen.findByRole('button', { name: 'Edit name' }));
+    await user.type(screen.getByRole('textbox', { name: 'Name' }), ' Jr.{Enter}');
+    await waitFor(() => expect(contactsData.writes).toHaveLength(1));
+    expect(contactsData.writes[0].path).toBe('users/u1/contacts/p2');
+    expect(Object.keys(contactsData.writes[0].data).sort()).toEqual(['name', 'updated_at']);
+    expect(contactsData.writes[0].data.name).toBe('Wes Clark Jr.');
+    await user.click(screen.getByRole('link', { name: 'My People' }));
+    expect(screen.getByRole('link', { name: 'Wes Clark Jr.' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Nakaiya Wiley' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Tom Green' })).toBeInTheDocument();
+  });
+
+  it('a change to the title shows in the header at once and leaves the name, the organization and the stickers as they were', async () => {
+    const user = userEvent.setup();
+    renderHub('/contact-hub/person/p2');
+    await user.click(await screen.findByRole('button', { name: 'Edit title' }));
+    await user.clear(screen.getByRole('textbox', { name: 'Title' }));
+    await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Chief of Staff{Enter}');
+    expect(await screen.findByText('Chief of Staff')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1, name: 'Wes Clark' })).toBeInTheDocument();
+    expect(screen.getByText('UAC')).toBeInTheDocument();
+    expect(await screen.findByText('Partner', { selector: '.ph-sticker-name' })).toBeInTheDocument();
+  });
+
+  it('a sticker that finishes saving after you left the person is on them when you come back, by id, without a reload', async () => {
+    const user = userEvent.setup();
+    renderHub('/contact-hub/person/p2');
+    let finish;
+    fake.current.state.impl.add = () => new Promise((r) => { finish = r; });
+    await user.click(await screen.findByRole('button', { name: 'Add sticker' }));
+    await user.click(screen.getByRole('option', { name: 'VIP' }));
+    await user.click(screen.getByRole('link', { name: 'My People' }));
+    await user.click(await screen.findByRole('link', { name: 'Tom Green' }));
+    await screen.findByRole('heading', { level: 1, name: 'Tom Green' });
+    await act(async () => finish({ status: 'added' }));
+    await user.click(screen.getByRole('link', { name: 'My People' }));
+    await user.click(await screen.findByRole('link', { name: 'Wes Clark' }));
+    await waitFor(() => expect([...document.querySelectorAll('.ph-sticker-name')].map((n) => n.textContent).sort()).toEqual(['Partner', 'VIP']));
+    expect(contactsData.loads).toBe(1);
+  });
+
+  it('moving to another person shows that person, with the first person\'s header gone and nothing carried over', async () => {
+    const user = userEvent.setup();
+    renderHub('/contact-hub/person/p2');
+    await user.click(await screen.findByRole('button', { name: 'Edit name' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('link', { name: 'My People' }));
+    await user.click(await screen.findByRole('link', { name: 'Tom Green' }));
+    expect(await screen.findByRole('heading', { level: 1, name: 'Tom Green' })).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Name' })).toBeNull();
+    expect(contactsData.writes).toEqual([]);
   });
 
   it('an edit on the card shows in the list when you go back, with the search kept', async () => {
@@ -516,6 +585,7 @@ describe('the simple profile', () => {
     await screen.findByRole('list', { name: 'My People' });
     await user.type(screen.getByRole('searchbox', { name: 'Search people' }), 'e');
     await user.click(screen.getByRole('link', { name: 'Wes Clark' }));
+    await user.click(screen.getByRole('tab', { name: 'Details' }));
     await user.click(screen.getByRole('button', { name: 'rename' }));
     await user.click(screen.getByRole('link', { name: 'My People' }));
     expect(screen.getByRole('searchbox', { name: 'Search people' })).toHaveValue('e');
@@ -662,7 +732,7 @@ describe('addresses: the Sticker Wall and a sticker filter each have one', () =>
     const user = userEvent.setup();
     renderHub('/contact-hub/person/p2');
     // Once the person has loaded: the link shown while loading is replaced.
-    await screen.findByTestId('notes');
+    await screen.findByRole('tab', { name: 'Details' });
     await user.click(screen.getByRole('link', { name: 'My People' }));
     expect(router.at).toBe('/contact-hub');
     expect(names()).toHaveLength(4);
@@ -738,12 +808,12 @@ describe('the shell is told who is open', () => {
   });
   const NOBODY = { type: null, id: null, label: null, stage: null };
 
-  function renderHubInShell(url) {
+  function renderHubInShell(url, shellUser = { id: 'u1' }) {
     shellSeen.context = null;
     return render(
       <MemoryRouter initialEntries={[url]}>
         <RouterProbe />
-        <ShellProvider user={{ uid: 'u1' }} userData={{}}>
+        <ShellProvider user={shellUser} userData={{}}>
           <ShellProbe />
           <Routes>
             <Route path="/contact-hub" element={<ContactHubMain />}>
@@ -757,15 +827,26 @@ describe('the shell is told who is open', () => {
     );
   }
 
+  it.each([
+    [{ id: 'u1', hasCompletedPayment: false }, false],
+    [{ id: 'u1', hasCompletedPayment: true }, true],
+    [{ id: 'other', hasCompletedPayment: true }, false],
+  ])('gates Emails and Barry to the entitled profile account (%j)', async (shellUser, allowed) => {
+    renderHubInShell('/contact-hub/person/p2', shellUser);
+    await screen.findByRole('tab', { name: 'Action Center' });
+    expect(Boolean(screen.queryByRole('tab', { name: 'Emails' }))).toBe(allowed);
+    expect(Boolean(screen.queryByRole('button', { name: 'Open Barry' }))).toBe(allowed);
+  });
+
   it('opening a person reports their name and id, and no pipeline stage', async () => {
     renderHubInShell('/contact-hub/person/p2');
-    await screen.findByTestId('notes');
+    await screen.findByRole('tab', { name: 'Action Center' });
     await waitFor(() => expect(open()).toEqual({ type: 'contact', id: 'p2', label: 'Wes Clark', stage: null }));
   });
 
   it('a person in a sales stage is reported the same way: Contact Hub passes no stage', async () => {
     renderHubInShell('/contact-hub/person/p5');
-    await screen.findByTestId('notes');
+    await screen.findByRole('tab', { name: 'Action Center' });
     await waitFor(() => expect(open()).toEqual({ type: 'contact', id: 'p5', label: 'Hunter Stage', stage: null }));
   });
 
@@ -783,8 +864,9 @@ describe('the shell is told who is open', () => {
   it('renaming the person updates what the shell holds, for the same id', async () => {
     const user = userEvent.setup();
     renderHubInShell('/contact-hub/person/p2');
-    await screen.findByTestId('notes');
+    await screen.findByRole('tab', { name: 'Action Center' });
     await waitFor(() => expect(open().label).toBe('Wes Clark'));
+    await user.click(screen.getByRole('tab', { name: 'Details' }));
     await user.click(screen.getByRole('button', { name: 'rename' }));
     await waitFor(() => expect(open()).toEqual({ type: 'contact', id: 'p2', label: 'Renamed Person', stage: null }));
   });
@@ -808,7 +890,7 @@ describe('the shell is told who is open', () => {
   it('returning to My People clears the person; opening another reports the new one', async () => {
     const user = userEvent.setup();
     renderHubInShell('/contact-hub/person/p2');
-    await screen.findByTestId('notes');
+    await screen.findByRole('tab', { name: 'Action Center' });
     await waitFor(() => expect(open().id).toBe('p2'));
 
     await user.click(screen.getByRole('link', { name: 'My People' }));

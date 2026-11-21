@@ -37,7 +37,7 @@ const LABEL_COLORS = {
 const shown = p => (p.extension ? `${p.value} ext. ${p.extension}` : p.value);
 
 /** One number: its type pill, the number (a call link, except a fax), and its actions. */
-function PhoneRow({ entry, isNew, onChange, onDelete, T }) {
+function PhoneRow({ readOnly, entry, isNew, onChange, onDelete, T }) {
   const [editing, setEditing] = useState(isNew);
   const [draft, setDraft] = useState(isNew ? '' : shown(entry).replace(' ext. ', ' x'));
   const [error, setError] = useState(null);
@@ -97,10 +97,11 @@ function PhoneRow({ entry, isNew, onChange, onDelete, T }) {
             type="button"
             className="idc-label-btn"
             style={pillStyle}
+            disabled={readOnly}
             onClick={() => setPickerOpen(v => !v)}
             aria-haspopup="listbox"
             aria-expanded={pickerOpen}
-            aria-label={`Phone type: ${LABEL_TEXT[entry.label]}. Change`}
+            aria-label={`Phone type: ${LABEL_TEXT[entry.label]}${readOnly ? '' : '. Change'}`}
             title={`${unset ? 'What is this number? Choose a type' : LABEL_TEXT[entry.label]}${cardSaid}`}
           >
             {LABEL_TEXT[entry.label]}
@@ -165,12 +166,14 @@ function PhoneRow({ entry, isNew, onChange, onDelete, T }) {
             <button type="button" className="idc-icon-btn" onClick={copy} aria-label="Copy number" title="Copy">
               {copied ? <Check size={12} color="#10b981" /> : <Copy size={12} color={T.textFaint} />}
             </button>
-            <button type="button" className="idc-icon-btn" onClick={() => setEditing(true)} aria-label="Edit number" title="Edit">
-              <Pencil size={11} color={T.textFaint} />
-            </button>
-            <button type="button" className="idc-entry-delete" onClick={onDelete} aria-label="Remove number" title="Remove">
-              <X size={11} />
-            </button>
+            {!readOnly && <>
+              <button type="button" className="idc-icon-btn" onClick={() => setEditing(true)} aria-label="Edit number" title="Edit">
+                <Pencil size={11} color={T.textFaint} />
+              </button>
+              <button type="button" className="idc-entry-delete" onClick={onDelete} aria-label="Remove number" title="Remove">
+                <X size={11} />
+              </button>
+            </>}
           </div>
         )}
       </div>
@@ -186,7 +189,7 @@ function PhoneRow({ entry, isNew, onChange, onDelete, T }) {
  * @param {Function} props.onSave   (list) => void|Promise: the whole new list of canonical entries
  * @param {object}   props.T        theme tokens (useT)
  */
-export default function ContactPhones({ contact, onSave, T }) {
+export default function ContactPhones({ contact, onSave, T, readOnly = false }) {
   const phones = useMemo(() => sortPhonesForDisplay(readContactPhones(contact)), [contact]);
   const [adding, setAdding] = useState(null);
 
@@ -205,6 +208,7 @@ export default function ContactPhones({ contact, onSave, T }) {
           <PhoneRow
             key={entry.id}
             entry={entry}
+            readOnly={readOnly}
             onChange={updated => save(phones.map(p => (p.id === entry.id ? updated : p)))}
             onDelete={() => save(phones.filter(p => p.id !== entry.id))}
             T={T}
@@ -226,7 +230,7 @@ export default function ContactPhones({ contact, onSave, T }) {
           />
         )}
       </div>
-      {!adding && (
+      {!readOnly && !adding && (
         <button
           type="button"
           className="idc-add-entry"

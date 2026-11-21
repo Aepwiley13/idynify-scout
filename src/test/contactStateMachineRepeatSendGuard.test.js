@@ -6,11 +6,14 @@
  * nothing did. This was found during the first production smoke test after
  * a bounced send was manually corrected and resent.
  *
- * MESSAGE_SENT must still remain an "always apply" trigger — a real send
- * legitimately resets the waiting clock from any prior status (including
- * from a reply, moving back to Awaiting Reply) — this guard only blocks the
- * exact case where the resolved status is identical to the status already
- * on the document.
+ * MESSAGE_SENT legitimately resets the waiting clock from New, Engaged, or
+ * a stale Awaiting Reply — this guard blocks the exact case where the
+ * resolved status is identical to the status already on the document (a
+ * genuine resend while still Awaiting Reply), which is a distinct question
+ * from whether a send may regress an established In Conversation
+ * relationship back to Awaiting Reply at all — it may not; see
+ * resolveTransition's own MESSAGE_SENT handling and
+ * contactStateMachineEngagedSemantics.test.js for that guard's coverage.
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
@@ -97,12 +100,18 @@ describe('Repeat MESSAGE_SENT to an already-Awaiting-Reply contact', () => {
     expect(loggedEvents.filter((e) => e.type === 'contact_status_changed')).toHaveLength(1);
   });
 
-  it('a send that reaches a contact already past Awaiting Reply (In Conversation) still legitimately resets the waiting clock — not blocked by this guard', async () => {
+  it('a send that reaches a contact already past Awaiting Reply (In Conversation) is now blocked — a follow-up does not end an active conversation', async () => {
+    // This is the opposite of what this test asserted before the
+    // relationship-state fix: a confirmed send used to unconditionally
+    // reset ANY status back to Awaiting Reply, including regressing an
+    // established In Conversation relationship. See resolveTransition's
+    // own MESSAGE_SENT handling.
     put('c1', { contact_status: CONTACT_STATUSES.IN_CONVERSATION });
     const result = await updateContactStatus({
       userId: UID, contactId: 'c1', trigger: STATUS_TRIGGERS.MESSAGE_SENT,
     });
-    expect(result).toBe(CONTACT_STATUSES.AWAITING_REPLY);
-    expect(loggedEvents.filter((e) => e.type === 'contact_status_changed')).toHaveLength(1);
+    expect(result).toBeNull();
+    expect(get('c1').contact_status).toBe(CONTACT_STATUSES.IN_CONVERSATION);
+    expect(loggedEvents.filter((e) => e.type === 'contact_status_changed')).toHaveLength(0);
   });
 });

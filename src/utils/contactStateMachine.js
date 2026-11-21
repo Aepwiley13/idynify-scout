@@ -155,7 +155,11 @@ const STATUS_PRIORITY = {
  * at a higher-priority status than the trigger would produce).
  *
  * Person-type triggers always apply — they represent an explicit reclassification.
- * MESSAGE_SENT and reply triggers always apply — they represent explicit actions.
+ * POSITIVE_REPLY / NEGATIVE_REPLY and the other lifecycle triggers below
+ * always apply — they are new information about what the OTHER side did,
+ * not an action of ours, so they always supersede. MESSAGE_SENT is NOT
+ * one of these (see below): it is our own action, not new information
+ * about the relationship, and must never regress one.
  */
 export function resolveTransition(currentStatus, trigger) {
   const targetStatus = TRANSITION_MAP[trigger];
@@ -173,9 +177,48 @@ export function resolveTransition(currentStatus, trigger) {
     return targetStatus;
   }
 
-  // These triggers always apply regardless of current lead status
+  // Person-type / relationship statuses (priority -1, below) are a
+  // different lifecycle dimension than the lead-stage sequence and are
+  // set only by an explicit reclassification (above). No other trigger —
+  // including the always-apply ones below — may move a contact out of
+  // one. Without this, a contact who became an Active Customer (say)
+  // would get yanked straight back into the lead lifecycle by the very
+  // next outbound send or inbound reply.
+  if ((STATUS_PRIORITY[currentStatus] ?? 0) === -1) {
+    return null;
+  }
+
+  // MESSAGE_SENT marks a contact as newly awaiting a reply — but sending
+  // a follow-up does not end an established conversation. Handled as its
+  // own explicit case, not folded into the generic priority check below:
+  // that check treats "target priority <= current priority" uniformly as
+  // "blocked, do nothing at all," but the caller (updateContactStatus)
+  // needs to tell apart "blocked" (resolveTransition returns null — no
+  // write at all) from "resolved to the SAME status already on the
+  // document" (returns that status unchanged — still refreshes
+  // contact_status_updated_at so recommendationEngine.js's Stalled
+  // Engagement Alerts doesn't read a just-resent contact as still
+  // overdue, even though contact_status itself didn't change). A genuine
+  // resend while still Awaiting Reply is the second case; a send reaching
+  // an established In Conversation is the first.
+  if (trigger === STATUS_TRIGGERS.MESSAGE_SENT) {
+    const currentPriority = STATUS_PRIORITY[currentStatus] ?? 0;
+    const targetPriority = STATUS_PRIORITY[targetStatus] ?? 0;
+    // Strictly less-than, not <=: a priority TIE (a genuine resend while
+    // still Awaiting Reply) must still return targetStatus so the caller
+    // sees "resolved to the same value" and refreshes the timestamp —
+    // only a status that outranks Awaiting Reply (In Conversation,
+    // Mission Complete, …) is an actual regression and gets blocked.
+    if (targetPriority < currentPriority) {
+      return null; // blocked — preserve the more-advanced status untouched
+    }
+    return targetStatus;
+  }
+
+  // These triggers always apply regardless of current lead status — they
+  // are new information about what the OTHER side did, not an action of
+  // ours, so they always supersede.
   const alwaysApplyTriggers = [
-    STATUS_TRIGGERS.MESSAGE_SENT,
     STATUS_TRIGGERS.POSITIVE_REPLY,
     STATUS_TRIGGERS.NEGATIVE_REPLY,
     STATUS_TRIGGERS.NO_REPLY_EXTENDED,

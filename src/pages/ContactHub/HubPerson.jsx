@@ -13,7 +13,7 @@ import { Link, useOutletContext, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { canUseContactHubScout, CONTACT_HUB_PATH } from '../../constants/contactHub';
-import ConnectedPersonHeader from '../../components/contacts/personHeader/ConnectedPersonHeader';
+import ContactHubPhotoHeader from './ContactHubPhotoHeader';
 import ContactActionCenter from './actionCenter/ContactActionCenter';
 import { useImpersonation } from '../../context/ImpersonationContext';
 import { useShell, useShellEntity } from '../../context/ShellContext';
@@ -87,10 +87,11 @@ export default function HubPerson() {
   }
 
   return (
-    <div className="hub-person">
+    <div className="hub-person hub-person--action">
       <BackLink />
       {/* Keep transient editing state scoped to this person and session. */}
-      <ConnectedPersonHeader key={`header-${contact.id}`} contact={contact} onPatch={patchContact} onLateStickerChange={applyStickerChange} />
+      <ContactHubPhotoHeader key={JSON.stringify([uid, contact.id, readOnly])} uid={uid} readOnly={readOnly} contact={contact}
+        onPatch={patchContact} onLateStickerChange={applyStickerChange} />
       <ContactActionCenter key={JSON.stringify([uid, contact.id, readOnly])} uid={uid} contact={contact}
         readOnly={readOnly} scout={scout} openBarry={openBarry} onUpdate={updateContact} onLateStickerChange={applyStickerChange} />
     </div>

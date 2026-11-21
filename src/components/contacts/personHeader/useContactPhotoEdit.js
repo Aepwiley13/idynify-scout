@@ -20,6 +20,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getEffectiveUser, useImpersonation } from '../../../context/ImpersonationContext';
 import { saveContactFields } from '../../../services/contactFields';
 import { hasRealContactPhoto } from '../../../utils/contactPhoto';
+import { planPhotoOverride, resolvePhotoOverride } from './contactPhotoOverride';
 import { planPhotoRemove, planPhotoSet } from './photoEditRules';
 
 function liveAccount() {
@@ -33,7 +34,7 @@ function liveAccount() {
 
 const refused = (reason) => ({ status: 'refused', reason });
 
-export function useContactPhotoEdit({ contact, onPatch }) {
+export function useContactPhotoEdit({ contact, onPatch, saveOverride }) {
   const { isImpersonating } = useImpersonation();
   const contactId = typeof contact?.id === 'string' && contact.id !== '' ? contact.id : null;
   const [owner, setOwner] = useState(() => ({ contactId, uid: liveAccount().uid }));
@@ -53,13 +54,13 @@ export function useContactPhotoEdit({ contact, onPatch }) {
   const canEdit = Boolean(contactId) && typeof onPatch === 'function' && !isImpersonating
     && Boolean(ownerUid) && liveAccount().uid === ownerUid;
 
-  async function run(plan) {
+  async function run(plan, save = saveContactFields) {
     const current = latest.current;
     const patch = patchRef.current;
     if (!current?.id || typeof patch !== 'function') return refused('no_contact');
     const account = liveAccount();
     if (!account.uid) return refused('no_user');
-    if (account.impersonated) return refused('read_only');
+    if (account.impersonated || isImpersonating) return refused('read_only');
     if (!ownerUid || account.uid !== ownerUid) return refused('account_changed');
     if (inFlight.current) return refused('busy');
     const planned = plan(current);
@@ -70,7 +71,7 @@ export function useContactPhotoEdit({ contact, onPatch }) {
     if (mounted.current) { setSavingId(id); setErrorState(null); }
     patch(id, planned.patch);
     try {
-      await saveContactFields(id, planned.patch, { expectUid: ownerUid });
+      await save(id, planned.patch, { expectUid: ownerUid });
       return { status: 'saved' };
     } catch (error) {
       const code = typeof error?.code === 'string' && error.code ? error.code : 'write_failed';
@@ -90,7 +91,8 @@ export function useContactPhotoEdit({ contact, onPatch }) {
 
   return {
     canEdit,
-    hasPhoto: hasRealContactPhoto(contact),
+    hasPhoto: saveOverride ? Boolean(resolvePhotoOverride(contact).full) : hasRealContactPhoto(contact),
+    setOverride: saveOverride ? (value) => run((c) => planPhotoOverride(c, value), saveOverride) : undefined,
     saving: savingId !== null && savingId === contactId,
     error: errorState && errorState.contactId === contactId ? { code: errorState.code } : null,
     setUrl: (raw) => run((c) => planPhotoSet(c, raw)),

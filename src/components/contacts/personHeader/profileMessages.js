@@ -41,5 +41,6 @@ export function photoRefusalMessage(reason) {
 
 /** Why saving a photo failed (the photo hook's `error`). */
 export function photoFailureMessage(error) {
+  if (error?.code === 'photo_changed') return 'This photo changed in another session. Reopen the contact before saving again.';
   return failure(error?.code, 'the photo');
 }

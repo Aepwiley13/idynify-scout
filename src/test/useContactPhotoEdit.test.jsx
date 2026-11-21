@@ -5,6 +5,8 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { useState, useCallback } from 'react';
+import { photoDataUrl, EXIF } from './helpers/photoFixtures';
+import { resolvePhotoOverride } from '../components/contacts/personHeader/contactPhotoOverride';
 import { renderHook, act } from '@testing-library/react';
 
 const fake = vi.hoisted(() => ({ writes: [] }));
@@ -26,11 +28,11 @@ const WITHOUT = { id: 'c2', name: 'No Photo' };
 const NEW = 'https://images.example.com/new.jpg';
 
 let patches;
-function useHarness(initial, { withPatch = true } = {}) {
+function useHarness(initial, { withPatch = true, saveOverride } = {}) {
   const [contacts, setContacts] = useState(initial);
   const [currentId, setCurrentId] = useState(Object.keys(initial)[0]);
   const onPatch = useCallback((id, fields) => { patches.push([id, { ...fields }]); setContacts((prev) => ({ ...prev, [id]: { ...prev[id], ...fields } })); }, []);
-  const api = useContactPhotoEdit({ contact: contacts[currentId], onPatch: withPatch ? onPatch : undefined });
+  const api = useContactPhotoEdit({ contact: contacts[currentId], onPatch: withPatch ? onPatch : undefined, saveOverride });
   return { api, contacts, setCurrentId };
 }
 const setup = (list, options) => renderHook(() => useHarness(Object.fromEntries(list.map((c) => [c.id, c])), options));
@@ -209,5 +211,46 @@ describe('the right contact and the right account', () => {
     await start(result, () => result.current.api.setUrl(NEW));
     await fail(0);
     expect(JSON.stringify(console.warn.mock.calls)).not.toContain('images.example.com');
+  });
+});
+
+describe('optional photo override adapter', () => {
+  it('displays an uploaded JPEG while preserving the original through hide and restore', async () => {
+    const saveOverride = vi.fn().mockResolvedValue(undefined);
+    const { result } = setup([WITH], { saveOverride });
+    const jpeg = photoDataUrl();
+    await act(() => result.current.api.setOverride({ kind: 'upload', jpeg }));
+    expect(saveOverride).toHaveBeenCalledWith('c1', { photoOverride: { kind: 'upload', jpeg } }, { expectUid: 'u1' });
+    expect(resolvePhotoOverride(result.current.contacts.c1).full).toBe(jpeg);
+    expect(resolvePhotoOverride({ ...result.current.contacts.c1, photo_url: NEW }).full).toBe(jpeg);
+    await act(() => result.current.api.setOverride({ kind: 'hidden' }));
+    expect(result.current.api.hasPhoto).toBe(false);
+    expect(resolvePhotoOverride({ ...result.current.contacts.c1, photo_url: NEW }).full).toBeNull();
+    await act(() => result.current.api.setOverride(null));
+    expect(resolvePhotoOverride(result.current.contacts.c1).full).toBe(WITH.photo_url);
+    expect(result.current.contacts.c1.photo_source).toBe('apollo');
+    expect(fake.writes).toEqual([]);
+  });
+
+  it('rejects metadata and stale or impersonated accounts before invoking the adapter', async () => {
+    const saveOverride = vi.fn();
+    const { result } = setup([WITH], { saveOverride });
+    const upload = { kind: 'upload', jpeg: photoDataUrl() };
+    expect(await result.current.api.setOverride({ ...upload, jpeg: photoDataUrl(320, 20000, { extra: EXIF }) }))
+      .toEqual({ status: 'refused', reason: 'not_a_photo' });
+    viewer.value = { uid: 'u1', _isImpersonated: true };
+    expect(await result.current.api.setOverride(upload)).toEqual({ status: 'refused', reason: 'read_only' });
+    viewer.value = { uid: 'u2' };
+    expect(await result.current.api.setOverride(upload)).toEqual({ status: 'refused', reason: 'account_changed' });
+    expect(saveOverride).not.toHaveBeenCalled();
+  });
+
+  it('restores the previous override after an unsuccessful save', async () => {
+    const previous = { kind: 'url', url: NEW };
+    const saveOverride = vi.fn().mockRejectedValue(Object.assign(new Error('failed'), { code: 'unavailable' }));
+    const { result } = setup([{ ...WITH, photoOverride: previous }], { saveOverride });
+    await act(() => result.current.api.setOverride({ kind: 'hidden' }));
+    expect(result.current.contacts.c1.photoOverride).toEqual(previous);
+    expect(result.current.api.error).toEqual({ code: 'unavailable' });
   });
 });

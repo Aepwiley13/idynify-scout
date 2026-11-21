@@ -36,8 +36,8 @@ const MAX_UPSCALE = 1.5;
 
 const FOCUSABLE = 'a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export default function ContactIdentityViewer({ contact, open, onClose, returnFocusRef }) {
-  const { thumbnail, full } = resolveContactPhotoSources(contact);
+export default function ContactIdentityViewer({ contact, open, onClose, returnFocusRef, photoSources }) {
+  const { thumbnail, full } = photoSources ?? resolveContactPhotoSources(contact);
   if (!open || !full) return null;
   // Keyed on the photo so image state starts fresh for each photo.
   return (

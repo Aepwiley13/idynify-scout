@@ -79,3 +79,23 @@ With the fixture running, capture desktop and mobile screenshots and an interact
 ```sh
 node scripts/visual/contact-profile/capture.mjs /tmp/action-center-review --action
 ```
+
+## Contact photo upload fixture
+
+Open `profile.html?action=1&photo=1` on the same fixture server. On mobile, choose **Edit profile → Change photo**. Tap empty initials to add a first photo. The fixture supports camera and library input, crop, preview, mocked Save, removal and restoration. Use the existing **Fail next save** and **read-only** fixture controls to exercise those states. Reloading clears the private overrides.
+
+Run the browser checks and capture the photo screens with:
+
+```sh
+node scripts/visual/contact-profile/capture.mjs /tmp/contact-photo-review --photo
+```
+
+The camera-check path supplies a local JPEG through Chrome's chooser interception. Test the physical camera on a phone separately.
+
+### Trusted photo persistence rollout
+
+The fixture above uses in-memory photo overrides. Contact Hub's real adapter and trusted writer are off by default. A verified staging integration uses `VITE_CONTACT_HUB_PHOTO_OVERRIDES=on` for the client, `CONTACT_PHOTO_WRITES=on` for the function, and the reviewed local rules and index exemption. Keep the flags off until contact and account deletion paths are integrated with trusted cleanup. The local rules reject client deletion of a contact with an override to protect the private document. Existing Admin SDK deletion and account-purge paths, which bypass rules, need verified cleanup before enrollment.
+
+The profile lazily reads a single private override. My People rows, cards and tables use the display marker returned by the normal contacts query. They show initials for hidden and custom photos, so they neither display an older imported picture in its place nor download full-size JPEGs. Sticker Wall tiles are sticker summaries. Contact Hub's Details uses the profile editor, and Scout's legacy URL editor remains on its existing path.
+
+The local emulator suite is `scripts/rules-check/contact-photo.mjs` under the existing rules-check dependencies. It checks owner isolation, overlapping rule matches, the bulk-delete guard, atomic trusted cleanup, concurrent saves, and a recursive purge fixture. The purge fixture exercises Firestore cleanup separately from any deployed account-deletion workflow.

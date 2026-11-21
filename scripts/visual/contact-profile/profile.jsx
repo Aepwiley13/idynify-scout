@@ -18,7 +18,8 @@ import { withMembershipChange } from '../../../src/services/stickers/stickerCore
 import ContactActionCenter from '../../../src/pages/ContactHub/actionCenter/ContactActionCenter';
 import { seedFixtureDoc } from './stubs/firestore';
 import { getEffectiveUser } from './stubs/impersonation';
-import { fixture } from './stubs/fixture.js';
+import { fixture, log, wait } from './stubs/fixture.js';
+import ContactPhotoEditor from '../../../src/components/contacts/personHeader/ContactPhotoEditor';
 
 const params = new URLSearchParams(window.location.search);
 if (params.get('theme')) { try { window.localStorage.setItem('idynify_theme', params.get('theme') === 'dark' ? 'mission' : 'workspace'); } catch { /* storage blocked */ } }
@@ -33,6 +34,7 @@ const CONTACTS = [
   { id: 'long', name: 'Bartholomew-Alexandrovich Featherstonehaugh-Cholmondeley-Wolfeschlegelsteinhausenbergerdorff', title: 'Senior Vice President of Global Strategic Partnerships, Ecosystem Development and Public Sector Alliances', company_name: 'The International Association of Analytical Engine Manufacturers and Allied Trades of the Northern Hemisphere', location: 'Wales, United Kingdom', photo_url: portrait('morgan'), phones: [{ id: '1', value: '+44 20 7946 0958', label: 'work' }], emails: [{ id: '0', value: 'bartholomew@internationalassociation.example', label: 'work' }], sticker_ids: ['S00', 'S01', 'S02', 'S03', 'S04', 'S05', 'S06', 'S07'] },
 ];
 const isAction = params.get('action') === '1';
+const isPhotoDemo = isAction && params.get('photo') === '1';
 const scout = params.get('scout') === '1' && !fixture.readonly;
 const uid = getEffectiveUser().uid;
 const dateAgo = (days) => new Date(Date.now() - days * 86400000).toISOString();
@@ -49,6 +51,24 @@ if (isAction) {
   seedFixtureDoc(historyPath + 'call', { type: 'outreach_logged', preview: 'Jordan offered to introduce the volunteer coordinator.', metadata: { channel: 'call' }, createdAt: dateAgo(2) });
   seedFixtureDoc(historyPath + 'email', { type: 'message_sent', preview: 'Shared the volunteer sign-up link.', metadata: { channel: 'email' }, createdAt: dateAgo(1) });
 }
+
+const photoEditor = {
+  Editor: ContactPhotoEditor,
+  async saveOverride(id, { photoOverride }, { expectUid }) {
+    const canSave = () => {
+      const user = getEffectiveUser();
+      return !fixture.readonly && !user?._isImpersonated && user?.uid === uid && expectUid === uid && Object.hasOwn(BY_ID, id);
+    };
+    if (!canSave()) throw Object.assign(new Error('Fixture access denied'), { code: 'permission-denied' });
+    log({ kind: 'photo override', path: `users/${uid}/contacts/${id}/private/photo`, fields: photoOverride?.kind ?? 'restore' });
+    await wait();
+    if (!canSave()) throw Object.assign(new Error('Fixture account changed'), { code: 'permission-denied' });
+    if (fixture.failNext) {
+      fixture.failNext = false;
+      throw Object.assign(new Error('Fixture save failed'), { code: 'unavailable' });
+    }
+  },
+};
 
 function Controls({ currentId, onPick, bump }) {
   const { themeId, setThemeId } = useThemeCtx();
@@ -108,11 +128,18 @@ function WriteLog() {
 
 function Demo() {
   const [contacts, setContacts] = useState(BY_ID);
+  const [photoOverrides, setPhotoOverrides] = useState({});
   const [currentId, setCurrentId] = useState(params.get('contact') && BY_ID[params.get('contact')] ? params.get('contact') : 'jordan');
   const [barryOpened, setBarryOpened] = useState(false);
   const [, bump] = useReducer((n) => n + 1, 0);
   // What Contact Hub's list will do: merge what it is told into that contact, by id.
-  const onPatch = useCallback((id, fields) => setContacts((prev) => ({ ...prev, [id]: { ...prev[id], ...fields } })), []);
+  const onPatch = useCallback((id, fields) => {
+    if (Object.hasOwn(fields, 'photoOverride')) {
+      setPhotoOverrides((previous) => ({ ...previous, [id]: fields.photoOverride }));
+    } else {
+      setContacts((previous) => ({ ...previous, [id]: { ...previous[id], ...fields } }));
+    }
+  }, []);
   const onUpdate = useCallback((next, patch = next) => setContacts((prev) => {
     if (!next?.id) return prev;
     const current = prev[next.id];
@@ -124,8 +151,9 @@ function Demo() {
     <div className="demo">
       {isAction ? <p className="demo-banner"><strong>Isolated Action Center.</strong> Sample contacts and in-memory saves.</p> : <p className="demo-banner"><strong>Isolated demo of the redesigned Contact Profile.</strong> Real components, made-up contacts, edits kept in this page only (reload resets them). Try: edit the name, title or organization (Enter saves, Esc or Cancel cancels, leaving the box saves); click the photo; Change photo; add and remove stickers and press Undo; edit email, phone and social below the header; use <em>Fail next save</em> to see Try again and Retry.</p>}
       <Controls currentId={currentId} onPick={setCurrentId} bump={bump} />
-      <main className="demo-profile">
-        <ConnectedPersonHeader contact={contact} onPatch={onPatch} onLateStickerChange={onLateStickerChange} />
+      <main className={isAction ? "demo-profile hub-person--action" : "demo-profile"}>
+        <ConnectedPersonHeader compactMobileHeader={isAction} photoEditor={isPhotoDemo ? photoEditor : undefined}
+          contact={isPhotoDemo ? { ...contact, photoOverride: photoOverrides[currentId] } : contact} onPatch={onPatch} onLateStickerChange={onLateStickerChange} />
         {isAction ? (
           <ContactActionCenter key={currentId} uid={uid} contact={contact} readOnly={fixture.readonly}
             scout={scout} openBarry={() => setBarryOpened(true)} onUpdate={onUpdate} onLateStickerChange={onLateStickerChange} />

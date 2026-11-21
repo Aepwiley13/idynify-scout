@@ -338,3 +338,78 @@
 .ph-editor-btn--primary:hover:not(:disabled) { background: var(--ph-ink); filter: brightness(1.08); }
 .ph-editor-btn:disabled { opacity: 0.6; cursor: default; }
 .ph-photo-confirm { color: var(--text-secondary); }
+
+.ph-sticker-strip {
+  grid-area: stickers;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ph .ph-sticker-scroll {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 44px;
+  padding-inline: 2px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.ph-sticker-scroll:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: -2px; border-radius: 8px; }
+.ph-sticker-scroll .ph-sticker { flex: 0 0 auto; max-width: 100%; white-space: nowrap; }
+.ph-sticker-strip .ph-add-sticker-item { flex: 0 0 auto; }
+.ph-sticker-strip .ph-add-sticker { width: 44px; min-height: 44px; justify-content: center; padding: 0; }
+.ph-sticker-strip .ph-add-sticker > span { display: none; }
+.ph-sticker-strip .ph-add-sticker::after { content: none; }
+
+.ph-avatar-btn--add .ph-avatar { flex-direction: column; gap: 3px; }
+.ph-avatar-add-label { font-size: 9px; font-weight: 650; line-height: 1.1; }
+.ph-identity:has(.ph-profile-menu) { position: relative; }
+.ph-profile-menu {
+  position: absolute;
+  inset: 0 0 auto auto;
+  z-index: 4;
+}
+.ph-identity:has(.ph-profile-menu) > :is(.ph-line--name, .ph-editor--name, .ph-name) {
+  margin-inline-end: 48px;
+  min-height: 44px;
+}
+.ph-profile-menu-trigger {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--ph-ink);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  list-style: none;
+}
+.ph-profile-menu-trigger::-webkit-details-marker { display: none; }
+.ph-profile-menu :is(button, summary):focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 1px; }
+.ph-profile-menu-actions {
+  position: absolute;
+  inset: calc(100% + 4px) 0 auto auto;
+  display: grid;
+  min-width: 156px;
+  border: 1px solid var(--border-2);
+  border-radius: 12px;
+  padding: 4px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-card);
+}
+.ph-profile-menu:not([open]) .ph-profile-menu-actions { display: none; }
+.ph-profile-menu-actions button {
+  min-height: 44px;
+  text-align: start;
+  padding-inline: 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  color: inherit;
+}
+.ph-profile-menu-actions button:hover, .ph-profile-menu-trigger:hover { background: var(--ph-tint); }

@@ -27,8 +27,11 @@
  * they are available and writable (it renders nothing otherwise, as the row does). The photo may always be viewed.
  */
 import { useEffect, useRef, useState } from 'react';
+import { useIsMobile } from '../../../hooks/useIsMobile';
 import PersonHeader from './PersonHeader';
 import PhotoPanel from './PhotoPanel';
+import { resolvePhotoOverride } from './contactPhotoOverride';
+import { resolveContactPhotoSources } from '../../../utils/contactPhoto';
 import { buildPersonHeaderModel } from './personHeaderModel';
 import { EDIT_FIELDS } from './personHeaderContract';
 import { useContactIdentityEdit } from './useContactIdentityEdit';
@@ -39,15 +42,16 @@ import StickerPicker from '../../stickers/StickerPicker';
 import { useStickers } from '../../stickers/stickersRegistry';
 import { useContactStickers } from '../../stickers/useContactStickers';
 
-export default function ConnectedPersonHeader({ contact, onPatch, onLateStickerChange, headingLevel = 1 }) {
+export default function ConnectedPersonHeader({ contact, onPatch, onLateStickerChange, headingLevel = 1, compactMobileHeader = false, photoEditor }) {
   const stickers = useStickers();
+  const isMobile = useIsMobile();
   if (!contact?.id) return null;
-  return <Connected key={contact.id} contact={contact} onPatch={onPatch} onLateStickerChange={onLateStickerChange} headingLevel={headingLevel} stickers={stickers} />;
+  return <Connected key={contact.id} contact={contact} onPatch={onPatch} onLateStickerChange={onLateStickerChange} headingLevel={headingLevel} compactHeader={compactMobileHeader && isMobile} stickers={stickers} photoEditor={photoEditor} />;
 }
 
-function Connected({ contact, onPatch, onLateStickerChange, headingLevel, stickers }) {
+function Connected({ contact, onPatch, onLateStickerChange, headingLevel, compactHeader, stickers, photoEditor }) {
   const edit = useContactIdentityEdit({ contact, onPatch });
-  const photo = useContactPhotoEdit({ contact, onPatch });
+  const photo = useContactPhotoEdit({ contact, onPatch, saveOverride: photoEditor?.saveOverride });
 
   // The shared sticker behaviour reports a whole contact; this parent takes id-addressed fields, so only what changed is sent.
   const latest = useRef(contact);
@@ -79,8 +83,10 @@ function Connected({ contact, onPatch, onLateStickerChange, headingLevel, sticke
   const closePanel = (withFocus) => { returnFocus.current = Boolean(withFocus); setPanelOpen(false); };
 
   const person = buildPersonHeaderModel(contact, { stickersById: null });
+  const photoSources = photoEditor ? resolvePhotoOverride(contact) : undefined;
   const withStickers = {
     ...person,
+    avatar: photoSources ? { ...person.avatar, photoUrl: photoSources.thumbnail } : person.avatar,
     stickers: ready ? st.chips.map(({ sticker, busy }) => ({ id: sticker.id, name: sticker.name, color: sticker.color, emoji: sticker.emoji ?? null, busy })) : null,
   };
 
@@ -95,8 +101,10 @@ function Connected({ contact, onPatch, onLateStickerChange, headingLevel, sticke
     onCancel: () => { edit.cancel(); edit.clearError(); },
   };
 
-  const canAddPhoto = photo.canEdit && !photo.hasPhoto;
-  const onPhotoClick = photo.hasPhoto
+  const hasPhoto = photoSources ? Boolean(photoSources.full) : photo.hasPhoto;
+  const canEditPhoto = photo.canEdit && (!photoEditor || Boolean(photoEditor.saveOverride));
+  const canAddPhoto = canEditPhoto && !hasPhoto;
+  const onPhotoClick = hasPhoto
     ? () => setViewerOpen(true)
     : canAddPhoto ? () => setPanelOpen((open) => !open) : undefined;
 
@@ -109,26 +117,31 @@ function Connected({ contact, onPatch, onLateStickerChange, headingLevel, sticke
       : undefined,
   };
 
-  const panel = panelOpen && photo.canEdit ? (
+  const Editor = photoEditor?.Editor;
+  const panel = panelOpen && canEditPhoto ? (Editor ? (
+    <Editor currentPhoto={photoSources.full} originalPhoto={resolveContactPhotoSources(contact).full} overrideKind={contact.photoOverride?.kind}
+      saving={photo.saving} failure={photo.error} onSave={photo.setOverride} onClose={closePanel} clearError={photo.clearError} />
+  ) : (
     <PhotoPanel
-      hasPhoto={photo.hasPhoto}
+      hasPhoto={hasPhoto}
       saving={photo.saving}
       failure={photo.error}
       onSave={photo.setUrl}
       onRemove={photo.remove}
       onClose={closePanel}
     />
-  ) : null;
+  )) : null;
 
   return (
     <>
       <PersonHeader
         person={withStickers}
         headingLevel={headingLevel}
+        compactHeader={compactHeader}
         actions={actions}
         editing={editing}
         photoButtonRef={photoButtonRef}
-        photoEdit={photo.canEdit && photo.hasPhoto ? { onEdit: () => { photo.clearError(); setPanelOpen((open) => !open); }, saving: photo.saving, panel } : { panel }}
+        photoEdit={canEditPhoto && hasPhoto ? { onEdit: () => { photo.clearError(); setPanelOpen((open) => !open); }, saving: photo.saving, panel } : { panel }}
         photoEditButtonRef={photoEditButtonRef}
         addStickerRef={st.buttonRef}
         addStickerOpen={ready && st.open}
@@ -146,7 +159,7 @@ function Connected({ contact, onPatch, onLateStickerChange, headingLevel, sticke
           />
         ) : null}
       />
-      <ContactIdentityViewer contact={contact} open={viewerOpen && photo.hasPhoto} onClose={() => setViewerOpen(false)} returnFocusRef={photoButtonRef} />
+      <ContactIdentityViewer contact={contact} photoSources={photoSources} open={viewerOpen && hasPhoto} onClose={() => setViewerOpen(false)} returnFocusRef={photoButtonRef} />
     </>
   );
 }

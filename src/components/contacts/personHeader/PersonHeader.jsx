@@ -45,7 +45,7 @@
  * keeps its own colour, in the same tint the existing sticker chips use.
  */
 import { Fragment, useEffect, useRef, useState } from 'react';
-import { Camera, Facebook, Instagram, Linkedin, Mail, MapPin, Pencil, Phone, Plus, X } from 'lucide-react';
+import { Camera, Facebook, Instagram, Linkedin, Mail, MapPin, MoreHorizontal, Pencil, Phone, Plus, X } from 'lucide-react';
 import { BRAND } from '../../../theme/tokens';
 import { hexOf, TINT_ALPHA, BORDER_ALPHA } from '../../stickers/stickerPalette';
 import { EDIT_LABEL, editState, headerParts } from './personHeaderContract';
@@ -71,12 +71,14 @@ const safe = (kind, href) => typeof href === 'string' && SAFE_HREF[kind].test(hr
 
 const clampLevel = (level) => Math.min(6, Math.max(1, Number.isInteger(level) ? level : 2));
 
-function Avatar({ person, onPhotoClick, photoButtonRef, photoEdit, photoEditButtonRef }) {
+function Avatar({ person, onPhotoClick, photoButtonRef, photoEdit, photoEditButtonRef, compactHeader }) {
   const { initials, photoUrl } = person.avatar;
   // A photo that does not load falls back to the initials, for that address only.
   const [failedUrl, setFailedUrl] = useState(null);
   const showPhoto = Boolean(photoUrl) && failedUrl !== photoUrl;
   const { active } = person.activity;
+  const photoAction = compactHeader && photoUrl && !showPhoto ? photoEdit?.onEdit : onPhotoClick;
+  const showAddLabel = compactHeader && !showPhoto && typeof photoAction === 'function';
   const picture = (
     <span className="ph-avatar" aria-hidden="true">
       {showPhoto ? (
@@ -89,21 +91,24 @@ function Avatar({ person, onPhotoClick, photoButtonRef, photoEdit, photoEditButt
           onError={() => setFailedUrl(photoUrl)}
         />
       ) : (
-        <span className="ph-avatar-initials" dir="auto">{initials}</span>
+        <>
+          <span className="ph-avatar-initials" dir="auto">{initials}</span>
+          {showAddLabel && <span className="ph-avatar-add-label">Add photo</span>}
+        </>
       )}
     </span>
   );
   return (
     <div className="ph-avatar-wrap">
-      {typeof onPhotoClick === 'function' ? (
+      {typeof photoAction === 'function' ? (
         // A button only when the parent can do something with a press: view the photo, or add one.
         <button
           type="button"
           ref={photoButtonRef}
-          className="ph-avatar-btn"
+          className={showAddLabel ? "ph-avatar-btn ph-avatar-btn--add" : "ph-avatar-btn"}
           aria-label={showPhoto ? `View photo of ${person.name}` : `Add photo for ${person.name}`}
           aria-haspopup={showPhoto ? 'dialog' : 'true'}
-          onClick={onPhotoClick}
+          onClick={photoAction}
         >
           {picture}
         </button>
@@ -114,7 +119,7 @@ function Avatar({ person, onPhotoClick, photoButtonRef, photoEdit, photoEditButt
         aria-label={active ? 'Active in the last 30 days' : 'No recent activity'}
         title={active ? 'Active in the last 30 days' : 'No recent activity'}
       />
-      {showPhoto && typeof photoEdit?.onEdit === 'function' ? (
+      {!compactHeader && showPhoto && typeof photoEdit?.onEdit === 'function' ? (
         <button
           type="button"
           ref={photoEditButtonRef}
@@ -157,7 +162,7 @@ function StickerPill({ sticker, onRemove }) {
         >
           {busy ? <span className="ph-spinner" aria-hidden="true" /> : <X size={14} aria-hidden="true" />}
         </button>
-      ) : null}
+      ) : busy ? <span className="ph-spinner" aria-hidden="true" /> : null}
     </li>
   );
 }
@@ -183,7 +188,7 @@ function useEditFocus(edit, root) {
   const failureField = edit.failure?.field ?? null;
   const activeField = edit.active?.field ?? null;
 
-  const trigger = (field) => root.current?.querySelector(`[data-edit-trigger="${field}"]`) ?? null;
+  const trigger = (field) => root.current?.querySelector(`[data-edit-trigger="${field}"]`) ?? root.current?.querySelector('.ph-profile-menu-trigger');
 
   useEffect(() => {
     const was = lastActive.current;
@@ -308,7 +313,7 @@ function FieldEditor({ field, edit, refs }) {
 }
 
 /** The title and the organization, each with its own edit control, an "Add" control when empty, or its editor. */
-function SubtitleEditable({ person, edit, refs, onEdit }) {
+function SubtitleEditable({ person, edit, refs, onEdit, compactHeader }) {
   const part = (field, value) => {
     if (edit.active?.field === field) return <FieldEditor key={field} field={field} edit={edit} refs={refs} />;
     // A failed save with no box open is said beside its line, not inside it, so it cannot squeeze the line.
@@ -318,7 +323,7 @@ function SubtitleEditable({ person, edit, refs, onEdit }) {
         <Fragment key={field}>
           <span className="ph-subtitle-part ph-edit-part">
             <span className="ph-subtitle-text" dir="auto" title={value}>{value}</span>
-            {edit.canEdit[field]
+            {edit.canEdit[field] && !compactHeader
               ? <EditButton field={field} label={`Edit ${EDIT_LABEL[field]}`} edit={edit} refs={refs} onEdit={onEdit} />
               : null}
           </span>
@@ -326,7 +331,7 @@ function SubtitleEditable({ person, edit, refs, onEdit }) {
         </Fragment>
       );
     }
-    if (!edit.canEdit[field]) return null;
+    if (!edit.canEdit[field] || compactHeader) return failed;
     return (
       <Fragment key={field}>
         <span className="ph-subtitle-part ph-edit-part">
@@ -359,6 +364,45 @@ function SubtitleEditable({ person, edit, refs, onEdit }) {
   );
 }
 
+function ProfileMenu({ person, edit, refs, onEdit, photoEdit, photoEditButtonRef }) {
+  const fields = Object.keys(EDIT_LABEL).filter((field) => edit.canEdit[field]);
+  const changePhoto = person.avatar.photoUrl && photoEdit?.onEdit;
+  if (!fields.length && !changePhoto) return null;
+
+  function choose(event, action) {
+    const menu = event.currentTarget.closest('details');
+    menu.open = false;
+    menu.querySelector('summary').focus();
+    action();
+  }
+
+  return <details className="ph-profile-menu"
+    onBlur={(event) => {
+      if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false;
+    }}
+    onKeyDown={(event) => {
+      if (event.key !== 'Escape' || !event.currentTarget.open) return;
+      event.preventDefault();
+      event.currentTarget.open = false;
+      event.currentTarget.querySelector('summary').focus();
+    }}>
+    <summary className="ph-profile-menu-trigger" aria-label="Edit profile" ref={changePhoto ? photoEditButtonRef : undefined}>
+      <MoreHorizontal size={20} aria-hidden="true" />
+    </summary>
+    <div className="ph-profile-menu-actions">
+      {fields.map((field) => {
+        const value = person[field];
+        return <button type="button" key={field} aria-busy={edit.saving[field] || undefined}
+          onClick={(event) => choose(event, () => { refs.noteOpened(field); onEdit(field); })}>
+          {value || field === 'name' ? 'Edit' : 'Add'} {EDIT_LABEL[field]}
+        </button>;
+      })}
+      {changePhoto && <button type="button" aria-busy={photoEdit.saving || undefined}
+        onClick={(event) => choose(event, changePhoto)}>Change photo</button>}
+    </div>
+  </details>;
+}
+
 /**
  * @param {object} props
  * @param {import('./personHeaderModel.js').PersonHeaderModel} props.person
@@ -369,7 +413,7 @@ function SubtitleEditable({ person, edit, refs, onEdit }) {
 export default function PersonHeader({
   person, headingLevel = 2, actions = undefined, editing = undefined,
   photoButtonRef = undefined, photoEdit = undefined, photoEditButtonRef = undefined,
-  addStickerRef = undefined, addStickerOpen = false, addStickerPanel = null,
+  addStickerRef = undefined, addStickerOpen = false, addStickerPanel = null, compactHeader = false,
 }) {
   const edit = editState(actions, editing);
   const root = useRef(null);
@@ -388,25 +432,41 @@ export default function PersonHeader({
   const editable = edit.canEdit.title || edit.canEdit.organization || edit.active?.field === 'title' || edit.active?.field === 'organization';
   const showSubtitle = parts.subtitle || editable;
 
+  const stickerPills = stickers?.map((sticker) => (
+    <StickerPill key={sticker.id} sticker={sticker}
+      onRemove={!compactHeader && parts.controls.removeSticker ? actions.onRemoveSticker : null} />
+  ));
+  // Keep the picker in its anchor, outside the mobile scrolling region.
+  const addSticker = parts.addSticker && <>
+    <button type="button" ref={addStickerRef} className="ph-add-sticker" aria-label="Add sticker"
+      aria-haspopup="listbox" aria-expanded={addStickerOpen ? 'true' : 'false'} onClick={actions.onAddSticker}>
+      <Plus size={14} aria-hidden="true" />
+      <span>Add sticker</span>
+    </button>
+    {addStickerPanel}
+  </>;
+
   return (
     <article ref={root} className="ph" aria-label={`Contact: ${person.name}`} style={ACCENT}>
       {/* data-layout says which of the two optional rows exist (c: ways to reach them, s: stickers), so the layout closes up around a missing one. */}
       <div className="ph-card" data-layout={`${hasContacts ? 'c1' : 'c0'}${stickers ? 's1' : 's0'}`}>
-        <Avatar person={person} onPhotoClick={actions?.onPhotoClick} photoButtonRef={photoButtonRef} photoEdit={photoEdit} photoEditButtonRef={photoEditButtonRef} />
+        <Avatar compactHeader={compactHeader} person={person} onPhotoClick={actions?.onPhotoClick} photoButtonRef={photoButtonRef} photoEdit={photoEdit} photoEditButtonRef={photoEditButtonRef} />
 
         <div className="ph-identity">
+          {compactHeader && <ProfileMenu person={person} edit={edit} refs={refs} onEdit={actions?.onEdit}
+            photoEdit={photoEdit} photoEditButtonRef={photoEditButtonRef} />}
           {edit.active?.field === 'name' ? (
             <FieldEditor field="name" edit={edit} refs={refs} />
           ) : edit.canEdit.name ? (
             <div className="ph-line ph-line--name">
               {heading}
-              <EditButton field="name" label="Edit name" edit={edit} refs={refs} onEdit={actions.onEdit} />
+              {!compactHeader && <EditButton field="name" label="Edit name" edit={edit} refs={refs} onEdit={actions.onEdit} />}
             </div>
           ) : heading}
           {edit.failure?.field === 'name' && edit.active?.field !== 'name' ? <FieldMessage message={edit.failure.message} /> : null}
           {showSubtitle ? (
             editable ? (
-              <SubtitleEditable person={person} edit={edit} refs={refs} onEdit={actions.onEdit} />
+              <SubtitleEditable compactHeader={compactHeader} person={person} edit={edit} refs={refs} onEdit={actions.onEdit} />
             ) : parts.subtitle ? (
               <p className="ph-subtitle" dir="auto" title={subtitle.join(' · ')}>
                 {subtitle.map((part, index) => (
@@ -479,31 +539,17 @@ export default function PersonHeader({
           </ul>
         ) : null}
 
-        {stickers ? (
+        {stickers && (compactHeader ? (
+          <div className="ph-sticker-strip" role="group" aria-label="Contact stickers">
+            {stickerPills.length > 0 && <ul className="ph-sticker-scroll" aria-label="Stickers" tabIndex={0}>{stickerPills}</ul>}
+            {addSticker && <div className="ph-add-sticker-item">{addSticker}</div>}
+          </div>
+        ) : (
           <ul className={`ph-stickers${parts.controls.addSticker || parts.controls.removeSticker ? ' ph-stickers--editable' : ''}`} aria-label="Stickers">
-            {stickers.map((sticker) => (
-              <StickerPill key={sticker.id} sticker={sticker} onRemove={parts.controls.removeSticker ? actions.onRemoveSticker : null} />
-            ))}
-            {parts.addSticker ? (
-              // The picker is drawn INSIDE this item: it places itself against its parent, which is the chip's own box.
-              <li className="ph-add-sticker-item">
-                <button
-                  type="button"
-                  ref={addStickerRef}
-                  className="ph-add-sticker"
-                  aria-label="Add sticker"
-                  aria-haspopup="listbox"
-                  aria-expanded={addStickerOpen ? 'true' : 'false'}
-                  onClick={actions.onAddSticker}
-                >
-                  <Plus size={14} aria-hidden="true" />
-                  <span>Add sticker</span>
-                </button>
-                {addStickerPanel}
-              </li>
-            ) : null}
+            {stickerPills}
+            {addSticker && <li className="ph-add-sticker-item">{addSticker}</li>}
           </ul>
-        ) : null}
+        ))}
       </div>
       {edit.anyEdit || edit.active ? (
         <p className="ph-sr" role="status" aria-live="polite" aria-atomic="true">{edit.message}</p>

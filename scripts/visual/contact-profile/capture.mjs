@@ -152,6 +152,102 @@ const load = async (query) => {
 };
 const pickContact = async (id) => { await click(demoBtn(id)); await until(`document.querySelector('.demo-btn[aria-pressed="true"]').textContent === ${JSON.stringify(id)}`); await wait(500); };
 
+if (process.argv.includes('--photo')) {
+  await send('Page.setInterceptFileChooserDialog', { enabled: true });
+  const photoShot = async (filename) => {
+    const { data } = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    writeFileSync(join(OUT, filename), Buffer.from(data, 'base64'));
+  };
+  async function pickFile(label, filename) {
+    let opened;
+    const chooser = new Promise((resolve) => { opened = resolve; });
+    const onChooser = ({ method, params }) => { if (method === 'Page.fileChooserOpened') opened(params); };
+    listeners.push(onChooser);
+    try {
+      await click(byText(label));
+      const { backendNodeId } = await Promise.race([chooser, wait(3000).then(() => { throw new Error('File chooser did not open'); })]);
+      await send('DOM.setFileInputFiles', { backendNodeId, files: [join(process.cwd(), 'public', filename)] });
+    } finally {
+      listeners.splice(listeners.indexOf(onChooser), 1);
+    }
+  }
+  async function openPhoto(mobile, hasPhoto = true, name = 'Jordan Lee') {
+    if (mobile && hasPhoto) {
+      await click(byLabel('Edit profile'));
+      await click(byText('Change photo'));
+    } else await click(byLabel(hasPhoto ? 'Change photo' : `Add photo for ${name}`));
+  }
+  for (const [folder, theme] of THEMES) for (const vp of VIEWPORTS) {
+    const tag = `${folder}-${vp.id}`;
+    await send('Emulation.setDeviceMetricsOverride', { width: vp.width, height: vp.height, deviceScaleFactor: vp.dpr, mobile: vp.mobile });
+    await send('Emulation.setTouchEmulationEnabled', { enabled: vp.mobile });
+    await load(`action=1&photo=1&theme=${theme}&latency=300&scout=${folder === 'dark' ? 1 : 0}`);
+    const original = await evaluate("document.querySelector('.ph-avatar-img').src");
+    await openPhoto(vp.mobile);
+    check(`${tag}: editor is a modal in the expected position`, await evaluate(`(() => {
+      const rect = document.querySelector('.cp-photo-editor:modal').getBoundingClientRect();
+      return ${vp.mobile} ? Math.abs(rect.bottom - innerHeight) < 3 : Math.abs((rect.left + rect.right) / 2 - innerWidth / 2) < 3;
+    })()`));
+    check(`${tag}: camera and library have separate native inputs`, await evaluate(`document.querySelector('[aria-label="Camera photo"]').getAttribute('capture') === 'environment' &&
+      !document.querySelector('[aria-label="Device photo"]').hasAttribute('capture')`));
+    await photoShot(`photo-options-${tag}.png`);
+    await pickFile(vp.mobile ? 'Take a photo' : 'Choose a photo', 'barry-bear.jpg');
+    check(`${tag}: real local file opens the existing crop dialog`, await until(`Boolean(document.querySelector('.mycard-crop-viewport img'))`));
+    await until(`[...document.querySelectorAll('.mycard-crop button')].some(b => b.textContent.trim() === 'Use photo' && !b.disabled)`);
+    await click(byLabel('Zoom in'));
+    check(`${tag}: crop zoom changes framing`, await evaluate(`Number(document.querySelector('.mycard-crop-slider').value) > 1`));
+    await photoShot(`photo-crop-${tag}.png`);
+    await click(byText('Use photo'));
+    check(`${tag}: processed preview waits for Save`, await until(`document.querySelector('.cp-photo-preview img')?.src.startsWith('data:image/jpeg;base64,') &&
+      document.querySelector('.cp-photo-preview img').src.length <= 65536 && window.__writes.length === 0`));
+    await photoShot(`photo-preview-${tag}.png`);
+    await evaluate('window.__fixture.failNext = true');
+    await click(byText('Save photo'));
+    check(`${tag}: failure restores the original and keeps the staged preview`, await until(`Boolean(document.querySelector('.cp-photo-editor [role=alert]')) &&
+      document.querySelector('.ph-avatar-img').src === ${JSON.stringify(original)} &&
+      document.querySelector('.cp-photo-preview img').src.startsWith('data:image/jpeg')`));
+    await click(byText('Save photo'));
+    check(`${tag}: retry shows the saved upload`, await until(`!document.querySelector('.cp-photo-editor') && document.querySelector('.ph-avatar-img').src.startsWith('data:image/jpeg')`));
+    await click(byLabel('View photo of Jordan Lee'));
+    check(`${tag}: uploaded photo opens in the existing viewer`, await until(`Boolean(document.querySelector('.civ-backdrop img[src^="data:image/jpeg"]'))`));
+    await key('Escape');
+    await openPhoto(vp.mobile);
+    await click(byText('Remove photo'));
+    await click(byText('Save photo'));
+    check(`${tag}: removal shows initials and keeps the original hidden`, await until(`!document.querySelector('.cp-photo-editor') && Boolean(${byLabel('Add photo for Jordan Lee')})`));
+    await pickContact('avery');
+    await pickContact('jordan');
+    check(`${tag}: hidden state survives leaving the contact`, Boolean(await evaluate(byLabel('Add photo for Jordan Lee'))));
+    await openPhoto(vp.mobile, false);
+    await click(byText('Restore original photo'));
+    await click(byText('Save photo'));
+    check(`${tag}: restore displays exactly the original URL`, await until(`!document.querySelector('.cp-photo-editor') && document.querySelector('.ph-avatar-img')?.src === ${JSON.stringify(original)}`));
+    await pickContact('avery');
+    await openPhoto(vp.mobile, false, 'Avery Quinn');
+    await click(byText('Use a photo URL'));
+    await click(`document.querySelector('.cp-photo-editor input[type=text]')`);
+    await typeText('http://images.fixture.test/avery.svg');
+    const before = (await writeRows()).length;
+    await click(byText('Save photo'));
+    check(`${tag}: invalid URL makes no write`, (await writeRows()).length === before && await evaluate(`Boolean(document.querySelector('.cp-photo-editor [role=alert]'))`));
+    await click(`document.querySelector('.cp-photo-editor input[type=text]')`);
+    await replaceText('https://images.fixture.test/avery.svg');
+    check(`${tag}: typing a URL does not fetch a preview`, !(await evaluate(`Boolean(document.querySelector('.cp-photo-preview img'))`)));
+    await click(byText('Preview link'));
+    await until(`document.querySelector('.cp-photo-preview img')?.naturalWidth > 0`);
+    await click(byText('Save photo'));
+    check(`${tag}: a contact without a photo can save a URL`, await until(`!document.querySelector('.cp-photo-editor') &&
+      document.querySelector('.ph-avatar-img')?.src === 'https://images.fixture.test/avery.svg'`));
+    await load(`action=1&photo=1&theme=${theme}&readonly=1`);
+    check(`${tag}: read-only can view but has no photo edit action`, await evaluate(`Boolean(${byLabel('View photo of Jordan Lee')}) &&
+      !document.querySelector('.ph-photo-edit, .ph-profile-menu-trigger, .cp-photo-editor')`));
+  }
+  const failed = checks.filter((entry) => !entry.pass);
+  writeFileSync(join(OUT, 'photo-report.json'), JSON.stringify({ checks, blocked: [...blocked], problems }, null, 2));
+  console.log(`${checks.length - failed.length}/${checks.length} photo checks passed. ${blocked.size} refused requests. ${problems.length} page errors.`);
+  socket.close(); cleanup(); process.exit(failed.length || blocked.size || problems.length ? 1 : 0);
+}
+
 if (process.argv.includes('--action')) {
   const button = (label) => byText(label, "document.querySelector('.ac')");
   const input = () => byLabel('What would you like to remember or do?');
@@ -160,30 +256,7 @@ if (process.argv.includes('--action')) {
     await typeText(value);
   };
   const waitForText = (text) => until(`document.querySelector('.ac').innerText.includes(${JSON.stringify(text)})`);
-  for (const vp of VIEWPORTS) {
-    await send('Emulation.setDeviceMetricsOverride', { width: vp.width, height: vp.height, deviceScaleFactor: vp.dpr, mobile: vp.mobile });
-    await send('Emulation.setTouchEmulationEnabled', { enabled: vp.mobile });
-    await load('action=1&latency=300');
-    check(`${vp.id}: Free defaults to Action Center with local Barry and no Emails`, Boolean(await evaluate(input())) &&
-      !(await evaluate(button('Emails'))) && !(await evaluate(button('Open Barry'))));
-    check(`${vp.id}: responsive layout has no horizontal overflow`, await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'));
-    await enteredText('Bring volunteer sign-up sheets');
-    await click(button('Set reminder'));
-    await evaluate(`(() => {
-      const date = document.querySelector('.ac input[type=date]');
-      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(date, '2027-07-10');
-      date.dispatchEvent(new Event('input', { bubbles: true }));
-      date.dispatchEvent(new Event('change', { bubbles: true }));
-    })()`);
-    await click(button('Save reminder'));
-    check(`${vp.id}: reminder saved with due date and Done`, (await waitForText('Reminder saved.')) && Boolean(await evaluate(button('Done'))));
-    await enteredText('Jordan confirmed the event date');
-    await click(button('Log update'));
-    await click(button('Save update'));
-    check(`${vp.id}: logged call appears in Recent Activity`, await waitForText('Jordan confirmed the event date'));
-    await enteredText('Prefers to coordinate on Mondays');
-    await click(button('Add note'));
-    check(`${vp.id}: saved note appears in Recent Activity`, await waitForText('Prefers to coordinate on Mondays'));
+  const captureAction = async (filename) => {
     await evaluate(`(() => {
       document.querySelector('.demo-banner').hidden = true;
       document.querySelector('.demo-controls').style.display = 'none';
@@ -194,19 +267,99 @@ if (process.argv.includes('--action')) {
     const { data } = await send('Page.captureScreenshot', {
       format: 'png', captureBeyondViewport: true, clip: { x: 0, y: 0, width, height, scale: 1 },
     });
-    writeFileSync(join(OUT, `action-center-${vp.id}.png`), Buffer.from(data, 'base64'));
+    writeFileSync(join(OUT, filename), Buffer.from(data, 'base64'));
     await evaluate(`(() => {
       document.querySelector('.demo-banner').hidden = false;
       document.querySelector('.demo-controls').style.display = '';
       document.querySelector('.demo-log').hidden = false;
     })()`);
-    await click(button('View activity'));
-    check(`${vp.id}: the Activity tab shows the same saved history once`, await evaluate(`document.querySelector('.ac [role=tabpanel]').innerText.split('Prefers to coordinate on Mondays').length === 2`));
+  };
+  for (const [folder, theme] of THEMES) for (const vp of VIEWPORTS) {
+    const tag = `${folder}-${vp.id}`;
+    await send('Emulation.setDeviceMetricsOverride', { width: vp.width, height: vp.height, deviceScaleFactor: vp.dpr, mobile: vp.mobile });
+    await send('Emulation.setTouchEmulationEnabled', { enabled: vp.mobile });
+    await load(`action=1&latency=300&theme=${theme}`);
+    check(`${tag}: Free defaults to Action Center with local Barry and no Emails`, Boolean(await evaluate(input())) &&
+      !(await evaluate(button('Emails'))) && !(await evaluate(button('Open Barry'))));
+    check(`${tag}: responsive layout has no horizontal overflow`, await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'));
+    check(`${tag}: colorful stickers and Add sticker are visible`, await evaluate(`Boolean(
+      document.querySelector('${vp.mobile ? '.ph-sticker-strip' : '.ph-stickers'} .ph-sticker-emoji')?.getClientRects().length &&
+      document.querySelector('.ph-add-sticker')?.getClientRects().length)`));
+    if (!vp.mobile) check(`${tag}: desktop stickers occupy the upper-right header column`, await evaluate(`(() => {
+      const stickers = document.querySelector('.ph-stickers').getBoundingClientRect();
+      const name = document.querySelector('.ph-name').getBoundingClientRect();
+      return stickers.left > name.right && Math.abs(stickers.top - name.top) < 40;
+    })()`));
+    await enteredText('Bring volunteer sign-up sheets');
+    await click(button('Set reminder'));
+    await evaluate(`(() => {
+      const date = document.querySelector('.ac input[type=date]');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(date, '2027-07-10');
+      date.dispatchEvent(new Event('input', { bubbles: true }));
+      date.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await click(button('Save reminder'));
+    check(`${tag}: reminder saved with due date and Done`, (await waitForText('Reminder saved.')) && Boolean(await evaluate(button('Done'))));
+    await enteredText('Jordan confirmed the event date');
+    await click(button('Log update'));
+    check(`${tag}: interaction sheet opens with the draft and editable date`, await evaluate(`Boolean(document.querySelector('.ac-sheet[open] input[type=date]').value) && document.querySelector('.ac-sheet textarea').value === 'Jordan confirmed the event date'`));
+    if (vp.mobile && folder === 'light') await shot(join(OUT, 'log-interaction-mobile.png'));
+    await click(button('Save update'));
+    check(`${tag}: logged call appears in Recent Activity`, await waitForText('Jordan confirmed the event date'));
+    await enteredText('Prefers to coordinate on Mondays');
+    await click(button('Add note'));
+    check(`${tag}: saved note appears in Recent Activity`, await waitForText('Prefers to coordinate on Mondays'));
+    await captureAction(`action-center-${tag}.png`);
+    await click(button('View all'));
+    check(`${tag}: the Activity tab shows the same saved history once`, await evaluate(`document.querySelector('.ac [role=tabpanel]').innerText.split('Prefers to coordinate on Mondays').length === 2`));
     await click(button('Action Center'));
+    if (vp.mobile && folder === 'light') {
+      await click(byLabel('Note actions'));
+      await captureAction('recent-activity-menu-mobile.png');
+      await click(button('Edit note'));
+      await click(button('Cancel'));
+      await click(button('Details'));
+      await captureAction('details-mobile.png');
+      await click(button('Edit location'));
+      await click(`document.querySelector('.ac-details input')`);
+      await replaceText('Ogden, UT');
+      await click(button('Save location'));
+      check('mobile: editing location updates the same profile', await until(`document.querySelector('.ph-location-text').textContent === 'Ogden, UT'`));
+      await click(button('Stickers'));
+      check('mobile: sticker management remains available under Stickers', await evaluate(`Boolean(document.querySelector('.ac [aria-label="Add sticker"]')?.getClientRects().length)`));
+      await captureAction('stickers-mobile.png');
+      await click(button('Action Center'));
+    }
     await click(button('Done'));
-    check(`${vp.id}: Done clears Up Next and records completion`, (await waitForText('Reminder completed.')) && (await waitForText('No reminder set.')));
+    check(`${tag}: Done clears Up Next and records completion`, (await waitForText('Reminder completed.')) && (await waitForText('No reminder set.')));
     await pickContact('avery');
-    check(`${vp.id}: switching contact resets the composer and history`, (await waitForText('Notes and logged interactions will appear here.')) && !(await evaluate(`${input()}.value`)));
+    check(`${tag}: switching contact resets the composer and history`, (await waitForText('Notes and logged interactions will appear here.')) && !(await evaluate(`${input()}.value`)));
+    if (vp.mobile && folder === 'light') {
+      check('mobile: empty contact still offers Add sticker', await evaluate(`Boolean(document.querySelector('.ph-sticker-strip .ph-add-sticker')) &&
+        !document.querySelector('.ph-sticker-scroll')`));
+      await click(byLabel('Add sticker'));
+      await until(`Boolean(document.querySelector('.stk-picker--sheet'))`);
+      await holdStickerWrite();
+      await click(pickerOption('Donor'));
+      check('mobile: pending sticker is visible in the compact row', await evaluate(`document.querySelector('.ph-sticker-scroll [aria-busy=true]')?.title === 'Donor'`));
+      await settleStickerWrite();
+      await until(`!document.querySelector('.ph-sticker-scroll [aria-busy=true]')`);
+      await pickContact('long');
+      check('mobile: chips stay on one scrollable row and the Add sticker target stays fixed', await evaluate(`(() => {
+        const row = document.querySelector('.ph-sticker-scroll');
+        const add = document.querySelector('.ph-add-sticker');
+        const before = add.getBoundingClientRect();
+        const chipRows = new Set([...row.children].map((chip) => chip.getBoundingClientRect().top));
+        row.scrollLeft = row.scrollWidth;
+        const after = add.getBoundingClientRect();
+        return row.scrollLeft > 0 && chipRows.size === 1 && Math.abs(after.x - before.x) < 1 && after.height >= 44 && after.width >= 44;
+      })()`));
+      await captureAction('stickers-overflow-mobile.png');
+      await click(byLabel('Add sticker'));
+      check('mobile: pinned Add sticker opens an unclipped sheet after scrolling', await until(`Boolean(document.querySelector('.stk-picker--sheet'))`));
+      await load('action=1&stickers=off');
+      check('mobile: unavailable stickers keep their existing visibility gate', !(await evaluate(`Boolean(document.querySelector('.ph-sticker-strip'))`)));
+    }
   }
   await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   await send('Emulation.setTouchEmulationEnabled', { enabled: false });

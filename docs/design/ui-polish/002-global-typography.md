@@ -515,3 +515,39 @@ knowing before that team sees a 16px field they did not write.
 - The 1,918 inline sizes outside Daily Discoveries.
 - Five never-imported stylesheets, left in place as instructed.
 - No test asserts rendered typography; the guard checks source, not pixels.
+
+---
+
+## Notice for the Contact Hub team
+
+**One rule in `src/index.css` affects your surface, and no file of yours was
+touched.**
+
+UI Polish #002 added a mobile-only guard against iOS Safari's focus zoom:
+
+```css
+@media (max-width: 768px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+  textarea,
+  select { font-size: var(--text-md) !important; }
+}
+```
+
+**What you will see:** on viewports ≤768px, text inputs, textareas and selects
+in Contact Hub render at 16px regardless of the size your CSS specifies.
+Desktop is completely unaffected — your components keep the sizes they chose.
+
+**Why it is global:** iOS zooms the whole viewport when a field under 16px
+takes focus and leaves the page zoomed. 81 live controls across the product
+were under 16px. One platform rule was preferable to 81 edits across 39 files,
+and it was the only way to fix it without editing your files.
+
+**If it causes you a problem:** it is a single self-contained block, tagged
+`iOS INPUT ZOOM GUARD`. Reverting commit `5e8d687b` removes it and touches
+nothing else (verified: one file, 26 deletions). Say so and it comes out.
+
+Also relevant to you: Contact Hub is **excluded by path** from the typography
+guard in `scripts/checkTypography.mjs`, so none of its files can fail that
+check. It was already the cleanest surface in the codebase — zero inline sizes,
+no font-family override — and #002 used it as the reference rather than
+changing it.

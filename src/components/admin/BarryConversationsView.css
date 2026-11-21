@@ -21,7 +21,7 @@
 }
 
 .barry-conversations-view .section-header h2 {
-  font-size: 1.125rem;
+  font-size: var(--text-lg);
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
@@ -35,7 +35,7 @@
   gap: 0.375rem;
   padding: 0.25rem 0.625rem;
   border-radius: 9999px;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   font-weight: 600;
 }
 
@@ -63,7 +63,7 @@
   padding: 1rem;
   text-align: center;
   color: var(--text-secondary);
-  font-size: 0.875rem;
+  font-size: var(--text-base);
 }
 
 .error-state {
@@ -81,12 +81,12 @@
 
 .empty-state p {
   margin: 0.75rem 0 0.25rem 0;
-  font-size: 0.9375rem;
+  font-size: var(--text-md);
   color: var(--text-secondary);
 }
 
 .empty-hint {
-  font-size: 0.8125rem;
+  font-size: var(--text-sm);
   color: var(--text-faint);
 }
 
@@ -112,7 +112,7 @@
 }
 
 .summary-label {
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   font-weight: 600;
   color: var(--text-secondary);
   text-transform: uppercase;
@@ -120,7 +120,7 @@
 }
 
 .summary-value {
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   font-weight: 600;
   color: var(--text-primary);
 }
@@ -148,7 +148,7 @@
 
 .extracted-icp h3 {
   margin: 0 0 0.75rem 0;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   font-weight: 700;
   color: #5b21b6;
 }
@@ -170,7 +170,7 @@
 }
 
 .field-label {
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   font-weight: 600;
   color: #7c3aed;
   text-transform: uppercase;
@@ -178,7 +178,7 @@
 }
 
 .field-value {
-  font-size: 0.8125rem;
+  font-size: var(--text-sm);
   color: var(--text-primary);
   font-weight: 500;
 }
@@ -205,7 +205,7 @@
   background: var(--bg-secondary);
   border: none;
   cursor: pointer;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   font-weight: 600;
   color: var(--text-primary);
   transition: background 0.2s;
@@ -257,21 +257,21 @@
 }
 
 .message-role {
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .message-time {
-  font-size: 0.6875rem;
+  font-size: var(--text-2xs);
   color: var(--text-faint);
 }
 
 .message-content p {
   margin: 0 0 0.25rem 0;
-  font-size: 0.8125rem;
+  font-size: var(--text-sm);
   color: var(--text-primary);
-  line-height: 1.5;
+  line-height: var(--leading-normal);
 }
 
 .message-content p:last-child {
@@ -285,7 +285,7 @@
 }
 
 .source-label {
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   color: var(--text-faint);
 }
 

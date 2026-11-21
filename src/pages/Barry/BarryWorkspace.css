@@ -158,7 +158,7 @@
   gap: 7px;
   padding: 10px 18px;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: var(--text-base);
   font-weight: 600;
   cursor: pointer;
   border: 1px solid transparent;
@@ -214,14 +214,14 @@
 
 .barry-workspace-title {
   margin: 0;
-  font-size: 17px;
+  font-size: var(--text-lg);
   font-weight: 700;
-  line-height: 1.2;
+  line-height: var(--leading-tight);
 }
 
 .barry-workspace-subtitle {
-  font-size: 13px;
-  line-height: 1.2;
+  font-size: var(--text-sm);
+  line-height: var(--leading-tight);
 }
 
 /* ── Conversation thread ─────────────────────────────────────────────────── */
@@ -280,8 +280,8 @@
   border-radius: 14px;
   border: 1px solid;
   max-width: 100%;
-  line-height: 1.6;
-  font-size: 14px;
+  line-height: var(--leading-relaxed);
+  font-size: var(--text-base);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
 }
 
@@ -298,7 +298,7 @@
 }
 
 .barry-workspace-prose {
-  line-height: 1.6;
+  line-height: var(--leading-relaxed);
 }
 
 .barry-workspace-prose p {
@@ -326,12 +326,12 @@
 /* Angles badge for structured turns */
 .barry-workspace-angles-summary {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 
 .barry-workspace-angles-badge {
   font-weight: 700;
-  font-size: 11px;
+  font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.04em;
   margin-right: 4px;
@@ -388,8 +388,8 @@
   border: 1.5px solid;
   border-radius: 12px;
   padding: 12px 16px;
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
   font-family: inherit;
   outline: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -414,7 +414,7 @@
   padding: 12px 22px;
   border: none;
   border-radius: 12px;
-  font-size: 14px;
+  font-size: var(--text-base);
   font-weight: 600;
   cursor: pointer;
   transition: opacity 0.15s ease, background 0.15s ease;
@@ -540,16 +540,16 @@
 
 .barry-fe-hero-heading {
   margin: 0 0 4px;
-  font-size: 26px;
+  font-size: var(--text-2xl);
   font-weight: 800;
   letter-spacing: -0.02em;
-  line-height: 1.2;
+  line-height: var(--leading-tight);
 }
 
 .barry-fe-hero-sub {
   margin: 0;
-  font-size: 15px;
-  line-height: 1.5;
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
   opacity: 0.7;
 }
 
@@ -583,7 +583,7 @@
 
 .barry-fe-send {
   padding: 12px 28px;
-  font-size: 15px;
+  font-size: var(--text-md);
 }
 
 /* ── First Experience responsive ───────────────────────────────────────── */
@@ -663,7 +663,7 @@
    Stripped from production builds by the import.meta.env.DEV guard. */
 .barry-workspace-devbar { padding: 6px 16px 0; }
 .barry-workspace-devbar button {
-  font-size: 11px; font-family: ui-monospace, monospace; opacity: .55;
+  font-size: var(--text-2xs); font-family: ui-monospace, monospace; opacity: .55;
   background: none; border: 1px dashed currentColor; border-radius: 6px;
   padding: 3px 8px; cursor: pointer; color: inherit;
 }
@@ -674,7 +674,7 @@
 .barry-workspace-linkoffer { display: flex; gap: 8px; align-items: center; padding: 8px 16px 0; }
 .barry-workspace-linkoffer button {
   padding: 8px 14px; border-radius: 9px; border: 0; font: inherit;
-  font-size: 13px; font-weight: 600; cursor: pointer;
+  font-size: var(--text-sm); font-weight: 600; cursor: pointer;
 }
 .barry-workspace-linkoffer button.quiet { background: none; text-decoration: underline; text-underline-offset: 2px; }
 .barry-workspace-linkoffer button:disabled { opacity: .5; cursor: not-allowed; }

@@ -66,6 +66,31 @@ export function addedLabel(contact, now = new Date()) {
   return `Added ${text}`;
 }
 
+/** The Added column: "Nov 12", with the year once it is not this one. '' when unknown. */
+export function addedShort(contact, now = new Date()) {
+  return addedLabel(contact, now).replace(/^Added /, '');
+}
+
+/**
+ * How many people are drawn at first, and how many more each "Show more" adds.
+ *
+ * DISPLAY PAGING ONLY. Every person is already loaded (ContactHubMain reads the
+ * whole contacts collection once), and search, the sticker filter and the
+ * sticker counts all run over everyone, drawn or not. This only limits how
+ * many rows are put on screen. It does not reduce what is read or what it
+ * costs; paging the read itself would mean moving search, filtering and
+ * counting to the database.
+ */
+export const PAGE_SIZE = 50;
+
+/** The first `count` of a list, and what a "Show more" press would add. */
+export function pageOf(list, count) {
+  const all = list ?? [];
+  const drawn = all.slice(0, Math.max(0, count));
+  const remaining = all.length - drawn.length;
+  return { drawn, total: all.length, remaining, next: Math.min(PAGE_SIZE, remaining) };
+}
+
 export const personName = (contact) => contactDisplayName(contact);
 
 export const companyOf = (contact) => contact?.company_name || contact?.company || '';
@@ -111,3 +136,13 @@ export function visiblePeople(contacts, { term = '', stickerId = null, stickersB
 
 /** Where ContactHubMain's one load of the user's contacts stands. */
 export const HUB_STATUS = Object.freeze({ LOADING: 'loading', READY: 'ready', ERROR: 'error' });
+
+/**
+ * Stickers are switched on for this user, but their sticker list could not be
+ * read. That is not the same as having no stickers, and the page says so
+ * rather than showing an empty sticker area.
+ * @param stickers the value of useStickers()
+ */
+export function stickersFailedToLoad(stickers) {
+  return stickers?.availability === 'available' && stickers?.status === 'error';
+}

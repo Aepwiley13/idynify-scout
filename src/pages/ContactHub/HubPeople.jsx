@@ -1,10 +1,20 @@
 /**
  * HubPeople — Contact Hub's My People.
  *
- * A heading, a search box, Add Person, the sticker chips and a plain list.
- * Nothing else: no pipeline stages, no engagement status, no outreach
- * actions. Those stay in People (Command Center), which this does not replace
- * or change.
+ * A heading, Add Person, a search box, sticker navigation and the people, as
+ * a plain list or (on a desktop, by choice) a compact table. Nothing else: no
+ * pipeline stages, no engagement status, no outreach actions. Those stay in
+ * People (Command Center), which this does not replace or change.
+ *
+ * WHERE THE STICKER NAVIGATION IS
+ *   In the application sidebar, under Contact Hub (HubSidebarNav), wherever
+ *   the sidebar offers a place for it: a desktop with the sidebar expanded.
+ *   The people then have the whole content area.
+ *   Otherwise (a phone, the compact sidebar, a page with no sidebar) it is
+ *   the chip row here. Never both.
+ * The List / Table choice follows the room the people actually have beside
+ * the sidebar, measured here, not the size of the window: the sidebar can be
+ * 64 or 220px, so the same window can be either.
  *
  * Reused as they are: the contacts ContactHubMain loaded, the sticker
  * registry, People's sticker chips (interactive on a wide screen, read-only
@@ -13,12 +23,14 @@
  * With no one in My People yet there is nothing to search, filter or sort, so
  * none of that is drawn: one friendly message and one action.
  */
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
-import { Link, useOutletContext } from 'react-router-dom';
-import { Mail, Phone, Search, Upload, UserPlus, Users, X } from 'lucide-react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
+import { ArrowLeft, List, Mail, Phone, Search, Table2, Upload, UserPlus, Users, X } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { useIsMobile } from '../../hooks/useIsMobile';
-import { contactHubPersonPath } from '../../constants/contactHub';
+import {
+  CONTACT_HUB_PATH, CONTACT_HUB_SIDEBAR_SLOT, CONTACT_HUB_STICKERS_PATH, contactHubPersonPath, isContactHubStickersPath,
+} from '../../constants/contactHub';
 import { hasRealContactPhoto, resolveContactPhotoSources, getInitials } from '../../utils/contactPhoto';
 import { useStickers } from '../../components/stickers/stickersRegistry';
 import { resolveStickerFilter } from '../../components/stickers/peopleStickers';
@@ -29,13 +41,61 @@ import ManualContactForm from '../../components/scout/ManualContactForm';
 import ImportPeopleDialog from '../../components/contactImport/ImportPeopleDialog';
 import { importSummary } from '../../components/contactImport/importPeople';
 import StickerChipRow from './StickerChipRow';
+import { AVAILABILITY } from '../../components/stickers/stickersAvailabilityState';
+import StickersLoadError from './StickersLoadError';
+import { useSidebarSlot } from '../../components/layout/sidebarSlots';
+import HubTable from './HubTable';
 import { describeAddPersonError } from './addPersonErrors';
 import {
-  HUB_STATUS, listMyPeople, visiblePeople, personName, personSubtitle, emailOf, phoneOf, addedLabel,
+  HUB_STATUS, PAGE_SIZE, listMyPeople, visiblePeople, pageOf, stickersFailedToLoad, personName, personSubtitle, emailOf, phoneOf, addedLabel,
 } from './peopleRules';
 
 /** How many sticker chips a row shows before "+N". */
 export const ROW_STICKER_MAX = 2;
+
+/**
+ * The table needs room for its columns. Where Contact Hub's content area is
+ * narrower than this (a small window beside the wide sidebar), the list is
+ * shown whatever was chosen, and the choice is not offered. Between this and
+ * TABLE_FULL_WIDTH the Added column gives way to the other four.
+ */
+export const TABLE_MIN_WIDTH = 600;
+export const TABLE_FULL_WIDTH = 760;
+
+export const VIEW = Object.freeze({ LIST: 'list', TABLE: 'table' });
+/** This browser only: a convenience, not an account setting. */
+export const VIEW_STORAGE_KEY = 'idynify_hub_view';
+
+function readStoredView() {
+  try {
+    return window.localStorage.getItem(VIEW_STORAGE_KEY) === VIEW.TABLE ? VIEW.TABLE : VIEW.LIST;
+  } catch {
+    return VIEW.LIST; // storage blocked or unavailable: the default
+  }
+}
+
+/**
+ * The width of an element, kept up to date. 0 until it can be measured (and
+ * wherever it cannot be, such as a test without layout), which callers treat
+ * as "not wide".
+ */
+function useElementWidth(ref) {
+  const [width, setWidth] = useState(0);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return undefined;
+    // Before the first paint, so the table does not appear a frame late.
+    setWidth(el.getBoundingClientRect().width);
+    if (typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver((entries) => {
+      const next = entries[entries.length - 1]?.contentRect?.width;
+      if (typeof next === 'number') setWidth(next);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref]);
+  return width;
+}
 
 /**
  * The add form here: no pipeline, no enrichment, no Scout+, and only Name,
@@ -165,14 +225,27 @@ export default function HubPeople() {
   const isMobile = useIsMobile();
   const {
     status, contacts, reload, addContacts, applyStickerChange,
-    searchTerm, setSearchTerm, stickerId, setStickerId,
+    searchTerm, setSearchTerm, stickerId, setStickerId, listPath,
   } = useOutletContext();
   const stickers = useStickers();
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
   const [imported, setImported] = useState('');
-  const [managing, setManaging] = useState(false);
+  // The Sticker Wall is this screen at its own address (/contact-hub/stickers).
+  const navigate = useNavigate();
+  const managing = isContactHubStickersPath(useLocation().pathname);
+  const openWall = () => navigate(CONTACT_HUB_STICKERS_PATH);
+  // Leaving the wall returns to My People as it was, sticker filter included.
+  const closeWall = () => navigate(listPath || CONTACT_HUB_PATH);
   const [justAdded, setJustAdded] = useState(null);
+  const [view, setView] = useState(readStoredView);
+  const workspaceRef = useRef(null);
+  const contentWidth = useElementWidth(workspaceRef);
+
+  function chooseView(next) {
+    setView(next);
+    try { window.localStorage.setItem(VIEW_STORAGE_KEY, next); } catch { /* not remembered; still switches */ }
+  }
 
   const people = useMemo(() => listMyPeople(contacts), [contacts]);
 
@@ -190,8 +263,23 @@ export default function HubPeople() {
     [contacts, searchTerm, activeSticker, stickers.ready, stickers.byId],
   );
 
-  // The Stickers view exists only while stickers are available.
-  const showWall = managing && stickers.ready;
+  // The wall's address is always the Sticker Wall screen: its own heading and
+  // way back, never My People under another name. The wall itself is drawn
+  // once stickers are available and loaded; until then, or if they are not
+  // available for this account, the screen says so (wallNotice, below).
+  const showWall = managing;
+  const wallReady = managing && stickers.ready;
+
+  // Display paging: how many of `shown` are drawn. A new search or filter
+  // starts from the first page again. Everyone is loaded and searched either
+  // way (peopleRules.js: PAGE_SIZE).
+  const pageKey = `${searchTerm}\u0000${activeSticker?.id ?? ''}`;
+  const [paging, setPaging] = useState({ key: pageKey, count: PAGE_SIZE });
+  // Adjusted while rendering, so the reset is permanent: clearing a search
+  // does not bring back every row that had been drawn before it.
+  if (paging.key !== pageKey) setPaging({ key: pageKey, count: PAGE_SIZE });
+  const drawnCount = paging.key === pageKey ? paging.count : PAGE_SIZE;
+  const page = useMemo(() => pageOf(shown, drawnCount), [shown, drawnCount]);
 
   function handleAdded(added) {
     addContacts(added);
@@ -208,8 +296,8 @@ export default function HubPeople() {
     reload();
   }
 
+  // Navigates to My People with that filter (or none), which also leaves the wall.
   function selectSticker(id) {
-    setManaging(false);
     setStickerId(id);
   }
 
@@ -217,9 +305,28 @@ export default function HubPeople() {
   // No one yet: the page is the invitation, with nothing else competing.
   const firstRun = status === HUB_STATUS.READY && people.length === 0;
 
-  // On a phone, Add sits beside the heading and search runs the full width
-  // below; on a wide screen search comes first. The order on screen is the
-  // order in the page, so the keyboard and screen readers follow what is seen.
+  const stickersBroken = stickersFailedToLoad(stickers);
+  // What the Sticker Wall screen says while the wall itself cannot be drawn.
+  // A failed load has its own message (StickersLoadError), so nothing here.
+  const wallNotice = !showWall || wallReady || stickersBroken
+    ? null
+    : stickers.availability === AVAILABILITY.UNAVAILABLE
+      ? 'Stickers are not available for this account yet.'
+      : 'Loading your stickers…';
+  // Contact Hub's entries are in the application sidebar wherever it offers a
+  // place for them (HubSidebarNav). Only where it does not (a phone, the
+  // compact sidebar, a page with no sidebar) is the chip row drawn here.
+  const sidebarSlot = useSidebarSlot(CONTACT_HUB_SIDEBAR_SLOT);
+  const navInSidebar = Boolean(sidebarSlot) && !isMobile;
+  // The room the people have: the whole content area.
+  // 0 means it could not be measured, which does not rule the table out.
+  const peopleWidth = contentWidth;
+  const tableFits = !isMobile && (peopleWidth === 0 || peopleWidth >= TABLE_MIN_WIDTH);
+  const asTable = view === VIEW.TABLE && tableFits;
+  const tightTable = peopleWidth !== 0 && peopleWidth < TABLE_FULL_WIDTH;
+
+  // Heading and Add first, then search across the full width: the same order
+  // at every width, so the keyboard and screen readers follow what is seen.
   const searchField = (
     <label key="search" className="hub-search" style={{ background: T.input ?? T.surface, borderColor: isMobile ? T.textMuted : T.border }}>
       <Search size={isMobile ? 20 : 18} aria-hidden="true" style={{ color: T.textMuted, flexShrink: 0 }} />
@@ -247,14 +354,50 @@ export default function HubPeople() {
     </button>
   );
 
+  // The page title, above the people at every width.
+  const pageHeader = (
+    <header className="hub-header">
+      <div>
+        <h1 className="hub-title">Contact Hub</h1>
+        <p className="hub-tagline" style={{ color: T.textMuted }}>The people in your world, in one place.</p>
+      </div>
+    </header>
+  );
+  // Desktop only: a phone always has the list.
+  const viewToggle = (
+    <div key="view" className="hub-view" role="group" aria-label="View" style={{ borderColor: T.border, background: T.cardBg }}>
+      {[VIEW.LIST, VIEW.TABLE].map((id) => (
+        <button
+          key={id}
+          type="button"
+          className="hub-view-btn"
+          aria-pressed={view === id ? 'true' : 'false'}
+          style={view === id ? { background: T.accentBg, color: T.text } : { background: 'transparent', color: T.textMuted }}
+          onClick={() => chooseView(id)}
+        >
+          {id === VIEW.LIST ? <List size={16} aria-hidden="true" /> : <Table2 size={16} aria-hidden="true" />}
+          {id === VIEW.LIST ? 'List' : 'Table'}
+        </button>
+      ))}
+    </div>
+  );
+  // The Sticker Wall is this screen under its own name, with its own way back.
+  const subtitle = showWall
+    ? 'Open a sticker to see its people'
+    : activeSticker
+      ? `People with the ${activeSticker.name} sticker`
+      : 'Everyone you know, in one place';
+  // On a phone the selected chip can be scrolled out of sight, so the list
+  // says which sticker it is filtered by, how many that is, and how to undo it.
+  const filteredNote = isMobile && activeSticker && !showWall && status === HUB_STATUS.READY
+    ? `${shown.length} ${shown.length === 1 ? 'person' : 'people'} with the ${activeSticker.name} sticker`
+    : null;
+
   return (
     <>
-      <header className="hub-header">
-        <div>
-          <h1 className="hub-title">Contact Hub</h1>
-          <p className="hub-tagline" style={{ color: T.textMuted }}>The people in your world, in one place.</p>
-        </div>
-      </header>
+      {pageHeader}
+
+      <div ref={workspaceRef} className="hub-workspace">
 
       {/* Colours reach the stylesheet as variables: on a phone the card is the list
           alone, and the heading, search and chips sit on the page above it. */}
@@ -264,22 +407,50 @@ export default function HubPeople() {
         style={{ '--hub-card': T.cardBg, '--hub-border': T.border, '--hub-muted': T.textMuted }}
       >
         <div className="hub-toolbar">
-          <h2 id="hub-people-heading" className="hub-section-title">
-            My People
-            {status === HUB_STATUS.READY && !firstRun ? <span className="hub-count" style={{ color: T.textMuted }}> ({people.length})</span> : null}
-          </h2>
-          {!firstRun && (isMobile ? [addButton, importButton, searchField] : [searchField, importButton, addButton])}
+          <div className="hub-heading">
+            {showWall ? (
+              <Link className="hub-back hub-back--wall" to={listPath || CONTACT_HUB_PATH} style={{ color: T.text }}>
+                <ArrowLeft size={18} aria-hidden="true" />
+                My People
+              </Link>
+            ) : null}
+            <h2 id="hub-people-heading" className="hub-section-title">
+              {showWall ? 'Sticker Wall' : 'My People'}
+              {status === HUB_STATUS.READY && !firstRun && !showWall ? <span className="hub-count" style={{ color: T.textMuted }}> ({people.length})</span> : null}
+            </h2>
+            {!firstRun && !isMobile ? <p className="hub-subtitle" style={{ color: T.textMuted }}>{subtitle}</p> : null}
+          </div>
+          {/* Adding and searching people belong to My People, not to the wall. */}
+          {!firstRun && !showWall && addButton}
+          {!firstRun && !showWall && (
+            <div className="hub-tools">
+              {searchField}
+              {importButton}
+              {tableFits ? viewToggle : null}
+            </div>
+          )}
         </div>
 
-        {!firstRun && (
+        {!firstRun && !navInSidebar && (
         <StickerChipRow
           people={people}
           selectedId={activeSticker?.id ?? null}
           onSelect={selectSticker}
           managing={showWall}
-          onToggleManage={() => setManaging((on) => !on)}
+          onToggleManage={() => (managing ? closeWall() : openWall())}
+          // A phone reaches the wall from the bottom bar; the row is filters only.
+          wallChip={!isMobile}
         />
         )}
+        {!firstRun && !navInSidebar && stickersBroken ? <StickersLoadError /> : null}
+        {filteredNote ? (
+          <p className="hub-filter-note" style={{ color: T.textMuted }}>
+            <span>{filteredNote}</span>
+            <button type="button" className="hub-link-btn" style={{ color: T.text }} onClick={() => setStickerId(null)}>
+              Show everyone
+            </button>
+          </p>
+        ) : null}
 
         <p className="hub-status" role="status" aria-live="polite" style={{ color: T.textMuted }}>
           {justAdded ? `${justAdded} was added to My People.` : imported}
@@ -296,11 +467,14 @@ export default function HubPeople() {
           </div>
         )}
 
-        {status === HUB_STATUS.READY && !firstRun && showWall && (
+        {status === HUB_STATUS.READY && wallReady && (
           <StickersWall contacts={people} onOpenSticker={(id) => selectSticker(id)} />
         )}
+        {wallNotice ? <p className="hub-note" style={{ color: T.textMuted }}>{wallNotice}</p> : null}
+        {/* With the navigation in the sidebar the message is there; the wall says it too. */}
+        {showWall && stickersBroken && navInSidebar ? <StickersLoadError /> : null}
 
-        {firstRun && (
+        {firstRun && !showWall && (
           <div className="hub-empty hub-empty--first">
             <span className="hub-empty-art" style={{ background: T.accentBg, color: T.accent }} aria-hidden="true">
               <Users size={32} />
@@ -338,9 +512,18 @@ export default function HubPeople() {
           </div>
         )}
 
-        {status === HUB_STATUS.READY && !showWall && shown.length > 0 && (
+        {status === HUB_STATUS.READY && !showWall && shown.length > 0 && (asTable ? (
+          <HubTable
+            rows={page.drawn}
+            tight={tightTable}
+            showStickers={stickers.ready}
+            stickerMax={ROW_STICKER_MAX}
+            onStickerChange={applyStickerChange}
+            renderAvatar={(contact, name) => <Avatar contact={contact} name={name} />}
+          />
+        ) : (
           <ul className="hub-list" aria-label="My People">
-            {shown.map((contact) => (
+            {page.drawn.map((contact) => (
               <PersonRow
                 key={contact.id}
                 contact={contact}
@@ -349,8 +532,25 @@ export default function HubPeople() {
               />
             ))}
           </ul>
+        ))}
+
+        {status === HUB_STATUS.READY && !showWall && page.remaining > 0 && (
+          <div className="hub-more" style={{ borderColor: T.border }}>
+            <span role="status" style={{ color: T.textMuted }}>
+              Showing {page.drawn.length} of {page.total} people
+            </span>
+            <button
+              type="button"
+              className="hub-secondary-btn"
+              style={{ color: T.text, borderColor: T.border }}
+              onClick={() => setPaging({ key: pageKey, count: drawnCount + PAGE_SIZE })}
+            >
+              Show {page.next} more
+            </button>
+          </div>
         )}
       </section>
+      </div>
 
       {adding ? <AddPersonDialog onClose={() => setAdding(false)} onAdded={handleAdded} /> : null}
       {importing ? <ImportPeopleDialog onClose={() => setImporting(false)} onImported={handleImported} /> : null}

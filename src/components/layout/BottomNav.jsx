@@ -24,6 +24,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { MoreHorizontal } from 'lucide-react';
 import { resolveModule } from '../../constants/navigationModel';
 import { bottomNavFor, moduleColorFor, GLOBAL_BOTTOM_NAV } from '../../constants/mobileNavigation';
+import { useStickersAvailability } from '../stickers/useStickersAvailability.js';
+import { AVAILABILITY } from '../stickers/stickersAvailabilityState.js';
 import './BottomNav.css';
 
 /**
@@ -70,7 +72,15 @@ const DEFAULT_ITEM = {
   'command-center': 'people',
 };
 
-export default function BottomNav({ onOpenMore, moreButtonRef }) {
+/** The Contact Hub cell that is the Sticker Wall: offered only to people stickers are available to. */
+const STICKER_WALL_ID = 'stickers';
+
+/**
+ * The bar. `without` names cells to leave out (their ids); everything else about
+ * the bar, its active item included, is worked out from the cells that remain,
+ * so a person on a page whose cell is not offered is lit on its nearest cell.
+ */
+function Bar({ onOpenMore, moreButtonRef, without = [] }) {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -81,7 +91,7 @@ export default function BottomNav({ onOpenMore, moreButtonRef }) {
   // Nothing is drawn, rather than a bar with one cell or the global fallback.
   if (config?.hidden) return null;
 
-  const items = config ? config.primary : GLOBAL_BOTTOM_NAV;
+  const items = (config ? config.primary : GLOBAL_BOTTOM_NAV).filter((item) => !without.includes(item.id));
   const hasOverflow = Boolean(config?.overflow?.length);
   const accent = moduleColorFor(module.id);
 
@@ -133,4 +143,23 @@ export default function BottomNav({ onOpenMore, moreButtonRef }) {
       })}
     </nav>
   );
+}
+
+/**
+ * Contact Hub's bar asks the same question the desktop sidebar asks (the server's
+ * stickersConfig answer, through useStickersAvailability): the Sticker Wall cell
+ * is there only when stickers are available. While the answer is not known, and
+ * for disabled, not enrolled, read-only, failed or unrecognised answers, it is
+ * not offered. My Card and My People never wait for it.
+ *
+ * A component of its own so that the question is asked in Contact Hub only.
+ */
+function ContactHubBar(props) {
+  const availability = useStickersAvailability();
+  return <Bar {...props} without={availability === AVAILABILITY.AVAILABLE ? [] : [STICKER_WALL_ID]} />;
+}
+
+export default function BottomNav(props) {
+  const module = resolveModule(useLocation().pathname);
+  return module.id === 'contact-hub' ? <ContactHubBar {...props} /> : <Bar {...props} />;
 }

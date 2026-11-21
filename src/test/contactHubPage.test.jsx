@@ -10,9 +10,12 @@
  * them.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, within, waitFor, configure } from '@testing-library/react';
+import { useEffect } from 'react';
+import { render, screen, within, waitFor, configure, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { MemoryRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { CONTACT_HUB_STICKERS_PATH, contactHubStickerPath } from '../constants/contactHub';
+import { ShellProvider, useShell } from '../context/ShellContext';
 import { createFakeStickers, sticker, config } from './helpers/stickersUi';
 import { setViewportWidth } from './helpers/matchMedia';
 
@@ -110,12 +113,30 @@ beforeEach(() => {
 });
 afterEach(() => { setViewportWidth(1024); vi.restoreAllMocks(); });
 
+// The address the app is at, and its history, as a test can see and drive them.
+const router = { at: '', navigate: null };
+function RouterProbe() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    router.at = location.pathname + location.search;
+    router.navigate = navigate;
+  }, [location, navigate]);
+  return null;
+}
+const goBack = () => act(() => { router.navigate(-1); });
+const goForward = () => act(() => { router.navigate(1); });
+/** Go to an address, as a tap on the shell's bottom bar does on a phone. */
+const goTo = (to) => act(() => { router.navigate(to); });
+
 function renderHub(url = '/contact-hub') {
   return render(
     <MemoryRouter initialEntries={[url]}>
+      <RouterProbe />
       <Routes>
         <Route path="/contact-hub" element={<ContactHubMain />}>
           <Route index element={<HubPeople />} />
+          <Route path="stickers" element={<HubPeople />} />
           <Route path="person/:contactId" element={<HubPerson />} />
         </Route>
         <Route path="/contact/:contactId" element={<div data-testid="full-profile" />} />
@@ -222,11 +243,11 @@ describe('sticker filters', () => {
     expect(names()).toHaveLength(4);
   });
 
-  it('the Stickers button opens the existing Stickers view, and a tile returns to the list filtered by it', async () => {
+  it('the Sticker Wall chip opens the existing Stickers view, and a tile returns to the list filtered by it', async () => {
     const user = userEvent.setup();
     renderHub();
     const group = await screen.findByRole('group', { name: 'Filter by sticker' });
-    await user.click(within(group).getByRole('button', { name: 'Stickers' }));
+    await user.click(within(group).getByRole('button', { name: 'Sticker Wall' }));
     expect(screen.queryByRole('list', { name: 'My People' })).toBeNull();
     const wall = await screen.findByTestId('stickers-wall');
     await user.click(within(wall).getByRole('button', { name: 'Partner, 1 person' }));
@@ -253,11 +274,11 @@ describe('sticker filters', () => {
     expect(names()).toHaveLength(4);
   });
 
-  it('stickers are optional: with none yet there is only the quiet Stickers button', async () => {
+  it('stickers are optional: with none yet there is only the quiet Sticker Wall chip', async () => {
     fake.current.state.registry = [];
     renderHub();
     const group = await screen.findByRole('group', { name: 'Filter by sticker' });
-    expect(within(group).getAllByRole('button').map((b) => b.textContent)).toEqual(['Stickers']);
+    expect(within(group).getAllByRole('button').map((b) => b.textContent)).toEqual(['Sticker Wall']);
   });
 });
 
@@ -428,13 +449,15 @@ describe('the add button and search at each width', () => {
     expect(screen.getByRole('dialog', { name: 'Add Person' })).toBeInTheDocument();
   });
 
-  it('a wide screen shows "Add Person", after search', async () => {
+  it('a wide screen shows "Add Person" beside the heading, with search across the row below', async () => {
     setViewportWidth(1280);
     renderHub();
     const add = await screen.findByRole('button', { name: 'Add Person' });
     expect(add).toHaveTextContent(/^Add Person$/);
     const search = screen.getByRole('searchbox', { name: 'Search people' });
-    expect(search.compareDocumentPosition(add) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // The same order at every width: heading, Add Person, then search.
+    expect(add.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(search.closest('.hub-tools')).not.toBeNull();
   });
 
   it('what is typed in search survives the layout changing width', async () => {
@@ -511,5 +534,448 @@ describe('the simple profile', () => {
   it('an unknown id gets the same answer', async () => {
     renderHub('/contact-hub/person/nope');
     expect(await screen.findByText('This person is not in My People.')).toBeInTheDocument();
+  });
+});
+
+describe('addresses: the Sticker Wall and a sticker filter each have one', () => {
+  const chips = () => screen.findByRole('group', { name: 'Filter by sticker' });
+
+  it('the helpers build the addresses the routes answer to', () => {
+    expect(CONTACT_HUB_STICKERS_PATH).toBe('/contact-hub/stickers');
+    expect(contactHubStickerPath(null)).toBe('/contact-hub');
+    expect(contactHubStickerPath('abc')).toBe('/contact-hub?sticker=abc');
+    expect(contactHubStickerPath('a b&c')).toBe('/contact-hub?sticker=a%20b%26c');
+  });
+
+  it('choosing a sticker puts it in the address; Back and Forward step through it', async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await user.click(within(await chips()).getByRole('button', { name: 'Partner, 1 person' }));
+    expect(router.at).toBe(`/contact-hub?sticker=${PARTNER.id}`);
+    expect(names()).toEqual(['Wes Clark']);
+    await user.click(within(await chips()).getByRole('button', { name: 'VIP, 1 person' }));
+    expect(router.at).toBe(`/contact-hub?sticker=${VIP.id}`);
+    expect(names()).toEqual(['Nakaiya Wiley']);
+
+    await goBack();
+    expect(router.at).toBe(`/contact-hub?sticker=${PARTNER.id}`);
+    expect(names()).toEqual(['Wes Clark']);
+    await goBack();
+    expect(router.at).toBe('/contact-hub');
+    expect(names()).toHaveLength(4);
+    await goForward();
+    expect(names()).toEqual(['Wes Clark']);
+    expect(within(await chips()).getByRole('button', { name: 'Partner, 1 person' })).toHaveAttribute('aria-pressed', 'true');
+    // Everyone was loaded once: a filter reads nothing.
+    expect(contactsData.loads).toBe(1);
+  });
+
+  it('pressing the chosen sticker again, or All, clears it from the address', async () => {
+    const user = userEvent.setup();
+    renderHub(`/contact-hub?sticker=${PARTNER.id}`);
+    await user.click(within(await chips()).getByRole('button', { name: 'Partner, 1 person' }));
+    expect(router.at).toBe('/contact-hub');
+    expect(names()).toHaveLength(4);
+  });
+
+  it('an address with a sticker opens My People already filtered', async () => {
+    renderHub(`/contact-hub?sticker=${VIP.id}`);
+    expect(within(await chips()).getByRole('button', { name: 'VIP, 1 person' })).toHaveAttribute('aria-pressed', 'true');
+    expect(names()).toEqual(['Nakaiya Wiley']);
+  });
+
+  it('an address naming a sticker that does not exist shows everyone', async () => {
+    renderHub('/contact-hub?sticker=NoSuchSticker00000000');
+    await chips();
+    expect(names()).toHaveLength(4);
+  });
+
+  it('/contact-hub/stickers opens the Sticker Wall directly', async () => {
+    renderHub('/contact-hub/stickers');
+    expect(await screen.findByTestId('stickers-wall')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'My People' })).toBeNull();
+    expect(within(await chips()).getByRole('button', { name: 'Sticker Wall' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('opening the wall is a step in history: Back returns to My People', async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await user.click(within(await chips()).getByRole('button', { name: 'Sticker Wall' }));
+    expect(router.at).toBe('/contact-hub/stickers');
+    await screen.findByTestId('stickers-wall');
+    await goBack();
+    expect(router.at).toBe('/contact-hub');
+    expect(screen.queryByTestId('stickers-wall')).toBeNull();
+    expect(names()).toHaveLength(4);
+  });
+
+  it('closing the wall returns to My People as it was, sticker filter included', async () => {
+    const user = userEvent.setup();
+    renderHub(`/contact-hub?sticker=${PARTNER.id}`);
+    await user.click(within(await chips()).getByRole('button', { name: 'Sticker Wall' }));
+    await screen.findByTestId('stickers-wall');
+    await user.click(within(await chips()).getByRole('button', { name: 'Sticker Wall' }));
+    expect(router.at).toBe(`/contact-hub?sticker=${PARTNER.id}`);
+    expect(names()).toEqual(['Wes Clark']);
+  });
+
+  it('a tile on the wall goes to My People filtered by that sticker', async () => {
+    const user = userEvent.setup();
+    renderHub('/contact-hub/stickers');
+    const wall = await screen.findByTestId('stickers-wall');
+    await user.click(within(wall).getByRole('button', { name: 'Partner, 1 person' }));
+    expect(router.at).toBe(`/contact-hub?sticker=${PARTNER.id}`);
+    expect(names()).toEqual(['Wes Clark']);
+  });
+
+  it('what is typed in search is kept across the wall and a filter, and is never in the address', async () => {
+    const user = userEvent.setup();
+    renderHub();
+    await screen.findByRole('list', { name: 'My People' });
+    await user.type(screen.getByRole('searchbox', { name: 'Search people' }), 'e');
+    await user.click(within(await chips()).getByRole('button', { name: 'Sticker Wall' }));
+    await screen.findByTestId('stickers-wall');
+    // The wall has no people to search, so the box is not shown there; what
+    // was typed is still there when My People comes back.
+    expect(screen.queryByRole('searchbox', { name: 'Search people' })).toBeNull();
+    await user.click(within(await chips()).getByRole('button', { name: 'Partner, 1 person' }));
+    expect(screen.getByRole('searchbox', { name: 'Search people' })).toHaveValue('e');
+    expect(router.at).toBe(`/contact-hub?sticker=${PARTNER.id}`);
+    expect(names()).toEqual(['Wes Clark']);
+    expect(contactsData.loads).toBe(1);
+  });
+
+  it('the way back from a person is My People as it was left, filter and search included', async () => {
+    const user = userEvent.setup();
+    renderHub(`/contact-hub?sticker=${PARTNER.id}`);
+    await chips();
+    await user.type(screen.getByRole('searchbox', { name: 'Search people' }), 'wes');
+    await user.click(screen.getByRole('link', { name: 'Wes Clark' }));
+    expect(router.at).toBe('/contact-hub/person/p2');
+    await user.click(screen.getByRole('link', { name: 'My People' }));
+    expect(router.at).toBe(`/contact-hub?sticker=${PARTNER.id}`);
+    expect(screen.getByRole('searchbox', { name: 'Search people' })).toHaveValue('wes');
+    expect(names()).toEqual(['Wes Clark']);
+  });
+
+  it('a person opened cold still has a way back to My People', async () => {
+    const user = userEvent.setup();
+    renderHub('/contact-hub/person/p2');
+    // Once the person has loaded: the link shown while loading is replaced.
+    await screen.findByTestId('notes');
+    await user.click(screen.getByRole('link', { name: 'My People' }));
+    expect(router.at).toBe('/contact-hub');
+    expect(names()).toHaveLength(4);
+  });
+
+  it('with stickers unavailable, the wall address says so plainly and leads back to My People', async () => {
+    const user = userEvent.setup();
+    fake.current.state.config = config({ enabled: false, mode: 'off', readOnly: false });
+    renderHub('/contact-hub/stickers');
+    expect(await screen.findByText('Stickers are not available for this account yet.')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeInTheDocument();
+    // Not My People under another name, and nothing that would write a sticker.
+    expect(screen.queryByRole('list', { name: 'My People' })).toBeNull();
+    expect(screen.queryByTestId('stickers-wall')).toBeNull();
+    expect(screen.queryByRole('button', { name: /sticker/i })).toBeNull();
+    expect(fake.current.state.subscriptions).toBe(0);
+
+    await user.click(screen.getByRole('link', { name: 'My People' }));
+    expect(router.at).toBe('/contact-hub');
+    expect(names()).toHaveLength(4);
+  });
+
+  it('on a phone the same addresses work; the chips are filters only, the wall is reached from the bottom bar', async () => {
+    setViewportWidth(375);
+    renderHub(`/contact-hub?sticker=${VIP.id}`);
+    expect(within(await chips()).getByRole('button', { name: 'VIP, 1 person' })).toHaveAttribute('aria-pressed', 'true');
+    expect(names()).toEqual(['Nakaiya Wiley']);
+    // No Sticker Wall chip on a phone: the shell's bottom bar carries it.
+    expect(within(await chips()).queryByRole('button', { name: 'Sticker Wall' })).toBeNull();
+    expect(within(await chips()).getAllByRole('button').map((b) => b.textContent.replace(/\d+$/, ''))).toEqual(['All', 'Partner', 'VIP']);
+    await goTo('/contact-hub/stickers');
+    expect(await screen.findByTestId('stickers-wall')).toBeInTheDocument();
+    // The filters are still there on the wall, and one still leads to its people.
+    expect(within(await chips()).queryByRole('button', { name: 'Sticker Wall' })).toBeNull();
+  });
+
+  it('a desktop without the sidebar entries keeps the Sticker Wall chip', async () => {
+    setViewportWidth(1024);
+    renderHub();
+    expect(within(await chips()).getByRole('button', { name: 'Sticker Wall' })).toBeInTheDocument();
+  });
+
+  it('on a phone with no stickers yet there is no empty chip row; the wall is where one is made', async () => {
+    setViewportWidth(375);
+    fake.current.state.registry = [];
+    renderHub();
+    await screen.findByRole('list', { name: 'My People' });
+    await waitFor(() => expect(fake.current.state.subscriptions).toBe(1));
+    expect(screen.queryByRole('group', { name: 'Filter by sticker' })).toBeNull();
+    await goTo('/contact-hub/stickers');
+    const wall = await screen.findByTestId('stickers-wall');
+    expect(within(wall).getByRole('button', { name: /New sticker/ })).toBeInTheDocument();
+  });
+});
+
+// The person page tells the shell who is open, the way every other profile
+// does, so the top bar names the person. These run inside the REAL shell
+// provider and read back what it holds, so the hook's own set and clear are
+// what is being tested, not a stand-in.
+describe('the shell is told who is open', () => {
+  const shellSeen = { context: null };
+  function ShellProbe() {
+    const { navigationContext } = useShell();
+    useEffect(() => { shellSeen.context = navigationContext; }, [navigationContext]);
+    return null;
+  }
+  /** What the shell currently holds about the open record. */
+  const open = () => ({
+    type: shellSeen.context.current_entity_type,
+    id: shellSeen.context.current_entity_id,
+    label: shellSeen.context.entity_label,
+    stage: shellSeen.context.current_pipeline_stage,
+  });
+  const NOBODY = { type: null, id: null, label: null, stage: null };
+
+  function renderHubInShell(url) {
+    shellSeen.context = null;
+    return render(
+      <MemoryRouter initialEntries={[url]}>
+        <RouterProbe />
+        <ShellProvider user={{ uid: 'u1' }} userData={{}}>
+          <ShellProbe />
+          <Routes>
+            <Route path="/contact-hub" element={<ContactHubMain />}>
+              <Route index element={<HubPeople />} />
+              <Route path="stickers" element={<HubPeople />} />
+              <Route path="person/:contactId" element={<HubPerson />} />
+            </Route>
+          </Routes>
+        </ShellProvider>
+      </MemoryRouter>,
+    );
+  }
+
+  it('opening a person reports their name and id, and no pipeline stage', async () => {
+    renderHubInShell('/contact-hub/person/p2');
+    await screen.findByTestId('notes');
+    await waitFor(() => expect(open()).toEqual({ type: 'contact', id: 'p2', label: 'Wes Clark', stage: null }));
+  });
+
+  it('a person in a sales stage is reported the same way: Contact Hub passes no stage', async () => {
+    renderHubInShell('/contact-hub/person/p5');
+    await screen.findByTestId('notes');
+    await waitFor(() => expect(open()).toEqual({ type: 'contact', id: 'p5', label: 'Hunter Stage', stage: null }));
+  });
+
+  it('nothing is reported while the people are still loading', async () => {
+    let finish;
+    const { getDocs } = await import('firebase/firestore');
+    getDocs.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve; }));
+    renderHubInShell('/contact-hub/person/p2');
+    await screen.findByText('Loading…');
+    expect(open()).toEqual(NOBODY);
+    finish({ docs: contactsData.list.map((d) => ({ id: d.id, data: () => d })) });
+    await waitFor(() => expect(open().id).toBe('p2'));
+  });
+
+  it('renaming the person updates what the shell holds, for the same id', async () => {
+    const user = userEvent.setup();
+    renderHubInShell('/contact-hub/person/p2');
+    await screen.findByTestId('notes');
+    await waitFor(() => expect(open().label).toBe('Wes Clark'));
+    await user.click(screen.getByRole('button', { name: 'rename' }));
+    await waitFor(() => expect(open()).toEqual({ type: 'contact', id: 'p2', label: 'Renamed Person', stage: null }));
+  });
+
+  it.each([
+    ['archived', '/contact-hub/person/p4'],
+    ['unknown', '/contact-hub/person/nobody'],
+  ])('an %s person is not reported as open', async (_label, url) => {
+    renderHubInShell(url);
+    await screen.findByText('This person is not in My People.');
+    expect(open()).toEqual(NOBODY);
+  });
+
+  it('when the people cannot be loaded, nobody is reported as open', async () => {
+    contactsData.fail = true;
+    renderHubInShell('/contact-hub/person/p2');
+    await screen.findByText('This person could not be loaded.');
+    expect(open()).toEqual(NOBODY);
+  });
+
+  it('returning to My People clears the person; opening another reports the new one', async () => {
+    const user = userEvent.setup();
+    renderHubInShell('/contact-hub/person/p2');
+    await screen.findByTestId('notes');
+    await waitFor(() => expect(open().id).toBe('p2'));
+
+    await user.click(screen.getByRole('link', { name: 'My People' }));
+    await screen.findByRole('list', { name: 'My People' });
+    await waitFor(() => expect(open()).toEqual(NOBODY));
+
+    await user.click(screen.getByRole('link', { name: 'Nakaiya Wiley' }));
+    await waitFor(() => expect(open()).toEqual({ type: 'contact', id: 'p1', label: 'Nakaiya Wiley', stage: null }));
+
+    // The browser's Back button leaves the person the same way.
+    await goBack();
+    await waitFor(() => expect(open()).toEqual(NOBODY));
+  });
+
+  it('My People and the Sticker Wall report nobody', async () => {
+    renderHubInShell('/contact-hub');
+    await screen.findByRole('list', { name: 'My People' });
+    expect(open()).toEqual(NOBODY);
+  });
+});
+
+describe('the Sticker Wall has its own name and a visible way back', () => {
+  it.each([[1024], [375]])('at %ipx it is headed "Sticker Wall", not "My People", with a link back', async (width) => {
+    setViewportWidth(width);
+    renderHub('/contact-hub/stickers');
+    await screen.findByTestId('stickers-wall');
+    expect(screen.getByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2, name: /My People/ })).toBeNull();
+    expect(screen.getByRole('link', { name: 'My People' })).toHaveAttribute('href', '/contact-hub');
+  });
+
+  it('adding and searching people are not offered on the wall, and come back with My People', async () => {
+    const user = userEvent.setup();
+    renderHub('/contact-hub/stickers');
+    await screen.findByTestId('stickers-wall');
+    expect(screen.queryByRole('button', { name: 'Add Person' })).toBeNull();
+    expect(screen.queryByRole('searchbox', { name: 'Search people' })).toBeNull();
+    expect(screen.queryByRole('group', { name: 'View' })).toBeNull();
+
+    await user.click(screen.getByRole('link', { name: 'My People' }));
+    expect(router.at).toBe('/contact-hub');
+    expect(screen.getByRole('heading', { level: 2, name: /My People/ })).toHaveTextContent('(4)');
+    expect(screen.getByRole('button', { name: 'Add Person' })).toBeInTheDocument();
+    expect(screen.getByRole('searchbox', { name: 'Search people' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeNull();
+    expect(names()).toHaveLength(4);
+  });
+
+  it('the way back returns to My People as it was left, sticker filter included', async () => {
+    const user = userEvent.setup();
+    setViewportWidth(375);
+    renderHub(`/contact-hub?sticker=${PARTNER.id}`);
+    await screen.findByRole('group', { name: 'Filter by sticker' });
+    await goTo('/contact-hub/stickers');
+    await screen.findByTestId('stickers-wall');
+    await user.click(screen.getByRole('link', { name: 'My People' }));
+    expect(router.at).toBe(`/contact-hub?sticker=${PARTNER.id}`);
+    expect(names()).toEqual(['Wes Clark']);
+  });
+
+  it('Back and Forward step between My People and the wall, and the heading follows', async () => {
+    const user = userEvent.setup();
+    renderHub();
+    const group = await screen.findByRole('group', { name: 'Filter by sticker' });
+    await user.click(within(group).getByRole('button', { name: 'Sticker Wall' }));
+    expect(await screen.findByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeInTheDocument();
+    await goBack();
+    expect(screen.getByRole('heading', { level: 2, name: /My People/ })).toBeInTheDocument();
+    await goForward();
+    expect(screen.getByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeInTheDocument();
+  });
+
+  it('while stickers are still being checked the wall says it is loading, never My People, then draws', async () => {
+    let answer;
+    fake.current.services.fetchStickersConfig = () => new Promise((resolve) => { answer = resolve; });
+    renderHub('/contact-hub/stickers');
+    expect(await screen.findByText('Loading your stickers…')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'My People' })).toBeNull();
+    expect(screen.queryByText(/not available|could not be loaded/i)).toBeNull();
+    answer(config());
+    expect(await screen.findByTestId('stickers-wall')).toBeInTheDocument();
+    expect(screen.queryByText('Loading your stickers…')).toBeNull();
+  });
+
+  it('when the sticker list fails to load, the wall says that, once, and not "not available"', async () => {
+    fake.current.services.subscribeStickers = (_uid, _onNext, onError) => {
+      fake.current.state.subscriptions += 1;
+      Promise.resolve().then(() => onError(Object.assign(new Error('unavailable'), { code: 'unavailable' })));
+      return () => {};
+    };
+    renderHub('/contact-hub/stickers');
+    expect(await screen.findByText(/Your stickers could not be loaded\. They have not been changed\./)).toBeInTheDocument();
+    expect(screen.getAllByText(/Your stickers could not be loaded/)).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeInTheDocument();
+    expect(screen.queryByText(/not available|Loading your stickers/i)).toBeNull();
+    expect(screen.queryByTestId('stickers-wall')).toBeNull();
+  });
+
+  it('with nobody in My People yet the wall is still the wall, so a sticker can be made first', async () => {
+    const user = userEvent.setup();
+    contactsData.list = [];
+    renderHub('/contact-hub/stickers');
+    const wall = await screen.findByTestId('stickers-wall');
+    expect(screen.getByRole('heading', { level: 2, name: 'Sticker Wall' })).toBeInTheDocument();
+    expect(within(wall).getByRole('button', { name: /New sticker/ })).toBeInTheDocument();
+    expect(screen.queryByText('Start with one person')).toBeNull();
+    // The invitation is My People's, and is there when you go back.
+    await user.click(screen.getByRole('link', { name: 'My People' }));
+    expect(await screen.findByText('Start with one person')).toBeInTheDocument();
+  });
+});
+
+describe('on a phone, a filtered list says which sticker and how many', () => {
+  beforeEach(() => { setViewportWidth(375); });
+
+  it('names the sticker and the number listed, and Show everyone clears it', async () => {
+    const user = userEvent.setup();
+    renderHub(`/contact-hub?sticker=${VIP.id}`);
+    await screen.findByRole('group', { name: 'Filter by sticker' });
+    expect(screen.getByText('1 person with the VIP sticker')).toBeInTheDocument();
+    expect(names()).toEqual(['Nakaiya Wiley']);
+
+    await user.click(screen.getByRole('button', { name: 'Show everyone' }));
+    expect(router.at).toBe('/contact-hub');
+    expect(screen.queryByText(/with the VIP sticker/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Show everyone' })).toBeNull();
+    expect(names()).toHaveLength(4);
+  });
+
+  it('counts what is listed: several people, and fewer when a search narrows them', async () => {
+    const user = userEvent.setup();
+    contactsData.list.push(person('p9', 'Zed Young', { sticker_ids: [VIP.id] }));
+    renderHub(`/contact-hub?sticker=${VIP.id}`);
+    await screen.findByRole('group', { name: 'Filter by sticker' });
+    expect(screen.getByText('2 people with the VIP sticker')).toBeInTheDocument();
+    // The archived person also holds VIP and is not counted.
+    expect(names()).toHaveLength(2);
+    await user.type(screen.getByRole('searchbox', { name: 'Search people' }), 'zed');
+    expect(screen.getByText('1 person with the VIP sticker')).toBeInTheDocument();
+    // Show everyone removes the sticker and keeps what was typed.
+    await user.click(screen.getByRole('button', { name: 'Show everyone' }));
+    expect(screen.getByRole('searchbox', { name: 'Search people' })).toHaveValue('zed');
+    expect(names()).toEqual(['Zed Young']);
+  });
+
+  it('says nothing with no sticker selected, and nothing on the wall', async () => {
+    renderHub();
+    await screen.findByRole('group', { name: 'Filter by sticker' });
+    expect(screen.queryByRole('button', { name: 'Show everyone' })).toBeNull();
+    await goTo('/contact-hub/stickers');
+    await screen.findByTestId('stickers-wall');
+    expect(screen.queryByRole('button', { name: 'Show everyone' })).toBeNull();
+  });
+
+  it('a sticker in the address that does not exist filters nothing and says nothing', async () => {
+    renderHub('/contact-hub?sticker=NoSuchSticker00000000');
+    await screen.findByRole('group', { name: 'Filter by sticker' });
+    expect(screen.queryByRole('button', { name: 'Show everyone' })).toBeNull();
+    expect(names()).toHaveLength(4);
+  });
+
+  it('a desktop keeps its own line and has no second one', async () => {
+    setViewportWidth(1024);
+    renderHub(`/contact-hub?sticker=${VIP.id}`);
+    await screen.findByRole('group', { name: 'Filter by sticker' });
+    expect(screen.getByText('People with the VIP sticker')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Show everyone' })).toBeNull();
   });
 });

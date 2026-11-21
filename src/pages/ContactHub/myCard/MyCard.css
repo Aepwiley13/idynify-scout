@@ -1,0 +1,417 @@
+/* My Card: the editor, the preview and their layout.
+
+   Colours are the shell's theme variables (src/index.css, set on
+   html[data-theme]) and nothing else, so every theme works without a second
+   sheet and this file holds no colour of its own. The one exception to
+   "follows the theme" is the card itself, which is IDYNIFY-branded in every
+   theme: its brand colours arrive as --mycard-brand-* from the design tokens
+   (MyCardPreview.jsx), not from here.
+
+   Mobile first, and compact: a control a thumb is meant to hit is 44px to hit
+   even where it is smaller to look at (a ::after grows the touch area), and
+   inputs are 16px so a phone does not zoom into them. */
+
+/* The scroll container, as for the rest of Contact Hub: the shell fixes the
+   content area to the height of the screen and does not scroll it, so the
+   page scrolls inside. */
+.mycard {
+  position: relative; width: 100%; box-sizing: border-box;
+  display: flex; flex-direction: column;
+  flex: 1 1 auto; min-height: 0;
+  padding: 12px 16px 0;
+  overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
+  /* The Save bar stays in view at the bottom, so anything scrolled to (a field that has just been
+     focused, a notice, the download's answer) must stop above it, not slide beneath. */
+  scroll-padding-bottom: 96px;
+  color: var(--text-primary);
+}
+/* The column fills the screen when the page is short, so the actions bar sits at the bottom
+   rather than just under the content, and grows with the page when it is long. */
+.mycard-inner { display: flex; flex-direction: column; flex: 1 0 auto; width: 100%; max-width: 1100px; margin: 0 auto; }
+.mycard-body { flex: 1 0 auto; padding-bottom: 20px; }
+
+@media (max-width: 768px) {
+  /* The shell paints a phone's content area in the card colour; here the page
+     is the app background and the sections are the cards on it. */
+  .mycard { background: var(--bg-primary); }
+}
+
+.mycard-header { margin-bottom: 12px; }
+.mycard-title { margin: 0; font-size: 24px; font-weight: 800; line-height: 1.15; letter-spacing: -0.01em; }
+.mycard-tagline { margin: 4px 0 0; font-size: 14px; color: var(--text-secondary); }
+
+/* ── Edit / Preview, on a narrow screen ── */
+.mycard-switch {
+  display: flex; gap: 4px; padding: 4px; margin-bottom: 12px;
+  border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card);
+}
+.mycard-switch-btn {
+  flex: 1 1 0; min-height: 44px; border: none; border-radius: 10px;
+  background: transparent; color: var(--text-secondary);
+  font: inherit; font-size: 15px; font-weight: 600; cursor: pointer;
+}
+.mycard-switch-btn[aria-pressed="true"] {
+  background: var(--accent-bg); color: var(--text-primary); font-weight: 700;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+/* ── Layout ── */
+.mycard-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.mycard-pane { min-width: 0; }
+.mycard-pane--preview { display: flex; flex-direction: column; gap: 12px; }
+@media (max-width: 899px) {
+  .mycard[data-view="edit"] .mycard-pane--preview,
+  .mycard[data-view="preview"] .mycard-pane--editor { display: none; }
+}
+@media (min-width: 900px) {
+  /* The shell gives module content no padding at any size, so the gutter is ours. */
+  .mycard { padding: 24px 32px 0; }
+  .mycard-header { margin-bottom: 16px; }
+  .mycard-title { font-size: 28px; }
+  .mycard-tagline { font-size: 15px; }
+  .mycard-switch { display: none; }
+  .mycard-grid { grid-template-columns: minmax(0, 1fr) 400px; align-items: start; gap: 24px; }
+  /* The card stays in view while the form scrolls. */
+  .mycard-pane--preview { position: sticky; top: 0; }
+}
+
+/* ── Editor ── */
+.mycard-editor { display: flex; flex-direction: column; gap: 12px; }
+.mycard-section {
+  display: flex; flex-direction: column; gap: 12px; min-width: 0;
+  padding: 14px; border: 1px solid var(--border); border-radius: 16px;
+  background: var(--bg-card); box-shadow: var(--shadow-card);
+}
+@media (min-width: 900px) {
+  .mycard-editor { gap: 16px; }
+  .mycard-section { gap: 16px; padding: 18px 20px; border-radius: 18px; }
+}
+.mycard-section-title {
+  margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.mycard-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mycard-field-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.mycard-label { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+
+.mycard-input {
+  width: 100%; box-sizing: border-box; min-width: 0; min-height: 46px; padding: 0 14px;
+  border: 1px solid var(--input-border); border-radius: 12px;
+  background: var(--input-bg); color: var(--text-primary);
+  font: inherit; font-size: 16px;
+}
+.mycard-input::placeholder { color: var(--text-secondary); opacity: 1; }
+.mycard-input[aria-invalid="true"] { border-color: var(--status-error); }
+.mycard-input:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.mycard-name { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; }
+.mycard-always { margin: -4px 0 0; font-size: 13px; color: var(--text-secondary); }
+
+.mycard-message { margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-secondary); }
+.mycard-message--error { color: var(--status-error-text); font-weight: 600; }
+
+/* ── The photo ── */
+.mycard-photo-row { display: flex; align-items: flex-start; gap: 14px; }
+.mycard-photo-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.mycard-photo-main .mycard-field-head { width: 100%; }
+.mycard-field--photoUrl { gap: 10px; }
+.mycard-photo-actions { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+
+/* ── Shared / Private: compact to look at, 44px to hit ── */
+.mycard-share {
+  position: relative; display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto;
+  min-height: 32px; padding: 0 11px;
+  border: 1px solid var(--border-2); border-radius: 999px;
+  background: transparent; color: var(--text-secondary);
+  font: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.mycard-share::after { content: ""; position: absolute; inset: -6px; }
+.mycard-share--on { background: var(--accent-bg); border-color: var(--accent); color: var(--text-primary); }
+.mycard-share:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── "Use this" chips: compact to look at, 44px to hit ── */
+.mycard-suggest {
+  position: relative; display: inline-flex; align-items: center; gap: 6px;
+  align-self: flex-start; max-width: 100%; min-height: 36px; box-sizing: border-box; padding: 5px 12px;
+  border: 1px dashed var(--accent); border-radius: 999px;
+  background: transparent; color: var(--text-primary);
+  font: inherit; font-size: 13px; font-weight: 600; line-height: 1.25; text-align: left; cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.mycard-suggest::after { content: ""; position: absolute; inset: -4px 0; }
+.mycard-suggest svg { flex: 0 0 auto; }
+/* The one big, friendly button: the LinkedIn photo. */
+.mycard-suggest--primary {
+  min-height: 40px; padding: 8px 16px; border-style: solid;
+  background: var(--accent-bg); font-size: 14px; font-weight: 700;
+}
+.mycard-suggest--primary::after { inset: -2px 0; }
+.mycard-suggest:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* A quiet text button: "Paste a photo link instead", "Remove photo". */
+.mycard-linkbtn {
+  position: relative; align-self: flex-start; min-height: 32px; padding: 0;
+  border: none; background: none; color: var(--text-primary);
+  font: inherit; font-size: 13px; font-weight: 600; text-decoration: underline; cursor: pointer;
+}
+.mycard-linkbtn::after { content: ""; position: absolute; inset: -6px -8px; }
+.mycard-linkbtn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* ── Focus: one ring for every control ── */
+.mycard-input:focus-visible,
+.mycard-share:focus-visible,
+.mycard-suggest:focus-visible,
+.mycard-linkbtn:focus-visible,
+.mycard-switch-btn:focus-visible,
+.mycard-btn:focus-visible,
+.mycard-back:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+
+/* ── Avatar ── */
+.mycard-avatar {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  border-radius: 50%; overflow: hidden;
+  background: var(--border-2); color: var(--text-primary); font-weight: 700;
+}
+.mycard-avatar--sm { width: 32px; height: 32px; font-size: 13px; }
+.mycard-avatar--md { width: 56px; height: 56px; font-size: 19px; }
+.mycard-avatar--lg { width: 80px; height: 80px; font-size: 28px; }
+.mycard-avatar--xl { width: 112px; height: 112px; font-size: 40px; }
+.mycard-avatar--brand {
+  background: linear-gradient(135deg, var(--mycard-brand-2), var(--mycard-brand-4));
+  color: var(--mycard-on-brand);
+}
+.mycard-avatar-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mycard-avatar-initials { display: inline-flex; align-items: center; justify-content: center; letter-spacing: 0.02em; }
+
+/* ── Preview ── */
+.mycard-preview { display: flex; flex-direction: column; gap: 12px; }
+.mycard-preview-title {
+  margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* The card: an IDYNIFY identity card. Photo, name, title and organization lead. */
+.mycard-card {
+  overflow: hidden; border: 1px solid var(--border); border-radius: 24px;
+  background: var(--bg-card); box-shadow: var(--shadow-card);
+}
+.mycard-card-banner {
+  position: relative; height: 128px;
+  background:
+    radial-gradient(120% 150% at 100% 0%, var(--mycard-brand-4) 0%, transparent 58%),
+    linear-gradient(135deg, var(--mycard-brand-1) 0%, var(--mycard-brand-2) 55%, var(--mycard-brand-3) 100%);
+}
+.mycard-card-brand {
+  position: absolute; top: 16px; left: 20px;
+  font-size: 12px; font-weight: 800; letter-spacing: 0.22em; color: var(--mycard-on-brand);
+}
+/* An organization's name is the header: readable first, so a calmer tracking, up to two lines,
+   and kept off the pink corner, where white is thinnest (4.3:1), and clear of the photo. */
+.mycard-card-brand--org {
+  max-width: calc(100% - 96px);
+  font-size: 15px; font-weight: 700; letter-spacing: 0.04em; line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.mycard-card-body {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 0 24px 24px; text-align: center;
+}
+.mycard-card-body .mycard-avatar {
+  /* Rises over the banner: the banner is positioned, so without its own layer the photo
+     would sit underneath it. */
+  position: relative; z-index: 1;
+  margin-top: -56px; margin-bottom: 14px;
+  box-shadow: 0 0 0 5px var(--bg-card), var(--shadow-card);
+}
+.mycard-card-name { margin: 0; max-width: 100%; font-size: 28px; font-weight: 800; line-height: 1.15; letter-spacing: -0.01em; overflow-wrap: anywhere; }
+.mycard-card-title { margin: 4px 0 0; max-width: 100%; font-size: 17px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+.mycard-card-made { margin: 18px 0 0; font-size: 12px; line-height: 1.2; letter-spacing: 0.02em; color: var(--text-secondary); }
+
+.mycard-rows {
+  display: flex; flex-direction: column; gap: 2px; width: 100%;
+  margin: 20px 0 0; padding: 14px 0 0; list-style: none; text-align: left;
+  border-top: 1px solid var(--border);
+}
+.mycard-row { display: flex; align-items: center; gap: 12px; min-height: 40px; font-size: 15px; }
+.mycard-row-icon {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 32px; height: 32px; border-radius: 50%;
+  background: var(--accent-bg); color: var(--accent);
+}
+.mycard-row-value { min-width: 0; overflow-wrap: anywhere; }
+.mycard-card--empty { padding: 40px 20px; text-align: center; border-style: dashed; box-shadow: none; }
+.mycard-empty { margin: 0; color: var(--text-secondary); font-size: 15px; }
+
+/* What the card is not saying: beside it, never on it. */
+.mycard-aside {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px 14px;
+  border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card-2);
+}
+.mycard-aside-row { display: flex; align-items: flex-start; gap: 8px; margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-secondary); }
+.mycard-aside-row svg { flex: 0 0 auto; margin-top: 2px; }
+
+/* ── Actions, kept in view at the bottom of the scrolling page ── */
+.mycard-actions {
+  position: sticky; bottom: 0; z-index: 2;
+  display: flex; align-items: center; justify-content: flex-end; gap: 12px;
+  margin: 0 -16px; padding: 10px 16px;
+  border-top: 1px solid var(--border); background: var(--bg-card);
+}
+@media (min-width: 900px) {
+  .mycard-actions { margin: 0; border: 1px solid var(--border); border-bottom: none; border-radius: 16px 16px 0 0; }
+}
+
+/* ── Text for screen readers only ── */
+.mycard-sr {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+
+/* ── Back to My People ── */
+.mycard-back {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; margin: 0 0 2px;
+  color: var(--text-secondary); font-size: 14px; font-weight: 600; text-decoration: none;
+}
+.mycard-back:hover { color: var(--text-primary); text-decoration: underline; }
+
+/* A page with no card on it (loading, could not load, read-only) is one calm column. */
+.mycard-single { max-width: 720px; }
+.mycard-loading { margin: 8px 0; font-size: 15px; color: var(--text-secondary); }
+
+/* ── Buttons: 44px to hit, one set for the page ── */
+.mycard-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 44px; box-sizing: border-box; padding: 0 18px;
+  border: 1px solid transparent; border-radius: 12px;
+  font: inherit; font-size: 15px; font-weight: 600; line-height: 1.2; cursor: pointer;
+}
+.mycard-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+/* The one primary action, in the brand pink. Its label stays large and bold: it is the
+   text on the accent, which only reads as large text. */
+.mycard-btn--primary {
+  min-width: 96px; background: var(--accent); border-color: var(--accent); color: var(--bg-card);
+  font-size: 19px; font-weight: 700;
+}
+.mycard-btn--secondary { background: transparent; border-color: var(--border-2); color: var(--text-primary); }
+.mycard-btn--danger { background: transparent; border-color: var(--status-error); color: var(--status-error-text); font-weight: 700; }
+
+/* ── Save bar ── */
+.mycard-savebar { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; }
+.mycard-savestatus { margin: 0; min-width: 0; font-size: 14px; font-weight: 600; line-height: 1.3; color: var(--text-secondary); }
+.mycard-savestatus--unsaved { color: var(--text-primary); }
+.mycard-savestatus--fix, .mycard-savestatus--save-error { color: var(--status-error-text); }
+.mycard-savestatus--conflict { color: var(--status-warning-text); }
+
+/* ── Download contact, under the card it downloads ── */
+.mycard-download {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 8px;
+  padding: 14px 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--bg-card);
+}
+.mycard-download .mycard-btn { max-width: 100%; }
+/* The two downloads side by side where there is room, and one under the other where there is not. */
+.mycard-download-actions { display: flex; flex-wrap: wrap; gap: 8px; max-width: 100%; }
+.mycard-download-picture { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: 100%; }
+.mycard-download-picture-img { display: block; width: 100%; max-width: 320px; height: auto; border: 1px solid var(--border); border-radius: 12px; }
+.mycard-download-note { margin: 0; font-size: 13px; line-height: 1.4; color: var(--text-secondary); }
+.mycard-download-feedback { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.4; color: var(--text-primary); }
+.mycard-download-feedback--error { color: var(--status-error-text); }
+
+/* ── Notices: a conflict, a failed save, a restored draft ── */
+.mycard-notice {
+  display: flex; flex-direction: column; gap: 8px; box-sizing: border-box;
+  margin: 0 0 12px; padding: 14px 16px;
+  border: 1px solid var(--border-2); border-radius: 14px; background: var(--bg-card-2);
+  color: var(--text-primary);
+}
+.mycard-notice--conflict { border-color: var(--status-warning); background: var(--status-warning-bg); }
+.mycard-notice--error { border-color: var(--status-error); background: var(--status-error-bg); }
+.mycard-notice-title { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.3; }
+.mycard-notice-text { margin: 0; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.mycard-notice-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.mycard-confirm { display: flex; flex-direction: column; gap: 8px; padding-top: 10px; border-top: 1px solid var(--border-2); }
+
+@media (max-width: 480px) {
+  /* Two buttons side by side stay readable; more wrap onto their own lines. */
+  .mycard-notice-actions .mycard-btn { flex: 1 1 auto; }
+}
+
+/* ── Upload photo: the photo section's one main action ── */
+.mycard-upload {
+  position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  align-self: flex-start; max-width: 100%; min-height: 44px; box-sizing: border-box; padding: 8px 18px;
+  border: 1px solid var(--accent); border-radius: 999px;
+  background: var(--accent-bg); color: var(--text-primary);
+  font: inherit; font-size: 15px; font-weight: 700; line-height: 1.25; cursor: pointer;
+}
+.mycard-upload svg { flex: 0 0 auto; }
+.mycard-upload:disabled { opacity: 0.6; cursor: not-allowed; }
+
+/* "Advanced": the pasted photo link, out of the way. */
+.mycard-advanced { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; width: 100%; }
+.mycard-advanced .mycard-field { width: 100%; }
+.mycard-advanced-toggle { display: inline-flex; align-items: center; gap: 4px; color: var(--text-secondary); text-decoration: none; }
+.mycard-advanced-toggle span { text-decoration: underline; }
+
+/* Removing a photo asks first. */
+.mycard-photo-confirm {
+  display: flex; flex-direction: column; gap: 10px; box-sizing: border-box; width: 100%;
+  padding: 12px 14px; border: 1px solid var(--border-2); border-radius: 14px; background: var(--bg-card-2);
+}
+.mycard-photo-confirm-text { margin: 0; font-size: 14px; line-height: 1.45; color: var(--text-primary); }
+.mycard-photo-confirm-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* ── The crop dialog: a sheet from the bottom on a phone, a card in the middle on a computer ── */
+.mycard-crop-backdrop {
+  position: fixed; inset: 0; z-index: 1000; display: flex; align-items: flex-end; justify-content: center;
+  background: color-mix(in srgb, var(--bg-primary) 78%, transparent);
+}
+.mycard-crop {
+  display: flex; flex-direction: column; gap: 12px; box-sizing: border-box; width: 100%; max-width: 460px;
+  max-height: 100dvh; overflow-y: auto; overscroll-behavior: contain;
+  padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+  border: 1px solid var(--border); border-radius: 20px 20px 0 0;
+  background: var(--bg-card); color: var(--text-primary); box-shadow: var(--shadow-card);
+}
+@media (min-width: 600px) {
+  .mycard-crop-backdrop { align-items: center; padding: 24px; }
+  .mycard-crop { padding-bottom: 18px; border-radius: 20px; }
+}
+.mycard-crop-title { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.3; }
+.mycard-crop-help { margin: 0; font-size: 14px; line-height: 1.4; color: var(--text-secondary); }
+.mycard-crop-viewport {
+  position: relative; align-self: center; box-sizing: border-box; width: min(100%, 340px); aspect-ratio: 1 / 1;
+  overflow: hidden; border: 1px solid var(--border-2); border-radius: 16px; background: var(--bg-card-2);
+  touch-action: none; cursor: grab; user-select: none; -webkit-user-select: none;
+}
+.mycard-crop-viewport:active { cursor: grabbing; }
+.mycard-crop-img { position: absolute; max-width: none; user-select: none; -webkit-user-drag: none; pointer-events: none; }
+/* The circle is how the photo will sit on the card; the square is what is kept. */
+.mycard-crop-guide {
+  position: absolute; inset: 0; border: 2px solid var(--accent); border-radius: 50%; pointer-events: none;
+  box-shadow: 0 0 0 999px color-mix(in srgb, var(--bg-primary) 55%, transparent);
+}
+.mycard-crop-zoom { display: flex; align-items: center; gap: 6px; }
+.mycard-crop-iconbtn {
+  display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto;
+  width: 44px; height: 44px; padding: 0; border: 1px solid var(--border-2); border-radius: 12px;
+  background: transparent; color: var(--text-primary); cursor: pointer;
+}
+.mycard-crop-iconbtn:disabled { opacity: 0.5; cursor: not-allowed; }
+.mycard-crop-slider { flex: 1 1 auto; min-width: 0; min-height: 44px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.mycard-crop-slider:disabled { cursor: not-allowed; }
+.mycard-crop-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.mycard-crop-actions .mycard-btn { flex: 1 1 auto; }
+@media (min-width: 600px) {
+  .mycard-crop-actions .mycard-btn { flex: 0 0 auto; }
+}
+
+.mycard-upload:focus-visible,
+.mycard-crop-iconbtn:focus-visible,
+.mycard-crop-slider:focus-visible,
+.mycard-crop-viewport:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}

@@ -503,7 +503,7 @@ describe('the simple profile', () => {
     expect(screen.queryByTestId('full-profile')).toBeNull();
   });
 
-  it('keeps the redesigned header and puts the existing details and notes in their tab', async () => {
+  it('keeps the redesigned header and puts the contact information in Details', async () => {
     renderHub('/contact-hub/person/p2');
     await userEvent.setup().click(await screen.findByRole('tab', { name: 'Details' }));
     const card = await screen.findByTestId('identity-card');
@@ -513,8 +513,7 @@ describe('the simple profile', () => {
     expect(seen.card.contact.id).toBe('p2');
     expect(screen.getByRole('article', { name: 'Contact: Wes Clark' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { level: 1, name: 'Wes Clark' })).toBeInTheDocument();
-    expect(screen.getByTestId('notes')).toBeInTheDocument();
-    expect(seen.notes.contact.id).toBe('p2');
+    expect(screen.queryByTestId('notes')).toBeNull();
     // No link out to the advanced profile, and no second load for the person.
     expect(screen.queryByRole('link', { name: /full profile|open in/i })).toBeNull();
     expect(contactsData.loads).toBe(1);

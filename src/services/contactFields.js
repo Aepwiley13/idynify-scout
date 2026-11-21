@@ -25,10 +25,11 @@ import { isHttpsPhotoUrl } from '../utils/photoUrl';
  *   photo_url                   '' (remove) or a plain https address
  *   photo_source                only "manual_url", the value the card's own "Paste photo URL" writes
  */
-export const CONTACT_FIELD_WRITES = Object.freeze(['name', 'title', 'company_name', 'photo_url', 'photo_source']);
+export const CONTACT_FIELD_WRITES = Object.freeze(['name', 'title', 'company_name', 'photo_url', 'photo_source', 'location']);
 
 const VALID_VALUE = Object.freeze({
   photo_url: (value) => value === '' || isHttpsPhotoUrl(value),
+  location: (value) => value.length <= 200,
   photo_source: (value) => value === 'manual_url',
 });
 

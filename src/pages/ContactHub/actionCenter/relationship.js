@@ -1,6 +1,6 @@
 import { getEffectiveUser } from '../../../context/ImpersonationContext';
 
-export const INTERACTIONS = { call: 'Call', meeting: 'Meeting', other: 'Interaction' };
+export const INTERACTIONS = { call: 'Call', meeting: 'Meeting', text: 'Text', other: 'Other' };
 
 export function canWriteRelationship(uid) {
   const user = getEffectiveUser();
@@ -29,7 +29,7 @@ export function relationshipHistory(notes, events) {
   for (const note of Array.isArray(notes) ? notes : []) {
     if (!note?.id || !note.content || noteIds.has(note.id)) continue;
     noteIds.add(note.id);
-    rows.push({ id: 'note:' + note.id, label: 'Note', text: note.content, time: milliseconds(note.created_at) });
+    rows.push({ id: 'note:' + note.id, label: 'Note', note, text: note.content, time: milliseconds(note.created_at) });
   }
   const eventIds = new Set();
   for (const event of events) {
@@ -43,7 +43,7 @@ export function relationshipHistory(notes, events) {
           next_step_completed: 'Reminder completed', message_sent: 'Message sent',
           message_received: 'Message received', reply_received: 'Reply received',
         })[event.type] ?? event.type?.replaceAll('_', ' ');
-    if (label) rows.push({ id: 'event:' + event.id, label, text: event.preview, time: milliseconds(event.timestamp ?? event.createdAt), isEmail });
+    if (label) rows.push({ id: 'event:' + event.id, label, text: event.preview, time: milliseconds(event.metadata?.occurred_at ?? event.timestamp ?? event.createdAt), isEmail });
   }
   return rows.sort((a, b) => (b.time || 0) - (a.time || 0));
 }

@@ -73,13 +73,46 @@ describe('Action Center', () => {
     render(<Page />);
     await user.type(draft(), 'Met at the project kickoff');
     await click(user, 'Log update');
-    await user.selectOptions(screen.getByLabelText('Interaction type'), 'meeting');
+    await user.click(screen.getByRole('radio', { name: 'Meeting' }));
     await click(user, 'Save update');
     expect(await screen.findByText('Met at the project kickoff')).toBeInTheDocument();
     await tab(user, 'Activity');
     expect(screen.getAllByText('Met at the project kickoff')).toHaveLength(1);
     const saved = window.__writes.find((row) => row.path.startsWith(path + '/timeline/'));
     expect(saved.data).toMatchObject({ type: 'outreach_logged', actor: 'user', metadata: { channel: 'meeting' } });
+  });
+
+  it('keeps the capture draft when canceling the interaction sheet', async () => {
+    const user = userEvent.setup();
+    render(<Page />);
+    await user.type(draft(), 'A quick update');
+    await click(user, 'Log update');
+    expect(screen.getByRole('textbox', { name: 'What happened?' })).toHaveValue('A quick update');
+    await user.clear(screen.getByRole('textbox', { name: 'What happened?' }));
+    await user.type(screen.getByRole('textbox', { name: 'What happened?' }), 'Updated text');
+    await click(user, 'Cancel');
+    expect(draft()).toHaveValue('Updated text');
+    expect(window.__writes).toEqual([]);
+  });
+
+  it('edits and deletes notes from the shared activity feed', async () => {
+    const user = userEvent.setup();
+    const item = { ...contact, notes: [{ id: 'a', content: 'Original note', created_at: '2026-11-01' }] };
+    seedFixtureDoc(path, item);
+    render(<Page item={item} />);
+    await user.click(screen.getByLabelText('Note actions'));
+    await click(user, 'Edit note');
+    await user.clear(screen.getByRole('textbox', { name: 'Note' }));
+    await user.type(screen.getByRole('textbox', { name: 'Note' }), 'Edited note');
+    await click(user, 'Save note');
+    expect(await screen.findByText('Edited note')).toBeVisible();
+    await tab(user, 'Activity');
+    await user.click(screen.getByLabelText('Note actions'));
+    await click(user, 'Delete note');
+    expect(screen.getByText('Edited note')).toBeVisible();
+    await click(user, 'Confirm delete');
+    await waitFor(() => expect(screen.queryByText('Edited note')).toBeNull());
+    expect((await read(path)).notes).toEqual([]);
   });
 
   it('requires explicit rescheduling and records completion', async () => {
@@ -91,6 +124,7 @@ describe('Action Center', () => {
     await click(user, 'Save reminder');
     expect(await screen.findByRole('button', { name: 'Done' })).toBeEnabled();
     const original = (await read(path)).next_best_step;
+    await user.click(screen.getByLabelText('Reminder actions'));
     await click(user, 'Reschedule');
     fireEvent.change(screen.getByLabelText('Due date'), { target: { value: '2027-02-08' } });
     expect((await read(path)).next_best_step.due_at).toBe(original.due_at);
@@ -147,6 +181,16 @@ describe('reminder transaction', () => {
     expect(await read(queued(request.id))).toMatchObject({ status: 'confirmed', due_at: due, contact_id: contact.id });
     expect(await read(timeline(request.id))).toMatchObject({ actor: 'user', type: 'next_step_queued' });
     expect(window.__writes).toHaveLength(3);
+  });
+
+  it('cancels a manual reminder across the contact, queue, and timeline', async () => {
+    const created = await saveRelationshipReminder(uid, contact.id, request);
+    await saveRelationshipReminder(uid, contact.id, {
+      id: 'dismissed-a', expected: stepVersion(created.next_best_step), dismiss: true,
+    });
+    expect((await read(path)).next_best_step).toBeNull();
+    expect(await read(queued(request.id))).toMatchObject({ status: 'dismissed' });
+    expect(await read(timeline('dismissed-a'))).toMatchObject({ type: 'next_step_dismissed', actor: 'user' });
   });
 
   it('preserves the existing Barry step, and rejects a stale confirmation and the wrong account', async () => {

@@ -444,3 +444,29 @@ button, a, [role="button"] {
   to   { opacity: 1; }
 }
 
+
+/* ─── iOS INPUT ZOOM GUARD ───────────────────────────────────────────────────
+   Mobile Safari zooms the whole viewport when a text field smaller than 16px
+   takes focus, then leaves the page zoomed. 81 live form controls sit under
+   16px, so this fires on most of the product's typing surfaces.
+
+   One rule rather than 81 edits. Scoped to the app's own mobile breakpoint, so
+   desktop is untouched and every component keeps the size it chose there —
+   which is the whole point: the controls are not too small, they are too small
+   *for iOS*, and only on a phone.
+
+   `!important` is deliberate and is the reason this is one rule. Component
+   rules are all of the form `.search-bar input`, which outranks a bare element
+   selector; without it this would have to be 81 separate overrides, each of
+   which could drift. Keep it narrow: text-entry controls only, mobile only.
+
+   This block is self-contained. Deleting it restores the previous behaviour
+   exactly and changes nothing else.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+  textarea,
+  select {
+    font-size: var(--text-md) !important;
+  }
+}

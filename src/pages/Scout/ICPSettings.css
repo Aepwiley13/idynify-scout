@@ -219,7 +219,7 @@
   color: white;
   border: none;
   border-radius: 8px;
-  font-size: 0.875rem;
+  font-size: var(--text-base);
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
@@ -255,15 +255,15 @@
 }
 
 .page-title {
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-bold);
   color: var(--text-primary);
   margin: 0 0 0.5rem 0;
   letter-spacing: -0.02em;
 }
 
 .page-subtitle {
-  font-size: 1rem;
+  font-size: var(--text-md);
   color: var(--text-secondary);
   margin: 0;
   font-weight: 400;

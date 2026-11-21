@@ -25,14 +25,14 @@
 }
 
 .page-title {
-  font-size: 2rem;
-  font-weight: 700;
+  font-size: var(--text-3xl);
+  font-weight: var(--weight-bold);
   color: var(--text-primary);
   margin: 0 0 0.5rem 0;
 }
 
 .page-subtitle {
-  font-size: 1rem;
+  font-size: var(--text-md);
   color: var(--text-secondary);
   margin: 0;
 }

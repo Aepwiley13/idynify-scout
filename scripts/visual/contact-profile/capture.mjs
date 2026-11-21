@@ -20,11 +20,14 @@ import { join } from 'node:path';
 
 const OUT = process.argv[2];
 if (!OUT) { console.error('usage: captureEdit.mjs <output folder>'); process.exit(2); }
+mkdirSync(OUT, { recursive: true });
+const workspaceReview = process.argv.includes('--workspace');
 const gmailReview = process.argv.includes('--gmail');
-const origin = `http://127.0.0.1:${gmailReview ? 5312 : 5311}`;
+const origin = `http://127.0.0.1:${process.env.CONTACT_HUB_FIXTURE_PORT || (gmailReview ? 5312 : 5311)}`;
 const BASE = `${origin}/scripts/visual/contact-profile/profile.html`;
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const PORT = gmailReview ? 9364 : process.argv.includes('--action') ? 9363 : 9362;
+const defaultDebugPort = workspaceReview ? 9365 : gmailReview ? 9364 : process.argv.includes('--action') ? 9363 : 9362;
+const PORT = Number(process.env.CONTACT_HUB_CHROME_PORT || defaultDebugPort);
 const FONT_HOSTS = [/^https:\/\/fonts\.googleapis\.com\//, /^https:\/\/fonts\.gstatic\.com\//];
 const PHOTO_HOST = 'images.fixture.test';
 const wait = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
@@ -70,7 +73,7 @@ listeners.push(({ method, params }) => {
     const url = new URL(request.url);
     if (url.hostname === PHOTO_HOST) {
       send('Fetch.fulfillRequest', { requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'image/svg+xml' }, { name: 'Access-Control-Allow-Origin', value: '*' }], body: Buffer.from(PORTRAITS[url.pathname] ?? portrait('#999', '#666', '#333')).toString('base64') }).catch(() => {});
-    } else if (url.origin === origin || (!gmailReview && FONT_HOSTS.some((re) => re.test(request.url)))) send('Fetch.continueRequest', { requestId }).catch(() => {});
+    } else if (url.origin === origin || (!gmailReview && !workspaceReview && FONT_HOSTS.some((re) => re.test(request.url)))) send('Fetch.continueRequest', { requestId }).catch(() => {});
     else { blocked.add(request.url); send('Fetch.failRequest', { requestId, errorReason: 'BlockedByClient' }).catch(() => {}); }
   }
   if (method === 'Runtime.exceptionThrown') problems.push(params.exceptionDetails.exception?.description ?? params.exceptionDetails.text);
@@ -154,11 +157,41 @@ const load = async (query) => {
 };
 const pickContact = async (id) => { await click(demoBtn(id)); await until(`document.querySelector('.demo-btn[aria-pressed="true"]').textContent === ${JSON.stringify(id)}`); await wait(500); };
 
+if (workspaceReview) {
+  const nav = (text) => byText(text, byLabel("Fixture navigation"));
+  const tab = (name) => `[...document.querySelectorAll('[role=tab]')].find((item) => item.textContent.trim() === ${JSON.stringify(name)})`;
+  const person = `document.querySelector('a[href="/contact-hub/person/jordan"]')`;
+  for (const [session, query] of [['free', ''], ['scout', '&scout=1'], ['read-only', '&readonly=1']]) {
+    await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+    await send('Page.navigate', { url: `${BASE}?workspace=1${query}` });
+    check(session + ' My People loaded', await until(person));
+    if (session !== 'read-only') {
+      check(session + ' Import visible', await evaluate(byLabel('Import Contacts')));
+      await click(nav('Sticker Wall'));
+      check(session + ' navigates to Sticker Wall', await until("document.querySelector('#hub-people-heading')?.textContent.trim() === 'Sticker Wall'"));
+      await click(nav('My Card'));
+      check(session + ' navigates to My Card', await until("document.querySelector('h1')?.innerText.includes('My Card')"));
+      await click(nav('My People'));
+      await until(person);
+    }
+    await click(person);
+    check(session + ' person defaults to Action Center', await until(`(${tab('Action Center')})?.getAttribute('aria-selected') === 'true'`));
+    check(session + ' Emails access', Boolean(await evaluate(tab('Emails'))) === (session === 'scout'));
+    check(session + ' capture access', Boolean(await evaluate(byLabel('What would you like to remember or do?'))) === (session !== 'read-only'));
+    check(session + ' no photo persistence fixture request', await evaluate("!window.__writes.some((entry) => entry.kind === 'photo override')"));
+    await shot(join(OUT, `workspace-${session}.png`));
+  }
+  check('no browser exceptions', problems.length === 0);
+  check('no remote API requests', [...blocked].every((url) => FONT_HOSTS.some((re) => re.test(url))));
+  writeFileSync(join(OUT, 'workspace-report.json'), JSON.stringify({ checks, blocked: [...blocked], problems }, null, 2));
+  console.log(`Workspace browser smoke: ${checks.filter(({ pass }) => pass).length}/${checks.length} passed`);
+  process.exit(checks.some(({ pass }) => !pass) ? 1 : 0);
+}
+
 if (gmailReview) {
-  mkdirSync(OUT, { recursive: true });
   const dialog = "document.querySelector('.hub-gmail-dialog[open]')";
   const option = (text) => byText(text, dialog);
-  const status = (text) => until(`(${dialog})?.querySelector('[role=status]')?.textContent.includes(${JSON.stringify(text)})`);
+  const status = (text) => until(`(${dialog})?.querySelector('[role=status]')?.textContent.includes(${JSON.stringify(text)})`, 20_000);
   const outcome = (value) => evaluate(`(() => {
     const select = document.querySelector('[aria-label="Next simulated send"]');
     select.value = ${JSON.stringify(value)};

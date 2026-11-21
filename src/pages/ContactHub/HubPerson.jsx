@@ -93,9 +93,9 @@ export default function HubPerson() {
       {/* Keep transient editing state scoped to this person and session. */}
       <ContactHubGmailHeader key={JSON.stringify([uid, contact.id, readOnly])} uid={uid} readOnly={readOnly} contact={contact}
         onPatch={patchContact} onLateStickerChange={applyStickerChange} />
+      <ScoutOpportunity key={contact.id} contact={contact} />
       <ContactActionCenter key={JSON.stringify([uid, contact.id, readOnly])} uid={uid} contact={contact}
         readOnly={readOnly} scout={scout} openBarry={openBarry} onUpdate={updateContact} onLateStickerChange={applyStickerChange} />
-      <ScoutOpportunity key={contact.id} contact={contact} />
     </div>
   );
 }

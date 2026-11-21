@@ -9,7 +9,11 @@
  */
 import '../../../src/index.css';
 import { useCallback, useEffect, useReducer, useState } from 'react';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, Link, MemoryRouter, Routes } from 'react-router-dom';
+import { contactHubRoutes } from '../../../src/pages/ContactHub/contactHubRoutes';
+import { ShellProvider } from '../../../src/context/ShellContext';
+import { AccountPlanContext } from '../../../src/components/billing/accountPlanContext';
+import { PLAN } from '../../../src/utils/accountPlan';
 import ContactHubGmailHeader from '../../../src/pages/ContactHub/ContactHubGmailHeader';
 import { configureGmailFixture, openFixtureConsent } from './stubs/gmail';
 import { createRoot } from 'react-dom/client';
@@ -36,7 +40,8 @@ const CONTACTS = [
   { id: 'lee', name: 'Lee Park', title: 'CTO', company_name: 'Initech', company_id: 'co-9', city: 'Austin', state: 'TX', photo_url: portrait('avery'), phones: [{ id: '1', value: '(512) 555-0110', label: 'work' }], emails: [{ id: '0', value: 'lee@initech.example', label: 'work' }], linkedin_url: 'https://www.linkedin.com/in/lee-park-example', sticker_ids: ['S03', 'S04'] },
   { id: 'long', name: 'Bartholomew-Alexandrovich Featherstonehaugh-Cholmondeley-Wolfeschlegelsteinhausenbergerdorff', title: 'Senior Vice President of Global Strategic Partnerships, Ecosystem Development and Public Sector Alliances', company_name: 'The International Association of Analytical Engine Manufacturers and Allied Trades of the Northern Hemisphere', location: 'Wales, United Kingdom', photo_url: portrait('morgan'), phones: [{ id: '1', value: '+44 20 7946 0958', label: 'work' }], emails: [{ id: '0', value: 'bartholomew@internationalassociation.example', label: 'work' }], sticker_ids: ['S00', 'S01', 'S02', 'S03', 'S04', 'S05', 'S06', 'S07'] },
 ];
-const isAction = params.get('action') === '1';
+const isWorkspace = params.get('workspace') === '1';
+const isAction = isWorkspace || params.get('action') === '1';
 const isGmailDemo = isAction && params.get('gmail_demo') === '1';
 const isPhotoDemo = isAction && params.get('photo') === '1';
 const scout = params.get('scout') === '1' && !fixture.readonly;
@@ -186,9 +191,30 @@ function Demo() {
   );
 }
 
+function WorkspaceDemo() {
+  const account = { id: uid, hasCompletedPayment: scout };
+  return (
+    <div className="demo">
+      <p className="demo-banner"><strong>Isolated Contact Hub workspace.</strong> Synthetic data and local-only saves.</p>
+      <MemoryRouter initialEntries={['/contact-hub']}>
+        <ShellProvider user={account} userData={account}>
+          <AccountPlanContext.Provider value={scout ? PLAN.STARTER : PLAN.FREE}>
+            <nav className="demo-controls" aria-label="Fixture navigation">
+              <Link className="demo-btn" to="/contact-hub/my-card">My Card</Link>
+              <Link className="demo-btn" to="/contact-hub">My People</Link>
+              <Link className="demo-btn" to="/contact-hub/stickers">Sticker Wall</Link>
+            </nav>
+            <Routes>{contactHubRoutes()}</Routes>
+          </AccountPlanContext.Provider>
+        </ShellProvider>
+      </MemoryRouter>
+    </div>
+  );
+}
+
 createRoot(document.getElementById('root')).render(
   <ThemeProvider>
-    <StickersProvider uid="u1"><BrowserRouter><Demo /></BrowserRouter></StickersProvider>
+    {isWorkspace ? <WorkspaceDemo /> : <StickersProvider uid="u1"><BrowserRouter><Demo /></BrowserRouter></StickersProvider>}
   </ThemeProvider>,
 );
 document.fonts.ready.then(() => { document.documentElement.dataset.ready = '1'; });

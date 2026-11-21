@@ -121,13 +121,13 @@ function renderHub(url = '/contact-hub', plan) {
 }
 
 describe('the person page', () => {
-  it('a Free account sees what Scout would add, below the card and above the notes', async () => {
+  it('a Free account sees what Scout would add, between the profile header and Action Center', async () => {
     renderHub('/contact-hub/person/p3', 'free');
     const upgrade = await screen.findByRole('button', { name: 'Upgrade to Scout' });
-    const card = screen.getByTestId('identity-card');
-    const notes = screen.getByTestId('notes');
+    const card = screen.getByRole('heading', { name: 'Tom Green', level: 1 });
+    const actionCenter = screen.getByRole('tab', { name: 'Action Center' });
     expect(card.compareDocumentPosition(upgrade) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(upgrade.compareDocumentPosition(notes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(upgrade.compareDocumentPosition(actionCenter) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText(/Tom Green has no email/)).toBeInTheDocument();
   });
 
@@ -138,7 +138,7 @@ describe('the person page', () => {
 
   it('with no plan known (as in the existing page tests) nothing is added', async () => {
     renderHub('/contact-hub/person/p3');
-    await screen.findByTestId('identity-card');
+    await screen.findByRole('heading', { name: 'Tom Green', level: 1 });
     expect(screen.queryByRole('button', { name: 'Upgrade to Scout' })).toBeNull();
     expect(screen.queryByRole('link', { name: 'Open in Scout' })).toBeNull();
   });

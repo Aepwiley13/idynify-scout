@@ -16,3 +16,10 @@ export async function createSticker(_uid, { name, color = 'gray' }) {
   for (const l of listeners) l(current);
   return { id };
 }
+
+export async function updateSticker(_uid, id, fields) {
+  current = current.map((sticker) => sticker.id === id ? { ...sticker, ...fields } : sticker);
+  for (const listener of listeners) listener(current);
+}
+export const archiveSticker = (uid, id) => updateSticker(uid, id, { status: 'archived' });
+export const restoreSticker = (uid, id) => updateSticker(uid, id, { status: 'active' });

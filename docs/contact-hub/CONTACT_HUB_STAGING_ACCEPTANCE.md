@@ -1,5 +1,65 @@
 # Contact Hub staging acceptance
 
+## Local integration candidate
+
+Use `integration/contact-hub-unified-qa` in
+`/tmp/idynify-contact-hub-integration`. The development branch is preserved
+at documentation commit `af3c2522`, and `recovery/contact-hub-83e72e3c`
+pins the accepted implementation.
+
+| Checkpoint | Commit |
+| --- | --- |
+| GitHub main reverified for integration | `424fa462b94beb5f1aa5bc6c358ea4ab14f0696a` |
+| PR #817 head reverified | `317d908b9f1118209624be36d5ff0c89710a41cf` |
+| Foundation merge | `a747cf7ed9dd07e2f8d43a2368a6c22eb4d6be44` |
+| Completed feature stack merge | `1b39eb46938a7158aa2e588f56ea828c49a7a8d4` |
+
+The foundation resolution retained the current main credit-write guards,
+added My Card's private rules, kept Import on My People, and combined shell
+entity navigation with the existing Scout opportunity panel. The stack
+resolution kept main's authoritative Free-plan route gate, combined the
+paid Barry shell check with Contact Hub's route/account check, kept the
+Scout opportunity below the new header, and preserved both the main and
+photo guards in overlapping Firestore grants. The local test adjustments
+verify the current profile and combined rules. Sticker-tab state uses
+a membership-only patch from the existing sticker service boundary.
+
+For the candidate, set `VITE_FREE_PLAN=existing` to admit verified existing
+Free accounts without opening new signups. The existing `on` mode also
+allows new Free signup and needs its own authorization. Keep the shell
+migration enabled. For rollback, retain the approved Free mode and a build
+that provides the Free Contact Hub route so existing Free users can still
+reach their contacts.
+
+### Browser review of the merged routes
+
+From the candidate worktree:
+
+```sh
+node node_modules/vite/bin/vite.js --config scripts/visual/contact-profile/vite.config.mjs --configLoader runner --port 5313
+CONTACT_HUB_FIXTURE_PORT=5313 node scripts/visual/contact-profile/capture.mjs /tmp/idynify-hub-integrated-browser --workspace
+```
+
+Start at
+`http://127.0.0.1:5313/scripts/visual/contact-profile/profile.html?workspace=1`.
+Append `&scout=1` or `&readonly=1` to switch the synthetic session.
+This mode renders the candidate's My People, Sticker Wall, My Card and
+person routes with local memory fixtures. The navigation strip belongs
+to the fixture. Shell route access is covered independently by regression
+tests. For the simulated Gmail composer, open the same page with
+`?action=1&gmail_demo=1`. Using `--action` or `--gmail` with
+`CONTACT_HUB_FIXTURE_PORT=5313` runs the component browser regressions on
+this worktree. The workspace smoke makes no requests to remote APIs.
+
+Local QA covers the merged workspace in Free, Scout and read-only modes,
+the focused regression suite, and a test-mode build using synthetic Firebase
+configuration. The emulator uses loopback and demo project IDs. It covers
+general rules, sticker rules and service behavior, flag parity, write
+semantics, My Card, private photo invariants, and client denials for all
+Contact Hub Gmail collections. Targeted lint introduced no new findings.
+The inherited lint findings are 43 in `src/App.jsx` and four in
+`src/components/contacts/IdentityCard.jsx`.
+
 ## Baseline and integration sequence
 
 The frozen feature branch is `feature/contact-profile-header-h1` at
@@ -116,7 +176,7 @@ Cancellation after verified state returns to that contact with
 
 | Context | Settings |
 | --- | --- |
-| Frontend staging build | `VITE_CONTACT_HUB=on`, `VITE_SHELL_MIGRATION=on` or unset to use the enabled default, and `VITE_FIREBASE_PROJECT_ID=idynify-staging`. Add `VITE_CONTACT_HUB_GMAIL=on` at the connection-only gate. |
+| Frontend staging build | `VITE_CONTACT_HUB=on`, `VITE_FREE_PLAN=existing` for already provisioned Free accounts, `VITE_SHELL_MIGRATION=on` or unset to use the enabled default, and `VITE_FIREBASE_PROJECT_ID=idynify-staging`. Add `VITE_CONTACT_HUB_GMAIL=on` at the connection-only gate. |
 | Frontend Firebase configuration | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID` from the staging web app |
 | Staging Functions | `FIREBASE_PROJECT_ID=idynify-staging`, `FIREBASE_CLIENT_EMAIL` and `FIREBASE_PRIVATE_KEY` from the approved staging identity. For local staging QA only, ADC can use `FIREBASE_ADMIN_CREDENTIALS=application-default` without a private key |
 | Gmail connection and status | `CONTACT_HUB_GMAIL=on` and `CONTACT_HUB_GMAIL_CLIENT_ID`, `CONTACT_HUB_GMAIL_CLIENT_SECRET`, `CONTACT_HUB_GMAIL_REDIRECT_URI` for the dedicated client |
@@ -167,7 +227,8 @@ tokens, OAuth callback queries and request bodies out of screenshots and logs.
   `users/{uid}/card/main` owner-only access and revision/field guards,
   Stickers registry and rollout restrictions, the contact timeline, and the
   existing impersonation protections. Use the My Card and Stickers rules
-  suites and `scripts/rules-check/contact-photo.mjs` against the candidate.
+  suites, `scripts/rules-check/contact-photo.mjs`, and
+  `scripts/rules-check/contact-hub-gmail.mjs` against the candidate.
   Verify direct SDK denials for cross-account access, private photo list/write,
   contact display marker forgery and all three top-level Gmail collections.
 - Use the combined `firestore.indexes.json`. The photo branch adds a

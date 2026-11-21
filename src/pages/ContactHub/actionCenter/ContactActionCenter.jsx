@@ -1,3 +1,4 @@
+import { stickerMembershipFields } from '../../../services/stickers/stickerCore';
 import { useEffect, useId, useRef, useState } from 'react';
 import { CalendarClock, Check, Clock3, Contact, LayoutGrid, Mail, MessageSquare, MoreHorizontal, NotebookPen, Pencil, Phone, Sparkles, Sticker } from 'lucide-react';
 import ContactDetails from './ContactDetails';
@@ -264,7 +265,7 @@ export default function ContactActionCenter({ uid, contact, readOnly, scout, ope
         {currentTab === 'emails' && <section className="ac-card"><h2>Scout Emails</h2><History rows={rows.filter((row) => row.isEmail && !row.manualEmail)} empty="No email activity yet." {...feedProps} /></section>}
         {currentTab === 'details' && <ContactDetails contact={contact} uid={uid} canWrite={canWrite} onUpdate={onUpdate} />}
         {currentTab === 'stickers' && <section className="ac-card"><h2>Stickers</h2>
-          {canWrite && stickers.ready ? <ContactStickersRow contact={contact} onUpdate={(next) => onUpdate({ id: contact.id }, { sticker_ids: next.sticker_ids })}
+          {canWrite && stickers.ready ? <ContactStickersRow contact={contact} onUpdate={(next) => onUpdate({ id: contact.id }, stickerMembershipFields(next))}
             onLateUpdate={onLateStickerChange} /> : <p>Stickers are unavailable to edit in this session.</p>}
         </section>}
       </div>

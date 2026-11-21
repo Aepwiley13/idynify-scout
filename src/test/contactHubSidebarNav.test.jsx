@@ -305,7 +305,7 @@ describe('under Contact Hub, while it is the active module', () => {
     const nav = await hubNav();
     expect(within(nav).getByRole('button', { name: /My People/ })).toHaveAttribute('aria-current', 'true');
     // The shell is told who is open (in full, against the real shell: contactHubPage.test.jsx).
-    await screen.findByTestId('notes');
+    await screen.findByRole('tab', { name: 'Action Center' });
     expect(shell.entities.at(-1)).toEqual({ type: 'contact', id: 'p2', stage: null, label: 'Wes Clark' });
     await user.click(await within(nav).findByRole('button', { name: 'VIP, 1 person' }));
     expect(router.at).toBe(`/contact-hub?sticker=${VIP.id}`);
@@ -691,7 +691,7 @@ describe('a phone: the shell\'s bottom bar is My Card · My People · Sticker Wa
   it('a person keeps My People lit, and the bar still leads to the wall and back', async () => {
     const user = userEvent.setup();
     renderPhone('/contact-hub/person/p2');
-    await screen.findByTestId('notes');
+    await screen.findByRole('tab', { name: 'Action Center' });
     expect(lit()).toEqual(['My People']);
     await user.click(cell('Sticker Wall'));
     expect(await screen.findByTestId('stickers-wall')).toBeInTheDocument();

@@ -126,6 +126,11 @@ export function storedStickerIds(contact) {
   return Array.isArray(contact?.sticker_ids) ? contact.sticker_ids : [];
 }
 
+/** The narrow local-state patch returned after a sticker transaction. */
+export function stickerMembershipFields(contact) {
+  return { sticker_ids: storedStickerIds(contact) };
+}
+
 /**
  * The contact as the screen shows it after a confirmed add or remove. Pure:
  * it updates local state once a transaction has resolved, so the membership

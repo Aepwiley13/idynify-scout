@@ -105,3 +105,12 @@ export function runTransaction(_db, apply) {
   pending = result.catch(() => {});
   return result;
 }
+
+export function writeBatch(db) {
+  const writes = [];
+  return {
+    set: (...args) => writes.push((tx) => tx.set(...args)),
+    update: (...args) => writes.push((tx) => tx.update(...args)),
+    commit: () => runTransaction(db, (tx) => { for (const write of writes) write(tx); }),
+  };
+}

@@ -99,3 +99,20 @@ The fixture above uses in-memory photo overrides. Contact Hub's real adapter and
 The profile lazily reads a single private override. My People rows, cards and tables use the display marker returned by the normal contacts query. They show initials for hidden and custom photos, so they neither display an older imported picture in its place nor download full-size JPEGs. Sticker Wall tiles are sticker summaries. Contact Hub's Details uses the profile editor, and Scout's legacy URL editor remains on its existing path.
 
 The local emulator suite is `scripts/rules-check/contact-photo.mjs` under the existing rules-check dependencies. It checks owner isolation, overlapping rule matches, the bulk-delete guard, atomic trusted cleanup, concurrent saves, and a recursive purge fixture. The purge fixture exercises Firestore cleanup separately from any deployed account-deletion workflow.
+
+#### Photo staging requirements
+
+- Keep both photo flags off until trusted individual contact deletion, bulk deletion, and account deletion remove private photo documents. Verify all three workflows using real staging data.
+- Test taking and saving a photo on a physical mobile device, including returning from the camera and cancelling.
+- Verify real staging writes, reloads, owner isolation, read-only and impersonation rejection, and concurrent deletion. Fixture and emulator results are local evidence.
+- Add lightweight thumbnails in a future pass for custom photos in My People and contact cards. The current list projection can show initials without fetching each private JPEG.
+
+### Contact Hub manual Gmail staging
+
+The Contact Hub composer is off by default. An isolated staging setup uses `VITE_CONTACT_HUB_GMAIL=on` in the frontend and `CONTACT_HUB_GMAIL=on` for the functions. Use a dedicated Google OAuth client for new Contact Hub connections through `CONTACT_HUB_GMAIL_CLIENT_ID`, `CONTACT_HUB_GMAIL_CLIENT_SECRET`, and `CONTACT_HUB_GMAIL_REDIRECT_URI`. Register the exact HTTPS `/.netlify/functions/contact-hub-gmail-callback` URL. Configure consent for Gmail send and email identity scopes, and verify Google consent and OAuth publishing requirements for the rollout audience. Previously connected Scout Gmail accounts use their original credentials and client to refresh. New Contact Hub connections grant send-only Gmail access and are stored separately.
+
+Test real Free and Scout staging accounts with a controlled recipient. Verify connect, cancel, return to the same contact, account switch, expired or revoked permission, actual delivery, the shared activity entry, and unchanged Scout contact state. Test the client and function flags together. The server requires an authenticated owner, confirms the sender and saved recipient at reservation, and rejects impersonation. No credits or AI are involved.
+
+The trusted function reserves one send attempt per request ID. It limits attempts to five per UTC minute and thirty per UTC day per IDYNIFY account. Google applies its own sending limits. An unconfirmed Gmail response requires checking Gmail Sent before trying a new message. A confirmed send with a failed activity write is shown as sent with a warning. Neither case automatically retries Gmail.
+
+The new top-level collections are server-only under the current rules. Before any enrollment, set retention for expired OAuth records (`contact_hub_gmail_oauth.expiresAt`), integrate removal of private connection and send-ledger documents with account deletion, and review an account-level disconnect and revocation path for the new OAuth client. Send reservations and quota records incur Firestore transaction reads and writes. The relationship timeline stores the subject and Gmail message ID for confirmed sends. The message body is sent to Gmail and is not persisted by the Contact Hub function.

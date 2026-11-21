@@ -42,14 +42,14 @@ import StickerPicker from '../../stickers/StickerPicker';
 import { useStickers } from '../../stickers/stickersRegistry';
 import { useContactStickers } from '../../stickers/useContactStickers';
 
-export default function ConnectedPersonHeader({ contact, onPatch, onLateStickerChange, headingLevel = 1, compactMobileHeader = false, photoEditor }) {
+export default function ConnectedPersonHeader({ contact, onPatch, onLateStickerChange, headingLevel = 1, compactMobileHeader = false, photoEditor, onEmail }) {
   const stickers = useStickers();
   const isMobile = useIsMobile();
   if (!contact?.id) return null;
-  return <Connected key={contact.id} contact={contact} onPatch={onPatch} onLateStickerChange={onLateStickerChange} headingLevel={headingLevel} compactHeader={compactMobileHeader && isMobile} stickers={stickers} photoEditor={photoEditor} />;
+  return <Connected key={contact.id} contact={contact} onPatch={onPatch} onLateStickerChange={onLateStickerChange} headingLevel={headingLevel} compactHeader={compactMobileHeader && isMobile} stickers={stickers} photoEditor={photoEditor} onEmail={onEmail} />;
 }
 
-function Connected({ contact, onPatch, onLateStickerChange, headingLevel, compactHeader, stickers, photoEditor }) {
+function Connected({ contact, onPatch, onLateStickerChange, headingLevel, compactHeader, stickers, photoEditor, onEmail }) {
   const edit = useContactIdentityEdit({ contact, onPatch });
   const photo = useContactPhotoEdit({ contact, onPatch, saveOverride: photoEditor?.saveOverride });
 
@@ -111,6 +111,7 @@ function Connected({ contact, onPatch, onLateStickerChange, headingLevel, compac
   const actions = {
     onEdit: edit.start,
     onPhotoClick,
+    onEmail,
     onAddSticker: ready ? () => (st.open ? st.closePicker() : st.setOpen(true)) : undefined,
     onRemoveSticker: ready
       ? ({ id }) => { const chip = st.chips.find((c) => c.sticker.id === id); if (chip) st.change('remove', chip.sticker); }

@@ -43,7 +43,7 @@ export function relationshipHistory(notes, events) {
           next_step_completed: 'Reminder completed', message_sent: 'Message sent',
           message_received: 'Message received', reply_received: 'Reply received',
         })[event.type] ?? event.type?.replaceAll('_', ' ');
-    if (label) rows.push({ id: 'event:' + event.id, label, text: event.preview, time: milliseconds(event.metadata?.occurred_at ?? event.timestamp ?? event.createdAt), isEmail });
+    if (label) rows.push({ id: 'event:' + event.id, label, text: event.preview, time: milliseconds(event.metadata?.occurred_at ?? event.timestamp ?? event.createdAt), isEmail, manualEmail: event.type === 'message_sent' && event.metadata?.source === 'contact_hub_manual' });
   }
   return rows.sort((a, b) => (b.time || 0) - (a.time || 0));
 }

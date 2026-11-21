@@ -504,7 +504,15 @@ export default function PersonHeader({
                 </a>
               </li>
             ) : null}
-            {email ? (
+            {email && typeof actions?.onEmail === 'function' ? (
+              <li className="ph-contact">
+                <button type="button" className="ph-pill" aria-label={`Email ${email.address}`} aria-haspopup="dialog"
+                  onClick={actions.onEmail}>
+                  <Mail size={16} aria-hidden="true" className="ph-pill-icon" />
+                  <span className="ph-pill-text">{email.address}</span>
+                </button>
+              </li>
+            ) : email ? (
               <li className="ph-contact">
                 <a
                   className="ph-pill"

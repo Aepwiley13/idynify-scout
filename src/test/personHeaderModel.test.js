@@ -542,7 +542,7 @@ describe('the files stand alone', () => {
   it('import only pure helpers: no React, Firebase, router, service, context, plan, billing, Scout or Contact Hub', () => {
     const allowed = [
       /^\.\/personHeader\w+\.js$/,
-      /^\.\.\/\.\.\/\.\.\/utils\/(contactDisplayName|contactPhoto|contactPhones|socialProfiles)\.js$/,
+      /^\.\.\/\.\.\/\.\.\/utils\/(contactDisplayName|contactPhoto|contactPhones|socialProfiles|savedContactEmail)\.js$/,
       /^\.\.\/\.\.\/\.\.\/services\/stickers\/stickerCore\.js$/,
     ];
     for (const file of files) {

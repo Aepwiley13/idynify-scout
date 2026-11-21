@@ -13,7 +13,7 @@ const mayWrite = (uid) => {
 const markerFor = (override) => override === null ? null : override.kind === 'hidden' ? 'hidden' : 'custom';
 const codeFor = { read_only: 'permission-denied', sign_in: 'permission-denied', photo_changed: 'photo_changed' };
 
-export default function ContactHubPhotoHeader({ uid, readOnly, contact, onPatch, onLateStickerChange }) {
+export default function ContactHubPhotoHeader({ uid, readOnly, contact, onPatch, onLateStickerChange, onEmail }) {
   const [photo, setPhoto] = useState({ status: 'loading', override: null, version: null });
   const active = useRef(true);
   const hasAccess = enabled && !readOnly && mayWrite(uid);
@@ -67,5 +67,5 @@ export default function ContactHubPhotoHeader({ uid, readOnly, contact, onPatch,
     : enabled || contact.contact_hub_photo ? {} : undefined;
   const shown = ready ? { ...contact, photoOverride: photo.override, contact_hub_photo: markerFor(photo.override) } : contact;
   return <ConnectedPersonHeader compactMobileHeader contact={shown} photoEditor={photoEditor}
-    onPatch={patchHeader} onLateStickerChange={onLateStickerChange} />;
+    onPatch={patchHeader} onLateStickerChange={onLateStickerChange} onEmail={onEmail} />;
 }

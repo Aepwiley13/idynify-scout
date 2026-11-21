@@ -89,7 +89,7 @@ export default function ContactActionCenter({ uid, contact, readOnly, scout, ope
 
   useEffect(() => { noteRef.current?.querySelector('textarea, button')?.focus(); }, [noteEdit?.note, noteEdit?.remove]);
 
-  const rows = relationshipHistory(contact.notes, feed.events).filter((row) => scout || !row.isEmail);
+  const rows = relationshipHistory(contact.notes, feed.events).filter((row) => scout || !row.isEmail || row.manualEmail);
   const feedProps = { onNote: canWrite ? (note, remove) => {
     setNoteError(false);
     setNoteEdit({ note, remove, content: note.content });
@@ -261,7 +261,7 @@ export default function ContactActionCenter({ uid, contact, readOnly, scout, ope
           </div>
         )}
         {currentTab === 'activity' && <section className="ac-card"><h2>Activity</h2><History rows={rows} empty="No activity yet." {...feedProps} /></section>}
-        {currentTab === 'emails' && <section className="ac-card"><h2>Scout Emails</h2><History rows={rows.filter((row) => row.isEmail)} empty="No email activity yet." {...feedProps} /></section>}
+        {currentTab === 'emails' && <section className="ac-card"><h2>Scout Emails</h2><History rows={rows.filter((row) => row.isEmail && !row.manualEmail)} empty="No email activity yet." {...feedProps} /></section>}
         {currentTab === 'details' && <ContactDetails contact={contact} uid={uid} canWrite={canWrite} onUpdate={onUpdate} />}
         {currentTab === 'stickers' && <section className="ac-card"><h2>Stickers</h2>
           {canWrite && stickers.ready ? <ContactStickersRow contact={contact} onUpdate={(next) => onUpdate({ id: contact.id }, { sticker_ids: next.sticker_ids })}

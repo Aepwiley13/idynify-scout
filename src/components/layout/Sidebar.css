@@ -70,12 +70,14 @@
   object-fit: contain;
 }
 
-/* 40px in the 64px rail, matching the proportion the wordmark keeps in the
-   wide one. The source is 128px square, so this still has 3× to spare. */
+/* 36px in the 64px rail — up from 32px so the mark holds roughly the
+   proportion the wordmark now holds in the wide rail, but not the 40px that
+   would leave it half a pixel off the collapse chevron. At 36 the gap is
+   2.5px. The source is 128px square, so this still has 3.5× to spare. */
 .sidebar-mark-img {
-  width: 40px;
-  height: 40px;
-  border-radius: 11px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   object-fit: contain;
 }
 
@@ -111,12 +113,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 11px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   background: linear-gradient(135deg, #e8197d, #00c4cc);
   color: #fff;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 800;
   font-style: italic;
   letter-spacing: 0.02em;

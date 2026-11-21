@@ -19,4 +19,5 @@ project, and it belongs somewhere else.
 
 | # | Title | Area | Status |
 |---|-------|------|--------|
-| [001](001-global-brand-identity.md) | Global Brand Identity | Shared sidebar — brand mark | Awaiting merge |
+| [001](001-global-brand-identity.md) | Global Brand Identity | Shared sidebar — brand mark | Ready for PR |
+| 002 | Global Typography & Visual Hierarchy | Platform-wide type system | Audit in progress |

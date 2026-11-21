@@ -43,7 +43,7 @@ the painted ratio measures **3.0000** against the master's **3.0000**.
 | Gutters (L/R) | 18 / 101 | **18 / 18** |
 | Served asset | 204×68 | **552×184** |
 | Effective DPR | 2.00× | **3.02×** |
-| Collapsed mark | 32px in a 64px rail | **40px** |
+| Collapsed mark | 32px in a 64px rail | **36px** |
 
 ### The assets
 
@@ -88,7 +88,8 @@ agree exactly) → AVIF q82 straight off the resize. It is recorded in the
 - **Collapse button** — position byte-identical (208,20 wide; 52,20 collapsed).
   It is `position: absolute` on `.sidebar`, not a child of the header, so a
   taller header cannot move it. Verified functionally by clicking it: wide →
-  compact → wide.
+  compact → wide. Clearance from the collapsed mark measured 2.5px at the final
+  36px, with no overlap.
 - **Build** — production build succeeds; the three derivatives land in `dist`
   byte-identical to source at 552×184, and the minified CSS carries the new
   rules.
@@ -102,12 +103,12 @@ agree exactly) → AVIF q82 straight off the resize. It is recorded in the
 
 ## Known, and deliberately left
 
-- **The collapsed mark now sits 0.5px from the collapse chevron** (it was
-  4.5px). They do not overlap, and the chevron straddles the rail edge so most
-  of it sits outside, but at 40px the two effectively abut. Flagged and left at
-  the approved 40px; dropping to 36px would restore ~2.5px if it reads as tight
-  in use.
-- **The collapsed mark is 1px off-centre** — 11.5px left, 12.5px right. The
+- **The collapsed mark was sized twice.** 40px matched the wordmark's new
+  proportion but left it 0.5px from the collapse chevron — not overlapping, but
+  abutting. It was reduced to **36px**, which restores a **2.5px** gap (32px
+  gave 4.5px) while still reading larger than before. Effective DPR 3.56 from
+  the 128px source.
+- **The collapsed mark is 1px off-centre** — 13.5px left, 14.5px right. The
   sidebar's 1px right border makes the content box 63px, not 64px. This is
   pre-existing (15.5/16.5 before) and was not introduced here.
 - **`tokens.js` defines an AVIF derivative that `<picture>` never serves** —
@@ -122,7 +123,7 @@ agree exactly) → AVIF q82 straight off the resize. It is recorded in the
 
 | File | Change |
 |---|---|
-| `src/components/layout/Sidebar.css` | Brand block sizing, centring, mobile pin, collapsed mark |
+| `src/components/layout/Sidebar.css` | Brand block sizing, centring, mobile pin, collapsed mark (36px) |
 | `src/components/layout/Sidebar.jsx` | `sidebar-wordmark` class on `<picture>`; doc comment. No logic. |
 | `src/theme/tokens.js` | Derivative dimensions 204×68 → 552×184, plus the recut recipe |
 | `public/assets/sidebar/idynify-wordmark.{avif,webp,png}` | Recut at 552×184 |

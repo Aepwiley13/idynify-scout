@@ -43,7 +43,7 @@ const gmail = {
     let token = connection.accessToken;
     if (!token || Date.now() >= (connection.expiresAt ?? 0) - 60_000) {
       try {
-        const refresh = oauth(connection.source !== 'contact_hub_manual');
+        const refresh = oauth(connection.legacy);
         refresh.setCredentials({ refresh_token: connection.refreshToken });
         const { credentials } = await refresh.refreshAccessToken();
         token = credentials.access_token;
@@ -54,6 +54,16 @@ const gmail = {
     // Only give the transport an access token. The OAuth client cannot refresh and replay a send.
     const auth = new google.auth.OAuth2();
     auth.setCredentials({ access_token: token });
+    // The legacy Scout integration document is owner-writable. Confirm the
+    // real Google sender before using its token in Contact Hub.
+    if (connection.legacy) {
+      try {
+        const { data } = await google.oauth2({ version: 'v2', auth }).userinfo.get({}, { timeout: 5_000 });
+        if (!data.verified_email || data.email?.toLowerCase() !== connection.email.toLowerCase()) {
+          throw new Error('Google sender mismatch');
+        }
+      } catch { throw failed('connect_gmail'); }
+    }
     const raw = Buffer.from(buildPlainTextEmail(message), 'utf8').toString('base64url');
     try {
       const { data } = await google.gmail({ version: 'v1', auth }).users.messages.send(
@@ -75,5 +85,6 @@ const gmail = {
 export const contactHubGmail = createContactHubGmail({
   db, verifyToken: (token) => admin.auth().verifyIdToken(token, true), gmail,
   enabled: () => process.env.CONTACT_HUB_GMAIL === 'on',
+  sendingEnabled: () => process.env.CONTACT_HUB_GMAIL_SEND === 'on',
   timestamp: (ms) => ms === undefined ? Timestamp.now() : Timestamp.fromMillis(ms),
 });

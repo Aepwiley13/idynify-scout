@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { describe, expect, it, vi } from 'vitest';
 import { createContactHubGmail } from '../../netlify/functions/utils/contactHubGmail';
 
-function fixture() {
+function fixture({ sendingEnabled = true, now = () => 1_000 } = {}) {
   const records = new Map([
     ['users/owner', { plan: 'free' }],
     ['users/owner/contacts/alex', { email: 'alex@example.com', status: 'saved' }],
@@ -38,7 +38,7 @@ function fixture() {
     exchange: vi.fn(async () => ({ email: 'mine@example.com', refreshToken: 'new-private' })),
   };
   const { api, callback } = createContactHubGmail({
-    db, gmail, timestamp, now: () => 1_000, enabled: () => true,
+    db, gmail, timestamp, now, enabled: () => true, sendingEnabled: () => sendingEnabled,
     verifyToken: async (token) => token === 'custom'
       ? { uid: 'owner', firebase: { sign_in_provider: 'custom' } }
       : { uid: token },
@@ -64,7 +64,7 @@ describe('Contact Hub manual Gmail', () => {
     await Promise.all([call(draft), call(draft)]);
     expect((await call(draft)).data).toEqual({ status: 'sent' });
     expect(gmail.send).toHaveBeenCalledTimes(1);
-    expect(gmail.send).toHaveBeenCalledWith(integration, { toEmail: 'alex@example.com', subject: 'Hello', body: 'Great to meet you' });
+    expect(gmail.send).toHaveBeenCalledWith({ ...integration, legacy: true }, { toEmail: 'alex@example.com', subject: 'Hello', body: 'Great to meet you' });
     expect(records.get(`users/owner/contacts/alex/timeline/contact-hub-gmail-${draft.requestId}`)).toMatchObject({
       type: 'message_sent', actor: 'user', preview: 'Hello',
       metadata: { channel: 'email', source: 'contact_hub_manual', gmail_message_id: 'gmail-id' },
@@ -72,6 +72,14 @@ describe('Contact Hub manual Gmail', () => {
     expect(records.get('users/owner/contacts/alex')).toEqual(original);
     expect(records.get('users/owner/integrations/gmail')).toEqual(integration);
     expect((await call({ ...draft, message: 'Different message' })).data.error).toBe('intent_changed');
+  });
+
+  it('can verify connection status with live sends disabled', async () => {
+    const { records, gmail, call, message } = fixture({ sendingEnabled: false });
+    expect((await call({ action: 'status' })).data.connected).toBe(true);
+    expect((await call(message())).data.error).toBe('sending_disabled');
+    expect(gmail.send).not.toHaveBeenCalled();
+    expect([...records.keys()].some((key) => key.startsWith('contact_hub_gmail_limits/'))).toBe(false);
   });
 
   it('rejects another account, impersonation, missing contacts, and recipient substitution', async () => {
@@ -98,6 +106,19 @@ describe('Contact Hub manual Gmail', () => {
     for (let i = 0; i < 3; i += 1) await call(message());
     expect((await call(message())).data.error).toBe('app_limit');
     expect(gmail.send).toHaveBeenCalledTimes(5);
+  });
+
+  it('enforces the daily limit across minute windows and resets at the next UTC day', async () => {
+    let ms = 1_000;
+    const { call, gmail, message } = fixture({ now: () => ms });
+    for (let i = 0; i < 30; i += 1) {
+      expect((await call(message())).data.status).toBe('sent');
+      ms += 60_000;
+    }
+    expect((await call(message())).data.error).toBe('app_limit');
+    ms = 86_400_000;
+    expect((await call(message())).data.status).toBe('sent');
+    expect(gmail.send).toHaveBeenCalledTimes(31);
   });
 
   it('finishes OAuth only in the originating browser, account, and contact', async () => {

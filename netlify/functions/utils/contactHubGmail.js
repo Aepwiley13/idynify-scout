@@ -29,7 +29,7 @@ const redirect = (location) => ({
 const pathFor = (id) => `/contact-hub/person/${encodeURIComponent(id)}?compose=email`;
 const publicState = (entry) => ({ status: entry.status, ...(entry.reason ? { reason: entry.reason } : {}) });
 
-export function createContactHubGmail({ db, verifyToken, gmail, enabled, timestamp, now = Date.now }) {
+export function createContactHubGmail({ db, verifyToken, gmail, enabled, sendingEnabled, timestamp, now = Date.now }) {
   const refs = (uid, id) => ({
     owner: db.doc(`users/${uid}`),
     contact: db.doc(`users/${uid}/contacts/${id}`),
@@ -56,7 +56,7 @@ export function createContactHubGmail({ db, verifyToken, gmail, enabled, timesta
     const [privateDoc, existing] = await Promise.all([tx.get(refs.privateConnection), tx.get(refs.existingConnection)]);
     for (const doc of [privateDoc, existing]) {
       const record = doc.data();
-      if (record?.status === 'connected' && record.refreshToken && GMAIL_ADDRESS.test(record.email ?? '')) return record;
+      if (record?.status === 'connected' && record.refreshToken && GMAIL_ADDRESS.test(record.email ?? '')) return { ...record, legacy: doc === existing };
     }
     return null;
   }
@@ -141,7 +141,10 @@ export function createContactHubGmail({ db, verifyToken, gmail, enabled, timesta
       if (!validId(input?.contactId)) throw fail(400, 'invalid_contact');
       if (input.uid !== actor.uid) throw fail(403, 'read_only');
       const scoped = refs(actor.uid, input.contactId);
-      if (input.action === 'send') return await send(scoped, actor.uid, input);
+      if (input.action === 'send') {
+        if (!sendingEnabled()) throw fail(403, 'sending_disabled');
+        return await send(scoped, actor.uid, input);
+      }
       if (input.action === 'finish_connect') {
         if (!SECRET.test(input.completion ?? '')) throw fail(400, 'invalid_oauth');
         await db.runTransaction(async (tx) => {

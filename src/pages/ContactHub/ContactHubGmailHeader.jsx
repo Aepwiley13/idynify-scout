@@ -8,6 +8,7 @@ import './ContactHubGmail.css';
 
 const enabled = import.meta.env.VITE_CONTACT_HUB_GMAIL === 'on';
 const feedback = {
+  sending_disabled: 'Sending is disabled in this environment.',
   app_limit: 'You’ve reached the Contact Hub sending limit. Try again later.',
   gmail_quota: 'Gmail’s sending limit has been reached. Try again later.',
   gmail_rejected: 'Gmail declined this email. Review the message and try again.',
@@ -52,7 +53,12 @@ async function request(uid, contactId, action, fields, isActive) {
   return result;
 }
 
-function Compose({ uid, contactId, onClose, failedConnection, completion }) {
+function openGoogleConsent(url) {
+  if (new URL(url).origin !== 'https://accounts.google.com') throw new Error('Unexpected Gmail URL');
+  window.location.assign(url);
+}
+
+function Compose({ uid, contactId, onClose, failedConnection, completion, openConsent = openGoogleConsent }) {
   const T = useT();
   const storageKey = `contact-hub-gmail-pending:${JSON.stringify([uid, contactId])}`;
   const [needsReview, setNeedsReview] = useState(() => Boolean(sessionStorage.getItem(storageKey)));
@@ -89,8 +95,7 @@ function Compose({ uid, contactId, onClose, failedConnection, completion }) {
     setBusy(true);
     try {
       const { url } = await request(uid, contactId, 'connect', {}, () => active.current);
-      if (new URL(url).origin !== 'https://accounts.google.com') throw new Error('Unexpected Gmail URL');
-      window.location.assign(url);
+      openConsent(url);
     } catch (error) {
       if (active.current) {
         setNotice(feedback[error.code] || 'Could not start the Gmail connection.');
@@ -166,7 +171,7 @@ function Compose({ uid, contactId, onClose, failedConnection, completion }) {
 }
 
 export default function ContactHubGmailHeader(props) {
-  const { uid, contact, readOnly } = props;
+  const { uid, contact, readOnly, openConsent, ...headerProps } = props;
   const [params, setParams] = useSearchParams();
   const [open, setOpen] = useState(false);
   const available = enabled && Boolean(uid) && !readOnly;
@@ -185,8 +190,8 @@ export default function ContactHubGmailHeader(props) {
 
   return (
     <>
-      <ContactHubPhotoHeader {...props} onEmail={available ? () => setOpen(true) : undefined} />
-      {available && (open || returned) && <Compose uid={uid} contactId={contact.id} onClose={close} failedConnection={params.get('gmail') === 'failed'} completion={params.get('gmail_connection')} />}
+      <ContactHubPhotoHeader {...headerProps} uid={uid} contact={contact} readOnly={readOnly} onEmail={available ? () => setOpen(true) : undefined} />
+      {available && (open || returned) && <Compose uid={uid} contactId={contact.id} onClose={close} failedConnection={params.get('gmail') === 'failed'} completion={params.get('gmail_connection')} openConsent={openConsent} />}
     </>
   );
 }

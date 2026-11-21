@@ -9,6 +9,9 @@
  */
 import '../../../src/index.css';
 import { useCallback, useEffect, useReducer, useState } from 'react';
+import { BrowserRouter } from 'react-router-dom';
+import ContactHubGmailHeader from '../../../src/pages/ContactHub/ContactHubGmailHeader';
+import { configureGmailFixture, openFixtureConsent } from './stubs/gmail';
 import { createRoot } from 'react-dom/client';
 import { ThemeProvider, useThemeCtx } from '../../../src/theme/ThemeContext';
 import { StickersProvider } from '../../../src/components/stickers/StickersContext';
@@ -34,11 +37,19 @@ const CONTACTS = [
   { id: 'long', name: 'Bartholomew-Alexandrovich Featherstonehaugh-Cholmondeley-Wolfeschlegelsteinhausenbergerdorff', title: 'Senior Vice President of Global Strategic Partnerships, Ecosystem Development and Public Sector Alliances', company_name: 'The International Association of Analytical Engine Manufacturers and Allied Trades of the Northern Hemisphere', location: 'Wales, United Kingdom', photo_url: portrait('morgan'), phones: [{ id: '1', value: '+44 20 7946 0958', label: 'work' }], emails: [{ id: '0', value: 'bartholomew@internationalassociation.example', label: 'work' }], sticker_ids: ['S00', 'S01', 'S02', 'S03', 'S04', 'S05', 'S06', 'S07'] },
 ];
 const isAction = params.get('action') === '1';
+const isGmailDemo = isAction && params.get('gmail_demo') === '1';
 const isPhotoDemo = isAction && params.get('photo') === '1';
 const scout = params.get('scout') === '1' && !fixture.readonly;
 const uid = getEffectiveUser().uid;
 const dateAgo = (days) => new Date(Date.now() - days * 86400000).toISOString();
 const BY_ID = Object.fromEntries(CONTACTS.map((c) => [c.id, c]));
+if (isGmailDemo) {
+  BY_ID.jordan = { ...BY_ID.jordan, emails: [
+    { value: 'jordan@example.org', label: 'work' },
+    { value: 'jordan.personal@example.net', label: 'personal' },
+  ], email: 'imported@example.net' };
+  configureGmailFixture(BY_ID);
+}
 if (isAction) {
   BY_ID.jordan = { ...BY_ID.jordan, notes: [
     { id: 'intro', content: 'Met Jordan at the neighborhood partners lunch.', created_at: dateAgo(4) },
@@ -96,6 +107,12 @@ function Controls({ currentId, onPick, bump }) {
         <a className="demo-btn" href={link({ readonly: null })} aria-current={!fixture.readonly}>owner</a>
         <a className="demo-btn" href={link({ readonly: '1' })} aria-current={fixture.readonly}>admin viewing (read-only)</a>
       </div>
+      {isGmailDemo && <div className="demo-group"><label>Next simulated send <select aria-label="Next simulated send"
+        defaultValue="sent" onChange={(event) => { fixture.gmailOutcome = event.target.value; }}>
+        <option value="sent">Success</option><option value="retry">Recoverable failure</option>
+        <option value="unknown">Uncertain delivery</option><option value="quota">Contact Hub rate limit</option>
+        <option value="gmailQuota">Gmail rate limit</option>
+      </select></label></div>}
       {isAction && <div className="demo-group"><span>Access</span>
         <a className="demo-btn" href={link({ scout: null })} aria-current={!scout}>Free</a>
         <a className="demo-btn" href={link({ scout: '1' })} aria-current={scout}>Scout</a>
@@ -149,11 +166,13 @@ function Demo() {
   const contact = contacts[currentId];
   return (
     <div className="demo">
-      {isAction ? <p className="demo-banner"><strong>Isolated Action Center.</strong> Sample contacts and in-memory saves.</p> : <p className="demo-banner"><strong>Isolated demo of the redesigned Contact Profile.</strong> Real components, made-up contacts, edits kept in this page only (reload resets them). Try: edit the name, title or organization (Enter saves, Esc or Cancel cancels, leaving the box saves); click the photo; Change photo; add and remove stickers and press Undo; edit email, phone and social below the header; use <em>Fail next save</em> to see Try again and Retry.</p>}
+      {isGmailDemo ? <p className="demo-banner"><strong>Isolated Gmail review.</strong> All connection and send outcomes are simulated.</p> : isAction ? <p className="demo-banner"><strong>Isolated Action Center.</strong> Sample contacts and in-memory saves.</p> : <p className="demo-banner"><strong>Isolated demo of the redesigned Contact Profile.</strong> Real components, made-up contacts, edits kept in this page only (reload resets them). Try: edit the name, title or organization (Enter saves, Esc or Cancel cancels, leaving the box saves); click the photo; Change photo; add and remove stickers and press Undo; edit email, phone and social below the header; use <em>Fail next save</em> to see Try again and Retry.</p>}
       <Controls currentId={currentId} onPick={setCurrentId} bump={bump} />
       <main className={isAction ? "demo-profile hub-person--action" : "demo-profile"}>
-        <ConnectedPersonHeader compactMobileHeader={isAction} photoEditor={isPhotoDemo ? photoEditor : undefined}
-          contact={isPhotoDemo ? { ...contact, photoOverride: photoOverrides[currentId] } : contact} onPatch={onPatch} onLateStickerChange={onLateStickerChange} />
+        {isGmailDemo ? <ContactHubGmailHeader key={currentId} uid={uid} readOnly={fixture.readonly} contact={contact}
+          onPatch={onPatch} onLateStickerChange={onLateStickerChange} openConsent={openFixtureConsent} />
+          : <ConnectedPersonHeader compactMobileHeader={isAction} photoEditor={isPhotoDemo ? photoEditor : undefined}
+          contact={isPhotoDemo ? { ...contact, photoOverride: photoOverrides[currentId] } : contact} onPatch={onPatch} onLateStickerChange={onLateStickerChange} />}
         {isAction ? (
           <ContactActionCenter key={currentId} uid={uid} contact={contact} readOnly={fixture.readonly}
             scout={scout} openBarry={() => setBarryOpened(true)} onUpdate={onUpdate} onLateStickerChange={onLateStickerChange} />
@@ -169,7 +188,7 @@ function Demo() {
 
 createRoot(document.getElementById('root')).render(
   <ThemeProvider>
-    <StickersProvider uid="u1"><Demo /></StickersProvider>
+    <StickersProvider uid="u1"><BrowserRouter><Demo /></BrowserRouter></StickersProvider>
   </ThemeProvider>,
 );
 document.fonts.ready.then(() => { document.documentElement.dataset.ready = '1'; });

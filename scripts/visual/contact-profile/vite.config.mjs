@@ -19,6 +19,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 process.env.VITE_CONTACT_HUB = 'on';
+process.env.VITE_CONTACT_HUB_GMAIL = 'on';
 const stub = (name) => fileURLToPath(new URL(`./stubs/${name}`, import.meta.url));
 
 export default defineConfig({

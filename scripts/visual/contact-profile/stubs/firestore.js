@@ -28,6 +28,7 @@ export const getDoc = async (ref) => snapshot(ref.path);
 const list = (path) => [...dataByPath.keys()]
   .filter((key) => key.startsWith(path + '/') && !key.slice(path.length + 1).includes('/'))
   .map(snapshot);
+export const getDocFromServer = getDoc;
 export const getDocs = async (ref) => ({ docs: list(ref.path) });
 export const onSnapshot = (ref, next) => {
   const notify = () => next({ docs: list(ref.path) });

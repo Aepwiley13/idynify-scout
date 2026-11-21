@@ -20,10 +20,12 @@ import { join } from 'node:path';
 
 const OUT = process.argv[2];
 if (!OUT) { console.error('usage: captureEdit.mjs <output folder>'); process.exit(2); }
-const BASE = 'http://127.0.0.1:5311/scripts/visual/contact-profile/profile.html';
+const gmailReview = process.argv.includes('--gmail');
+const origin = `http://127.0.0.1:${gmailReview ? 5312 : 5311}`;
+const BASE = `${origin}/scripts/visual/contact-profile/profile.html`;
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const PORT = process.argv.includes('--action') ? 9363 : 9362;
-const ALLOWED = [/^http:\/\/127\.0\.0\.1:5311\//, /^https:\/\/fonts\.googleapis\.com\//, /^https:\/\/fonts\.gstatic\.com\//];
+const PORT = gmailReview ? 9364 : process.argv.includes('--action') ? 9363 : 9362;
+const FONT_HOSTS = [/^https:\/\/fonts\.googleapis\.com\//, /^https:\/\/fonts\.gstatic\.com\//];
 const PHOTO_HOST = 'images.fixture.test';
 const wait = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
 
@@ -68,7 +70,7 @@ listeners.push(({ method, params }) => {
     const url = new URL(request.url);
     if (url.hostname === PHOTO_HOST) {
       send('Fetch.fulfillRequest', { requestId, responseCode: 200, responseHeaders: [{ name: 'Content-Type', value: 'image/svg+xml' }, { name: 'Access-Control-Allow-Origin', value: '*' }], body: Buffer.from(PORTRAITS[url.pathname] ?? portrait('#999', '#666', '#333')).toString('base64') }).catch(() => {});
-    } else if (ALLOWED.some((re) => re.test(request.url))) send('Fetch.continueRequest', { requestId }).catch(() => {});
+    } else if (url.origin === origin || (!gmailReview && FONT_HOSTS.some((re) => re.test(request.url)))) send('Fetch.continueRequest', { requestId }).catch(() => {});
     else { blocked.add(request.url); send('Fetch.failRequest', { requestId, errorReason: 'BlockedByClient' }).catch(() => {}); }
   }
   if (method === 'Runtime.exceptionThrown') problems.push(params.exceptionDetails.exception?.description ?? params.exceptionDetails.text);
@@ -151,6 +153,96 @@ const load = async (query) => {
   await wait(500);
 };
 const pickContact = async (id) => { await click(demoBtn(id)); await until(`document.querySelector('.demo-btn[aria-pressed="true"]').textContent === ${JSON.stringify(id)}`); await wait(500); };
+
+if (gmailReview) {
+  mkdirSync(OUT, { recursive: true });
+  const dialog = "document.querySelector('.hub-gmail-dialog[open]')";
+  const option = (text) => byText(text, dialog);
+  const status = (text) => until(`(${dialog})?.querySelector('[role=status]')?.textContent.includes(${JSON.stringify(text)})`);
+  const outcome = (value) => evaluate(`(() => {
+    const select = document.querySelector('[aria-label="Next simulated send"]');
+    select.value = ${JSON.stringify(value)};
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  })()`);
+  const draft = async (subject) => {
+    await click(`(${dialog}).querySelector('input')`);
+    await typeText(subject);
+    await click(`(${dialog}).querySelector('textarea')`);
+    await typeText('Thanks for your time today.');
+  };
+  const draftMatches = (subject) => evaluate(`(${dialog}).querySelector('input').value === ${JSON.stringify(subject)} && (${dialog}).querySelector('textarea').value === 'Thanks for your time today.'`);
+  const viewportShot = async (file) => {
+    await evaluate("document.querySelector('.demo-profile').scrollIntoView({ block: 'start' })");
+    const { data } = await send('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false });
+    writeFileSync(join(OUT, file + '.png'), Buffer.from(data, 'base64'));
+  };
+  for (const { id, width, height, dpr, mobile } of VIEWPORTS) {
+    await send('Emulation.setDeviceMetricsOverride', { width, height, deviceScaleFactor: dpr, mobile });
+    await send('Emulation.setTouchEmulationEnabled', { enabled: mobile });
+    for (const [theme] of THEMES) {
+      const label = `${id}-${theme}`;
+      const query = `action=1&gmail_demo=1&theme=${theme}`;
+      await load(query);
+      await evaluate('sessionStorage.clear()');
+      const open = () => click(byLabel('Email jordan@example.org'));
+      await open();
+      check(label + ' disconnected', await until(option('Connect Gmail')));
+      await viewportShot(label + '-disconnected');
+      await click(option('Connect Gmail'));
+      check(label + ' returns to Jordan connected', await until(`location.search.includes('contact=jordan') && document.querySelector('.ph-card').textContent.includes('Jordan Lee') && (${dialog})?.textContent.includes('From review-sender@example.org')`));
+      check(label + ' first saved address only', await evaluate(`(${dialog}).textContent.includes('To jordan@example.org') && !(${dialog}).textContent.includes('personal') && !(${dialog}).textContent.includes('imported')`));
+      check(label + ' fits viewport', await evaluate(`(() => {
+        const bounds = (${dialog}).getBoundingClientRect();
+        return bounds.left >= 0 && bounds.right <= innerWidth + 1 && bounds.top >= 0 && bounds.bottom <= innerHeight + 1;
+      })()`));
+      await click(option('Cancel'));
+      await outcome('retry');
+      await open();
+      await until(`(${dialog})?.querySelector('input')`);
+      await draft('Thanks for meeting');
+      await viewportShot(label + '-composer');
+      await click(option('Send email'));
+      check(label + ' failure with draft', await status('Gmail declined') && await draftMatches('Thanks for meeting'));
+      await viewportShot(label + '-retry');
+      await click(option('Send email'));
+      check(label + ' retry confirms send', await status('Email sent.'));
+      await viewportShot(label + '-sent');
+      await click(option('Close'));
+      await click(byText('Activity'));
+      check(label + ' confirmed send appears once in Activity', await until("[...document.querySelectorAll('.ac-card li')].filter((item) => item.innerText.includes('Thanks for meeting')).length === 1"));
+      await viewportShot(label + '-activity');
+
+      for (const [kind, message] of [['quota', 'Contact Hub sending limit'], ['gmailQuota', 'Gmail’s sending limit'], ['unknown', 'Check your Sent folder']]) {
+        await outcome(kind);
+        await open();
+        await until(`(${dialog})?.querySelector('input')`);
+        await draft('Another check');
+        await click(option('Send email'));
+        check(label + ' ' + kind, await status(message) && await draftMatches('Another check'));
+        if (kind === 'unknown') {
+          check(label + ' uncertain cannot resend', await evaluate(`!(${option('Send email')}) && !!(${option('I checked Gmail Sent')})`));
+          await viewportShot(label + '-uncertain');
+        } else if (kind === 'quota') await viewportShot(label + '-rate-limit');
+        await click(option('Cancel'));
+      }
+      await open();
+      check(label + ' uncertain persists after reopening', await status('Check your Sent folder'));
+      await click(option('I checked Gmail Sent'));
+      await draft('Jordan only');
+      await load(query + '&contact=avery');
+      await click(byLabel('Email avery@example.org'));
+      check(label + ' navigation clears draft and keeps Avery scoped', await until(`(${dialog})?.textContent.includes('To avery@example.org') && (${dialog}).querySelector('input').value === '' && (${dialog}).querySelector('textarea').value === '' && window.__writes.length === 0`));
+      await load(query + '&readonly=1&compose=email');
+      check(label + ' read-only cannot open returned composer', await evaluate(`!(${dialog}) && !!document.querySelector('a[href="mailto:jordan@example.org"]')`));
+    }
+  }
+  const unexpected = [...blocked].filter((url) => !/^https:\/\/fonts\.(gstatic|googleapis)\.com\//.test(url));
+  check('no external service requests', unexpected.length === 0);
+  check('no browser exceptions', problems.length === 0);
+  writeFileSync(join(OUT, 'gmail-report.json'), JSON.stringify({ checks, blocked: [...blocked], problems }, null, 2));
+  console.log(`Gmail browser review: ${checks.filter(({ pass }) => pass).length}/${checks.length} checks passed`);
+  process.exit(checks.some(({ pass }) => !pass) ? 1 : 0);
+}
 
 if (process.argv.includes('--photo')) {
   await send('Page.setInterceptFileChooserDialog', { enabled: true });

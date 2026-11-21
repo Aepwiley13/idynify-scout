@@ -15,6 +15,8 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 process.env.VITE_CONTACT_HUB = 'on';
 const stub = (name) => fileURLToPath(new URL(`./stubs/${name}`, import.meta.url));
@@ -22,6 +24,7 @@ const stub = (name) => fileURLToPath(new URL(`./stubs/${name}`, import.meta.url)
 export default defineConfig({
   root: fileURLToPath(new URL('../../..', import.meta.url)),
   envDir: fileURLToPath(new URL('./', import.meta.url)),
+  cacheDir: join(tmpdir(), 'idynify-contact-profile-vite'),
   plugins: [react()],
   resolve: {
     alias: [

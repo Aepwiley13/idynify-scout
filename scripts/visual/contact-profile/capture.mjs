@@ -22,7 +22,7 @@ const OUT = process.argv[2];
 if (!OUT) { console.error('usage: captureEdit.mjs <output folder>'); process.exit(2); }
 const BASE = 'http://127.0.0.1:5311/scripts/visual/contact-profile/profile.html';
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const PORT = 9362;
+const PORT = process.argv.includes('--action') ? 9363 : 9362;
 const ALLOWED = [/^http:\/\/127\.0\.0\.1:5311\//, /^https:\/\/fonts\.googleapis\.com\//, /^https:\/\/fonts\.gstatic\.com\//];
 const PHOTO_HOST = 'images.fixture.test';
 const wait = (ms) => new Promise((resolve) => { setTimeout(resolve, ms); });
@@ -117,6 +117,13 @@ const resetWrites = () => evaluate('window.__writes.length = 0');
 const active = () => evaluate(`(() => { const e = document.activeElement; return e ? e.tagName.toLowerCase() + ':' + (e.getAttribute('aria-label') || e.id || (e.textContent || '').trim().slice(0, 30)) : null; })()`);
 const pills = () => evaluate("[...document.querySelectorAll('.ph-sticker-name')].map((n) => n.textContent + (n.closest('li').getAttribute('aria-busy') === 'true' ? '*' : ''))");
 const bodyText = () => evaluate('document.body.innerText');
+const holdStickerWrite = () => evaluate(`(() => {
+  window.__fixture.stickerWriteGate = new Promise((resolve) => { window.__fixture.finishStickerWrite = resolve; });
+})()`);
+const settleStickerWrite = () => evaluate(`(() => {
+  window.__fixture.finishStickerWrite();
+  delete window.__fixture.stickerWriteGate;
+})()`);
 
 // What the page reports about itself: overflow, escaping, and whether every header control is big enough to hit.
 const MEASURE = `(() => {
@@ -144,6 +151,83 @@ const load = async (query) => {
   await wait(500);
 };
 const pickContact = async (id) => { await click(demoBtn(id)); await until(`document.querySelector('.demo-btn[aria-pressed="true"]').textContent === ${JSON.stringify(id)}`); await wait(500); };
+
+if (process.argv.includes('--action')) {
+  const button = (label) => byText(label, "document.querySelector('.ac')");
+  const input = () => byLabel('What would you like to remember or do?');
+  const enteredText = async (value) => {
+    await click(input());
+    await typeText(value);
+  };
+  const waitForText = (text) => until(`document.querySelector('.ac').innerText.includes(${JSON.stringify(text)})`);
+  for (const vp of VIEWPORTS) {
+    await send('Emulation.setDeviceMetricsOverride', { width: vp.width, height: vp.height, deviceScaleFactor: vp.dpr, mobile: vp.mobile });
+    await send('Emulation.setTouchEmulationEnabled', { enabled: vp.mobile });
+    await load('action=1&latency=300');
+    check(`${vp.id}: Free defaults to Action Center with local Barry and no Emails`, Boolean(await evaluate(input())) &&
+      !(await evaluate(button('Emails'))) && !(await evaluate(button('Open Barry'))));
+    check(`${vp.id}: responsive layout has no horizontal overflow`, await evaluate('document.documentElement.scrollWidth <= document.documentElement.clientWidth'));
+    await enteredText('Bring volunteer sign-up sheets');
+    await click(button('Set reminder'));
+    await evaluate(`(() => {
+      const date = document.querySelector('.ac input[type=date]');
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(date, '2027-07-10');
+      date.dispatchEvent(new Event('input', { bubbles: true }));
+      date.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await click(button('Save reminder'));
+    check(`${vp.id}: reminder saved with due date and Done`, (await waitForText('Reminder saved.')) && Boolean(await evaluate(button('Done'))));
+    await enteredText('Jordan confirmed the event date');
+    await click(button('Log update'));
+    await click(button('Save update'));
+    check(`${vp.id}: logged call appears in Recent Activity`, await waitForText('Jordan confirmed the event date'));
+    await enteredText('Prefers to coordinate on Mondays');
+    await click(button('Add note'));
+    check(`${vp.id}: saved note appears in Recent Activity`, await waitForText('Prefers to coordinate on Mondays'));
+    await evaluate(`(() => {
+      document.querySelector('.demo-banner').hidden = true;
+      document.querySelector('.demo-controls').style.display = 'none';
+      document.querySelector('.demo-log').hidden = true;
+      window.scrollTo(0, 0);
+    })()`);
+    const { cssContentSize: { width, height } } = await send('Page.getLayoutMetrics');
+    const { data } = await send('Page.captureScreenshot', {
+      format: 'png', captureBeyondViewport: true, clip: { x: 0, y: 0, width, height, scale: 1 },
+    });
+    writeFileSync(join(OUT, `action-center-${vp.id}.png`), Buffer.from(data, 'base64'));
+    await evaluate(`(() => {
+      document.querySelector('.demo-banner').hidden = false;
+      document.querySelector('.demo-controls').style.display = '';
+      document.querySelector('.demo-log').hidden = false;
+    })()`);
+    await click(button('View activity'));
+    check(`${vp.id}: the Activity tab shows the same saved history once`, await evaluate(`document.querySelector('.ac [role=tabpanel]').innerText.split('Prefers to coordinate on Mondays').length === 2`));
+    await click(button('Action Center'));
+    await click(button('Done'));
+    check(`${vp.id}: Done clears Up Next and records completion`, (await waitForText('Reminder completed.')) && (await waitForText('No reminder set.')));
+    await pickContact('avery');
+    check(`${vp.id}: switching contact resets the composer and history`, (await waitForText('Notes and logged interactions will appear here.')) && !(await evaluate(`${input()}.value`)));
+  }
+  await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await send('Emulation.setTouchEmulationEnabled', { enabled: false });
+  await load('action=1&scout=1');
+  await click(button('Emails'));
+  check('Scout: Emails shows email history', await waitForText('Shared the volunteer sign-up link.'));
+  await click(button('Action Center'));
+  await click(button('Open Barry'));
+  check('Scout: Barry opens on explicit action', await until(`Boolean(document.querySelector('[aria-label="Barry fixture"]'))`));
+  await load('action=1&readonly=1');
+  check('Read-only: capture controls and Scout Emails are absent', (await waitForText('This profile is read-only.')) && !(await evaluate(input())) && !(await evaluate(button('Emails'))));
+  await click(button('Details'));
+  check('Read-only: existing details stay visible and editing controls are absent', await evaluate(`Boolean(document.querySelector('.idc-contact-details')) && !document.querySelector('.idc-add-entry')`));
+  await load('action=1&contact=morgan');
+  check('Legacy reminder: visible and protected from overwrite', (await waitForText('Send Morgan the community calendar')) &&
+    await evaluate(`${button('Set reminder')}?.disabled === true`));
+  const failed = checks.filter((entry) => !entry.pass);
+  writeFileSync(join(OUT, 'action-center-report.json'), JSON.stringify({ checks, blocked: [...blocked], problems }, null, 2));
+  console.log(`${checks.length - failed.length}/${checks.length} Action Center checks passed. ${blocked.size} refused requests. ${problems.length} page errors.`);
+  socket.close(); cleanup(); process.exit(failed.length || blocked.size || problems.length ? 1 : 0);
+}
 
 for (const [folder, theme] of THEMES) {
   for (const vp of VIEWPORTS) {
@@ -246,6 +330,7 @@ for (const [folder, theme] of THEMES) {
     // ── 8. Phone, email and social: the existing editors ────────────────────
     await resetWrites();
     await click(`[...document.querySelectorAll('.idc-add-entry')].find((e) => /add email/.test(e.textContent))`);
+    await until(`document.activeElement.matches('.idc-entry-input[type=email]')`);
     await typeText('second@communityslc.org');
     await key('Enter');
     await wait(500);
@@ -262,8 +347,10 @@ for (const [folder, theme] of THEMES) {
     check(`${tag}: picker: opens with focus in its search box and fully inside the screen`, pk.focused && pk.inside, JSON.stringify(pk));
     check(`${tag}: picker: ${vp.mobile ? 'is a bottom sheet' : 'is a popover beside the chip'}`, vp.mobile ? pk.sheet : (!pk.sheet && pk.parentIsItem), JSON.stringify(pk));
     await shot(join(dir, '12-picker.png'));
+    await holdStickerWrite();
     await click(pickerOption('Mentor'));
     check(`${tag}: picker: a pick writes once and the pill is pending, then focus is back on Add sticker`, (await writeRows()).filter((w) => w.kind === 'sticker').length === 1 && (await pills()).includes('Mentor*') && (await active()) === 'button:Add sticker', `${JSON.stringify(await pills())} ${await active()}`);
+    await settleStickerWrite();
     await until(`!document.querySelector('.ph-sticker[aria-busy="true"]')`);
     check(`${tag}: picker: the sticker is added`, (await pills()).includes('Mentor'));
     await shot(join(dir, '13-sticker-added.png'));
@@ -312,9 +399,7 @@ for (const [folder, theme] of THEMES) {
     // ── 13. Keep an add pending while leaving and returning to its contact ──
     await load(`theme=${theme}`);
     await resetWrites();
-    await evaluate(`(() => {
-      window.__fixture.stickerWriteGate = new Promise((resolve) => { window.__fixture.finishStickerWrite = resolve; });
-    })()`);
+    await holdStickerWrite();
     await click(byLabel('Add sticker'));
     await until(`Boolean(document.querySelector('.stk-picker'))`);
     await click(pickerOption('Donor'));
@@ -326,7 +411,7 @@ for (const [folder, theme] of THEMES) {
     await until(`Boolean(document.querySelector('.stk-picker'))`);
     check(`${tag}: switching: the pending sticker is disabled in the picker`, await evaluate(`${pickerOption('Donor')}?.getAttribute('aria-disabled') === 'true'`));
     await click(pickerOption('Donor'));
-    await evaluate('window.__fixture.finishStickerWrite()');
+    await settleStickerWrite();
     await until(`!document.querySelector('.ph-sticker[aria-busy="true"]')`);
     const writes = (await writeRows()).filter((w) => w.kind === 'sticker');
     check(`${tag}: switching: the add writes exactly once, to the original contact`, writes.length === 1 && writes[0].path.endsWith('/jordan'), JSON.stringify(writes));

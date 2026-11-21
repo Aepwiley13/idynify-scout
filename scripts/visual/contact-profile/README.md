@@ -67,3 +67,15 @@ const { contacts, updateContact, applyStickerChange } = useOutletContext();
 * Do NOT pass `ConnectedPersonHeader` a parent that stores whatever it is given as "the contact on screen" (Scout's `ContactProfile.handleContactUpdate`
   does); `onPatch` is a partial, id-addressed patch. Scout is unchanged and would need its own id-checked adapter.
 * Contact Hub's existing tests (`contactHubPage`, routes, workspace) must be rerun with the swap; the `StickyNotes` section is untouched.
+
+## Action Center fixture
+
+Start Vite with `--config scripts/visual/contact-profile/vite.config.mjs --configLoader runner --strictPort` and open the same profile URL with `?action=1`. The fixture opens on Action Center with a Free session. Use the fixture controls to change contact, simulate a failed save or a read-only session, or switch to Scout. `?action=1&contact=morgan` shows a protected legacy next step.
+
+The fixture uses the real UI and an in-memory Firestore stand-in. It resets on reload. Scout’s Barry button shows a local handoff so the fixture can demonstrate explicit activation without contacting a service.
+
+With the fixture running, capture desktop and mobile screenshots and an interaction report:
+
+```sh
+node scripts/visual/contact-profile/capture.mjs /tmp/action-center-review --action
+```

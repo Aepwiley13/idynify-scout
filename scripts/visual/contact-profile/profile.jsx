@@ -15,6 +15,9 @@ import { StickersProvider } from '../../../src/components/stickers/StickersConte
 import ConnectedPersonHeader from '../../../src/components/contacts/personHeader/ConnectedPersonHeader';
 import IdentityCard from '../../../src/components/contacts/IdentityCard';
 import { withMembershipChange } from '../../../src/services/stickers/stickerCore';
+import ContactActionCenter from '../../../src/pages/ContactHub/actionCenter/ContactActionCenter';
+import { seedFixtureDoc } from './stubs/firestore';
+import { getEffectiveUser } from './stubs/impersonation';
 import { fixture } from './stubs/fixture.js';
 
 const params = new URLSearchParams(window.location.search);
@@ -29,7 +32,23 @@ const CONTACTS = [
   { id: 'lee', name: 'Lee Park', title: 'CTO', company_name: 'Initech', company_id: 'co-9', city: 'Austin', state: 'TX', photo_url: portrait('avery'), phones: [{ id: '1', value: '(512) 555-0110', label: 'work' }], emails: [{ id: '0', value: 'lee@initech.example', label: 'work' }], linkedin_url: 'https://www.linkedin.com/in/lee-park-example', sticker_ids: ['S03', 'S04'] },
   { id: 'long', name: 'Bartholomew-Alexandrovich Featherstonehaugh-Cholmondeley-Wolfeschlegelsteinhausenbergerdorff', title: 'Senior Vice President of Global Strategic Partnerships, Ecosystem Development and Public Sector Alliances', company_name: 'The International Association of Analytical Engine Manufacturers and Allied Trades of the Northern Hemisphere', location: 'Wales, United Kingdom', photo_url: portrait('morgan'), phones: [{ id: '1', value: '+44 20 7946 0958', label: 'work' }], emails: [{ id: '0', value: 'bartholomew@internationalassociation.example', label: 'work' }], sticker_ids: ['S00', 'S01', 'S02', 'S03', 'S04', 'S05', 'S06', 'S07'] },
 ];
+const isAction = params.get('action') === '1';
+const scout = params.get('scout') === '1' && !fixture.readonly;
+const uid = getEffectiveUser().uid;
+const dateAgo = (days) => new Date(Date.now() - days * 86400000).toISOString();
 const BY_ID = Object.fromEntries(CONTACTS.map((c) => [c.id, c]));
+if (isAction) {
+  BY_ID.jordan = { ...BY_ID.jordan, notes: [
+    { id: 'intro', content: 'Met Jordan at the neighborhood partners lunch.', created_at: dateAgo(4) },
+  ] };
+  BY_ID.morgan = { ...BY_ID.morgan, next_best_step: {
+    id: 'barry-sample', action: 'Send Morgan the community calendar', due_at: dateAgo(-5), status: 'pending',
+  } };
+  for (const contact of Object.values(BY_ID)) seedFixtureDoc(`users/${uid}/contacts/${contact.id}`, contact);
+  const historyPath = `users/${uid}/contacts/jordan/timeline/`;
+  seedFixtureDoc(historyPath + 'call', { type: 'outreach_logged', preview: 'Jordan offered to introduce the volunteer coordinator.', metadata: { channel: 'call' }, createdAt: dateAgo(2) });
+  seedFixtureDoc(historyPath + 'email', { type: 'message_sent', preview: 'Shared the volunteer sign-up link.', metadata: { channel: 'email' }, createdAt: dateAgo(1) });
+}
 
 function Controls({ currentId, onPick, bump }) {
   const { themeId, setThemeId } = useThemeCtx();
@@ -57,6 +76,10 @@ function Controls({ currentId, onPick, bump }) {
         <a className="demo-btn" href={link({ readonly: null })} aria-current={!fixture.readonly}>owner</a>
         <a className="demo-btn" href={link({ readonly: '1' })} aria-current={fixture.readonly}>admin viewing (read-only)</a>
       </div>
+      {isAction && <div className="demo-group"><span>Access</span>
+        <a className="demo-btn" href={link({ scout: null })} aria-current={!scout}>Free</a>
+        <a className="demo-btn" href={link({ scout: '1' })} aria-current={scout}>Scout</a>
+      </div>}
       <div className="demo-group"><span>Stickers</span>
         {[['on', 'on'], ['off', 'not available'], ['readonly', 'read-only']].map(([value, label]) => (
           <a key={value} className="demo-btn" href={link({ stickers: value === 'on' ? null : value })} aria-current={fixture.stickers === value}>{label}</a>
@@ -86,19 +109,30 @@ function WriteLog() {
 function Demo() {
   const [contacts, setContacts] = useState(BY_ID);
   const [currentId, setCurrentId] = useState(params.get('contact') && BY_ID[params.get('contact')] ? params.get('contact') : 'jordan');
+  const [barryOpened, setBarryOpened] = useState(false);
   const [, bump] = useReducer((n) => n + 1, 0);
   // What Contact Hub's list will do: merge what it is told into that contact, by id.
   const onPatch = useCallback((id, fields) => setContacts((prev) => ({ ...prev, [id]: { ...prev[id], ...fields } })), []);
-  const onUpdate = useCallback((next) => setContacts((prev) => (next?.id ? { ...prev, [next.id]: { ...prev[next.id], ...next } } : prev)), []);
+  const onUpdate = useCallback((next, patch = next) => setContacts((prev) => {
+    if (!next?.id) return prev;
+    const current = prev[next.id];
+    return { ...prev, [next.id]: { ...current, ...(typeof patch === 'function' ? patch(current) : patch) } };
+  }), []);
   const onLateStickerChange = useCallback((id, stickerId, op) => setContacts((prev) => ({ ...prev, [id]: withMembershipChange(prev[id], stickerId, op) })), []);
   const contact = contacts[currentId];
   return (
     <div className="demo">
-      <p className="demo-banner"><strong>Isolated demo of the redesigned Contact Profile.</strong> Real components, made-up contacts, edits kept in this page only (reload resets them). Try: edit the name, title or organization (Enter saves, Esc or Cancel cancels, leaving the box saves); click the photo; Change photo; add and remove stickers and press Undo; edit email, phone and social below the header; use <em>Fail next save</em> to see Try again and Retry.</p>
+      {isAction ? <p className="demo-banner"><strong>Isolated Action Center.</strong> Sample contacts and in-memory saves.</p> : <p className="demo-banner"><strong>Isolated demo of the redesigned Contact Profile.</strong> Real components, made-up contacts, edits kept in this page only (reload resets them). Try: edit the name, title or organization (Enter saves, Esc or Cancel cancels, leaving the box saves); click the photo; Change photo; add and remove stickers and press Undo; edit email, phone and social below the header; use <em>Fail next save</em> to see Try again and Retry.</p>}
       <Controls currentId={currentId} onPick={setCurrentId} bump={bump} />
       <main className="demo-profile">
         <ConnectedPersonHeader contact={contact} onPatch={onPatch} onLateStickerChange={onLateStickerChange} />
-        <IdentityCard contact={contact} onUpdate={onUpdate} variant="details" />
+        {isAction ? (
+          <ContactActionCenter key={currentId} uid={uid} contact={contact} readOnly={fixture.readonly}
+            scout={scout} openBarry={() => setBarryOpened(true)} onUpdate={onUpdate} onLateStickerChange={onLateStickerChange} />
+        ) : <IdentityCard contact={contact} onUpdate={onUpdate} variant="details" />}
+        {barryOpened && <section aria-label="Barry fixture" role="status">
+          Barry opened for {contact.name || contact.first_name}. <button onClick={() => setBarryOpened(false)}>Close Barry</button>
+        </section>}
       </main>
       <WriteLog />
     </div>

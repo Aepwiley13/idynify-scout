@@ -71,11 +71,13 @@ const MODULE_ICONS = {
 /**
  * Brand mark — full wordmark in wide mode, square mark in compact.
  *
- * Wide mode serves optimized derivatives (AVIF → WebP → PNG) via <picture>,
- * sized at 204×68 (2× the 34px render height). Falls back to a CSS wordmark
- * if the asset 404s. The auth surface has its own BrandMark that references
- * AUTH_ASSETS with different fallback and accessibility patterns — the two
- * are deliberately independent.
+ * Wide mode serves optimized derivatives via <picture>, cut at 552×184 — 3×
+ * the 184×61 box they render in, so the wordmark stays sharp on 2× and 3×
+ * panels. The rendered width is the full 184px between the header's 18px
+ * gutters: 84% of the 220px rail. Falls back to a CSS wordmark if the asset
+ * 404s. The auth surface has its own BrandMark that references AUTH_ASSETS
+ * with different fallback and accessibility patterns — the two are
+ * deliberately independent.
  */
 function BrandMark({ compact }) {
   const [failed, setFailed] = useState(false);
@@ -97,7 +99,7 @@ function BrandMark({ compact }) {
   return failed ? (
     <span className="sidebar-wordmark-text" aria-hidden="true">IDYNIFY</span>
   ) : (
-    <picture>
+    <picture className="sidebar-wordmark">
       <source srcSet={opt.webp} type="image/webp" />
       <img
         className="sidebar-wordmark-img"

@@ -48,11 +48,17 @@ export const MODULE_COLORS = {
 export const ASSETS = {
   barryAvatar:  "/assets/barry/barry-avatar.png", // Astronaut bear — circular crop derived from approved signup asset
   logoFull:     "/assets/Idynify_logo1.png",     // Full wordmark — canonical master (not served directly)
+  // Sidebar derivatives, cut from the 2172×724 master at 3× the 184×61 box the
+  // wide rail renders them in, so the wordmark stays sharp on 2× and 3× panels.
+  // 552×184 is exactly 3.000:1 — the master's own ratio, untrimmed and uncropped.
+  // Recipe: lanczos3 resize → PNG palette q90 → that same quantized data as
+  // lossless WebP; AVIF q82 straight off the resize. Each format lands smaller
+  // than the one it falls back to.
   logoFullOptimized: {
     avif: "/assets/sidebar/idynify-wordmark.avif",
     webp: "/assets/sidebar/idynify-wordmark.webp",
     png:  "/assets/sidebar/idynify-wordmark.png",
-    width: 204, height: 68,
+    width: 552, height: 184,
   },
   logoMark:     "/assets/Short_Logo_Idynify.png",// Pocket icon — collapsed rail / favicon
 };

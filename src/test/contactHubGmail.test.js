@@ -99,6 +99,16 @@ describe('Contact Hub manual Gmail', () => {
     expect(gmail.send).not.toHaveBeenCalled();
   });
 
+  it('blocks a retired contact before reservation and leaves the send ledger untouched', async () => {
+    const { records, gmail, call, message } = fixture();
+    const path = 'users/owner/contacts/alex';
+    records.set(path, { ...records.get(path), contact_hub_lifecycle: { status: 'retired' } });
+    const draft = message();
+    expect((await call(draft)).data.error).toBe('contact_unavailable');
+    expect(gmail.send).not.toHaveBeenCalled();
+    expect(records.has(`contact_hub_gmail_limits/owner/attempts/${draft.requestId}`)).toBe(false);
+  });
+
   it('enforces normalized authoritative suppression without changing an existing receipt', async () => {
     const { records, gmail, call, message } = fixture();
     const sent = message();

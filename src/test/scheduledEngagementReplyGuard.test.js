@@ -190,6 +190,24 @@ describe('sendScheduledEmail: fresh suppression check before the Gmail send', ()
     };
   };
 
+  it.each([
+    [{ contact_hub_lifecycle: { status: 'retired' } }, 'contact_deleted'],
+    [{ contact_hub_email_suppressed: ['jane@acme.com'] }, 'contact_email_suppressed'],
+  ])('blocks covered merge state at dispatch and preserves scheduled history', async (state, reason) => {
+    setupPending(state);
+    await processScheduledEngagements();
+    expect(h.sentRaws).toHaveLength(0);
+    expect(h.docs[engagementPath('e1')]).toMatchObject({ status: 'skipped', skippedReason: reason,
+      contactId: 'c1', subject: 'Following up' });
+  });
+
+  // Audit characterization for the missing atomic reservation.
+  it('audit: concurrent scheduled workers can both dispatch the same pending entry', async () => {
+    setupPending();
+    await Promise.all([processScheduledEngagements(), processScheduledEngagements()]);
+    expect(h.sentRaws).toHaveLength(2);
+  });
+
   it('sends normally when the contact is still eligible', async () => {
     setupPending();
     await processScheduledEngagements();
@@ -294,6 +312,19 @@ describe('sendScheduledEmail: fresh suppression check before the Gmail send', ()
 });
 
 describe('sendScheduledWave: same suppression check in the per-recipient loop', () => {
+  it('skips retired and restricted recipients in the scheduled wave without erasing attribution', async () => {
+    h.docs[contactPath('retired')] = { email: 'retired@example.test', contact_hub_lifecycle: { status: 'retired' } };
+    h.docs[contactPath('restricted')] = { email: 'restricted@example.test', contact_hub_email_suppressed: ['restricted@example.test'] };
+    h.docs[wavePath('w1')] = {
+      status: 'scheduled', scheduledFor: new Date(Date.now() - 1000).toISOString(),
+      channel: 'via Email', message: 'Synthetic wave.', recipientIds: ['retired', 'restricted'],
+    };
+    await processScheduledEngagements();
+    expect(h.sentRaws).toHaveLength(0);
+    expect(h.docs[wavePath('w1')]).toMatchObject({ status: 'processed', stats: { skipped: 2 },
+      recipientIds: ['retired', 'restricted'] });
+  });
+
   it('skips a recipient who already replied, sends to the others, and records stats.skipped on the wave doc', async () => {
     h.docs[contactPath('replied')] = { hunter_status: 'in_conversation', email: 'replied@acme.com' };
     h.docs[contactPath('eligible')] = { hunter_status: 'awaiting_reply', email: 'eligible@acme.com' };

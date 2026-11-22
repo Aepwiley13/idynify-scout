@@ -123,6 +123,22 @@ describe('trusted Contact Hub merge', () => {
     expect((await request('preview_rollback')).error).toBe('rollback_expired');
   });
 
+  it('refuses rollback after new canceled outreach or a recorded send and retains the resulting history', async () => {
+    const { request, put, records } = fixture();
+    const { token } = await request('preview');
+    await request('commit', { token });
+    const rollback = await request('preview_rollback');
+    const outreach = 'users/owner/scheduledEngagements/canceled';
+    put(outreach, { status: 'canceled', contactId: 'a' });
+    expect((await request('rollback', { token: rollback.token })).error).toBe('rollback_changed');
+    expect(records.get(outreach).value.status).toBe('canceled');
+    records.delete(outreach);
+    const send = 'contact_hub_gmail_limits/owner/attempts/sent-post-merge';
+    put(send, { contactId: 'a', status: 'sent', createdAt: { toMillis: () => 2_000_001 } });
+    expect((await request('rollback', { token: rollback.token })).error).toBe('rollback_changed');
+    expect(records.get(send).value).toMatchObject({ status: 'sent', contactId: 'a' });
+  });
+
   it('keeps execution off and restores owner-scoped dismissals after relevant identity changes', async () => {
     const { a, request, put, records } = fixture({ execution: false });
     const { token } = await request('preview');

@@ -528,3 +528,8 @@ follow-up and Barry provider reservations still require end-to-end lifecycle
 and suppression verification before merge activation. Keep all gates closed
 until that work, staging rules/rollout approval, and private recovery retention
 and account cleanup are complete.
+
+The [outbound safety matrix](OUTBOUND_MERGE_SAFETY_MATRIX.md) records
+verified protections and release blockers per send path. Duplicate dispatch
+was reproduced locally against mock providers for both quick send and
+overlapping scheduled workers. Keep all activation gates closed.

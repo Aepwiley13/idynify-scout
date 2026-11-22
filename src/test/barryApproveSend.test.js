@@ -531,6 +531,22 @@ describe('send-once guarantee', () => {
     expect(sendMock).toHaveBeenCalledTimes(1);
   });
 
+  // A provider can accept a send even though the client receives a timeout.
+  // This characterization records the current release blocker using a mock.
+  it('audit: retries a draft after provider acceptance with a lost response', async () => {
+    const accepted = [];
+    sendMock.mockImplementationOnce(async () => {
+      accepted.push('first');
+      throw new Error('response timed out after acceptance');
+    }).mockImplementationOnce(async () => {
+      accepted.push('retry');
+      return { data: { id: 'second-provider-id', threadId: 'thr_1' } };
+    });
+    expect((await post(validBody)).statusCode).toBe(502);
+    expect((await post(validBody)).statusCode).toBe(200);
+    expect(accepted).toEqual(['first', 'retry']);
+  });
+
   it('hands the claim back when Gmail rejects the send', async () => {
     sendMock.mockRejectedValueOnce(new Error('rate limited'));
     const res = await post(validBody);

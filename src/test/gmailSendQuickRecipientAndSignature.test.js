@@ -18,7 +18,7 @@ import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 
 const h = vi.hoisted(() => {
   const docs = {};
-  const sent = { raw: null };
+  const sent = { raw: null, count: 0 };
   return { docs, sent };
 });
 
@@ -64,6 +64,7 @@ vi.mock('googleapis', () => ({
         messages: {
           send: vi.fn(async ({ requestBody }) => {
             h.sent.raw = requestBody.raw;
+            h.sent.count++;
             return { data: { id: 'gmail-msg-1', threadId: 'gmail-thread-1' } };
           }),
         },
@@ -109,6 +110,7 @@ function makeEvent(overrides = {}) {
 beforeEach(() => {
   for (const key of Object.keys(h.docs)) delete h.docs[key];
   h.sent.raw = null;
+  h.sent.count = 0;
   gmailSigMock.signature = '';
   process.env.FIREBASE_API_KEY = 'test-api-key';
   process.env.GOOGLE_CLIENT_ID = 'test-client-id';
@@ -213,4 +215,20 @@ describe('sender-name fallback signature', () => {
     expect((raw.match(/Best,/g) || []).length).toBe(1);
     expect(raw).not.toContain('Best,<br>Aaron Wiley');
   });
+});
+
+// Audit characterization: a failed release condition, asserted only against
+// a mock provider. Replace with a zero-dispatch acceptance test when repaired.
+it('audit: quick send can dispatch duplicate requests for a retired and suppressed recipient', async () => {
+  h.docs['users/u1/contacts/retired-fixture'] = {
+    email: 'jane@acme.com', contact_hub_lifecycle: { status: 'retired' },
+    contact_hub_email_suppressed: ['jane@acme.com'],
+  };
+  h.docs['emailSuppressionList/jane@acme.com'] = { reason: 'unsubscribe' };
+  const results = await Promise.all([
+    handler(makeEvent({ contactId: 'retired-fixture' })),
+    handler(makeEvent({ contactId: 'retired-fixture' })),
+  ]);
+  expect(results.map((result) => result.statusCode)).toEqual([200, 200]);
+  expect(h.sent.count).toBe(2);
 });

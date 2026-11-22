@@ -490,6 +490,13 @@ service cloud.firestore {
         allow update, delete: if owns(userId) && sub != 'criteriaVersions';
       }
 
+      // A delayed client write cannot recreate an activity or other contact
+      // child after the trusted deletion commits. Allow cleanup deletes.
+      function contactChildWriteOk(coll, docId) {
+        return coll != 'contacts' || request.resource == null
+          || existsAfter(/databases/$(database)/documents/users/$(userId)/contacts/$(docId));
+      }
+
       // Anything deeper, outside the subtrees handled above.
       //
       // Name the first nested document so the generic rule cannot grant
@@ -506,7 +513,8 @@ service cloud.firestore {
                      && coll != 'card'
                      && !serverOwnedIntegration(coll, docId)
                      && !serverOwnedCredits(coll)
-                     && contactStickersOk(coll, userId);
+                     && contactStickersOk(coll, userId)
+                     && contactChildWriteOk(coll, docId);
       }
     }
 

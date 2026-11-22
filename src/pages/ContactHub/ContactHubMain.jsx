@@ -99,6 +99,10 @@ export default function ContactHubMain() {
     });
   }, []);
 
+  const removeContacts = useCallback((ids) => {
+    setContacts((previous) => previous.filter((contact) => !ids.includes(contact.id)));
+  }, []);
+
   /** A sticker was added to or removed from someone, from a list row. */
   const applyStickerChange = useCallback((contactId, changedStickerId, op) => {
     setContacts((prev) => prev.map((c) => (c.id === contactId ? withMembershipChange(c, changedStickerId, op) : c)));
@@ -111,9 +115,9 @@ export default function ContactHubMain() {
   const openCard = useCallback(() => navigate(CONTACT_HUB_MY_CARD_PATH), [navigate]);
 
   const context = useMemo(() => ({
-    uid, status, contacts, reload, updateContact, addContacts, applyStickerChange,
+    uid, status, contacts, reload, updateContact, addContacts, removeContacts, applyStickerChange,
     searchTerm, setSearchTerm, stickerId, setStickerId, listPath,
-  }), [uid, status, contacts, reload, updateContact, addContacts, applyStickerChange, searchTerm, stickerId, setStickerId, listPath]);
+  }), [uid, status, contacts, reload, updateContact, addContacts, removeContacts, applyStickerChange, searchTerm, stickerId, setStickerId, listPath]);
 
   return (
     <StickersProvider uid={uid}>

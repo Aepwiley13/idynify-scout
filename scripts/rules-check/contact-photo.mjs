@@ -17,6 +17,8 @@ const adminDb = getFirestore(app);
 const env = await initializeTestEnvironment({ projectId, firestore: { rules: readFileSync('firestore.rules', 'utf8') } });
 const person = 'users/owner/contacts/c1';
 const photo = person + '/private/photo';
+const { createContactHubDelete } = await import(pathToFileURL(resolve('netlify/functions/utils/contactHubDelete.js')));
+const remove = createContactHubDelete({ db: adminDb, verifyToken: async () => ({ uid: 'owner' }) });
 try {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async (context) => {
@@ -50,6 +52,7 @@ try {
   await assertFails(setDoc(doc(owner, 'users/owner/contacts/c3'), { contact_hub_photo: 'hidden' }));
   await assertSucceeds(updateDoc(doc(owner, person), { name: 'Changed' }));
   await assertSucceeds(setDoc(doc(owner, person + '/timeline/event'), { type: 'note_added' }));
+  await assertFails(setDoc(doc(owner, 'users/owner/contacts/missing/timeline/event'), { type: 'note_added' }));
   await assertFails(deleteDoc(doc(owner, person)));
   const batch = writeBatch(owner);
   batch.delete(doc(owner, person));
@@ -84,14 +87,16 @@ try {
   const peers = await Promise.all([write(null), write(null, 'url')]);
   assert.deepEqual(peers.map((entry) => entry.statusCode).sort(), [200, 409]);
   const saved = JSON.parse(peers.find((entry) => entry.statusCode === 200).body);
-  const [writeDuringDeletion] = await Promise.all([
+  const queue = adminDb.doc('users/owner/nbs_queue/delete-race');
+  await queue.set({ contact_id: 'race' });
+  const [writeDuringDeletion, deletion] = await Promise.all([
     write(saved.version),
-    adminDb.runTransaction(async (tx) => {
-      await tx.get(contact);
-      tx.delete(override);
-      tx.delete(contact);
-    }),
+    remove({ httpMethod: 'POST', headers: { authorization: 'Bearer owner' },
+      body: JSON.stringify({ uid: 'owner', contactIds: ['race'] }) }),
   ]);
+  assert.equal(JSON.parse(deletion.body).results[0].status, 'deleted');
+  assert.equal((await queue.get()).exists, false);
+  await assertFails(setDoc(doc(owner, contact.path + '/timeline/late-event'), { type: 'note_added' }));
   assert.ok([200, 404].includes(writeDuringDeletion.statusCode), writeDuringDeletion.body);
   assert.equal((await override.get()).exists, false);
   assert.equal((await contact.get()).exists, false);

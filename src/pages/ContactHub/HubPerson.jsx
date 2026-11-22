@@ -8,13 +8,14 @@
  * cold (a refresh, a bookmark) waits for that load; a person who is not in My
  * People, or does not exist, gets a plain "not here" with a way back.
  */
-import { useCallback } from 'react';
-import { Link, useOutletContext, useParams } from 'react-router-dom';
+import { useCallback, useState } from 'react';
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
-import { canUseContactHubScout, CONTACT_HUB_PATH } from '../../constants/contactHub';
+import { canUseContactHubScout, contactDeletionEnabled, CONTACT_HUB_PATH } from '../../constants/contactHub';
 import ContactHubGmailHeader from './ContactHubGmailHeader';
 import ContactActionCenter from './actionCenter/ContactActionCenter';
+import DeleteContactsDialog from './DeleteContactsDialog';
 import { useImpersonation } from '../../context/ImpersonationContext';
 import { useShell, useShellEntity } from '../../context/ShellContext';
 import { HUB_STATUS, isListedInMyPeople, personName } from './peopleRules';
@@ -34,8 +35,10 @@ function BackLink() {
 
 export default function HubPerson() {
   const T = useT();
+  const navigate = useNavigate();
+  const [deleting, setDeleting] = useState(null);
   const { contactId } = useParams();
-  const { uid, status, contacts, updateContact, applyStickerChange, reload } = useOutletContext();
+  const { uid, status, contacts, updateContact, applyStickerChange, reload, removeContacts, listPath } = useOutletContext();
   const { isImpersonating, isReadOnly } = useImpersonation();
   const { shellUser, openBarry } = useShell();
   const readOnly = Boolean(isImpersonating || isReadOnly);
@@ -93,6 +96,16 @@ export default function HubPerson() {
       {/* Keep transient editing state scoped to this person and session. */}
       <ContactHubGmailHeader key={JSON.stringify([uid, contact.id, readOnly])} uid={uid} readOnly={readOnly} contact={contact}
         onPatch={patchContact} onLateStickerChange={applyStickerChange} />
+      {contactDeletionEnabled() && !readOnly && removeContacts && (
+        <button type="button" className="hub-link-btn" onClick={() => setDeleting(JSON.stringify([uid, contact.id]))}>Delete contact</button>
+      )}
+      {!readOnly && deleting === JSON.stringify([uid, contact.id]) && (
+        <DeleteContactsDialog key={deleting} uid={uid} ids={[contact.id]} nameFor={() => personName(contact)} onClose={() => setDeleting(null)}
+          onResult={(ids, done) => {
+            removeContacts(ids);
+            if (done) navigate(listPath || CONTACT_HUB_PATH, { replace: true });
+          }} />
+      )}
       <ScoutOpportunity key={contact.id} contact={contact} />
       <ContactActionCenter key={JSON.stringify([uid, contact.id, readOnly])} uid={uid} contact={contact}
         readOnly={readOnly} scout={scout} openBarry={openBarry} onUpdate={updateContact} onLateStickerChange={applyStickerChange} />

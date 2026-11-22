@@ -71,3 +71,6 @@ export function isContactHubPath(pathname) {
 
 export const isContactHubListPath = (pathname) => trimmed(pathname) === CONTACT_HUB_PATH;
 export const isContactHubStickersPath = (pathname) => trimmed(pathname) === CONTACT_HUB_STICKERS_PATH;
+
+export const DELETE_SELECTION_LIMIT = 20;
+export const contactDeletionEnabled = () => import.meta.env.VITE_CONTACT_HUB_DELETE === 'on';

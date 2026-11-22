@@ -26,10 +26,12 @@
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { ArrowLeft, List, Mail, Phone, Search, Table2, Upload, UserPlus, Users, X } from 'lucide-react';
+import DeleteContactsDialog from './DeleteContactsDialog';
+import { useImpersonation } from '../../context/ImpersonationContext';
 import { useT } from '../../theme/ThemeContext';
 import { useIsMobile } from '../../hooks/useIsMobile';
 import {
-  CONTACT_HUB_PATH, CONTACT_HUB_SIDEBAR_SLOT, CONTACT_HUB_STICKERS_PATH, contactHubPersonPath, isContactHubStickersPath,
+  contactDeletionEnabled, DELETE_SELECTION_LIMIT, CONTACT_HUB_PATH, CONTACT_HUB_SIDEBAR_SLOT, CONTACT_HUB_STICKERS_PATH, contactHubPersonPath, isContactHubStickersPath,
 } from '../../constants/contactHub';
 import { resolveContactPhotoSources, getInitials } from '../../utils/contactPhoto';
 import { useStickers } from '../../components/stickers/stickersRegistry';
@@ -137,7 +139,7 @@ function Avatar({ contact, name }) {
   );
 }
 
-function PersonRow({ contact, onStickerChange, readOnlyStickers }) {
+function PersonRow({ contact, onStickerChange, readOnlyStickers, selection }) {
   const T = useT();
   const name = personName(contact);
   const subtitle = personSubtitle(contact);
@@ -146,6 +148,7 @@ function PersonRow({ contact, onStickerChange, readOnlyStickers }) {
   const added = addedLabel(contact);
   return (
     <li className="hub-row" style={{ borderColor: T.border }}>
+      {selection}
       <Avatar contact={contact} name={name} />
       <div className="hub-row-main">
         {/* The name is the link; its hit area is stretched over the whole row
@@ -222,12 +225,32 @@ function AddPersonDialog({ onClose, onAdded }) {
 }
 
 export default function HubPeople() {
+  const { uid, removeContacts } = useOutletContext();
+  const { isImpersonating, isReadOnly } = useImpersonation();
+  const canDelete = Boolean(contactDeletionEnabled() && uid && removeContacts && !isImpersonating && !isReadOnly);
+  return <HubPeopleList key={JSON.stringify([uid, canDelete])} canDelete={canDelete} />;
+}
+
+function HubPeopleList({ canDelete }) {
   const T = useT();
   const isMobile = useIsMobile();
   const {
-    status, contacts, reload, addContacts, applyStickerChange,
+    uid, status, contacts, reload, addContacts, removeContacts, applyStickerChange,
     searchTerm, setSearchTerm, stickerId, setStickerId, listPath,
   } = useOutletContext();
+  const [selecting, setSelecting] = useState(false);
+  const [selected, setSelected] = useState([]);
+  const [deleting, setDeleting] = useState(null);
+
+  function selectionFor(contact) {
+    const checked = selected.includes(contact.id);
+    return <label className="hub-select-contact">
+      <input type="checkbox" aria-label={`Select ${personName(contact)}`} checked={checked}
+        disabled={!checked && selected.length >= DELETE_SELECTION_LIMIT}
+        onChange={() => setSelected((ids) => checked ? ids.filter((id) => id !== contact.id) : [...ids, contact.id])} />
+    </label>;
+  }
+
   const stickers = useStickers();
   const [adding, setAdding] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -427,6 +450,14 @@ export default function HubPeople() {
             <div className="hub-tools">
               {searchField}
               {importButton}
+              {canDelete && status === HUB_STATUS.READY && (
+                <button type="button" className="hub-secondary-btn" onClick={() => {
+                  setSelecting(!selecting);
+                  setSelected([]);
+                }}>{selecting ? 'Cancel selection' : 'Select contacts'}</button>
+              )}
+              {selecting && <button type="button" className="hub-secondary-btn" disabled={!selected.length}
+                onClick={() => setDeleting(selected)}>Delete selected ({selected.length})</button>}
               {tableFits ? viewToggle : null}
             </div>
           )}
@@ -456,6 +487,17 @@ export default function HubPeople() {
         <p className="hub-status" role="status" aria-live="polite" style={{ color: T.textMuted }}>
           {justAdded ? `${justAdded} was added to My People.` : imported}
         </p>
+
+        {canDelete && deleting && <DeleteContactsDialog uid={uid} ids={deleting}
+          nameFor={(id) => personName(contacts.find((contact) => contact.id === id))} onClose={() => setDeleting(null)}
+          onResult={(ids, done) => {
+            removeContacts(ids);
+            setSelected((previous) => previous.filter((id) => !ids.includes(id)));
+            if (done) {
+              setDeleting(null);
+              setSelecting(false);
+            }
+          }} />}
 
         {status === HUB_STATUS.LOADING && (
           <p className="hub-note" style={{ color: T.textMuted }}>Loading your people…</p>
@@ -513,7 +555,7 @@ export default function HubPeople() {
           </div>
         )}
 
-        {status === HUB_STATUS.READY && !showWall && shown.length > 0 && (asTable ? (
+        {status === HUB_STATUS.READY && !showWall && shown.length > 0 && (asTable && !selecting ? (
           <HubTable
             rows={page.drawn}
             tight={tightTable}
@@ -530,6 +572,7 @@ export default function HubPeople() {
                 contact={contact}
                 onStickerChange={applyStickerChange}
                 readOnlyStickers={isMobile}
+                selection={selecting ? selectionFor(contact) : null}
               />
             ))}
           </ul>

@@ -38,11 +38,11 @@ vi.mock('firebase/firestore', async (importOriginal) => ({
     return { docs: contactsData.list.map((d) => ({ id: d.id, data: () => d })) };
   }),
 }));
-vi.mock('../firebase/config', () => ({ db: {}, auth: { currentUser: { uid: 'u1' } } }));
+vi.mock('../firebase/config', () => ({ db: {}, auth: { currentUser: { uid: 'u1', getIdToken: async () => 'fixture-token' } } }));
 vi.mock('../context/ImpersonationContext', () => ({
   useActiveUserId: () => 'u1',
   getEffectiveUser: () => ({ uid: 'u1' }),
-  useImpersonation: () => ({ isImpersonating: false, isReadOnly: false }),
+  useImpersonation: () => ({ isImpersonating: false, isReadOnly: contactsData.readOnly ?? false }),
 }));
 vi.mock('../theme/ThemeContext', () => ({ useT: () => new Proxy({}, { get: () => '#888' }) }));
 vi.mock('../components/stickers/stickersApi.js', () => ({ fetchStickersConfig: (...a) => fake.current.services.fetchStickersConfig(...a) }));
@@ -1059,5 +1059,65 @@ describe('on a phone, a filtered list says which sticker and how many', () => {
     await screen.findByRole('group', { name: 'Filter by sticker' });
     expect(screen.getByText('People with the VIP sticker')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Show everyone' })).toBeNull();
+  });
+});
+
+describe('trusted deletion controls', () => {
+  beforeEach(() => { vi.stubEnv('VITE_CONTACT_HUB_DELETE', 'on'); });
+  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+
+  it('confirms a profile deletion and returns to My People', async () => {
+    const user = userEvent.setup();
+    const request = vi.fn(async () => ({
+      ok: true, json: async () => ({ results: [{ id: 'p1', status: 'deleted' }] }),
+    }));
+    vi.stubGlobal('fetch', request);
+    renderHub('/contact-hub/person/p1');
+    await user.click(await screen.findByRole('button', { name: 'Delete contact' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(request).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Delete contact' }));
+    await user.click(screen.getByRole('button', { name: 'Delete permanently' }));
+    await screen.findByRole('heading', { name: /My People/ });
+    expect(screen.queryByRole('link', { name: 'Nakaiya Wiley' })).not.toBeInTheDocument();
+  });
+
+  it('hides selection and profile deletion in a read-only session', async () => {
+    contactsData.readOnly = true;
+    const user = userEvent.setup();
+    try {
+      renderHub();
+      const contact = await screen.findByRole('link', { name: 'Nakaiya Wiley' });
+      expect(screen.queryByRole('button', { name: 'Select contacts' })).not.toBeInTheDocument();
+      await user.click(contact);
+      await screen.findByRole('tab', { name: 'Action Center' });
+      expect(screen.queryByRole('button', { name: 'Delete contact' })).not.toBeInTheDocument();
+    } finally {
+      contactsData.readOnly = false;
+    }
+  });
+
+  it('keeps only the failed selection for retry on mobile', async () => {
+    setViewportWidth(375);
+    const user = userEvent.setup();
+    const request = vi.fn(async (_, options) => {
+      const { contactIds } = JSON.parse(options.body);
+      return { ok: true, json: async () => ({ results: contactIds.map((id, index) => ({
+        id, status: index === 0 ? 'deleted' : 'retry',
+      })) }) };
+    });
+    vi.stubGlobal('fetch', request);
+    renderHub();
+    await user.click(await screen.findByRole('button', { name: 'Select contacts' }));
+    const boxes = screen.getAllByRole('checkbox');
+    await user.click(boxes[0]);
+    await user.click(boxes[1]);
+    await user.click(screen.getByRole('button', { name: 'Delete selected (2)' }));
+    await user.click(screen.getByRole('button', { name: 'Delete permanently' }));
+    await screen.findByRole('alert');
+    await user.click(screen.getByRole('button', { name: 'Delete permanently' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    const [original, retry] = request.mock.calls.map(([, options]) => JSON.parse(options.body).contactIds);
+    expect(retry).toEqual([original[1]]);
   });
 });

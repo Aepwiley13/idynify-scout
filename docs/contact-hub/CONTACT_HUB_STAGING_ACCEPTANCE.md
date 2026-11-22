@@ -462,3 +462,15 @@ Google references. [Web server OAuth](https://developers.google.com/identity/pro
 - [ ] Gmail dedicated OAuth, abandoned-grant cleanup and connection-only
   verification remain gated. Live sending stays off.
 - [ ] CH-002 remains an independent audited Admin read-only task.
+
+### Duplicate management Phase 1
+
+My People uses the loaded account snapshot to show a count of reviewable
+pairs. The comparison and combined preview use deterministic match evidence.
+The count reflects the review queue, with anchored comparisons for large
+shared-signal groups to avoid quadratic expansion. Dismissed pairs can be
+restored while My People is mounted. Account or permission changes reset
+the local review state. Read-only users can compare available contacts.
+The review performs no additional Firestore or paid-provider calls.
+[Trusted merge execution proposal](TRUSTED_CONTACT_MERGE_PROPOSAL.md)
+requires separate approval.

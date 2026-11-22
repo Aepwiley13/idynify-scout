@@ -374,11 +374,10 @@ responses and partial outcomes. Retry returns an outcome for each selected ID.
   A provider call already in progress can finish.
 - Client child writes require the contact parent to exist after the operation.
   Photo, manual reminder, and Contact Hub Gmail finalization read the parent
-  transactionally. Before enabling deletion on Scout accounts, inventory and
-  fence late Admin SDK writes from legacy Scout jobs (including tracking,
-  Barry inbox draft creation and stage/outcome logging). Admin SDK writes
-  bypass the client rule. Confirm unknown historical subcollections and
-  per-contact references with owners before widening the cleanup inventory.
+  transactionally. The final deletion-safety checkpoint covers the known
+  legacy Admin SDK writers that bypass client rules. Verify those worker
+  paths during staging and confirm any separately deployed writer or
+  historical contact subcollection with its owner.
 
 ### Account deletion architecture for approval
 
@@ -437,3 +436,29 @@ disposable account and audit failures without storing token or contact data.
    the architecture review above.
 
 Google references. [Web server OAuth](https://developers.google.com/identity/protocols/oauth2/web-server) and [token expiration](https://developers.google.com/identity/protocols/oauth2).
+
+## Final deletion safety and duplicate review
+
+- [x] Fence known legacy contact child writes in a transaction with the
+  parent read. Pending inbox jobs skip missing contacts. Tracking and follow-up
+  activity cannot add new dependent records after the contact is gone.
+- [x] Keep a server-only, ID-only deletion marker for trusted deterministic
+  create paths. Include `contact_hub_deleted/{uid}/contacts` in an approved
+  account purge. New, explicit re-additions use a fresh contact ID.
+- [ ] Keep deletion gated until the worker checkpoint and local rules are
+  integrated together and exercised with staged Free and Scout fixtures.
+  Confirm no other service can recreate a previously deleted deterministic ID.
+  Retain existing provider-send and audit history under its own policy. A
+  provider operation already accepted or in progress cannot be canceled by
+  database deletion.
+- [ ] Review the [duplicate audit and transfer plan](DUPLICATE_MANAGEMENT_AUDIT.md).
+  Approve read-only candidate review first. Approve merge writes separately.
+- [ ] Treat Contact Hub data removal as a scoped purge that can keep the
+  IDYNIFY login and services intact. Full account deletion additionally
+  requires authentication, Scout, subscription and financial retention
+  owners, and each external integration owner. Implement neither phase
+  before the purge contract, fences and ownership decisions are approved.
+- [ ] Photo persistence and physical-device camera checks remain gated.
+- [ ] Gmail dedicated OAuth, abandoned-grant cleanup and connection-only
+  verification remain gated. Live sending stays off.
+- [ ] CH-002 remains an independent audited Admin read-only task.

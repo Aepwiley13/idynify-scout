@@ -388,7 +388,8 @@ html, body {
 h1, h2, h3, h4, h5, h6 {
   font-weight: var(--weight-semibold);
   line-height: var(--leading-snug);
-  color: var(--text-primary);
+  /* No color here: headings inherit their surface's foreground, as before
+     #002. A global color fights pages that hardcode their own surface. */
 }
 
 h1 { font-size: var(--text-2xl); line-height: var(--leading-tight); font-weight: var(--weight-bold); }

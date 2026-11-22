@@ -32,12 +32,18 @@
 .sidebar.wide { width: 220px; }
 .sidebar.compact { width: 64px; align-items: center; }
 
-/* ── Brand ── */
+/* ── Brand ──
+   The wordmark spans the full width between the header's gutters. An even
+   18px on all four sides makes those gutters the spacing rule, and leaves the
+   logo at 184px of the 220px rail — 84% of it, which is where we want it.
+   Height follows from the asset's own 3:1 ratio, so nothing here crops or
+   squashes it. */
 .sidebar-brand {
   display: flex;
   align-items: center;
+  justify-content: center;
   width: 100%;
-  padding: 18px 18px 14px;
+  padding: 18px;
   background: transparent;
   border: none;
   cursor: pointer;
@@ -49,17 +55,29 @@
   padding: 14px 0 12px;
 }
 
-.sidebar-wordmark-img {
-  max-width: 100%;
-  max-height: 34px;
-  object-fit: contain;
-  object-position: left center;
+/* <picture> is the flex item; without a width of its own it would size to the
+   image, and the image's width:100% would have nothing to resolve against. */
+.sidebar-wordmark {
+  display: block;
+  width: 100%;
+  line-height: 0;
 }
 
+.sidebar-wordmark-img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+/* 36px in the 64px rail — up from 32px so the mark holds roughly the
+   proportion the wordmark now holds in the wide rail, but not the 40px that
+   would leave it half a pixel off the collapse chevron. At 36 the gap is
+   2.5px. The source is 128px square, so this still has 3.5× to spare. */
 .sidebar-mark-img {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   object-fit: contain;
 }
 
@@ -95,12 +113,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   background: linear-gradient(135deg, #e8197d, #00c4cc);
   color: #fff;
-  font-size: 0.6875rem;
+  font-size: 0.75rem;
   font-weight: 800;
   font-style: italic;
   letter-spacing: 0.02em;
@@ -368,6 +386,32 @@
   }
 
   .sidebar-toggle { display: none; }
+
+  /* The brand is unchanged on mobile. The 220px rail's sizing does not carry
+     over to a 264px drawer, so the wordmark stays at the 34px-tall, left-set
+     size the drawer has always used, and the compact mark stays 32px. */
+  .sidebar.wide .sidebar-brand {
+    justify-content: flex-start;
+    padding: 18px 18px 14px;
+  }
+
+  .sidebar.wide .sidebar-wordmark { width: auto; }
+
+  .sidebar.wide .sidebar-wordmark-img {
+    width: auto;
+    max-width: 100%;
+    max-height: 34px;
+    object-position: left center;
+  }
+
+  .sidebar-mark-img,
+  .sidebar-mark-fallback {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+  }
+
+  .sidebar-mark-fallback { font-size: 0.6875rem; }
 
   /* The drawer is full height and the bottom bar is fixed on top of it, so
      without this the Barry card at the drawer's foot sits underneath the bar —

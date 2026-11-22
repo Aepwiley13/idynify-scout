@@ -196,7 +196,7 @@ tokens, OAuth callback queries and request bodies out of screenshots and logs.
 | Area | Verified behavior and rollout requirement |
 | --- | --- |
 | OAuth | Random state, a ten-minute expiry, PKCE, and a Secure HttpOnly SameSite=Lax cookie bind the initial callback. State is consumed in a transaction before code exchange. A separate one-time completion requires a fresh Firebase token for the original IDYNIFY account and contact. Verify expired state, cancellation, missing/mismatched cookie, replay, and account switch on actual HTTPS staging. |
-| Tokens | New tokens are in server-only `contact_hub_gmail/{uid}`, with a short-lived copy in `contact_hub_gmail_oauth` until the one-time finish is consumed. The current rules have no client allow for either collection or the send ledger. Configure Firestore TTL on `contact_hub_gmail_oauth.expiresAt` for abandoned states and completions. Application expiry checks apply independently of TTL. Treat refresh tokens as secrets. Legacy Scout integration records are owner-writable, so the Contact Hub send path checks the token's actual verified Google identity before sending with a legacy connection. Verify that check with a dedicated staging legacy connection before using it. |
+| Tokens | New tokens are in server-only `contact_hub_gmail/{uid}`, with a short-lived copy in `contact_hub_gmail_oauth` until the one-time finish is consumed. The current rules have no client allow for either collection or the send ledger. Configure Firestore TTL on `contact_hub_gmail_oauth.expiresAt` for abandoned states and completions. Application expiry checks apply independently of TTL. Treat refresh tokens as secrets. Contact Hub only reads its dedicated grant. Verify that a Scout-only grant reports disconnected in Contact Hub and that disconnect preserves Scout access. |
 | Disconnect and revocation | The MVP has no dedicated disconnect action. An approved operator can revoke the dedicated Contact Hub grant through Google and remove the private connection through trusted staging cleanup. Google revocation alone leaves a local connected-looking record until an operation detects the invalid grant. Decide the supported account-level disconnect/revocation workflow before enrollment. Keep it scoped to the dedicated Google Cloud project. |
 | Account deletion | Integrate trusted cleanup of the private connection, pending OAuth records owned by the UID, and recursive deletion of `contact_hub_gmail_limits/{uid}` including `attempts`. Revoke the dedicated OAuth grant while the token is still available. Test interrupted or retried cleanup and keep the existing Scout deletion lifecycle separate. |
 | Authorization | The API checks a revocation-aware Firebase ID token, the caller's owner document, a saved contact in that user's data, and the absence of an active impersonation session. It rejects custom-token sessions. The client also checks the effective account and unmounts the draft on scope change. Verify real Free, Scout, read-only and impersonated sessions, including an attempted request sent directly to the function. |
@@ -269,7 +269,9 @@ The repository review found no general individual, bulk, or account purge
 entry point wired for Contact Hub. One concrete parent deletion path is
 `undoApprovalSideEffects` in `src/services/companyDecision.js`. It loops
 over auto-discovered contacts, after resetting company discovery fields.
-Include this path with the company/contact owner before activating photos.
+The trusted Undo action now rechecks the company state and contact source,
+then removes a marked contact and its private photo in one transaction.
+Verify it against an approved staging fixture before activating photos.
 Confirm any off-repository operator or account deletion workflow with its
 owner before treating the inventory as complete.
 
@@ -286,22 +288,21 @@ owner before treating the inventory as complete.
   in the same project. A Contact Hub client in Scout's project would still
   risk revoking Scout access.
   [Google OAuth token revocation](https://developers.google.com/identity/protocols/oauth2/web-server#tokenrevoke)
-- **Smallest disconnect.** Add one trusted account-scoped action using the
-  existing session checks. Fence new sends and stale OAuth completions first.
-  Revoke the dedicated refresh token server-side and remove local credentials
-  once revocation is confirmed or the grant is already invalid. On transient
-  errors, keep the connection unusable and retain credentials only in a
-  server-only retryable state. Block reconnect completion until revocation
-  settles, because revocation can affect a newly issued token in the same
-  project. Check reconnect and disconnect concurrency so delayed work cannot
-  remove a newer grant. Test with dedicated staging
-  accounts while live sending stays off.
-- **Legacy Scout connection.** Contact Hub may borrow the verified legacy
-  connection. It must never revoke or delete the Scout integration document.
-  A Contact Hub disconnect needs a credential-free account marker that
-  suppresses legacy fallback until explicit reconnect. Otherwise deleting a
-  dedicated connection could immediately make the account look connected to
-  Scout again. Keep that marker in the private Contact Hub connection record.
+- **Disconnect.** The owner-authenticated action blocks new sends and stale
+  OAuth completions before attempting revocation. A transient failure leaves
+  the dedicated grant unusable and retryable. Success leaves a credential-free
+  generation marker. Verify a timed-out revocation, retry, reconnect, and
+  existing Sent and Activity history using dedicated staging accounts.
+- **Scout isolation.** Contact Hub requires its own grant and has no fallback
+  to the Scout integration. A Scout inbox remains connected when Contact Hub
+  disconnects. The runtime rejects reuse of the configured Scout client ID.
+  Independently verify that both OAuth clients belong to different projects.
+- **Retention.** Newly stored credentials contain the refresh token and verified
+  sender email. Failed disconnect retains the refresh token for revocation.
+  Require an operator cleanup policy for abandoned or expired OAuth completions
+  and any provider grant issued around a concurrent cancellation. Verify that
+  TTL and cleanup are configured before enrolling real users. TTL alone removes
+  a Firestore record without revoking its Google grant.
 - **Account deletion.** Fence account access and pending OAuth completion,
   revoke dedicated grants while credentials are still available, delete
   `contact_hub_gmail/{uid}` and the UID's pending OAuth state/completion
@@ -318,6 +319,17 @@ One-time operator cleanup is sufficient for isolated connection-only QA on
 disposable accounts. User-facing disconnect, revocation, retention and
 authoritative account cleanup are prerequisites for enrolling real users.
 Live delivery still requires separate approval and actual staging evidence.
+
+## CH-002 admin read-only viewing
+
+The acceptance session confirmed that Firestore denied cross-account reads and
+writes during View as. The standard Contact Hub view currently fails to load
+in that session. A trusted read-only projection must verify a current admin
+role, the exact active impersonation session and target, and record an audit
+event before releasing data. Scope the API to Contact Hub records needed for
+support and deny access to private photo payloads and OAuth credentials.
+Verify expiration, session teardown, cross-target denial, and that every
+mutation remains inaccessible. Keep direct Firestore ownership rules intact.
 
 ## Unified Contact Hub acceptance and rollback
 

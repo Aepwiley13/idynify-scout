@@ -19,6 +19,7 @@ project, and it belongs somewhere else.
 
 | # | Title | Area | Status |
 |---|-------|------|--------|
-| [001](001-global-brand-identity.md) | Global Brand Identity | Shared sidebar — brand mark | Ready for PR |
-| [002](002-global-typography.md) | Global Typography & Visual Hierarchy | Platform-wide type system | Phases 2A + 2B implemented — ready to close |
+| [001](001-global-brand-identity.md) | Global Brand Identity | Shared sidebar — brand mark | Merged (#825) |
+| [002](002-global-typography.md) | Global Typography & Visual Hierarchy | Platform-wide type system | Merged (#828) |
+| [002.1](002.1-hunter-theme-integrity.md) | Hunter Theme Integrity | Hunter → Create Campaign, Mission Setup | Ready for PR |
 | [003](003-compact-navigation.md) | Compact Navigation Labels | Collapsed sidebar rail | Proposed — not authorized |

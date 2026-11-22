@@ -265,8 +265,8 @@ leave a child behind. The emulator suite tests a guarded batch, atomic
 cleanup and recursive purge, using fixtures rather than a real account
 deletion workflow.
 
-The repository review found no general individual, bulk, or account purge
-entry point wired for Contact Hub. One concrete parent deletion path is
+The follow-on checkpoint adds gated individual and selected-bulk deletion.
+An authoritative account purge remains open. Another parent deletion path is
 `undoApprovalSideEffects` in `src/services/companyDecision.js`. It loops
 over auto-discovered contacts, after resetting company discovery fields.
 The trusted Undo action now rechecks the company state and contact source,
@@ -277,8 +277,8 @@ owner before treating the inventory as complete.
 
 | Path | Smallest safe change and gate |
 | --- | --- |
-| Individual contact | Reuse the existing delete entry point and authorization once identified. In a trusted transaction, check the actor, account, deletion eligibility and exact contact path, then delete the parent and exact `private/photo` child together. Preserve existing archive and delete semantics and other subcollections. An absent private photo is safe to retry. Test save/delete races and access denial. |
-| Bulk and automatic deletion | Reuse the same primitive in bounded, retryable chunks and preserve each caller's scope and failure reporting. For company approval Undo, recheck the contact's company/source and preserve its eligibility criteria. Test mixed contacts, partial failures and retry. Avoid partial success that leaves a private photo without a parent. |
+| Individual contact | The trusted endpoint verifies the owner and deletes the contact, photo, and enumerated children in one transaction. The local emulator covers a concurrent photo save and rejects post-delete client timeline writes. Confirm real staging persistence and permissions after approval. |
+| Bulk and automatic deletion | Selected deletion uses one transaction per explicit ID with individual outcomes. Company approval Undo uses its own company/source eligibility checks. Verify real staging partial outcomes and retries. |
 | Account | Wire into the authoritative purge workflow, with writes fenced before cleanup. Use its trusted recursive deletion for the user subtree, or explicitly purge private photos if that workflow enumerates children. Verify actual account deletion, interrupted work, retries and absence of private photo documents. Preserve the established lifecycle for other account data. |
 
 ## Gmail disconnect and deletion rollout gate
@@ -352,3 +352,88 @@ orphans or reopen direct parent deletion. Restore the previous Stickers
 rollout mode or enrollment and use the prior staging artifact if the base
 experience regresses. Preserve saved contacts, notes, Activity, original
 photo provenance and Scout credentials during rollback.
+
+## Contact deletion follow-on checkpoint
+
+After approval, test with `VITE_CONTACT_HUB_DELETE=on` and
+`CONTACT_HUB_DELETE=on` in the isolated staging environment only. Both gates
+default to off. Approve the local rules diff before any rules deployment.
+Verify an ordinary contact and a mixed bulk selection in My People, plus
+delete from a person profile. Test cancellation, stale sessions, lost
+responses and partial outcomes. Retry returns an outcome for each selected ID.
+
+- Delete the contact, its embedded notes and sticker assignments, its exact
+  private photo, its known Activity/Scout child records (timeline, stage
+  history, outcome log, attributions, drafts), and its `nbs_queue` rows in
+  one transaction per contact. The request accepts up to 20 explicit IDs.
+  More than 400 related rows for one contact requires operator assistance.
+- Keep shared company and sticker definitions, unrelated contacts, existing
+  Gmail mailbox messages, the account rate-limit and deduplication ledger,
+  and shared Scout automation/reporting records. Scheduled outreach already
+  suppresses subsequent sends when the referenced contact is missing.
+  A provider call already in progress can finish.
+- Client child writes require the contact parent to exist after the operation.
+  Photo, manual reminder, and Contact Hub Gmail finalization read the parent
+  transactionally. Before enabling deletion on Scout accounts, inventory and
+  fence late Admin SDK writes from legacy Scout jobs (including tracking,
+  Barry inbox draft creation and stage/outcome logging). Admin SDK writes
+  bypass the client rule. Confirm unknown historical subcollections and
+  per-contact references with owners before widening the cleanup inventory.
+
+### Account deletion architecture for approval
+
+Use a trusted operator-controlled job on the existing account identity,
+with recent owner verification and audit. Before the first irreversible
+write, record a durable job and verify which systems own the account's data.
+Place a deletion fence that all participating writers honor, revoke Firebase
+sessions, and verify that other authenticated access is blocked before cleanup.
+Client rules and Admin writers require explicit fence coverage.
+
+Revoke the dedicated Contact Hub Gmail grant while the refresh token is
+available. Stop new Contact Hub OAuth exchanges and drain any in progress.
+Enumerate and clear that UID's OAuth state/completion records and Gmail
+credential record, then recursively purge its rate-limit and intent subtree.
+Revoke abandoned dedicated grants before removing their last credential.
+Retries retain unresolved credentials privately and record only status in
+audit output. Recursively purge the user's approved Contact Hub contact
+subtree, including photos and orphaned children, plus owner-only Contact Hub
+settings and sticker data. Verify absence before the job completes.
+
+Keep this as a Contact Hub data phase until the account owner approves the
+wider lifecycle. Confirm disposition of Scout data in the shared contacts
+collection before purging a Scout account. Gate deletion of the Firebase Auth identity and any shared
+user root on an approved dependency check. Scout grants and regulated or
+financial records require their existing owners' procedures and retention
+approval. Record completion or a retryable failure per phase. Test with a
+disposable account and audit failures without storing token or contact data.
+
+### Dedicated Gmail setup and connection-only verification
+
+1. In Google Cloud Console, create a dedicated project for Contact Hub QA,
+   outside the Scout OAuth project, and enable Gmail API.
+2. In Google Auth Platform, set Branding with the QA app name, owner support
+   email and developer contact. In Audience choose External Testing and add only
+   the dedicated Google QA mailboxes. In Data Access request only
+   `https://www.googleapis.com/auth/gmail.send` and
+   `https://www.googleapis.com/auth/userinfo.email`. External Testing refresh
+   tokens that include Gmail access generally expire in seven days.
+3. In Clients create an OAuth client of type Web application. Add this
+   authorized redirect URI after the stable staging host is confirmed:
+   `https://<approved-staging-host>/.netlify/functions/contact-hub-gmail-callback`.
+   Copy the exact URL to `CONTACT_HUB_GMAIL_REDIRECT_URI`. Keep the client
+   ID and secret in the staging function environment as
+   `CONTACT_HUB_GMAIL_CLIENT_ID` and `CONTACT_HUB_GMAIL_CLIENT_SECRET`.
+4. After separate approval, use the exact same HTTPS origin for the Connect
+   action and callback. Enable `VITE_CONTACT_HUB_GMAIL` and
+   `CONTACT_HUB_GMAIL` only there. Keep `CONTACT_HUB_GMAIL_SEND=off`.
+   Test consent, same-contact return, cancel, expired/replayed state,
+   cross-account denial, disconnect, revocation, retry and reconnect.
+   Where a test login also has Scout connected, verify the Scout grant survives.
+5. Before broader enrollment, approve a cleanup policy for abandoned OAuth
+   completions that revokes grants before credential removal. Serialize
+   cleanup against new connections for the same Google grant, since revocation
+   can invalidate a newer grant in the same project. Deleting expired records
+   with TTL does not revoke consent. Account deletion cleanup remains part of
+   the architecture review above.
+
+Google references. [Web server OAuth](https://developers.google.com/identity/protocols/oauth2/web-server) and [token expiration](https://developers.google.com/identity/protocols/oauth2).

@@ -1,27 +1,32 @@
 # Contact Hub integrated acceptance handoff
 
-Date: 2026-11-22
+Updated: 2026-11-22
 
 ## Local checkpoints
 
 - Integrated Contact Hub implementation: `2f4b355b`.
 - Outbound reliability audit and mocked-provider characterization: `53374189` on `fix/contact-hub-free-import`, a direct descendant of `2f4b355b`.
+- Previous documentation checkpoint: `b133ada2` on `fix/contact-hub-free-import`.
 - Accepted staging candidate: `2f4697fa` on `staging/contact-hub-candidate`, preserved at `~/idynify-staging/contact-hub-unified-qa`.
 - The accepted candidate's server remains on `127.0.0.1:8893`. No staging data, rules, indexes, or flags were changed.
 
 ## Verification completed tonight
 
 - Action Center isolated browser flow: 54/54 checks passed for notes, reminders, activity, access modes, responsiveness, stickers, and profile actions.
-- Synthetic duplicate review, persistent dismissal, merge preview, and conditional rollback: 13/13 checks passed.
-- Contact Hub photo browser run was stopped before completion. It had reached the desktop dark-theme preview; do not count the photo suite as passed.
-- The integrated `?workspace=1` browser smoke did not load My People beyond its loading state. This is a fixture/browser review blocker, not evidence of a candidate regression. Diagnose it before using this fixture to accept My People, My Card, Sticker Wall, or CSV import.
+- Contact Hub photo browser flow: 60/60 passed across desktop/mobile and light/dark, including camera/library entry, crop, preview, failed-save recovery, save, view, remove, hidden state, restore, URL validation, and read-only access. All writes were in-memory mocks.
+- Integrated workspace browser flow: 23/23 passed for Free, Scout, and read-only sessions, including My People, Import entry point, My Card, Sticker Wall, person route, Action Center default, and access visibility.
+- The initial workspace smoke timed out during a cold fixture load. After Vite warmed, My People rendered without browser errors and the canonical smoke passed. This was fixture/browser startup timing, not a product defect. No application or fixture code was changed.
+- Focused tests: 453 passed across 14 files covering My Card, import and duplicate prevention, Contact Hub routes, individual and bulk deletion UI, trusted deletion cleanup, stickers, photo writer, and merge services.
+- Synthetic duplicate review, dismissal, merge preview, and conditional rollback browser flow: 13/13 passed.
+- Trusted individual/bulk deletion used synthetic handler/UI tests. No staging deletion or live persistence was exercised.
 - No live Firebase, Gmail, or provider calls were made. All browser flows used local fixtures.
 
 Screenshots and reports from the completed browser runs are under:
 
 - `/tmp/idynify-contacthub-integrated-action`
 - `/tmp/idynify-contacthub-integrated-merge`
-- `/tmp/idynify-contacthub-integrated-photo` (partial; not acceptance evidence)
+- `/tmp/idynify-contacthub-integrated-photo`
+- `/tmp/idynify-contacthub-integrated-workspace`
 
 ## Activation gates
 
@@ -29,9 +34,9 @@ Keep merge execution, trusted contact deletion, private photo persistence, Conta
 
 ## Continuation point
 
-Resume on `fix/contact-hub-free-import` at `53374189`. Preserve the separate `staging/contact-hub-candidate` worktree and port 8893. First repair or diagnose only the synthetic workspace fixture load, then finish the photo browser run and acceptance checks for My People, My Card, stickers, import, and deletion using isolated fixtures. Keep deletion and merge demonstrations synthetic. Do not deploy, change activation flags, or modify production as part of local acceptance.
+Continue on `fix/contact-hub-free-import` at the latest local documentation checkpoint. Preserve the separate `staging/contact-hub-candidate` worktree and port 8893. The integrated local review is ready. Keep deletion and merge demonstrations synthetic. Real photo persistence, Gmail, and deletion activation remain gated pending their documented lifecycle requirements. Do not deploy, change activation flags, or modify production as part of local acceptance.
 
-The temporary review fixture used `127.0.0.1:5318` and has been stopped. Restart it from the audit worktree with:
+The isolated review fixture is running at `127.0.0.1:5318`. To restart it later from the audit worktree:
 
 ```sh
 VITE_CONTACT_HUB_GMAIL=off VITE_CONTACT_HUB_PHOTO_OVERRIDES=off VITE_CONTACT_HUB_DELETE=off VITE_CONTACT_HUB_MERGE=off VITE_CONTACT_HUB_MERGE_EXECUTION=off \

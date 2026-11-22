@@ -239,14 +239,14 @@ export default function CreateCampaign() {
 
   if (!gmailConnected && error) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] text-[color:var(--text-primary)] flex items-center justify-center">
+      <div className="flex-1 min-h-0 overflow-y-auto bg-[var(--bg-primary)] text-[color:var(--text-primary)] flex items-center justify-center">
         <div className="bg-[var(--bg-card)] border border-[color:var(--border)] rounded-2xl p-8 max-w-md">
-          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <AlertCircle className="w-12 h-12 text-[color:color-mix(in_srgb,#ef4444_70%,var(--text-primary))] mx-auto mb-4" />
           <h2 className="text-xl font-bold text-center mb-2">Gmail Not Connected</h2>
           <p className="text-[color:var(--text-secondary)] text-center mb-6">{error}</p>
           <button
             onClick={() => navigate('/hunter?tab=campaigns')}
-            className="w-full px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold transition-colors"
+            className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold transition-colors"
           >
             Go to Hunter Dashboard
           </button>
@@ -256,7 +256,7 @@ export default function CreateCampaign() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[color:var(--text-primary)]">
+    <div className="flex-1 min-h-0 overflow-y-auto bg-[var(--bg-primary)] text-[color:var(--text-primary)]">
       {/* Header */}
       <div className="border-b border-[color:var(--border)] bg-[var(--bg-nav)] backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-6 py-4">
@@ -301,7 +301,7 @@ export default function CreateCampaign() {
       <div className="max-w-5xl mx-auto px-6 py-8">
         {error && (
           <div className="mb-6 bg-[var(--status-error-bg)] border border-red-500/30 rounded-lg p-4 flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-red-500" />
+            <AlertCircle className="w-5 h-5 text-[color:color-mix(in_srgb,#ef4444_70%,var(--text-primary))]" />
             <span className="text-[color:var(--text-primary)]">{error}</span>
           </div>
         )}
@@ -328,7 +328,7 @@ export default function CreateCampaign() {
                 disabled={!campaignName.trim()}
                 className={`w-full px-6 py-3 rounded-lg font-bold transition-all ${
                   campaignName.trim()
-                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white'
+                    ? 'bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white'
                     : 'bg-[var(--bg-secondary)] text-[color:var(--text-faint)] cursor-not-allowed'
                 }`}
               >
@@ -360,7 +360,7 @@ export default function CreateCampaign() {
               disabled={!engagementIntent}
               className={`flex-1 px-6 py-3 rounded-lg font-bold transition-all ${
                 engagementIntent
-                  ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white'
+                  ? 'bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white'
                   : 'bg-[var(--bg-secondary)] text-[color:var(--text-faint)] cursor-not-allowed'
               }`}
             >
@@ -377,7 +377,7 @@ export default function CreateCampaign() {
 
             {selectedContactIds.length > 25 && (
               <div className="mb-6 bg-[var(--status-warning-bg)] border border-yellow-500/30 rounded-lg p-4 flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 text-amber-500" />
+                <AlertCircle className="w-5 h-5 text-[color:color-mix(in_srgb,#d97706_70%,var(--text-primary))]" />
                 <span className="text-[color:var(--text-primary)] text-sm">Gmail limits apply (~500 emails/day)</span>
               </div>
             )}
@@ -425,7 +425,7 @@ export default function CreateCampaign() {
                 disabled={selectedContactIds.length === 0}
                 className={`flex-1 px-6 py-3 rounded-lg font-bold transition-all ${
                   selectedContactIds.length > 0
-                    ? 'bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white'
+                    ? 'bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white'
                     : 'bg-[var(--bg-secondary)] text-[color:var(--text-faint)] cursor-not-allowed'
                 }`}
               >
@@ -478,7 +478,7 @@ export default function CreateCampaign() {
                   </button>
                   <button
                     onClick={handleGenerateMessages}
-                    className="flex-1 px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-lg font-bold transition-all flex items-center justify-center gap-2"
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white rounded-lg font-bold transition-all flex items-center justify-center gap-2"
                   >
                     <Sparkles className="w-5 h-5" />
                     Generate Messages
@@ -556,7 +556,7 @@ export default function CreateCampaign() {
               <button
                 onClick={handleSaveCampaign}
                 disabled={loading}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white rounded-lg font-bold transition-all flex items-center justify-center gap-2"
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white rounded-lg font-bold transition-all flex items-center justify-center gap-2"
               >
                 {loading ? (
                   <>

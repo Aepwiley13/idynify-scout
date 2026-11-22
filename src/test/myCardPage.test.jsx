@@ -54,14 +54,28 @@ function installService({ load = okResult(3), suggestions = { suggestions: {}, u
 }
 
 const page = () => (<MemoryRouter><MyCardPage /></MemoryRouter>);
+const finishSave = async (name = 'Ada Lovelace') => {
+  const editButton = await screen.findByRole('button', { name: 'Edit Card' });
+  expect(document.querySelector('.mycard')).toHaveAttribute('data-view', 'preview');
+  expect(screen.getByRole('article', { name: `Card for ${name}` })).toBeInTheDocument();
+  return editButton;
+};
+const ensureEditing = async () => {
+  if (!screen.queryByRole('form', { name: 'Edit your card' })) {
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit Card' }));
+    await screen.findByRole('form', { name: 'Edit your card' });
+  }
+};
 const open = async (options) => {
   const service = installService(options);
   const view = render(page());
+  await screen.findByRole('button', { name: 'Edit Card' });
+  await userEvent.click(screen.getByRole('button', { name: 'Edit Card' }));
   await screen.findByRole('form', { name: 'Edit your card' });
   return { service, view };
 };
 const field = (label) => screen.getByLabelText(label);
-const typeInto = async (user, label, text) => { await user.clear(field(label)); if (text) await user.type(field(label), text); };
+const typeInto = async (user, label, text) => { await ensureEditing(); await user.clear(field(label)); if (text) await user.type(field(label), text); };
 const saveButton = () => screen.getByRole('button', { name: /^Save$|^Saving…$/ });
 const toggle = (label) => screen.getByRole('switch', { name: `${label} on your card` });
 
@@ -99,6 +113,8 @@ describe('loading', () => {
     render(page());
     expect(screen.getByText('Loading your card…')).toBeInTheDocument();
     expect(screen.queryByRole('form', { name: 'Edit your card' })).toBeNull();
+    await screen.findByRole('article', { name: 'Card for Ada Lovelace' });
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Card' }));
     await screen.findByRole('form', { name: 'Edit your card' });
     expect(screen.queryByText('Loading your card…')).toBeNull();
     expect(service.loadMyCard).toHaveBeenCalledTimes(1);
@@ -111,13 +127,17 @@ describe('loading', () => {
     expect(screen.getByRole('link', { name: 'My People' })).toHaveAttribute('href', '/contact-hub');
   });
 
-  it('shows a saved card in the form and in the preview, as saved, with nothing to save', async () => {
-    await open();
+  it('shows the saved card first, and opens the editor only when requested', async () => {
+    installService();
+    render(page());
+    await screen.findByRole('article', { name: 'Card for Ada Lovelace' });
+    expect(screen.queryByRole('form', { name: 'Edit your card' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Card' }));
+    await screen.findByRole('form', { name: 'Edit your card' });
     expect(field('First name')).toHaveValue('Ada');
     expect(field('Title')).toHaveValue('Analyst');
     expect(within(screen.getByRole('article', { name: 'Card for Ada Lovelace' })).getByRole('heading', { name: 'Ada Lovelace' })).toBeInTheDocument();
     expect(screen.getByText('All changes saved')).toBeInTheDocument();
-    expect(saveButton()).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Download contact' })).toBeEnabled();
   });
 
@@ -158,6 +178,8 @@ describe('loading', () => {
     expect(screen.queryByRole('button', { name: 'Download contact' })).toBeNull();
     service.loadMyCard.mockResolvedValue(okResult(4));
     await userEvent.click(screen.getByRole('button', { name: 'Try again' }));
+    await screen.findByRole('button', { name: 'Edit Card' });
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Card' }));
     await screen.findByRole('form', { name: 'Edit your card' });
     expect(field('Title')).toHaveValue('Analyst');
     expect(service.loadMyCard).toHaveBeenCalledTimes(2);
@@ -201,9 +223,8 @@ describe('saving', () => {
     expect(saveButton()).toBeDisabled();
     expect(saveButton()).toHaveAttribute('aria-busy', 'true');
     await act(async () => { slow.resolve({ status: 'saved', card: savedCard({ title: 'Director' }), revision: 4 }); });
-    expect(await screen.findByText('All changes saved')).toBeInTheDocument();
-    expect(saveButton()).toBeDisabled();
-    expect(field('Title')).toHaveValue('Director');
+    await finishSave();
+    expect(within(screen.getByRole('article', { name: 'Card for Ada Lovelace' })).getByText('Director')).toBeInTheDocument();
   });
 
   it('saves again against the revision just made', async () => {
@@ -211,17 +232,17 @@ describe('saving', () => {
     const user = userEvent.setup();
     await typeInto(user, 'Title', 'Director');
     await user.click(saveButton());
-    await screen.findByText('All changes saved');
+    await finishSave();
     await typeInto(user, 'Title', 'Manager');
     await user.click(saveButton());
-    await screen.findByText('All changes saved');
+    await finishSave();
     expect(service.saveMyCard.mock.calls.map(([, options]) => options.expectedRevision)).toEqual([3, 4]);
   });
 
   it('saves a new card as it is, against "no card yet"', async () => {
     const { service } = await open({ load: missingResult(), suggestions: { suggestions: { firstName: { value: 'Grace', source: 'settings' } }, unavailable: [] } });
     await userEvent.click(saveButton());
-    await screen.findByText('All changes saved');
+    await finishSave('Grace');
     expect(service.saveMyCard.mock.calls[0][1]).toEqual({ expectedRevision: null });
   });
 
@@ -238,7 +259,7 @@ describe('saving', () => {
     // Fixing it lets it save.
     await typeInto(user, 'Email', 'ada@example.com');
     await user.click(saveButton());
-    await screen.findByText('All changes saved');
+    await finishSave();
     expect(service.saveMyCard).toHaveBeenCalledTimes(1);
   });
 
@@ -271,7 +292,7 @@ describe('saving', () => {
     await user.keyboard('{Enter}');
     expect(service.saveMyCard).not.toHaveBeenCalled();
     await user.type(field('Title'), ' Lead{Enter}');
-    await screen.findByText('All changes saved');
+    await finishSave();
     expect(service.saveMyCard).toHaveBeenCalledTimes(1);
     expect(service.saveMyCard.mock.calls[0][0].title).toBe('Analyst Lead');
   });
@@ -283,7 +304,7 @@ describe('saving', () => {
     saveButton().focus();
     expect(saveButton()).toHaveFocus();
     await user.keyboard('{Enter}');
-    await screen.findByText('All changes saved');
+    await finishSave();
     expect(service.saveMyCard).toHaveBeenCalledTimes(1);
   });
 
@@ -300,10 +321,10 @@ describe('saving', () => {
       expect(alert).toHaveTextContent('Couldn\'t save your changes');
       expect(alert).toHaveTextContent(OFFLINE.message);
       expect(alert).toHaveTextContent('Your changes are still here');
-      expect(field('Title')).toHaveValue('Director');
+      expect(within(screen.getByRole('article', { name: 'Card for Ada Lovelace' })).getByText('Director')).toBeInTheDocument();
       expect(screen.getByText('Couldn\'t save your changes', { selector: 'p' })).toBeInTheDocument();
       await user.click(within(alert).getByRole('button', { name: 'Try again' }));
-      await screen.findByText('All changes saved');
+      await finishSave();
       expect(screen.queryByRole('alert')).toBeNull();
       // The retry is the same save, against the same revision.
       expect(service.saveMyCard.mock.calls.map(([, options]) => options.expectedRevision)).toEqual([3, 3]);
@@ -318,7 +339,7 @@ describe('saving', () => {
       await screen.findByRole('alert');
       expect(saveButton()).toBeEnabled();
       await user.click(saveButton());
-      await screen.findByText('All changes saved');
+      await finishSave();
     });
 
     it('does not offer Try again when trying again cannot help', async () => {
@@ -371,8 +392,9 @@ describe('Shared / Private and sharing', () => {
     expect(toggle('Email')).toHaveAttribute('aria-checked', 'false');
     await user.click(toggle('Email'));
     await user.click(saveButton());
-    await screen.findByText('All changes saved');
+    await finishSave();
     expect(service.saveMyCard.mock.calls[0][0].share).toEqual({ ...DEFAULT_SHARE, email: true });
+    await ensureEditing();
     expect(toggle('Email')).toHaveAttribute('aria-checked', 'true');
   });
 
@@ -381,8 +403,9 @@ describe('Shared / Private and sharing', () => {
     const user = userEvent.setup();
     await typeInto(user, 'Title', 'Director');
     await user.click(saveButton());
-    await screen.findByText('All changes saved');
+    await finishSave();
     expect(service.saveMyCard.mock.calls[0][0].sharingEnabled).toBe(false);
+    await ensureEditing();
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
     // The only switches are the eight per-field ones, each about what a shared card WILL show.
     const names = screen.getAllByRole('switch').map((control) => control.getAttribute('aria-label'));
@@ -421,6 +444,8 @@ describe('a draft that comes back', () => {
     view.unmount();
     expect(readDraft('U').status).toBe('ok');
     render(page());
+    await screen.findByRole('button', { name: 'Edit Card' });
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Card' }));
     await screen.findByRole('form', { name: 'Edit your card' });
     expect(field('Title')).toHaveValue('Typed before leaving');
     expect(screen.getByText('We restored the changes you hadn\'t saved')).toBeInTheDocument();
@@ -433,6 +458,8 @@ describe('a draft that comes back', () => {
     window.dispatchEvent(new Event('pagehide'));
     first.view.unmount();
     render(page());
+    await screen.findByRole('button', { name: 'Edit Card' });
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Card' }));
     await screen.findByRole('form', { name: 'Edit your card' });
     expect(field('Phone')).toHaveValue('+1 555 010 2000');
   });
@@ -491,7 +518,7 @@ describe('a draft that comes back', () => {
     keep(savedCard({ title: 'Recovered title' }));
     await open();
     await userEvent.click(saveButton());
-    await screen.findByText('All changes saved');
+    await finishSave();
     expect(screen.queryByText('We restored the changes you hadn\'t saved')).toBeNull();
     expect(globalThis.sessionStorage.getItem(draftKey('U'))).toBeNull();
   });
@@ -550,7 +577,7 @@ describe('a newer saved version: the conflict', () => {
     it('can be cancelled, which brings the choices back and keeps the edits', async () => {
       const { user } = await intoConflict();
       await user.click(screen.getByRole('button', { name: 'Load latest saved version' }));
-      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      await user.click(within(screen.getByRole('alert')).getByRole('button', { name: 'Cancel' }));
       expect(screen.getByRole('button', { name: 'Load latest saved version' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'Save my version over it' })).toBeInTheDocument();
       expect(field('Title')).toHaveValue('My version');
@@ -569,7 +596,7 @@ describe('a newer saved version: the conflict', () => {
     it('moves focus to the safe choice, Cancel, when asking', async () => {
       const { user } = await intoConflict();
       await user.click(screen.getByRole('button', { name: 'Load latest saved version' }));
-      expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus();
+      expect(within(screen.getByRole('alert')).getByRole('button', { name: 'Cancel' })).toHaveFocus();
     });
   });
 
@@ -586,19 +613,19 @@ describe('a newer saved version: the conflict', () => {
       const { user, service } = await intoConflict();
       await user.click(screen.getByRole('button', { name: 'Save my version over it' }));
       await user.click(screen.getByRole('button', { name: 'Overwrite with my version' }));
-      await screen.findByText('All changes saved');
+      await finishSave();
       expect(service.saveMyCard).toHaveBeenCalledTimes(2);
       const [sent, options] = service.saveMyCard.mock.calls[1];
       expect(sent.title).toBe('My version');
       expect(options).toEqual({ expectedRevision: 5 });
       expect(screen.queryByRole('alert')).toBeNull();
-      expect(field('Title')).toHaveValue('My version');
+      expect(within(screen.getByRole('article', { name: 'Card for Ada Lovelace' })).getByText('My version')).toBeInTheDocument();
     });
 
     it('can be cancelled without saving anything', async () => {
       const { user, service } = await intoConflict();
       await user.click(screen.getByRole('button', { name: 'Save my version over it' }));
-      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      await user.click(within(screen.getByRole('alert')).getByRole('button', { name: 'Cancel' }));
       expect(service.saveMyCard).toHaveBeenCalledTimes(1);
       expect(screen.getByRole('button', { name: 'Load latest saved version' })).toBeInTheDocument();
     });
@@ -655,15 +682,14 @@ describe('a newer saved version: the conflict', () => {
     expect(field('Title')).toHaveValue('Saved since');
   });
 
-  it('can have its notice and the card seen in either view on a narrow screen', async () => {
+  it('keeps the conflict notice with the editor and the card preview in the responsive layout', async () => {
     const { view } = await intoConflict();
     const root = view.container.querySelector('.mycard');
     const notice = screen.getByRole('alert');
-    for (const label of ['Preview', 'Edit']) {
-      await userEvent.click(screen.getByRole('button', { name: label }));
-      expect(root).toHaveAttribute('data-view', label.toLowerCase());
-      expect(root).toContainElement(notice);
-    }
+    expect(root).toHaveAttribute('data-view', 'edit');
+    expect(root).toContainElement(notice);
+    expect(root).toContainElement(screen.getByRole('form', { name: 'Edit your card' }));
+    expect(root).toContainElement(screen.getByRole('article', { name: 'Card for Ada Lovelace' }));
   });
 });
 
@@ -808,6 +834,8 @@ describe('an admin viewing as someone else', () => {
     await screen.findByText('You\'re viewing as someone else');
     mocks.impersonation.isImpersonating = false;
     view.rerender(page());
+    await screen.findByRole('button', { name: 'Edit Card' });
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Card' }));
     await screen.findByRole('form', { name: 'Edit your card' });
     expect(service.loadMyCard).toHaveBeenCalledTimes(1);
     expect(field('Title')).toHaveValue('Analyst');
@@ -817,6 +845,8 @@ describe('an admin viewing as someone else', () => {
     mocks.impersonation.isImpersonating = false;
     installService();
     const view = render(page());
+    await screen.findByRole('button', { name: 'Edit Card' });
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Card' }));
     await screen.findByRole('form', { name: 'Edit your card' });
     mocks.impersonation.isImpersonating = true;
     view.rerender(page());
@@ -849,9 +879,10 @@ describe('signed out, and switching account', () => {
     const { service } = await open();
     service.loadMyCard.mockImplementation(async () => okResult(9, { firstName: 'Bob', lastName: 'Builder', title: 'Foreman' }));
     act(() => { mocks.auth.currentUser = { uid: 'V' }; mocks.auth.listeners.forEach((listener) => listener({ uid: 'V' })); });
-    await screen.findByDisplayValue('Bob');
+    await screen.findByRole('article', { name: 'Card for Bob Builder' });
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Card' }));
     expect(field('Title')).toHaveValue('Foreman');
-    expect(screen.queryByDisplayValue('Ada')).toBeNull();
+    expect(screen.queryByRole('article', { name: 'Card for Ada Lovelace' })).toBeNull();
     expect(service.loadMyCard).toHaveBeenCalledTimes(2);
   });
 });
@@ -922,7 +953,7 @@ describe('leaving, and being usable', () => {
     await typeInto(user, 'Title', 'Director');
     expect(beforeUnload()).toBe(true);
     await user.click(saveButton());
-    await screen.findByText('All changes saved');
+    await finishSave();
     expect(beforeUnload()).toBe(false);
   });
 
@@ -953,14 +984,25 @@ describe('leaving, and being usable', () => {
     expect(screen.getByRole('alert')).toHaveAccessibleName('Couldn\'t save your changes');
   });
 
-  it('switches between Edit and Preview on a narrow screen without losing what was typed', async () => {
-    const { view } = await open();
+  it('opens on the finished card and returns there after canceling edits', async () => {
+    installService();
+    render(page());
+    await screen.findByRole('article', { name: 'Card for Ada Lovelace' });
+    expect(screen.queryByRole('form', { name: 'Edit your card' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Card' }));
     const user = userEvent.setup();
     await user.type(field('Title'), ' Lead');
-    await user.click(screen.getByRole('button', { name: 'Preview' }));
-    expect(view.container.querySelector('.mycard')).toHaveAttribute('data-view', 'preview');
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
-    expect(field('Title')).toHaveValue('Analyst Lead');
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(await screen.findByRole('button', { name: 'Edit Card' })).toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: 'Edit your card' })).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Edit Card' }));
+    await user.clear(field('Title'));
+    await user.type(field('Title'), 'Lead');
+    await user.click(saveButton());
+    expect(await screen.findByRole('button', { name: 'Edit Card' })).toBeInTheDocument();
+    expect(within(screen.getByRole('article', { name: 'Card for Ada Lovelace' })).getByText('Lead')).toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: 'Edit your card' })).toBeNull();
   });
 });
 
@@ -1031,7 +1073,7 @@ describe('an uploaded photo', () => {
     await user.click(screen.getByRole('button', { name: 'Remove photo' }));
     await user.click(screen.getByRole('button', { name: 'Yes, remove it' }));
     await user.click(saveButton());
-    await screen.findByText('All changes saved');
+    await finishSave();
     expect(service.saveMyCard.mock.calls[0][0].photoUrl).toBe('');
     expect(service.saveMyCard.mock.calls[0][1]).toEqual({ expectedRevision: 3 });
   });
@@ -1139,7 +1181,7 @@ describe('adding a photo with Upload photo', () => {
     const user = userEvent.setup();
     await upload(user);
     await user.click(saveButton());
-    await screen.findByText('All changes saved');
+    await finishSave();
     expect(service.saveMyCard).toHaveBeenCalledTimes(1);
     expect(service.saveMyCard.mock.calls[0][0].photoUrl).toBe(made);
     expect(service.saveMyCard.mock.calls[0][1]).toEqual({ expectedRevision: 3 });
@@ -1168,7 +1210,7 @@ describe('adding a photo with Upload photo', () => {
     await settle();
     expect(kept()).toHaveLength(2);
     await user.click(saveButton());
-    await screen.findByText('All changes saved');
+    await finishSave();
     await settle();
     expect(kept()).toEqual([]);
   });
@@ -1185,7 +1227,7 @@ describe('adding a photo with Upload photo', () => {
     await settle();
     expect(kept()).toHaveLength(2);
     await user.click(screen.getByRole('button', { name: 'Try again' }));
-    await screen.findByText('All changes saved');
+    await finishSave();
     expect(service.saveMyCard.mock.calls[1][0].photoUrl).toBe(made);
   });
 
@@ -1203,7 +1245,7 @@ describe('adding a photo with Upload photo', () => {
     expect(service.saveMyCard).toHaveBeenCalledTimes(1);
     await user.click(screen.getByRole('button', { name: 'Save my version over it' }));
     await user.click(screen.getByRole('button', { name: 'Overwrite with my version' }));
-    await screen.findByText('All changes saved');
+    await finishSave();
     expect(service.saveMyCard.mock.calls[1][0].photoUrl).toBe(made);
     expect(service.saveMyCard.mock.calls[1][1]).toEqual({ expectedRevision: 5 });
   });
@@ -1236,7 +1278,7 @@ describe('adding a photo with Upload photo', () => {
     await user.click(screen.getByRole('button', { name: 'Yes, remove it' }));
     expect(card().querySelector('img')).toBeNull();
     await user.click(saveButton());
-    await screen.findByText('All changes saved');
+    await finishSave();
     expect(service.saveMyCard.mock.calls[0][0].photoUrl).toBe('');
   });
 
@@ -1280,6 +1322,8 @@ describe('adding a photo with Upload photo', () => {
     await settle();
     expect(kept()).toHaveLength(2);
     act(() => { mocks.auth.currentUser = { uid: 'V' }; mocks.auth.listeners.forEach((listener) => listener({ uid: 'V' })); });
+    await screen.findByRole('button', { name: 'Edit Card' });
+    await userEvent.click(screen.getByRole('button', { name: 'Edit Card' }));
     await screen.findByRole('form', { name: 'Edit your card' });
     expect(card().querySelector('img')).toBeNull();
     expect(screen.queryByText('We restored the changes you hadn\'t saved')).toBeNull();
@@ -1297,7 +1341,7 @@ describe('adding a photo with Upload photo', () => {
       const user = userEvent.setup();
       await upload(user, { move: true });
       await user.click(saveButton());
-      await screen.findByText('All changes saved');
+      await finishSave();
       expect(fetchSpy).not.toHaveBeenCalled();
       expect(xhr).not.toHaveBeenCalled();
     } finally { vi.unstubAllGlobals(); }

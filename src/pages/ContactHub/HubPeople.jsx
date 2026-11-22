@@ -72,9 +72,10 @@ export const VIEW_STORAGE_KEY = 'idynify_hub_view';
 
 function readStoredView() {
   try {
-    return window.localStorage.getItem(VIEW_STORAGE_KEY) === VIEW.TABLE ? VIEW.TABLE : VIEW.LIST;
+    const saved = window.localStorage.getItem(VIEW_STORAGE_KEY);
+    return saved === VIEW.LIST || saved === VIEW.TABLE ? saved : VIEW.TABLE;
   } catch {
-    return VIEW.LIST; // storage blocked or unavailable: the default
+    return VIEW.TABLE;
   }
 }
 
@@ -349,7 +350,7 @@ function HubPeopleList({ canDelete, readOnly }) {
   // The room the people have: the whole content area.
   // 0 means it could not be measured, which does not rule the table out.
   const peopleWidth = contentWidth;
-  const tableFits = !isMobile && (peopleWidth === 0 || peopleWidth >= TABLE_MIN_WIDTH);
+  const tableFits = true;
   const asTable = view === VIEW.TABLE && tableFits;
   const tightTable = peopleWidth !== 0 && peopleWidth < TABLE_FULL_WIDTH;
 
@@ -391,7 +392,6 @@ function HubPeopleList({ canDelete, readOnly }) {
       </div>
     </header>
   );
-  // Desktop only: a phone always has the list.
   const viewToggle = (
     <div key="view" className="hub-view" role="group" aria-label="View" style={{ borderColor: T.border, background: T.cardBg }}>
       {[VIEW.LIST, VIEW.TABLE].map((id) => (
@@ -404,7 +404,7 @@ function HubPeopleList({ canDelete, readOnly }) {
           onClick={() => chooseView(id)}
         >
           {id === VIEW.LIST ? <List size={16} aria-hidden="true" /> : <Table2 size={16} aria-hidden="true" />}
-          {id === VIEW.LIST ? 'List' : 'Table'}
+          {id === VIEW.LIST ? 'Cards' : 'Table'}
         </button>
       ))}
     </div>
@@ -442,7 +442,7 @@ function HubPeopleList({ canDelete, readOnly }) {
                 My People
               </Link>
             ) : null}
-            <h2 id="hub-people-heading" className="hub-section-title">
+            <h2 id="hub-people-heading" className="hub-section-title" tabIndex={-1}>
               {showWall ? 'Sticker Wall' : 'My People'}
               {status === HUB_STATUS.READY && !firstRun && !showWall ? <span className="hub-count" style={{ color: T.textMuted }}> ({people.length})</span> : null}
             </h2>
@@ -452,7 +452,8 @@ function HubPeopleList({ canDelete, readOnly }) {
           {!firstRun && !showWall && addButton}
           {!firstRun && !showWall && (
             <div className="hub-tools">
-              {searchField}
+              <div className="hub-tools-primary">{searchField}</div>
+              <div className="hub-tools-actions">
               {importButton}
               {uid && status === HUB_STATUS.READY && <DuplicateReview contacts={people} stickers={stickers.byId} readOnly={readOnly}
                 request={mergeReviewEnabled() && !readOnly ? requestMerge : undefined} onMerged={reload} />}
@@ -464,7 +465,8 @@ function HubPeopleList({ canDelete, readOnly }) {
               )}
               {selecting && <button type="button" className="hub-secondary-btn" disabled={!selected.length}
                 onClick={() => setDeleting(selected)}>Delete selected ({selected.length})</button>}
-              {tableFits ? viewToggle : null}
+              {viewToggle}
+              </div>
             </div>
           )}
         </div>

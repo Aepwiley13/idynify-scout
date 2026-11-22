@@ -238,9 +238,10 @@ export function useMyCard({
       cancelTimer();
       clearDraft(account, options);
       // The saved card is the new starting point. Typing done while it was saving stays, as unsaved changes.
-      if (draftRef.current.card === cardAtSave) draftRef.current.reset(result.card);
+      const hasUnsavedChanges = draftRef.current.card !== cardAtSave;
+      if (!hasUnsavedChanges) draftRef.current.reset(result.card);
       else draftRef.current.reset(result.card, draftRef.current.card);
-      return { status: 'saved' };
+      return { status: 'saved', hasUnsavedChanges };
     }
     if (result?.status === 'conflict') {
       const current = result.current;

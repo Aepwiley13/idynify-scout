@@ -1,10 +1,9 @@
 /**
- * MyCardLayout — the editor and its preview, arranged for the screen.
+ * MyCardLayout — a finished digital card first, with editing as a separate mode.
  *
- * From 900px the two sit side by side, the preview staying in view while the
- * form scrolls. Under that there is one column and a two-way switch, Edit or
- * Preview; the screen size is decided by the stylesheet, so both panels are
- * always in the page and only the one in view is shown.
+ * The saved card is the first view at every size. Edit Card opens the existing
+ * editor; desktop keeps the preview beside it while editing and mobile focuses
+ * on the form. Cancel and successful Save return to the finished card.
  *
  * It holds no card and no draft: the editor, the preview and any actions
  * (the Save bar) are passed in. With no preview there is nothing to switch
@@ -13,7 +12,7 @@
  * same pattern as the rest of Contact Hub: the shell does not scroll module
  * content, each module does.
  */
-import { useState } from 'react';
+import { useEffect, useRef } from 'react';
 import './MyCard.css';
 
 /**
@@ -23,38 +22,40 @@ import './MyCard.css';
  * @param {React.ReactNode} [props.actions]  a bar kept in view at the bottom (Save)
  * @param {React.ReactNode} [props.notice]   messages above both (a failed save, a conflict)
  * @param {React.ReactNode} [props.back]     a link above the heading, back to where the person came from
- * @param {'edit'|'preview'} [props.initialView]  which panel a narrow screen starts on
+ * @param {boolean} [props.editing]
  */
 export default function MyCardLayout({
-  editor, preview = null, actions = null, notice = null, back = null, initialView = 'edit',
+  editor, preview = null, actions = null, notice = null, back = null,
+  editing = false, onEdit,
 }) {
-  const [view, setView] = useState(initialView === 'preview' ? 'preview' : 'edit');
+  const view = editing ? 'edit' : 'preview';
+  const editButton = useRef(null);
+  const editorPane = useRef(null);
+  const previousEditing = useRef(editing);
+  useEffect(() => {
+    if (previousEditing.current !== editing) {
+      (editing ? editorPane.current?.querySelector('input, button') : editButton.current)?.focus?.();
+      previousEditing.current = editing;
+    }
+  }, [editing]);
 
   return (
-    <div className="mycard" data-view={view}>
+    <div className="mycard" data-view={view} data-editing={editing ? 'true' : 'false'}>
       <div className="mycard-inner">
         <div className="mycard-body">
           {back}
           <header className="mycard-header">
             <h1 className="mycard-title">My Card</h1>
-            <p className="mycard-tagline">Choose what people see when you share your card.</p>
+            <p className="mycard-tagline">Your digital business card</p>
+            {preview && !editing && <button ref={editButton} type="button" className="mycard-btn mycard-btn--secondary mycard-edit-card" onClick={onEdit}>Edit Card</button>}
           </header>
 
           {notice}
 
           {preview ? (
             <>
-              <div className="mycard-switch" role="group" aria-label="Show">
-                <button type="button" className="mycard-switch-btn" aria-pressed={view === 'edit'} onClick={() => setView('edit')}>
-                  Edit
-                </button>
-                <button type="button" className="mycard-switch-btn" aria-pressed={view === 'preview'} onClick={() => setView('preview')}>
-                  Preview
-                </button>
-              </div>
-
               <div className="mycard-grid">
-                <div className="mycard-pane mycard-pane--editor">{editor}</div>
+                {editing && <div ref={editorPane} className="mycard-pane mycard-pane--editor">{editor}</div>}
                 <div className="mycard-pane mycard-pane--preview">{preview}</div>
               </div>
             </>
@@ -62,7 +63,7 @@ export default function MyCardLayout({
             <div className="mycard-single">{editor}</div>
           )}
         </div>
-        {actions ? <div className="mycard-actions">{actions}</div> : null}
+        {editing && actions ? <div className="mycard-actions">{actions}</div> : null}
       </div>
     </div>
   );

@@ -99,6 +99,7 @@ const FRIEND = sticker('Friend', { color: 'green' });
 const person = (id, name, extra = {}) => ({ id, name, addedAt: '2026-11-01T12:00:00Z', ...extra });
 
 beforeEach(() => {
+  window.localStorage.setItem(VIEW_STORAGE_KEY, 'list');
   fake.current = createFakeStickers();
   fake.current.state.registry = [VIP, PARTNER];
   contactsData.fail = false;
@@ -319,7 +320,7 @@ describe('sticker states', () => {
     await waitFor(() => expect(fake.current.state.configFetches).toBe(1));
     await waitFor(() => expect(screen.queryByRole('navigation', { name: 'Contact Hub' })).toBeNull());
     expect(screen.queryByRole('group', { name: 'Filter by sticker' })).toBeNull();
-    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Name', 'Email', 'Phone', 'Added']);
+    expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Name', 'Company', 'Email', 'Phone']);
     expect(screen.queryByRole('button', { name: /sticker/i })).toBeNull();
     expect(screen.queryByText(/could not be loaded/i)).toBeNull();
     expect(fake.current.state.subscriptions).toBe(0);
@@ -384,23 +385,26 @@ describe('List and Table', () => {
   beforeEach(() => { contentWidth = WIDE; });
   const toggle = () => screen.findByRole('group', { name: 'View' });
 
-  it('List is the default', async () => {
+  it('Table is the default and Cards remains available', async () => {
+    window.localStorage.removeItem(VIEW_STORAGE_KEY);
     renderHub();
     const group = await toggle();
-    expect(within(group).getByRole('button', { name: 'List' })).toHaveAttribute('aria-pressed', 'true');
-    expect(within(group).getByRole('button', { name: 'Table' })).toHaveAttribute('aria-pressed', 'false');
+    expect(within(group).getByRole('button', { name: 'Table' })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(group).getByRole('button', { name: 'Cards' })).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByRole('table', { name: 'My People' })).toBeInTheDocument();
+    await userEvent.click(within(group).getByRole('button', { name: 'Cards' }));
     expect(screen.getByRole('list', { name: 'My People' })).toBeInTheDocument();
-    expect(screen.queryByRole('table')).toBeNull();
   });
 
   it('Table shows the same people in the same order, with Name, Email, Phone, Stickers and Added', async () => {
     const user = userEvent.setup();
+    window.localStorage.setItem(VIEW_STORAGE_KEY, 'list');
     renderHub();
     await screen.findByRole('list', { name: 'My People' });
     const inList = names();
     await user.click(within(await toggle()).getByRole('button', { name: 'Table' }));
     const table = screen.getByRole('table', { name: 'My People' });
-    await waitFor(() => expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Name', 'Email', 'Phone', 'Stickers', 'Added']));
+    await waitFor(() => expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Name', 'Company', 'Email', 'Phone', 'Stickers']));
     expect(names()).toEqual(inList);
     expect(within(table).getAllByRole('row')).toHaveLength(inList.length + 1);
     expect(screen.queryByRole('list', { name: 'My People' })).toBeNull();
@@ -412,7 +416,8 @@ describe('List and Table', () => {
     const table = await screen.findByRole('table', { name: 'My People' });
     // The headers and the cells that are not a person's own name or details.
     const headers = within(table).getAllByRole('columnheader').map((h) => h.textContent).join(' ');
-    expect(headers).not.toMatch(/status|stage|source|pipeline|hunter|engag|mission|credit|enrich|company|title/i);
+    expect(headers).toMatch(/company/i);
+    expect(headers).not.toMatch(/status|stage|source|pipeline|hunter|engag|mission|credit|enrich|title/i);
     // A person in a sales stage is listed like anyone else, with nothing saying so.
     const row = within(table).getByRole('link', { name: 'Hunter Stage' }).closest('[role="row"]');
     expect(row.textContent.replace('Hunter Stage', '')).not.toMatch(/hunter|active_mission|stage/i);
@@ -474,39 +479,41 @@ describe('List and Table', () => {
     expect(contactsData.paths.every((path) => path === 'users/u1/contacts')).toBe(true);
   });
 
-  it('still switches when browser storage is blocked', async () => {
+  it('still switches to Cards when browser storage is blocked', async () => {
     const user = userEvent.setup();
     vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => { throw new Error('blocked'); });
     vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => { throw new Error('blocked'); });
     renderHub();
-    await screen.findByRole('list', { name: 'My People' });
-    await user.click(within(await toggle()).getByRole('button', { name: 'Table' }));
-    expect(screen.getByRole('table', { name: 'My People' })).toBeInTheDocument();
+    await screen.findByRole('table', { name: 'My People' });
+    await user.click(within(await toggle()).getByRole('button', { name: 'Cards' }));
+    expect(screen.getByRole('list', { name: 'My People' })).toBeInTheDocument();
   });
 
-  it('a phone has the list and no choice, even if Table was chosen on a desktop', async () => {
+  it('a phone defaults to the compact table and can switch to cards', async () => {
     setViewportWidth(390);
     window.localStorage.setItem(VIEW_STORAGE_KEY, 'table');
     renderHub();
-    expect(await screen.findByRole('list', { name: 'My People' })).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'View' })).toBeNull();
-    expect(screen.queryByRole('table')).toBeNull();
+    expect(await screen.findByRole('table', { name: 'My People' })).toBeInTheDocument();
+    const view = within(await toggle());
+    expect(view.getByRole('button', { name: 'Table' })).toHaveAttribute('aria-pressed', 'true');
+    await userEvent.click(view.getByRole('button', { name: 'Cards' }));
+    expect(screen.getByRole('list', { name: 'My People' })).toBeInTheDocument();
   });
 
-  it('a content area too narrow for the columns gets the list and no choice', async () => {
+  it('a narrow desktop content area keeps the table choice available', async () => {
     contentWidth = TABLE_MIN_WIDTH - 1;
     window.localStorage.setItem(VIEW_STORAGE_KEY, 'table');
     renderHub();
-    expect(await screen.findByRole('list', { name: 'My People' })).toBeInTheDocument();
-    expect(screen.queryByRole('group', { name: 'View' })).toBeNull();
+    expect(await screen.findByRole('table', { name: 'My People' })).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'View' })).toBeInTheDocument();
   });
 
-  it('a tight content area keeps Name, Email, Phone and Stickers and leaves out Added', async () => {
+  it('a tight content area keeps the useful contact columns', async () => {
     contentWidth = TABLE_FULL_WIDTH - 1;
     window.localStorage.setItem(VIEW_STORAGE_KEY, 'table');
     renderHub();
     const table = await screen.findByRole('table', { name: 'My People' });
-    await waitFor(() => expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Name', 'Email', 'Phone', 'Stickers']));
+    await waitFor(() => expect(within(table).getAllByRole('columnheader').map((h) => h.textContent)).toEqual(['Name', 'Company', 'Email', 'Phone', 'Stickers']));
   });
 
   it('the choice is not offered on the Sticker Wall', async () => {

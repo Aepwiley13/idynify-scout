@@ -39,7 +39,10 @@ const PORTRAITS = { '/jordan.svg': portrait('#7c6bd6', '#e8a33d', '#2b2146'), '/
 
 const profile = mkdtempSync(join(tmpdir(), 'contactprofile-chrome-'));
 const chrome = spawn(CHROME, ['--headless=new', `--remote-debugging-port=${PORT}`, `--user-data-dir=${profile}`, '--no-first-run', '--no-default-browser-check', '--disable-extensions', '--disable-sync', 'about:blank'], { stdio: 'ignore' });
-const cleanup = () => { try { chrome.kill('SIGKILL'); } catch { /* gone */ } rmSync(profile, { recursive: true, force: true }); };
+const cleanup = () => {
+  try { chrome.kill('SIGKILL'); } catch { /* gone */ }
+  try { rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 }); } catch { /* Chrome may still be flushing its disposable profile. */ }
+};
 process.on('exit', cleanup);
 
 async function pageSocket() {
@@ -88,7 +91,10 @@ await send('Fetch.enable', { patterns: [{ urlPattern: '*' }] });
 
 const VIEWPORTS = [
   { id: 'desktop', width: 1440, height: 900, dpr: 1, mobile: false },
-  { id: 'phone', width: 390, height: 844, dpr: 2, mobile: true },
+  { id: 'laptop', width: 1024, height: 768, dpr: 1, mobile: false },
+  { id: 'phone320', width: 320, height: 780, dpr: 2, mobile: true },
+  { id: 'phone390', width: 390, height: 844, dpr: 2, mobile: true },
+  { id: 'phone430', width: 430, height: 932, dpr: 2, mobile: true },
 ];
 const THEMES = [['light', 'light'], ['dark', 'dark']];
 
@@ -161,38 +167,49 @@ const pickContact = async (id) => { await click(demoBtn(id)); await until(`docum
 
 if (mergeReview) {
   const dialog = "document.querySelector('.hub-duplicate-dialog[open]')";
-  const select = (expr, value) => evaluate(`(() => { const field = ${expr}; field.value = ${JSON.stringify(value)};
-    field.dispatchEvent(new Event('change', { bubbles: true })); })()`);
   for (const view of VIEWPORTS) {
     await send('Emulation.setDeviceMetricsOverride', { width: view.width, height: view.height, deviceScaleFactor: view.dpr, mobile: view.mobile });
     await send('Page.navigate', { url: `${BASE}?duplicates=1&merge_demo=1${view.mobile ? '&scout=1&theme=dark' : ''}` });
-    await until(byText('Review duplicates (2)'), 25_000);
-    await click(byText('Review duplicates (2)'));
-    await select(`(${dialog}).querySelector('label select:not([aria-label])')`, 'jordan');
-    await click(byText('Verify merge preview', dialog));
-    await until(byLabel('Resolve title'));
-    await select(byLabel('Resolve title'), '1');
-    await click(byText('Verify merge preview', dialog));
-    check(view.id + ' verified before confirmation', await until(byText('Confirm merge', dialog)));
+    await until(byText('Review possible duplicates 2'), 25_000);
+    await click(byText('Review possible duplicates 2'));
+    await click(`(${dialog}).querySelector('.hub-merge-survivor input[value="jordan"]').closest('label')`);
+    await click(byText('Continue', dialog));
+    await until(`(${dialog}).querySelector('input[name^="conflict-"]')`);
+    await click(`(${dialog}).querySelector('input[name^="conflict-"][value="1"]').closest('label')`);
+    await click(byText('Review combined contact', dialog));
+    check(view.id + ' verified before confirmation', await until(byText('Merge contacts', dialog)));
+    check(view.id + ' merge footer stays reachable while content scrolls', await evaluate(`(() => {
+      const d = ${dialog}; const content = d?.querySelector('.hub-duplicate-content'); const footer = d?.querySelector('.hub-merge-footer');
+      if (!d || !content || !footer) return false;
+      content.scrollTop = content.scrollHeight;
+      const dr = d.getBoundingClientRect(); const fr = footer.getBoundingClientRect();
+      const buttons = [...footer.querySelectorAll('button')].filter((button) => !button.disabled);
+      const okay = dr.left >= -1 && dr.right <= innerWidth + 1 && fr.bottom <= innerHeight + 1
+        && buttons.every((button) => button.getBoundingClientRect().height >= 44);
+      content.scrollTop = 0;
+      return okay;
+    })()`));
     await shot(join(OUT, `trusted-merge-${view.id}-preview.png`));
-    await click(byText('Confirm merge', dialog));
+    await click(byText('Merge contacts', dialog));
     check(view.id + ' merge receipt shown', await until(`(${dialog})?.innerText.includes('Contacts merged')`));
-    await click(byText('Check rollback eligibility', dialog));
-    await click(byText('Confirm rollback', dialog));
+    await click(byText('Check recovery options', dialog));
+    await click(byText('Confirm recovery', dialog));
     check(view.id + ' shows verified rollback outcome', await until(`(${dialog})?.innerText.includes('Merge rolled back')`));
     check(view.id + ' did not call cloud fixture writes', (await writeRows()).length === 0);
   }
   await send('Page.navigate', { url: `${BASE}?duplicates=1&merge_demo=1` });
-  await until(byText('Review duplicates (2)'), 25_000);
-  await click(byText('Review duplicates (2)'));
+  await until(byText('Review possible duplicates 2'), 25_000);
+  await click(byText('Review possible duplicates 2'));
   await until(`!(${byText('Not a duplicate', dialog)})?.disabled`);
   await click(byText('Not a duplicate', dialog));
-  check('dismissal updates count', await until(`(${dialog})?.innerText.includes('Pair 1 of 1')`));
+  check('dismissal updates count', await until(`(${dialog})?.innerText.includes('Possible match 1 of 1')`));
   await send('Page.reload');
-  check('dismissal survives reload', await until(byText('Review duplicates (1)'), 25_000));
-  await click(byText('Review duplicates (1)'));
-  await click(byText('Show dismissed pairs', dialog));
-  check('restoring a dismissal recovers the pair', await until(`(${dialog})?.innerText.includes('Pair 1 of 2')`));
+  check('dismissal survives reload', await until(byText('Review possible duplicates 1'), 25_000));
+  await click(byText('Review possible duplicates 1'));
+  await click(byText('Restore dismissed matches', dialog));
+  check('restoring a dismissal recovers the pair', await until(`(${dialog})?.innerText.includes('Possible match 1 of 2')`));
+  await key('Escape');
+  check('Escape closes duplicate review without starting a merge', !(await evaluate(dialog)) && (await writeRows()).length === 0);
   check('no browser exceptions', problems.length === 0);
   check('no remote API requests', [...blocked].every((url) => FONT_HOSTS.some((re) => re.test(url))));
   writeFileSync(join(OUT, 'trusted-merge-report.json'), JSON.stringify({ checks, blocked: [...blocked], problems }, null, 2));
@@ -209,26 +226,33 @@ if (duplicateReview) {
         width: view.width, height: view.height, deviceScaleFactor: view.dpr, mobile: view.mobile,
       });
       await send('Page.navigate', { url: `${BASE}?duplicates=1&theme=${value}${view.mobile ? '&scout=1' : ''}` });
-      const ready = await until(byText('Review duplicates (2)'), 25_000);
+      const ready = await until(byText('Review possible duplicates 2'), 25_000);
       check(label + ' finds two pairs', ready);
       if (!ready) throw new Error(JSON.stringify({ body: await bodyText(), blocked: [...blocked], problems }));
-      await click(byText('Review duplicates (2)'));
+      await click(byText('Review possible duplicates 2'));
       check(label + ' compares both records', await until(`(${dialog})?.querySelectorAll('th[scope="col"]').length === 3`));
       check(label + ' shows evidence', await evaluate(`(${dialog})?.innerText.includes('Same LinkedIn profile')`));
       check(label + ' fits width', await evaluate(`(${dialog}).scrollWidth <= (${dialog}).clientWidth + 1`));
+      check(label + ' dismiss, compare actions and modal content remain accessible', await evaluate(`(() => {
+        const d = ${dialog}; const close = d?.querySelector('.hub-duplicate-close'); const content = d?.querySelector('.hub-duplicate-content');
+        const footer = d?.querySelector('.hub-duplicate-footer'); if (!d || !close || !content || !footer) return false;
+        const dr = d.getBoundingClientRect(); const closeRect = close.getBoundingClientRect();
+        content.scrollTop = content.scrollHeight;
+        const scrollWorks = content.scrollHeight <= content.clientHeight || content.scrollTop > 0;
+        const buttons = [...footer.querySelectorAll('button')].filter((button) => !button.disabled);
+        const okay = dr.left >= -1 && dr.right <= innerWidth + 1 && closeRect.width >= 44 && closeRect.height >= 44
+          && buttons.every((button) => button.getBoundingClientRect().height >= 44) && scrollWorks;
+        content.scrollTop = 0; return okay;
+      })()`));
       await shot(join(OUT, `duplicates-${label}.png`));
-      const choice = byLabel('Choose Job title');
-      // The browser's native picker is outside the page event surface.
-      await evaluate(`(() => { const field = ${choice}; field.value = '1'; field.dispatchEvent(new Event('change', { bubbles: true })); })()`);
-      check(label + ' keeps preview choice', await evaluate(`(${choice})?.value === '1'`));
       await click(byText('Not a duplicate', dialog));
-      check(label + ' moves to remaining pair', await until(`(${dialog})?.innerText.includes('Pair 1 of 1')`));
+      check(label + ' moves to remaining pair', await until(`(${dialog})?.innerText.includes('Possible match 1 of 1')`));
       check(label + ' did not write', (await writeRows()).length === 0);
     }
   }
   await send('Page.navigate', { url: `${BASE}?duplicates=1&readonly=1` });
-  await until(byText('Review duplicates (2)'));
-  await click(byText('Review duplicates (2)'));
+  await until(byText('Review possible duplicates 2'));
+  await click(byText('Review possible duplicates 2'));
   check('read-only can compare', await until(`(${dialog})?.querySelector('table')`));
   check('read-only has no dismissal', !await evaluate(byText('Not a duplicate', dialog)));
   check('no browser exceptions', problems.length === 0);
@@ -242,25 +266,89 @@ if (workspaceReview) {
   const nav = (text) => byText(text, byLabel("Fixture navigation"));
   const tab = (name) => `[...document.querySelectorAll('[role=tab]')].find((item) => item.textContent.trim() === ${JSON.stringify(name)})`;
   const person = `document.querySelector('a[href="/contact-hub/person/jordan"]')`;
-  for (const [session, query] of [['free', ''], ['scout', '&scout=1'], ['read-only', '&readonly=1']]) {
-    await send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
-    await send('Page.navigate', { url: `${BASE}?workspace=1${query}` });
-    check(session + ' My People loaded', await until(person));
-    if (session !== 'read-only') {
-      check(session + ' Import visible', await evaluate(byLabel('Import Contacts')));
-      await click(nav('Sticker Wall'));
-      check(session + ' navigates to Sticker Wall', await until("document.querySelector('#hub-people-heading')?.textContent.trim() === 'Sticker Wall'"));
-      await click(nav('My Card'));
-      check(session + ' navigates to My Card', await until("document.querySelector('h1')?.innerText.includes('My Card')"));
-      await click(nav('My People'));
-      await until(person);
+  const sessions = [['free', ''], ['scout', '&scout=1'], ['read-only', '&readonly=1']]
+    .filter(([session]) => !process.env.CONTACT_HUB_REVIEW_SESSION || session === process.env.CONTACT_HUB_REVIEW_SESSION);
+  const viewports = VIEWPORTS.filter((view) => !process.env.CONTACT_HUB_REVIEW_VIEWPORT || view.id === process.env.CONTACT_HUB_REVIEW_VIEWPORT);
+  const themes = THEMES.filter(([theme]) => !process.env.CONTACT_HUB_REVIEW_THEME || theme === process.env.CONTACT_HUB_REVIEW_THEME);
+  for (const [session, query] of sessions) {
+    for (const vp of viewports) for (const [theme] of themes) {
+      const label = `${session}-${vp.id}-${theme}`;
+      await send('Emulation.setDeviceMetricsOverride', { width: vp.width, height: vp.height, deviceScaleFactor: vp.dpr, mobile: vp.mobile });
+      await send('Emulation.setTouchEmulationEnabled', { enabled: vp.mobile });
+      await send('Page.navigate', { url: `${BASE}?workspace=1${query}&theme=${theme}` });
+      check(label + ' My People loaded', await until(person));
+      check(label + ' defaults to Table View', await evaluate("document.querySelector('[role=table][aria-label=\"My People\"]') && document.querySelector('[role=group][aria-label=\"View\"] button[aria-pressed=\"true\"]')?.textContent.includes('Table')"));
+      check(label + ' avoids horizontal overflow', await evaluate('document.documentElement.scrollWidth <= innerWidth + 1'));
+      const peopleActionAudit = await evaluate(`(() => {
+        const root = document.querySelector('.hub-people');
+        const controls = [...(root?.querySelectorAll('button, a[href]') ?? [])].filter((node) => node.getClientRects().length);
+        const unnamed = controls.filter((node) => !(node.getAttribute('aria-label') || node.innerText || '').trim())
+          .map((node) => ({ tag: node.tagName, className: node.className, text: node.innerText, title: node.title, disabled: node.disabled, html: node.outerHTML.slice(0, 240) }));
+        const untabbable = controls.filter((node) => node.tabIndex < 0)
+          .map((node) => ({ tag: node.tagName, className: node.className, text: node.innerText?.trim().slice(0, 30), label: node.getAttribute('aria-label'), disabled: node.disabled }));
+        const named = unnamed.length === 0 && untabbable.length === 0;
+        const touch = !${vp.mobile} || [...(root?.querySelectorAll('.hub-view-btn, .hub-primary-btn, .hub-secondary-btn, .hub-row-actions a, .hub-td-link') ?? [])]
+          .filter((node) => node.getClientRects().length).every((node) => node.getBoundingClientRect().height >= 44);
+        const actionRow = root?.querySelector('.hub-tools-actions'); const view = root?.querySelector('.hub-view');
+        const visibleFit = !${vp.mobile} || Boolean(actionRow && view && actionRow.scrollWidth <= actionRow.clientWidth + 1
+          && [...view.querySelectorAll('button')].every((node) => { const r = node.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth + 1; }));
+        return { pass: named && touch && visibleFit, unnamed, untabbable, touch, visibleFit };
+      })()`);
+      check(label + ' My People controls have names, keyboard access and suitable touch targets', peopleActionAudit.pass, JSON.stringify(peopleActionAudit));
+      check(label + ' My People content can be vertically reached without clipping', await evaluate(`(() => {
+        const scroller = document.scrollingElement; if (!scroller) return false;
+        const old = scroller.scrollTop; scroller.scrollTop = scroller.scrollHeight;
+        const reached = scroller.scrollHeight <= scroller.clientHeight || scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
+        scroller.scrollTop = old; return reached;
+      })()`));
+      if (session !== 'read-only') {
+        check(label + ' Import visible', await evaluate(byLabel('Import Contacts')));
+        await shot(join(OUT, `my-people-table-${label}.png`));
+        await click(byText('Cards', "document.querySelector('[role=group][aria-label=\\\"View\\\"]')"));
+        check(label + ' Cards View remains available', await until("document.querySelector('ul.hub-list[aria-label=\\\"My People\\\"]')"));
+        await shot(join(OUT, `my-people-cards-${label}.png`));
+        await click(byText('Table', "document.querySelector('[role=group][aria-label=\\\"View\\\"]')"));
+        await click(nav('Sticker Wall'));
+        check(label + ' navigates to Sticker Wall', await until("document.querySelector('#hub-people-heading')?.textContent.trim() === 'Sticker Wall'"));
+        await click(nav('My Card'));
+        check(label + ' My Card opens finished card first', await until("document.querySelector('.mycard-card') && !document.querySelector('.mycard-editor') && document.querySelector('button.mycard-edit-card')"));
+        check(label + ' finished card shows synthetic identity, photo and contact links', await evaluate(`(() => {
+          const card = document.querySelector('.mycard-card'); const text = card?.innerText ?? '';
+          return text.includes('Jordan Lee') && text.includes('Community Partnerships Director')
+            && text.includes('Community Partners of Salt Lake') && text.includes('jordan.lee@example.org')
+            && text.includes('+1 (801) 555-0199') && text.includes('linkedin.com/in/jordan-lee-example')
+            && text.includes('@jordan.lee') && Boolean(card.querySelector('img[src*="images.fixture.test/jordan.svg"]'));
+        })()`));
+        check(label + ' My Card actions are accessible and fit the viewport', await evaluate(`(() => {
+          const root = document.querySelector('.mycard'); const controls = [...(root?.querySelectorAll('button, a[href]') ?? [])].filter((node) => node.getClientRects().length);
+          return document.documentElement.scrollWidth <= innerWidth + 1
+            && controls.every((node) => (node.getAttribute('aria-label') || node.innerText || '').trim().length > 0 && node.tabIndex >= 0);
+        })()`));
+        await shot(join(OUT, `my-card-finished-${label}.png`));
+        await click(byText('Edit Card'));
+        check(label + ' Edit Card opens existing editor', await until("document.querySelector('.mycard-editor')"));
+        check(label + ' editor scrolling keeps Save and Cancel reachable', await evaluate(`(() => {
+          const root = document.querySelector('.mycard'); const actions = root?.querySelector('.mycard-actions');
+          if (!root || !actions) return false;
+          root.scrollTop = root.scrollHeight;
+          const rr = root.getBoundingClientRect(); const ar = actions.getBoundingClientRect();
+          const buttons = [...actions.querySelectorAll('button')];
+          const okay = ar.top >= rr.top - 1 && ar.bottom <= rr.bottom + 1 && buttons.length >= 2
+            && buttons.every((button) => button.getBoundingClientRect().height >= 44 && (button.innerText || button.getAttribute('aria-label')));
+          root.scrollTop = 0; return okay;
+        })()`));
+        await click(byText('Cancel'));
+        check(label + ' Cancel returns to finished card', await until("document.querySelector('.mycard-card') && !document.querySelector('.mycard-editor')"));
+        await click(nav('My People'));
+        await until(person);
+      }
+      await click(person);
+      check(label + ' person defaults to Action Center', await until(`(${tab('Action Center')})?.getAttribute('aria-selected') === 'true'`));
+      check(label + ' Emails access', Boolean(await evaluate(tab('Emails'))) === (session === 'scout'));
+      check(label + ' capture access', Boolean(await evaluate(byLabel('What would you like to remember or do?'))) === (session !== 'read-only'));
+      check(label + ' no photo persistence fixture request', await evaluate("!window.__writes.some((entry) => entry.kind === 'photo override')"));
+      await shot(join(OUT, `workspace-${label}.png`));
     }
-    await click(person);
-    check(session + ' person defaults to Action Center', await until(`(${tab('Action Center')})?.getAttribute('aria-selected') === 'true'`));
-    check(session + ' Emails access', Boolean(await evaluate(tab('Emails'))) === (session === 'scout'));
-    check(session + ' capture access', Boolean(await evaluate(byLabel('What would you like to remember or do?'))) === (session !== 'read-only'));
-    check(session + ' no photo persistence fixture request', await evaluate("!window.__writes.some((entry) => entry.kind === 'photo override')"));
-    await shot(join(OUT, `workspace-${session}.png`));
   }
   check('no browser exceptions', problems.length === 0);
   check('no remote API requests', [...blocked].every((url) => FONT_HOSTS.some((re) => re.test(url))));

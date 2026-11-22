@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import DuplicateReview from '../pages/ContactHub/duplicates/DuplicateReview';
@@ -54,30 +54,69 @@ describe('account snapshot duplicate evidence', () => {
 });
 
 describe('Duplicate review', () => {
-  it('compares contacts, chooses values, locally dismisses and restores a false match', async () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('compares contacts and persists a false-match dismissal locally when no trusted service is supplied', async () => {
     const user = userEvent.setup();
     render(<DuplicateReview contacts={[a, b]} />);
-    await user.click(screen.getByRole('button', { name: 'Review duplicates (1)' }));
+    await user.click(screen.getByRole('button', { name: 'Review possible duplicates 1' }));
     const dialog = within(screen.getByRole('dialog'));
-    expect(dialog.getByRole('table', { name: 'Contact comparison' })).toBeInTheDocument();
-    const titleChoice = dialog.getByRole('combobox', { name: 'Choose Job title' });
-    await user.selectOptions(titleChoice, '1');
-    expect(titleChoice).toHaveValue('1');
-    await user.click(dialog.getByRole('button', { name: 'Not a duplicate' }));
+    expect(dialog.getByRole('table', { name: 'Compare the saved contact details' })).toBeInTheDocument();
+    await user.click(within(dialog.getByRole('navigation', { name: 'Possible matches' })).getByRole('button', { name: 'Not a duplicate' }));
     expect(dialog.getByText('No possible duplicates to review.')).toBeInTheDocument();
-    await user.click(dialog.getByRole('button', { name: 'Show dismissed pairs' }));
-    expect(dialog.getByRole('combobox', { name: 'Choose Job title' })).toHaveValue('');
+    await user.click(dialog.getByRole('button', { name: 'Restore dismissed matches' }));
+    expect(dialog.getByRole('button', { name: 'Not a duplicate' })).toBeInTheDocument();
+  });
+
+  it('resolves only conflicting values with source labels, previews and commits through the trusted request', async () => {
+    const user = userEvent.setup();
+    const request = vi.fn(async (action, fields) => {
+      if (action === 'dismissals') return { pairs: [], latest: null };
+      if (action === 'preview' && !Number.isInteger(fields.choices.title)) return { blockers: [], conflicts: [{ key: 'title', options: ['Director', 'Coordinator'] }], combined: { name: 'Jordan Lee', emails: ['jordan@example.org'], phones: [], notes: 0, stickers: 0 }, token: null };
+      if (action === 'preview') return { blockers: [], conflicts: [{ key: 'title', options: ['Director', 'Coordinator'] }], combined: { name: 'Jordan Lee', emails: ['jordan@example.org'], phones: [], notes: 0, stickers: 0 }, activityCount: 0, token: 'signed-preview' };
+      if (action === 'commit') return { receipt: { status: 'merged', operationId: fields.operationId } };
+      throw new Error(`Unexpected ${action}`);
+    });
+    render(<DuplicateReview contacts={[a, b]} request={request} />);
+    await user.click(await screen.findByRole('button', { name: 'Review possible duplicates 1' }));
+    const dialog = within(screen.getByRole('dialog'));
+    await user.click(dialog.getAllByRole('radio', { name: /Jordan Lee/ })[0]);
+    await user.click(dialog.getByRole('button', { name: 'Continue' }));
+    const titleOptions = await dialog.findAllByRole('radio', { name: /From Jordan Lee/ });
+    expect(titleOptions).toHaveLength(2);
+    await user.click(titleOptions[0]);
+    await user.click(dialog.getByRole('button', { name: 'Review combined contact' }));
+    expect(await dialog.findByText('Contact that will remain')).toBeInTheDocument();
+    expect(dialog.queryByText('Existing email opt-outs')).toBeNull();
+    await user.click(dialog.getByRole('button', { name: 'Merge contacts' }));
+    expect(await dialog.findByRole('heading', { name: 'Contacts merged' })).toBeInTheDocument();
+    expect(request.mock.calls.map(([action]) => action)).toEqual(['dismissals', 'preview', 'preview', 'commit']);
+  });
+
+  it('requires confirmation before discarding choices, and supports Escape and outside dismissal', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<DuplicateReview contacts={[a, b]} request={async (action) => action === 'dismissals' ? { pairs: [], latest: null } : { blockers: [], conflicts: [], combined: {}, token: 'token' }} />);
+    await user.click(await screen.findByRole('button', { name: 'Review possible duplicates 1' }));
+    const dialog = screen.getByRole('dialog');
+    await user.click(within(dialog).getAllByRole('radio', { name: /Jordan Lee/ })[0]);
+    await user.keyboard('{Escape}');
+    expect(window.confirm).toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    vi.mocked(window.confirm).mockReturnValue(true);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
   it('keeps read-only comparison available and account review state isolated', async () => {
     const user = userEvent.setup();
     const { rerender } = render(<DuplicateReview key="account-1" contacts={[a, b]} />);
-    await user.click(screen.getByRole('button', { name: 'Review duplicates (1)' }));
-    await user.click(screen.getByRole('button', { name: 'Not a duplicate' }));
+    await user.click(screen.getByRole('button', { name: 'Review possible duplicates 1' }));
+    await user.click(within(screen.getByRole('navigation', { name: 'Possible matches' })).getByRole('button', { name: 'Not a duplicate' }));
     // Identical local document IDs in another account must not inherit a dismissal.
     rerender(<DuplicateReview key="account-2" contacts={[{ ...a, title: 'Member' }, b]} readOnly />);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Review duplicates (1)' }));
+    await user.click(screen.getByRole('button', { name: 'Review possible duplicates 1' }));
     expect(screen.queryByRole('button', { name: 'Not a duplicate' })).not.toBeInTheDocument();
     expect(screen.getByRole('cell', { name: 'Member' })).toBeInTheDocument();
   });

@@ -12,7 +12,7 @@
  *
  * WHAT IS SAVED: only what the person saves, with Save, against the revision
  * the card was loaded at; a newer saved version is a conflict they settle.
- * Sharing is not touched: there is no control for it on this page, the card is
+ * Sharing is not touched: there is no public-card sharing control on this page, the card is
  * private, and the service writes `sharingEnabled: false` every time. The
  * Shared / Private switches only say what a shared card WILL show.
  *
@@ -63,21 +63,39 @@ function useSignedInUid() {
 export default function MyCardPage() {
   const { isImpersonating } = useImpersonation();
   const uid = useSignedInUid();
+  return <MyCardPageAccount key={`${uid ?? 'signed-out'}:${isImpersonating ? 'readonly' : 'owner'}`} uid={uid} isImpersonating={isImpersonating} />;
+}
+
+function MyCardPageAccount({ uid, isImpersonating }) {
   const { draft, state, status, availability, choices, actions } = useMyCard({
     uid, impersonating: isImpersonating, service: myCardService, currentUid,
   });
 
   // Where Save leaves a card that is not valid, the first thing to fix is focused.
   const [focusTick, setFocusTick] = useState(0);
+  const [editingCard, setEditingCard] = useState(false);
   useEffect(() => {
     if (focusTick > 0) document.querySelector('.mycard [aria-invalid="true"]')?.focus();
   }, [focusTick]);
 
   const { save } = actions;
-  const handleSave = useCallback(async () => {
-    const result = await save();
+  const settleSavedView = useCallback((result) => {
     if (result.status === 'invalid') setFocusTick((tick) => tick + 1);
-  }, [save]);
+    if (result.status === 'saved' && !result.hasUnsavedChanges) setEditingCard(false);
+    return result;
+  }, []);
+  const handleSave = useCallback(async () => {
+    return settleSavedView(await save());
+  }, [save, settleSavedView]);
+  const handleConfirmSaveOver = useCallback(async () => settleSavedView(await actions.confirmSaveOver()), [actions, settleSavedView]);
+
+  const handleCancelEdit = useCallback(() => {
+    if (status === 'saving') return;
+    if ((draft.dirty || state.recovered) && !window.confirm('Discard these card edits and return to your finished card?')) return;
+    if (state.recovered) actions.discardRecovered();
+    else draft.discard();
+    setEditingCard(false);
+  }, [actions, draft, state.recovered, status]);
 
   // The answer to a download is shown only while the card is as it was when it was clicked.
   const [downloaded, setDownloaded] = useState(null);
@@ -123,6 +141,9 @@ export default function MyCardPage() {
     <>
     {sidebar}
     <MyCardLayout
+      editing={editingCard}
+      onEdit={() => setEditingCard(true)}
+      onCancelEdit={handleCancelEdit}
       back={back}
       notice={(
         <MyCardNotices
@@ -135,7 +156,7 @@ export default function MyCardPage() {
           onChooseConflict={actions.chooseConflict}
           onCancelConflict={actions.cancelConflict}
           onConfirmLoadLatest={actions.confirmLoadLatest}
-          onConfirmSaveOver={actions.confirmSaveOver}
+          onConfirmSaveOver={handleConfirmSaveOver}
         />
       )}
       editor={(
@@ -174,6 +195,7 @@ export default function MyCardPage() {
           availability={availability}
           errorCount={Object.keys(draft.errors).length}
           onSave={handleSave}
+          onCancel={handleCancelEdit}
         />
       )}
     />

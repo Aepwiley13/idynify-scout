@@ -37,6 +37,7 @@
 }
 
 .mycard-header { margin-bottom: 12px; }
+.mycard-edit-card { margin-top: 12px; }
 .mycard-title { margin: 0; font-size: 24px; font-weight: 800; line-height: 1.15; letter-spacing: -0.01em; }
 .mycard-tagline { margin: 4px 0 0; font-size: 14px; color: var(--text-secondary); }
 
@@ -73,6 +74,7 @@
   .mycard-grid { grid-template-columns: minmax(0, 1fr) 400px; align-items: start; gap: 24px; }
   /* The card stays in view while the form scrolls. */
   .mycard-pane--preview { position: sticky; top: 0; }
+  .mycard[data-editing="false"] .mycard-grid { grid-template-columns: minmax(0, 560px); justify-content: center; }
 }
 
 /* ── Editor ── */
@@ -261,6 +263,9 @@
   margin: 0 -16px; padding: 10px 16px;
   border-top: 1px solid var(--border); background: var(--bg-card);
 }
+.mycard-savebar { display: flex; align-items: center; gap: 10px; width: 100%; }
+.mycard-savebar .mycard-savestatus { flex: 1 1 auto; }
+.mycard-savebar > .mycard-btn { min-height: 44px; }
 @media (min-width: 900px) {
   .mycard-actions { margin: 0; border: 1px solid var(--border); border-bottom: none; border-radius: 16px 16px 0 0; }
 }

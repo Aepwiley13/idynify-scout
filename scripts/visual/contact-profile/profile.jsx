@@ -79,6 +79,15 @@ if (isAction) {
   const historyPath = `users/${uid}/contacts/jordan/timeline/`;
   seedFixtureDoc(historyPath + 'call', { type: 'outreach_logged', preview: 'Jordan offered to introduce the volunteer coordinator.', metadata: { channel: 'call' }, createdAt: dateAgo(2) });
   seedFixtureDoc(historyPath + 'email', { type: 'message_sent', preview: 'Shared the volunteer sign-up link.', metadata: { channel: 'email' }, createdAt: dateAgo(1) });
+  seedFixtureDoc(`users/${uid}/card/main`, {
+    firstName: 'Jordan', lastName: 'Lee', photoUrl: 'https://images.fixture.test/jordan.svg',
+    title: 'Community Partnerships Director', organization: 'Community Partners of Salt Lake',
+    email: 'jordan.lee@example.org', phone: '+1 (801) 555-0199',
+    linkedinUrl: 'https://www.linkedin.com/in/jordan-lee-example', instagram: 'jordan.lee',
+    website: 'https://communitypartners.example.org',
+    share: { photoUrl: true, title: true, organization: true, email: true, phone: true, linkedinUrl: true, instagram: true, website: true },
+    sharingEnabled: false, schemaVersion: 1, revision: 3,
+  });
 }
 
 const photoEditor = {

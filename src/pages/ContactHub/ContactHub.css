@@ -65,6 +65,9 @@
 .hub-subtitle { margin: 4px 0 0; font-size: 14px; }
 /* Search, and on a desktop the List / Table choice, on a row of their own. */
 .hub-tools { flex: 1 1 100%; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.hub-tools-primary { flex: 1 1 260px; min-width: 150px; }
+.hub-tools-primary .hub-search { width: 100%; }
+.hub-tools-actions { display: flex; flex: 0 1 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
 .hub-count { font-weight: 600; }
 
 .hub-search {
@@ -318,17 +321,15 @@
 /* ── Compact table ──
    No overflow is set on the table or its rows: the sticker picker opens over
    the rows below and must not be clipped. */
-.hub-table { margin-top: 14px; font-size: 14px; }
+.hub-table { margin-top: 14px; font-size: 14px; min-width: 0; }
 .hub-tr {
   position: relative; display: grid; align-items: center; column-gap: 14px;
   /* Stickers get the widest share: two chips and the add control on one line
      keep every row one line tall. */
-  grid-template-columns: minmax(130px, 1.5fr) minmax(150px, 1.8fr) minmax(104px, 1fr) minmax(140px, 2.2fr) 64px;
+  grid-template-columns: minmax(120px, 1.3fr) minmax(100px, 1fr) minmax(145px, 1.7fr) minmax(110px, 1.1fr) minmax(130px, 1.6fr);
   min-height: 48px; padding: 6px 6px; border-top: 1px solid;
 }
-.hub-table--no-stickers .hub-tr { grid-template-columns: minmax(130px, 1.6fr) minmax(150px, 2.2fr) minmax(104px, 1.2fr) 64px; }
-.hub-table--tight .hub-tr { grid-template-columns: minmax(120px, 1.4fr) minmax(140px, 1.7fr) minmax(100px, 1fr) minmax(130px, 2fr); }
-.hub-table--tight.hub-table--no-stickers .hub-tr { grid-template-columns: minmax(120px, 1.5fr) minmax(140px, 2.2fr) minmax(100px, 1.2fr); }
+.hub-table--no-stickers .hub-tr { grid-template-columns: minmax(130px, 1.3fr) minmax(110px, 1.2fr) minmax(155px, 2fr) minmax(110px, 1.2fr); }
 .hub-tr--head { min-height: 34px; border-top: none; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
 .hub-tr:not(.hub-tr--head):hover { background: rgba(127, 127, 127, 0.06); }
 .hub-td { min-width: 0; }
@@ -338,10 +339,12 @@
    first, and inside a word only when one word is wider than the column. */
 .hub-td--name .hub-row-link { flex: 1 1 auto; min-width: 0; font-size: 14px; white-space: normal; overflow-wrap: break-word; }
 .hub-td--wrap { overflow-wrap: break-word; }
+.hub-td--company { overflow-wrap: anywhere; }
 /* Above the stretched name link, so these are their own targets. */
 /* max-width: an inline block is otherwise as wide as its longest unbroken run,
    which pushes a long address out of its column instead of wrapping it. */
-.hub-td-link { position: relative; z-index: 1; display: inline-block; max-width: 100%; padding: 6px 0; text-decoration: none; overflow-wrap: break-word; }
+.hub-td-link { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 6px 0; text-decoration: none; overflow-wrap: break-word; }
+.hub-td-link svg { display: none; flex: 0 0 auto; }
 .hub-td-link:hover { text-decoration: underline; }
 .hub-td--added { white-space: nowrap; font-variant-numeric: tabular-nums; }
 /* The list's sticker cell rules assume the list's named grid areas, and hide
@@ -349,6 +352,40 @@
 .hub-table .hub-row-stickers { grid-area: auto; }
 .hub-table .hub-row-stickers:empty { display: block; }
 .hub-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+@media (max-width: 768px) {
+  .hub-tools { align-items: stretch; flex-direction: column; gap: 8px; }
+  .hub-tools-primary { width: 100%; min-width: 0; flex: 1 1 auto; }
+  .hub-tools-actions { width: 100%; justify-content: flex-start; flex-wrap: wrap; overflow: visible; padding: 2px 1px 5px; }
+  .hub-tools-actions > * { flex: 0 0 auto; }
+  .hub-view { margin-left: auto; }
+  .hub-view-btn { min-height: 44px; padding: 0 11px; }
+  .hub-table { margin: 8px 0 0; }
+  .hub-table [role="rowgroup"]:first-child { display: none; }
+  .hub-table [role="rowgroup"]:last-child { display: grid; gap: 4px; }
+  .hub-table .hub-tr:not(.hub-tr--head) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "name actions" "company company" "email phone" "stickers stickers";
+    gap: 0 8px; padding: 6px 4px; border: 1px solid var(--hub-border); border-radius: 10px;
+  }
+  .hub-table .hub-td { min-height: 24px; padding-left: 42px; font-size: 12px; line-height: 1.25; }
+  .hub-table .hub-td--name { grid-area: name; padding-left: 0; min-height: 40px; }
+  .hub-table .hub-td--name .hub-avatar { width: 36px; height: 36px; }
+  .hub-table .hub-td--name .hub-row-link { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hub-table .hub-td--company { grid-area: company; }
+  .hub-table .hub-td--wrap { grid-area: email; }
+  .hub-table .hub-td--company::before { content: "Company · "; color: var(--hub-muted); font-weight: 600; }
+  .hub-table .hub-td--phone { grid-area: phone; }
+  .hub-table .hub-td-link { width: 100%; min-width: 0; white-space: nowrap; }
+  .hub-table .hub-td-link span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .hub-table .hub-td--wrap > span[aria-hidden="true"] { display: inline-block; min-height: 44px; padding-top: 13px; }
+  .hub-table .hub-row-stickers { grid-area: stickers; padding-left: 42px; }
+  .hub-table .hub-row-stickers .stk-card-row { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+  .hub-table .hub-row-stickers .stk-card-row::-webkit-scrollbar { display: none; }
+  .hub-table .hub-row-actions { grid-area: actions; justify-content: flex-end; }
+  .hub-table .hub-td-link { min-height: 44px; padding: 0; }
+  .hub-table .hub-td-link svg { display: block; }
+}
 
 /* ── Show more (display paging only; see peopleRules.js) ── */
 .hub-more {

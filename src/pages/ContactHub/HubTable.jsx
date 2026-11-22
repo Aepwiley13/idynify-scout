@@ -20,10 +20,11 @@
  * their room; the date is still on the list view and the person's page.
  */
 import { Link } from 'react-router-dom';
+import { Mail, Phone } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { contactHubPersonPath } from '../../constants/contactHub';
 import ContactCardStickersInteractive from '../../components/stickers/ContactCardStickersInteractive';
-import { personName, emailOf, phoneOf, addedShort } from './peopleRules';
+import { personName, emailOf, phoneOf, companyOf } from './peopleRules';
 
 export default function HubTable({ rows, showStickers, tight = false, stickerMax, onStickerChange, renderAvatar }) {
   const T = useT();
@@ -39,10 +40,10 @@ export default function HubTable({ rows, showStickers, tight = false, stickerMax
       <div role="rowgroup">
         <div className="hub-tr hub-tr--head" role="row" style={{ color: T.textMuted, borderColor: T.border }}>
           <span role="columnheader">Name</span>
+          <span role="columnheader">Company</span>
           <span role="columnheader">Email</span>
           <span role="columnheader">Phone</span>
           {showStickers ? <span role="columnheader">Stickers</span> : null}
-          {tight ? null : <span role="columnheader">Added</span>}
         </div>
       </div>
       <div role="rowgroup">
@@ -50,6 +51,7 @@ export default function HubTable({ rows, showStickers, tight = false, stickerMax
           const name = personName(contact);
           const email = emailOf(contact);
           const phone = phoneOf(contact);
+          const company = companyOf(contact);
           return (
             <div key={contact.id} className="hub-tr" role="row" style={{ borderColor: T.border }}>
               <span className="hub-td hub-td--name" role="cell">
@@ -58,14 +60,15 @@ export default function HubTable({ rows, showStickers, tight = false, stickerMax
                   {name}
                 </Link>
               </span>
+              <span className="hub-td hub-td--company" role="cell">{company || <>{none}<span className="hub-sr">No company</span></>}</span>
               <span className="hub-td hub-td--wrap" role="cell">
                 {email
-                  ? <a className="hub-td-link" href={`mailto:${email}`} aria-label={`Email ${name}, ${email}`} style={{ color: T.text }}>{email}</a>
+                  ? <a className="hub-td-link hub-td-link--email" href={`mailto:${email}`} aria-label={`Email ${name}, ${email}`} style={{ color: T.text }}><Mail size={16} aria-hidden="true" /><span>{email}</span></a>
                   : <>{none}<span className="hub-sr">No email</span></>}
               </span>
-              <span className="hub-td" role="cell">
+              <span className="hub-td hub-td--phone" role="cell">
                 {phone
-                  ? <a className="hub-td-link" href={`tel:${phone}`} aria-label={`Call ${name}, ${phone}`} style={{ color: T.text }}>{phone}</a>
+                  ? <a className="hub-td-link hub-td-link--phone" href={`tel:${phone}`} aria-label={`Call ${name}, ${phone}`} style={{ color: T.text }}><Phone size={16} aria-hidden="true" /><span>{phone}</span></a>
                   : <>{none}<span className="hub-sr">No phone</span></>}
               </span>
               {showStickers ? (
@@ -73,11 +76,6 @@ export default function HubTable({ rows, showStickers, tight = false, stickerMax
                   <ContactCardStickersInteractive contact={contact} max={stickerMax} onUpdate={onStickerChange} />
                 </span>
               ) : null}
-              {tight ? null : (
-                <span className="hub-td hub-td--added" role="cell" style={{ color: T.textMuted }}>
-                  {addedShort(contact) || none}
-                </span>
-              )}
             </div>
           );
         })}

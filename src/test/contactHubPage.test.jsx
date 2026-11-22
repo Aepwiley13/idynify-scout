@@ -100,6 +100,7 @@ const FRIEND = sticker('Friend', { color: 'green' });
 const person = (id, name, extra = {}) => ({ id, name, addedAt: '2026-11-01T12:00:00Z', ...extra });
 
 beforeEach(() => {
+  window.localStorage.setItem('idynify_hub_view', 'list');
   fake.current = createFakeStickers();
   fake.current.state.registry = [VIP, PARTNER];
   contactsData.fail = false;

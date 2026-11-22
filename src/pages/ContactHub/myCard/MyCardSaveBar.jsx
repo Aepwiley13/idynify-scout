@@ -27,7 +27,7 @@ const STATUS_TEXT = Object.freeze({
  * @param {number} [props.errorCount]  fields the card's rules refuse and the person has been told about
  * @param {() => void} props.onSave
  */
-export default function MyCardSaveBar({ status, availability, errorCount = 0, onSave }) {
+export default function MyCardSaveBar({ status, availability, errorCount = 0, onSave, onCancel }) {
   const saving = status === 'saving';
   // What there is to fix takes the line, once the person has been told what it is.
   const fix = errorCount > 0 && (status === 'unsaved' || status === 'new');
@@ -37,6 +37,7 @@ export default function MyCardSaveBar({ status, availability, errorCount = 0, on
 
   return (
     <div className="mycard-savebar">
+      <button type="button" className="mycard-btn mycard-btn--secondary" disabled={saving} onClick={onCancel}>Cancel</button>
       <p className={`mycard-savestatus mycard-savestatus--${fix ? 'fix' : status}`} role="status" aria-live="polite">
         {text}
       </p>

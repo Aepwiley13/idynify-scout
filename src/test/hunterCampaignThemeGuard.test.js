@@ -73,3 +73,30 @@ describe.each(FILES)('%s stays on the theme', (file) => {
     expect(src).toMatch(/text-\[color:var\(--text-primary\)\]/);
   });
 });
+
+/**
+ * Scrolling inside the shell (#002.2 QA fix).
+ *
+ * Module routes render into a fixed-height shell: `.shell-fixed-height` pins
+ * `.main-content` to 100vh and `.page-content-full` is `overflow: hidden`.
+ * A page there must scroll itself. These two roots were `min-h-screen` with no
+ * overflow, so anything below the fold — Mission Setup's Next button — was
+ * clipped and unreachable.
+ */
+describe.each(FILES)('%s scrolls inside the fixed-height shell', (file) => {
+  const src = read(file);
+  const roots = [...src.matchAll(/className="([^"]*bg-\[var\(--bg-primary\)\][^"]*)"/g)].map(m => m[1]);
+
+  it('has page roots, and none relies on min-h-screen', () => {
+    expect(roots.length).toBeGreaterThan(0);
+    expect(src).not.toMatch(/\bmin-h-screen\b/);
+  });
+
+  it('every page root is its own scroll container', () => {
+    for (const cls of roots) {
+      expect(cls).toMatch(/\bflex-1\b/);
+      expect(cls).toMatch(/\bmin-h-0\b/);
+      expect(cls).toMatch(/\boverflow-y-auto\b/);
+    }
+  });
+});

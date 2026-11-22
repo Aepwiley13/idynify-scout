@@ -207,7 +207,7 @@ export default function CampaignDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+      <div className="flex-1 min-h-0 overflow-y-auto bg-[var(--bg-primary)] flex items-center justify-center">
         <div className="text-[color:var(--text-secondary)] text-xl font-mono">Loading campaign...</div>
       </div>
     );
@@ -215,7 +215,7 @@ export default function CampaignDetail() {
 
   if (error && !campaign) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] text-[color:var(--text-primary)] flex items-center justify-center">
+      <div className="flex-1 min-h-0 overflow-y-auto bg-[var(--bg-primary)] text-[color:var(--text-primary)] flex items-center justify-center">
         <div className="bg-[var(--bg-card)] border border-[color:var(--border)] rounded-2xl p-8 max-w-md">
           <AlertCircle className="w-12 h-12 text-[color:color-mix(in_srgb,#ef4444_70%,var(--text-primary))] mx-auto mb-4" />
           <h2 className="text-xl font-bold text-center mb-2">Error</h2>
@@ -239,7 +239,7 @@ export default function CampaignDetail() {
   }[campaign.status] || 'text-[color:var(--text-secondary)] bg-[var(--bg-secondary)] border border-[color:var(--border-2)]';
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[color:var(--text-primary)]">
+    <div className="flex-1 min-h-0 overflow-y-auto bg-[var(--bg-primary)] text-[color:var(--text-primary)]">
       {/* Send Confirmation Modal */}
       {showSendConfirm !== null && (() => {
         const items = campaign.contacts || campaign.messages;

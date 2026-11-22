@@ -239,7 +239,7 @@ export default function CreateCampaign() {
 
   if (!gmailConnected && error) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] text-[color:var(--text-primary)] flex items-center justify-center">
+      <div className="flex-1 min-h-0 overflow-y-auto bg-[var(--bg-primary)] text-[color:var(--text-primary)] flex items-center justify-center">
         <div className="bg-[var(--bg-card)] border border-[color:var(--border)] rounded-2xl p-8 max-w-md">
           <AlertCircle className="w-12 h-12 text-[color:color-mix(in_srgb,#ef4444_70%,var(--text-primary))] mx-auto mb-4" />
           <h2 className="text-xl font-bold text-center mb-2">Gmail Not Connected</h2>
@@ -256,7 +256,7 @@ export default function CreateCampaign() {
   }
 
   return (
-    <div className="min-h-screen bg-[var(--bg-primary)] text-[color:var(--text-primary)]">
+    <div className="flex-1 min-h-0 overflow-y-auto bg-[var(--bg-primary)] text-[color:var(--text-primary)]">
       {/* Header */}
       <div className="border-b border-[color:var(--border)] bg-[var(--bg-nav)] backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-6 py-4">

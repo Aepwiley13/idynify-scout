@@ -146,7 +146,7 @@ export default function MissionDetail() {
         <div className="mission-detail-error">
           <AlertCircle className="w-8 h-8 text-red-400" />
           <p>{error}</p>
-          <button className="btn-back-mission" onClick={() => navigate('/hunter')}>
+          <button className="btn-back-mission" onClick={() => navigate('/hunter?tab=missions')}>
             <ArrowLeft className="w-4 h-4" /> Back to Hunter
           </button>
         </div>
@@ -382,7 +382,7 @@ export default function MissionDetail() {
     <div className="mission-detail">
       {/* Header */}
       <div className="mission-detail-header">
-        <button className="btn-back-mission" onClick={() => navigate('/hunter')}>
+        <button className="btn-back-mission" onClick={() => navigate('/hunter?tab=missions')}>
           <ArrowLeft className="w-5 h-5" />
           Back to Hunter
         </button>

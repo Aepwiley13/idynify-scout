@@ -368,7 +368,7 @@ export default function CreateMission() {
     <div className="create-mission">
       {/* Header */}
       <div className="create-mission-header">
-        <button className="btn-back" onClick={() => navigate('/hunter')}>
+        <button className="btn-back" onClick={() => navigate('/hunter?tab=missions')}>
           <ArrowLeft className="w-5 h-5" />
           Back to Hunter
         </button>

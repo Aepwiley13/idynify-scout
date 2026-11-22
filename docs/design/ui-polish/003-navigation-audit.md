@@ -1,6 +1,6 @@
 # Desktop UI Polish #003 — Navigation & Visual Hierarchy: audit
 
-**Status: audit complete. 003.1 + 003.2 implemented (below); 003.3–003.5 deferred.**
+**Status: audit complete. 003.1 + 003.2 merged (#830); 003.3 implemented (below); 003.4–003.5 deferred.**
 Audited on `main` at `33dc078e`. Companion to `003-compact-navigation.md` (rail labels).
 
 ## 003.1 — first improvement (direction approved)
@@ -43,6 +43,35 @@ Approved as one change: one canonical campaign list at **`/hunter?tab=campaigns`
 `CampaignDetail.jsx` still hardcodes light greys (for example, its status pill uses `text-gray-500 bg-gray-200`), the same
 defect class #002.1 fixed in the wizard. Users now reach it from the list, so it gets a
 separate #002.2 entry.
+
+## 003.3 — Missions in Hunter (implemented)
+
+Approved: one canonical mission list at **`/hunter?tab=missions`**, the same pattern as Campaigns.
+
+- **Entry points:** Hunter sub-nav (desktop, after Campaigns), Hunter's mobile "More" sheet, Command
+  Center → Missions (desktop and mobile), and the legacy `/hunter/missions` redirect, which previously
+  went to `/command-center?tab=missions`.
+- **Command Center keeps its active-mission count badge** on the Missions item (autopilot + draft),
+  from the missions it already loads for Outcomes. No extra query. `/command-center?tab=missions`
+  still renders Command Center's own view for any old link.
+- **List:** `pages/Hunter/sections/MissionsHost.jsx` runs the same single read-only query Command
+  Center uses, `users/{getEffectiveUser().uid}/missions` ordered by `createdAt` desc, and renders the
+  existing `MissionsSection`. That component owns loading, empty and list. The host adds an error
+  state with retry.
+- **Completed missions are included.** Command Center replaced the list with a "Start your first
+  mission" prompt whenever nothing was active, so an account whose missions had all finished saw none.
+  To make that honest, `MissionsSection`'s copy changed: "Active Missions — N in progress" →
+  **"Missions — N missions · K active"**, and the empty title "No Active Missions" → "No Missions Yet".
+  No other changes to the component.
+- **Routes unchanged:** `/hunter/create-mission`, `/hunter/mission/:id`. Mission detail's two Back
+  buttons and the create page's "Back to Hunter" now return to `/hunter?tab=missions`.
+- **Isolation and impersonation:** same as 003.2. Rules allow `users/{uid}/**` only to its owner,
+  so while impersonating, the read is denied and the list shows its error state.
+- **Go To War:** unchanged, still in Command Center.
+- **Tests:** `src/test/hunterMissions.test.jsx` (11): loading, status list, completed-only account,
+  empty → Create Mission, card → detail, error → retry, no user, impersonated uid path, and every
+  entry point, the redirect and the Back targets. `mobileNavigation.test.jsx` pins Hunter's overflow
+  list, now with "Missions".
 
 ## Where navigation is defined
 

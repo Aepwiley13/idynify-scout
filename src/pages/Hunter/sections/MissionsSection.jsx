@@ -32,6 +32,9 @@ export default function MissionsSection({ missions, loading }) {
     return { total, active, completed, activeSteps, outcomes };
   }
 
+  // "Active" as Command Center's badge counts it: on autopilot or still a draft.
+  const activeCount = missions.filter(m => m.status === 'autopilot' || m.status === 'draft').length;
+
   if (loading) {
     return (
       <div className="hunter-loading">
@@ -47,7 +50,7 @@ export default function MissionsSection({ missions, loading }) {
         <div className="hunter-empty-icon">
           <Target className="w-10 h-10" style={{ color: '#a78bfa' }} />
         </div>
-        <h2 className="hunter-empty-title">No Active Missions</h2>
+        <h2 className="hunter-empty-title">No Missions Yet</h2>
         <p className="hunter-empty-text">
           Create your first intent-driven mission. Tell Barry your goal, and he'll orchestrate the rest.
         </p>
@@ -66,8 +69,10 @@ export default function MissionsSection({ missions, loading }) {
     <div className="missions-section">
       <div className="section-header">
         <div>
-          <h2 className="section-title">Active Missions</h2>
-          <p className="section-description">{missions.length} mission{missions.length !== 1 ? 's' : ''} in progress</p>
+          <h2 className="section-title">Missions</h2>
+          <p className="section-description">
+            {missions.length} mission{missions.length !== 1 ? 's' : ''} · {activeCount} active
+          </p>
         </div>
         <button
           className="btn-primary-hunter"

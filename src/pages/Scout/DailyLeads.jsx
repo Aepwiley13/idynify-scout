@@ -2776,7 +2776,7 @@ export default function DailyLeads({ onNavigate }) {
         await setDoc(swipeProgressRef, { dailySwipeCount: entry.previousSwipeCount, lastSwipeDate: today, hasSeenTitleSetup });
         setDailySwipeCount(entry.previousSwipeCount);
         setTotalAcceptedCompanies(prev => Math.max(0, prev - 1));
-        await undoApprovalSideEffects({ userId: user.uid, companyId: entry.company.id });
+        await undoApprovalSideEffects({ user, userId: user.uid, companyId: entry.company.id });
         setSessionSaved(prev => Math.max(0, prev - 1));
         setSessionSavedCompanies(prev => prev.filter(c => c.id !== entry.company.id));
       } else {

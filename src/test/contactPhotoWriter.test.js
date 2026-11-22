@@ -42,7 +42,11 @@ function fixture({ enabled = true, user = true, contact = { photo_url: 'https://
     httpMethod: 'POST', headers: { authorization: `Bearer ${token}` },
     body: JSON.stringify({ uid, contactId: 'c1', expectedVersion, photo }),
   });
-  return { send, db, store, verifyToken };
+  const undo = (uid = 'u1', token = 'u1') => handler({
+    httpMethod: 'POST', headers: { authorization: `Bearer ${token}` },
+    body: JSON.stringify({ action: 'undo_company_approval', uid, companyId: 'co', contactId: 'c1' }),
+  });
+  return { send, undo, db, store, verifyToken };
 }
 
 const photoPath = 'users/u1/contacts/c1/private/photo';
@@ -99,6 +103,23 @@ describe('trusted contact photo writer', () => {
     expect((await state.send({ expectedVersion: body(hidden).version, photo: null })).statusCode).toBe(200);
     expect(state.store.has(photoPath)).toBe(false);
     expect(state.store.get(personPath)).toEqual({ photo_url: 'https://example.test/original.jpg', photo_source: 'apollo' });
+  });
+
+  it('cleans up only contacts discovered for the undone company, even with photo writes disabled', async () => {
+    const state = fixture({ enabled: false, contact: { company_id: 'co', source: 'icp_auto_discovery' } });
+    state.store.set(photoPath, { kind: 'hidden' });
+    state.store.set('users/u1/companies/co', { status: 'accepted' });
+    expect((await state.undo()).statusCode).toBe(409);
+    state.store.set('users/u1/companies/co', { status: 'pending' });
+    expect((await state.undo('u1', 'u2')).statusCode).toBe(403);
+    state.store.get(personPath).source = 'csv';
+    expect((await state.undo()).statusCode).toBe(409);
+    expect(state.store.has(photoPath)).toBe(true);
+    state.store.get(personPath).source = 'icp_auto_discovery';
+    expect(body(await state.undo())).toEqual({ status: 'deleted' });
+    expect(state.store.has(personPath)).toBe(false);
+    expect(state.store.has(photoPath)).toBe(false);
+    expect((await state.undo()).statusCode).toBe(200);
   });
 
   it('will not write a deleted contact or an account without a user document', async () => {

@@ -419,15 +419,19 @@ service cloud.firestore {
       // client that could write it could mark any LinkedIn member as its own.
       // Only the trusted writer publishes this small Contact Hub display state.
       function contactPhotoCreateOk(coll) {
-        return coll != 'contacts' || !request.resource.data.keys().hasAny(['contact_hub_photo']);
+        return coll != 'contacts' || !request.resource.data.keys().hasAny(['contact_hub_photo', 'contact_hub_lifecycle', 'contact_hub_merge_origin', 'contact_hub_primary_phone']);
       }
       function contactPhotoUpdateOk(coll) {
-        return coll != 'contacts' || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['contact_hub_photo']);
+        return coll != 'contacts' || (contactIsActive(resource.data)
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['contact_hub_photo', 'contact_hub_lifecycle', 'contact_hub_merge_origin', 'contact_hub_primary_phone']));
+      }
+      function contactIsActive(data) {
+        return data.get('contact_hub_lifecycle', {}).get('status', '') != 'retired';
       }
       function contactPhotoDeleteOk(coll) {
         // The photo and this server-only marker are written atomically.
         // Avoid rule lookups on each ordinary contact in a bulk delete.
-        return coll != 'contacts' || resource == null || !resource.data.keys().hasAny(['contact_hub_photo']);
+        return coll != 'contacts' || resource == null || (contactIsActive(resource.data) && !resource.data.keys().hasAny(['contact_hub_photo']));
       }
 
       match /contacts/{contactId}/private/photo {
@@ -438,8 +442,8 @@ service cloud.firestore {
       }
 
       match /{coll}/{docId} {
-        allow read:   if owns(userId) && coll != 'capture_operations';
-        allow create: if owns(userId) && coll != 'capture_operations'
+        allow read:   if owns(userId) && coll != 'capture_operations' && coll != 'contact_duplicate_dismissals';
+        allow create: if owns(userId) && coll != 'capture_operations' && coll != 'contact_duplicate_dismissals'
                       && coll != 'stickers'
                       && coll != 'card'
                       && !serverOwnedIntegration(coll, docId)
@@ -448,7 +452,7 @@ service cloud.firestore {
                       && contactPhotoCreateOk(coll);
         allow update, delete: if owns(userId)
                               && coll != 'lineageEvents'
-                              && coll != 'capture_operations'
+                              && coll != 'capture_operations' && coll != 'contact_duplicate_dismissals'
                               && coll != 'stickers'
                               && coll != 'card'
                               && !serverOwnedIntegration(coll, docId)
@@ -493,8 +497,8 @@ service cloud.firestore {
       // A delayed client write cannot recreate an activity or other contact
       // child after the trusted deletion commits. Allow cleanup deletes.
       function contactChildWriteOk(coll, docId) {
-        return coll != 'contacts' || request.resource == null
-          || existsAfter(/databases/$(database)/documents/users/$(userId)/contacts/$(docId));
+        return coll != 'contacts' || (existsAfter(/databases/$(database)/documents/users/$(userId)/contacts/$(docId))
+          && contactIsActive(getAfter(/databases/$(database)/documents/users/$(userId)/contacts/$(docId)).data));
       }
 
       // Anything deeper, outside the subtrees handled above.
@@ -502,13 +506,13 @@ service cloud.firestore {
       // Name the first nested document so the generic rule cannot grant
       // access to contact photo data through an overlapping allow.
       match /{coll}/{docId}/{sub}/{subId}/{rest=**} {
-        allow read:  if owns(userId) && coll != 'capture_operations'
+        allow read:  if owns(userId) && coll != 'capture_operations' && coll != 'contact_duplicate_dismissals'
                      && !(coll == 'contacts' && sub == 'private' && subId == 'photo');
         allow write: if owns(userId)
                      && !(coll == 'contacts' && sub == 'private' && subId == 'photo')
                      && coll != 'icpProfiles'
                      && coll != 'lineageEvents'
-                     && coll != 'capture_operations'
+                     && coll != 'capture_operations' && coll != 'contact_duplicate_dismissals'
                      && coll != 'stickers'
                      && coll != 'card'
                      && !serverOwnedIntegration(coll, docId)

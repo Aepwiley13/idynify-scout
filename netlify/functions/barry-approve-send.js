@@ -38,7 +38,7 @@
  * strand the draft permanently.
  */
 
-import { appendContactChild } from './utils/contactWriteLifecycle.js';
+import { appendContactChild, isWritableContact } from './utils/contactWriteLifecycle.js';
 import { google } from 'googleapis';
 import { FieldValue } from 'firebase-admin/firestore';
 import { db } from './firebase-admin.js';
@@ -89,7 +89,7 @@ function claimStartedMillis(value) {
 async function claimDraftForSend(draftRef, contactRef) {
   return db.runTransaction(async (tx) => {
     const [snap, contact] = await Promise.all([tx.get(draftRef), tx.get(contactRef)]);
-    if (!contact.exists) return { ok: false, reason: 'contact_deleted' };
+    if (!isWritableContact(contact)) return { ok: false, reason: 'contact_deleted' };
 
     // No stored draft is legitimate — a reply can be composed without one.
     // There is nothing to claim, and nothing that could be sent twice from it.

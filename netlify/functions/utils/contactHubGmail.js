@@ -1,3 +1,4 @@
+import { isWritableContact } from './contactWriteLifecycle.js';
 import { Buffer } from 'node:buffer';
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import { hasArchiveSignal, isDeferredRecord } from '../../../src/constants/statusModel.js';
@@ -48,7 +49,7 @@ export function createContactHubGmail({ db, verifyToken, gmail, enabled, sending
 
   async function checkOwner(tx, refs) {
     const [contact] = await Promise.all([tx.get(refs.contact), checkAccount(tx, refs)]);
-    if (!contact.exists) throw fail(404, 'contact_unavailable');
+    if (!isWritableContact(contact)) throw fail(404, 'contact_unavailable');
     const person = contact.data();
     if (hasArchiveSignal(person) || isDeferredRecord(person) || person.company_archived === true) throw fail(404, 'contact_unavailable');
     const recipient = emailOf(person)?.address;
@@ -119,7 +120,7 @@ export function createContactHubGmail({ db, verifyToken, gmail, enabled, sending
       const perDay = prior.day === day ? prior.perDay : 0;
       if (perMinute >= MAX_PER_MINUTE || perDay >= MAX_PER_DAY) throw fail(429, 'app_limit');
       tx.set(limit, { minute, day, perMinute: perMinute + 1, perDay: perDay + 1 });
-      tx.set(intent, { status: 'sending', fingerprint: input.fingerprint, createdAt: timestamp() });
+      tx.set(intent, { status: 'sending', contactId: refs.contact.id, fingerprint: input.fingerprint, createdAt: timestamp() });
       return { to, connection };
     });
   }
@@ -148,14 +149,14 @@ export function createContactHubGmail({ db, verifyToken, gmail, enabled, sending
     try {
       return await db.runTransaction(async (tx) => {
         const contact = await tx.get(refs.contact);
-        if (contact.exists) {
+        if (isWritableContact(contact)) {
           tx.set(refs.contact.collection('timeline').doc(`contact-hub-gmail-${input.requestId}`), {
             type: 'message_sent', actor: 'user', preview: input.subject.trim(), timestamp: at, createdAt: at,
             metadata: { channel: 'email', source: SEND_SOURCE, gmail_message_id: messageId },
           });
         }
-        tx.update(intent, { status: 'sent', ...(contact.exists ? {} : { reason: 'activity_unavailable' }) });
-        return json(200, { status: 'sent', ...(contact.exists ? {} : { reason: 'activity_unavailable' }) });
+        tx.update(intent, { status: 'sent', ...(isWritableContact(contact) ? {} : { reason: 'activity_unavailable' }) });
+        return json(200, { status: 'sent', ...(isWritableContact(contact) ? {} : { reason: 'activity_unavailable' }) });
       });
     } catch {
       // Gmail already sent it. Preserve the reserved ID even when the activity write fails.

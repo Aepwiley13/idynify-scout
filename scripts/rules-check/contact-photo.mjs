@@ -109,6 +109,56 @@ try {
   assert.equal((await override.get()).exists, false);
   assert.equal((await contact.get()).exists, false);
 
+  const { createContactMerge } = await import(pathToFileURL(resolve('netlify/functions/utils/contactMerge.js')));
+  const merge = createContactMerge({
+    db: adminDb, verifyToken: async () => ({ uid: 'owner' }),
+    secret: () => 'isolated-firestore-test-secret-777', enabled: () => true, executionEnabled: () => true,
+    timestamp: () => Timestamp.now(),
+  });
+  const survivor = adminDb.doc('users/owner/contacts/merge-survivor');
+  const duplicate = adminDb.doc('users/owner/contacts/merge-source');
+  const pair = { uid: 'owner', survivorId: survivor.id, sourceId: duplicate.id, choices: {},
+    operationId: 'd0a7a553-7e3f-4a3d-8b89-ae7f9652fb89' };
+  const mergeRequest = async (action, fields = {}) => {
+    const response = await merge({ httpMethod: 'POST', headers: { authorization: 'Bearer owner' },
+      body: JSON.stringify({ ...pair, ...fields, action }) });
+    return { status: response.statusCode, ...JSON.parse(response.body) };
+  };
+  await Promise.all([
+    survivor.set({ name: 'Synthetic Merge', email: 'merge@example.test' }),
+    duplicate.set({ name: 'Synthetic Merge', email: 'merge@example.test' }),
+  ]);
+  let proposed = await mergeRequest('preview');
+  assert.ok(proposed.token, JSON.stringify(proposed));
+  await appendContactChild(adminDb, duplicate, 'timeline', { type: 'note_added' });
+  assert.equal((await mergeRequest('commit', { token: proposed.token })).error, 'preview_changed');
+  proposed = await mergeRequest('preview');
+  const committed = await mergeRequest('commit', { token: proposed.token });
+  assert.equal(committed.receipt?.status, 'merged', JSON.stringify(committed));
+  await assertFails(updateDoc(doc(owner, duplicate.path), { name: 'Late edit' }));
+  await assertFails(setDoc(doc(owner, duplicate.path + '/timeline/late-merge-event'), { type: 'note_added' }));
+  assert.equal(await appendContactChild(adminDb, duplicate, 'timeline', { type: 'email_opened' }), null);
+  const deletionResult = await remove({ httpMethod: 'POST', headers: { authorization: 'Bearer owner' },
+    body: JSON.stringify({ uid: 'owner', contactIds: [duplicate.id] }) });
+  assert.equal(JSON.parse(deletionResult.body).results[0].status, 'contact_retired');
+  const reverse = await mergeRequest('preview_rollback');
+  assert.ok(reverse.token, JSON.stringify(reverse));
+  assert.equal((await mergeRequest('rollback', { token: reverse.token })).receipt?.status, 'rolled_back');
+  const fresh = await mergeRequest('preview');
+  const [racingMerge, racingPhoto] = await Promise.all([
+    mergeRequest('commit', { operationId: '018ce2e2-4c0c-4f6d-be3c-75f9c4562f89', token: fresh.token }),
+    writer({ httpMethod: 'POST', headers: { authorization: 'Bearer owner' }, body: JSON.stringify({
+      uid: 'owner', contactId: duplicate.id, expectedVersion: null, photo: { kind: 'hidden' },
+    }) }),
+  ]);
+  if (racingMerge.receipt?.status === 'merged') {
+    assert.equal(racingPhoto.statusCode, 409);
+    assert.equal((await duplicate.collection('private').doc('photo').get()).exists, false);
+  } else {
+    assert.equal(racingPhoto.statusCode, 200, racingPhoto.body);
+    assert.ok(['merge_blocked', 'preview_changed'].includes(racingMerge.error), JSON.stringify(racingMerge));
+    assert.equal((await duplicate.collection('private').doc('photo').get()).exists, true);
+  }
   const account = adminDb.doc('users/purge-fixture');
   const purgePhoto = account.collection('contacts').doc('c1').collection('private').doc('photo');
   await account.set({ name: 'Purge fixture' });

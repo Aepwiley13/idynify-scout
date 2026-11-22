@@ -29,7 +29,7 @@
  * mechanism below need no storage.
  */
 
-import { deletedContactRef } from './utils/contactWriteLifecycle.js';
+import { deletedContactRef, retiredContactRef } from './utils/contactWriteLifecycle.js';
 import { db } from './firebase-admin.js';
 import { verifyAuthToken } from './utils/verifyAuthToken.js';
 import { logApiUsage } from './utils/logApiUsage.js';
@@ -346,8 +346,8 @@ async function commitResults(userId, results, candidatesByRef, { operationId, ac
       // as it is stored right now — never a blind merge into whatever is
       // there, which would silently overwrite a stranger's canonical fields.
       const outcome = await db.runTransaction(async (tx) => {
-        const [snap, deleted] = await Promise.all([tx.get(ref), tx.get(deletedContactRef(db, userId, id))]);
-        if (deleted.exists) return 'deleted';
+        const [snap, deleted, retired] = await Promise.all([tx.get(ref), tx.get(deletedContactRef(db, userId, id)), tx.get(retiredContactRef(db, userId, id))]);
+        if (deleted.exists || retired.exists) return 'deleted';
         if (!snap.exists) {
           tx.set(ref, payload);
           return 'created';

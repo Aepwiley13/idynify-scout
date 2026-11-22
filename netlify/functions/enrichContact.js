@@ -1,4 +1,4 @@
-import { deletedContactRef } from './utils/contactWriteLifecycle.js';
+import { deletedContactRef, retiredContactRef } from './utils/contactWriteLifecycle.js';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
 import { logApolloError } from './utils/apolloErrorLogger.js';
@@ -50,7 +50,8 @@ const unmeteredHandler = async (event) => {
       const contactDocId = `${companyId}_${contactId}`;
       const contactRef = db.collection('users').doc(userId).collection('contacts').doc(contactDocId);
       const saved = await db.runTransaction(async (tx) => {
-        if ((await tx.get(deletedContactRef(db, userId, contactDocId))).exists) return false;
+        const records = await Promise.all([tx.get(deletedContactRef(db, userId, contactDocId)), tx.get(retiredContactRef(db, userId, contactDocId))]);
+        if (records.some((row) => row.exists)) return false;
         tx.set(contactRef, {
           apollo_person_id: contactId,
           name: contactData.name || 'Unknown',

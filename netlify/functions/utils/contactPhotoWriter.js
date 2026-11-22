@@ -1,3 +1,4 @@
+import { isWritableContact } from './contactWriteLifecycle.js';
 import { inspectPhotoDataUrl } from '../../../src/utils/photoPrep.js';
 import { isHttpsPhotoUrl } from '../../../src/utils/photoUrl.js';
 import { isPlaceholderPhoto } from '../../../src/utils/contactPhoto.js';
@@ -71,6 +72,7 @@ export function createContactPhotoWriter({ db, verifyToken, now, timestampAfter,
           const expires = entry.data().expiresAt?.toMillis?.();
           return !Number.isFinite(expires) || expires > now();
         })) throw rejected(403, 'read_only');
+        if (person.exists && !isWritableContact(person)) throw rejected(409, 'contact_retired');
         if (undo) {
           const company = await tx.get(user.collection('companies').doc(data.companyId));
           if (!owner.exists || !company.exists || company.data().status !== 'pending') throw rejected(409, 'company_changed');

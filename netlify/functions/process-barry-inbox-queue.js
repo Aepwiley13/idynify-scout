@@ -33,7 +33,7 @@
  * httpMethod, and a manual POST still works for local testing.
  */
 
-import { withExistingContact } from './utils/contactWriteLifecycle.js';
+import { isWritableContact, withExistingContact } from './utils/contactWriteLifecycle.js';
 import { schedule } from '@netlify/functions';
 import { db } from './firebase-admin.js';
 import { alertOps } from './utils/alertOps.js';
@@ -150,7 +150,7 @@ export const processInboxQueue = async (event = {}) => {
       };
 
       try {
-        if (!(await contactRef.get()).exists) {
+        if (!isWritableContact(await contactRef.get())) {
           await skipDeleted();
           continue;
         }

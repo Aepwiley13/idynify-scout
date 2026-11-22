@@ -1,3 +1,4 @@
+import { isWritableContact } from './contactWriteLifecycle.js';
 import { deletedContactRef } from './contactWriteLifecycle.js';
 import { deleteContactWithPhoto } from './contactPhotoWriter.js';
 
@@ -44,6 +45,7 @@ export function createContactHubDelete({ db, verifyToken, enabled = () => true, 
             const expiry = entry.data().expiresAt?.toMillis?.();
             return !Number.isFinite(expiry) || expiry > now();
           })) return 'read_only';
+          if (person.exists && !isWritableContact(person)) return 'contact_retired';
           if (!account.exists) return 'account_unavailable';
           const queries = CHILDREN.map((name) => contact.collection(name));
           queries.push(owner.collection('nbs_queue').where('contact_id', '==', id));

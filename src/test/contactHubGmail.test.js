@@ -15,7 +15,7 @@ function fixture({ sendingEnabled = true, now = () => 1_000 } = {}) {
   const sessions = [];
   const timestamp = (ms = 1_000) => ({ toMillis: () => ms });
   const doc = (path) => ({
-    path, collection: (name) => ({ doc: (id) => doc(`${path}/${name}/${id}`) }),
+    path, id: path.split('/').at(-1), collection: (name) => ({ doc: (id) => doc(`${path}/${name}/${id}`) }),
     update: async (data) => records.set(path, { ...records.get(path), ...data }),
   });
   const snapshot = (path) => ({ exists: records.has(path), data: () => records.get(path) });
@@ -67,6 +67,7 @@ describe('Contact Hub manual Gmail', () => {
     const draft = message();
     await Promise.all([call(draft), call(draft)]);
     expect((await call(draft)).data).toEqual({ status: 'sent' });
+    expect(records.get(`contact_hub_gmail_limits/owner/attempts/${draft.requestId}`).contactId).toBe('alex');
     expect(gmail.send).toHaveBeenCalledTimes(1);
     expect(gmail.send).toHaveBeenCalledWith(records.get('contact_hub_gmail/owner'), { toEmail: 'alex@example.com', subject: 'Hello', body: 'Great to meet you' });
     expect(records.get(`users/owner/contacts/alex/timeline/contact-hub-gmail-${draft.requestId}`)).toMatchObject({

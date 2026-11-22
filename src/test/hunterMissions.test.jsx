@@ -150,3 +150,30 @@ describe('every Missions entry point opens the Hunter list', () => {
     expect(src('pages/Hunter/CreateMission.jsx')).toMatch(/btn-back" onClick=\{\(\) => navigate\('\/hunter\?tab=missions'\)\}/);
   });
 });
+
+/**
+ * Scrolling inside the shell (#003.3 QA follow-up, same cause as #002.2).
+ *
+ * Module routes render into a fixed-height shell (.shell-fixed-height pins
+ * .main-content to 100vh; .page-content-full is overflow: hidden), so a page
+ * must scroll itself. The mission pages' roots are centred, max-width blocks
+ * (.create-mission 1000px, .mission-detail 800px), so each is wrapped in a
+ * full-width scroll container rather than made scrollable itself — widths and
+ * centring stay exactly as they were.
+ */
+describe('mission pages scroll inside the fixed-height shell', () => {
+  const src = (p) => readFileSync(resolve(__dirname, '..', p), 'utf8');
+  const WRAP = '<div className="flex-1 min-h-0 overflow-y-auto">';
+
+  it.each([
+    ['pages/Hunter/CreateMission.jsx', 'create-mission', 1],
+    ['pages/Hunter/MissionDetail.jsx', 'mission-detail', 3], // loading, error, main
+  ])('%s: every %s root sits directly inside a scroll container', (file, root, n) => {
+    const s = src(file);
+    const roots = s.match(new RegExp(`<div className="${root}">`, 'g')) || [];
+    const wrapped = s.match(new RegExp(`${WRAP.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*<div className="${root}">`, 'g')) || [];
+    expect(roots).toHaveLength(n);
+    expect(wrapped).toHaveLength(n);
+    expect(s).not.toMatch(/\bmin-h-screen\b/);
+  });
+});

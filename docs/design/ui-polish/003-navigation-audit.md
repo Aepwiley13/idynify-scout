@@ -73,6 +73,34 @@ Approved: one canonical mission list at **`/hunter?tab=missions`**, the same pat
   entry point, the redirect and the Back targets. `mobileNavigation.test.jsx` pins Hunter's overflow
   list, now with "Missions".
 
+### 003.3 QA follow-up — mission pages couldn't scroll
+
+The same pre-existing cause as the #002.2 campaign fix (#831). Module routes render into a
+fixed-height shell (`.shell-fixed-height` pins `.main-content` to `100vh`; `.page-content-full` is
+`overflow: hidden`), so a page must scroll itself. `CreateMission` (`.create-mission`) and
+`MissionDetail` (`.mission-detail`) had no scroll container, so anything past the viewport was
+clipped, including the create flow's actions and long mission plans.
+
+**Fix:** the same `flex-1 min-h-0 overflow-y-auto` container, here as a **wrapper** around each page
+root: CreateMission's one root, and MissionDetail's loading, error and main views. The roots are
+centred max-width blocks (1000px / 800px). Wrapping them rather than making them scroll keeps their
+width and centring exactly as before, and keeps the scrollbar at the page edge. 8 added lines, no
+removals. No CSS, shell or global change. The add-contact dialog is `position: fixed` with no
+transformed ancestor, so it's unaffected.
+
+**Verified in Chrome** with this branch's compiled CSS, in a harness of the shell structure:
+
+| Page | Viewport | Before | After |
+|---|---|---|---|
+| CreateMission | 1440×900 / 1280×720 | no scroll; last action unreachable | scrolls; reachable; width 1000, same left offset |
+| CreateMission | 390×844 | no scroll; last action at 1949px | scrolls; reachable; ends at 756px, clearing the 56px bar |
+| MissionDetail | 1440×900 / 1280×720 | no scroll; last action unreachable | scrolls; reachable; width 800, same left offset |
+| MissionDetail | 390×844 | no scroll; last action at 1949px | scrolls; reachable; ends at 756px, clearing the 56px bar |
+
+**Regression protection:** `hunterMissions.test.jsx` asserts that every `create-mission` (1) and
+`mission-detail` (3) root sits directly inside the scroll container, and that neither file uses
+`min-h-screen`. Checked against a copy with one wrapper removed: it fails.
+
 ## Where navigation is defined
 
 | Layer | Source |

@@ -365,6 +365,7 @@ export default function CreateMission() {
   };
 
   return (
+    <div className="flex-1 min-h-0 overflow-y-auto">
     <div className="create-mission">
       {/* Header */}
       <div className="create-mission-header">
@@ -984,6 +985,7 @@ export default function CreateMission() {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }

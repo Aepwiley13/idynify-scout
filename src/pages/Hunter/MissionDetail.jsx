@@ -131,17 +131,20 @@ export default function MissionDetail() {
 
   if (loading) {
     return (
+      <div className="flex-1 min-h-0 overflow-y-auto">
       <div className="mission-detail">
         <div className="mission-detail-loading">
           <Loader2 className="w-8 h-8 animate-spin text-purple-400" />
           <span>Loading mission...</span>
         </div>
       </div>
+      </div>
     );
   }
 
   if (error) {
     return (
+      <div className="flex-1 min-h-0 overflow-y-auto">
       <div className="mission-detail">
         <div className="mission-detail-error">
           <AlertCircle className="w-8 h-8 text-red-400" />
@@ -150,6 +153,7 @@ export default function MissionDetail() {
             <ArrowLeft className="w-4 h-4" /> Back to Hunter
           </button>
         </div>
+      </div>
       </div>
     );
   }
@@ -379,6 +383,7 @@ export default function MissionDetail() {
   }
 
   return (
+    <div className="flex-1 min-h-0 overflow-y-auto">
     <div className="mission-detail">
       {/* Header */}
       <div className="mission-detail-header">
@@ -805,6 +810,7 @@ export default function MissionDetail() {
           <span><strong>Expected Outcome:</strong> {plan.expectedOutcome}</span>
         </div>
       )}
+    </div>
     </div>
   );
 }

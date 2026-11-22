@@ -373,7 +373,7 @@ export const OVERWRITABLE_NAME_SOURCES = Object.freeze(['email_domain']);
  *
  * @returns {Promise<{companyId: string|null, signal: string|null, created: boolean, promoted: boolean}>}
  */
-export async function ensureCompanyForContact(userId, candidate = {}, { source = 'unknown', extraFields = {}, nameSource = NAME_SOURCE.APOLLO } = {}) {
+export async function ensureCompanyForContact(userId, candidate = {}, { source = 'unknown', extraFields = {}, nameSource = NAME_SOURCE.APOLLO, correctCompanyName = true } = {}) {
   if (!userId) return { companyId: null, signal: null, created: false, promoted: false };
 
   const apolloOrgId = readApolloOrgId(candidate);
@@ -450,7 +450,7 @@ export async function ensureCompanyForContact(userId, candidate = {}, { source =
   // The name is a guess. Correct it now rather than waiting for someone to
   // open the company — deliberately NOT awaited, so the contact save returns
   // at the same speed it always did.
-  if (!givenName) {
+  if (!givenName && correctCompanyName) {
     correctDerivedCompanyName(userId, companyId, { source }).catch((err) => {
       console.warn('[company-identity] name correction failed — guess stands', {
         source, companyId, message: err?.message,

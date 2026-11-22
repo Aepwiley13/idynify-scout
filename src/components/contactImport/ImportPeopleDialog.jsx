@@ -9,19 +9,22 @@
  *     and Scout both read, so a Free account that upgrades keeps every imported person;
  *   - people already in the account are matched by the shared identity rules and updated, never
  *     duplicated, and nothing already on a record is overwritten;
- *   - it uses no paid service: parsing, matching and writing happen in the browser and
- *     Firestore only.
+ *   - parsing, matching and writing happen in the browser and Firestore. Free accounts
+ *     skip optional background company-name correction.
  *
  * Laid out like My People's Add Person dialog (ContactHub.css .hub-dialog).
  */
 import { useEffect, useId, useRef } from 'react';
 import { X } from 'lucide-react';
+import { useAccountPlan } from '../billing/accountPlanContext';
+import { isPaidPlan } from '../../utils/accountPlan';
 import { useT } from '../../theme/ThemeContext';
 import { ContactCsvImport } from '../scout/CSVUpload';
 import { HUB_IMPORT_COPY } from './importPeople';
 
 export default function ImportPeopleDialog({ onClose, onImported }) {
   const T = useT();
+  const correctCompanyName = isPaidPlan(useAccountPlan());
   const titleId = useId();
   const boxRef = useRef(null);
   const opener = useRef(typeof document === 'undefined' ? null : document.activeElement);
@@ -56,6 +59,7 @@ export default function ImportPeopleDialog({ onClose, onImported }) {
         </div>
         <ContactCsvImport
           copy={HUB_IMPORT_COPY}
+          correctCompanyName={correctCompanyName}
           onCancel={onClose}
           onContactsAdded={(_items, result) => onImported(result)}
         />

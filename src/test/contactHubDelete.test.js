@@ -24,14 +24,17 @@ function fixture() {
     doc, collection: query,
     runTransaction: vi.fn(async (work) => {
       const removed = [];
+      const writes = [];
       const result = await work({
         get: async (ref) => ref.query ? { docs: [...data].filter(([path, row]) => {
           const parent = path.slice(0, path.lastIndexOf('/'));
           return parent === ref.path && ref.predicate(row);
         }).slice(0, ref.max).map(([path, row]) => ({ ref: doc(path), data: () => row })) }
           : { exists: data.has(ref.path) },
+        set: (ref, value) => writes.push([ref.path, value]),
         delete: (ref) => removed.push(ref.path),
       });
+      writes.forEach(([path, value]) => data.set(path, value));
       removed.forEach((path) => data.delete(path));
       return result;
     }),
@@ -60,7 +63,7 @@ describe('Contact Hub trusted deletion', () => {
     expect(data.has(queue)).toBe(false);
     expect([...data.keys()]).toEqual([
       'users/owner', 'users/owner/companies/company', 'users/owner/stickers/s', 'users/owner/contacts/b',
-      'users/other/contacts/a', 'contact_hub_gmail_limits/owner/attempts/key',
+      'users/other/contacts/a', 'contact_hub_gmail_limits/owner/attempts/key', 'contact_hub_deleted/owner/contacts/a',
     ]);
     expect((await remove(['a'])).results[0].status).toBe('already_deleted');
   });

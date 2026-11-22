@@ -1,8 +1,9 @@
+import { deletedContactRef } from './contactWriteLifecycle.js';
 import { deleteContactWithPhoto } from './contactPhotoWriter.js';
 
 const MAX_CONTACTS = 20;
 const MAX_RELATED = 400;
-const CHILDREN = ['timeline', 'stageHistory', 'outcomeLog', 'barry_attributions', 'barry_drafts'];
+const CHILDREN = ['timeline', 'stageHistory', 'outcomeLog', 'barry_attributions', 'barry_drafts', 'barry_analysis', 'relationship_context', 'barry_sessions'];
 const validId = (value) => typeof value === 'string' && value.length <= 1500
   && value !== '.' && value !== '..' && /^[^/\s]+$/.test(value);
 const reply = (statusCode, payload) => ({
@@ -50,6 +51,7 @@ export function createContactHubDelete({ db, verifyToken, enabled = () => true, 
             .flatMap((snapshot) => snapshot.docs);
           if (related.length > MAX_RELATED) return 'too_many_related_records';
           for (const entry of related) tx.delete(entry.ref);
+          if (person.exists) tx.set(deletedContactRef(db, actor.uid, id), { deleted: true });
           deleteContactWithPhoto(tx, contact);
           return person.exists ? 'deleted' : 'already_deleted';
         });

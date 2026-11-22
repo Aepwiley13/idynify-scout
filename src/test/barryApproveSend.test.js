@@ -107,6 +107,7 @@ function makeDraftRef() {
 
 function makeContactRef() {
   return {
+    get: async () => ({ exists: true }),
     update: async (patch) => {
       if (state.failWrites || state.failContactWrites) throw new Error('firestore unavailable');
       state.contactUpdates.push(patch);
@@ -116,10 +117,12 @@ function makeContactRef() {
         return { doc: () => makeDraftRef() };
       }
       return {
-        add: async (doc) => {
-          if (state.failWrites || state.failContactWrites) throw new Error('firestore unavailable');
-          state.timelineAdds.push(doc);
-        },
+        doc: () => ({
+          set: async (doc) => {
+            if (state.failWrites || state.failContactWrites) throw new Error('firestore unavailable');
+            state.timelineAdds.push(doc);
+          },
+        }),
       };
     },
   };
@@ -135,9 +138,10 @@ vi.mock('../../netlify/functions/firebase-admin.js', () => ({
       const writes = [];
       const result = await fn({
         get: (ref) => ref.get(),
-        update: (ref, patch) => { writes.push([ref, patch]); },
+        update: (ref, patch) => { writes.push(() => ref.update(patch)); },
+        set: (ref, patch) => { writes.push(() => ref.set(patch)); },
       });
-      for (const [ref, patch] of writes) await ref.update(patch);
+      for (const write of writes) await write();
       return result;
     },
     collection: (name) => {

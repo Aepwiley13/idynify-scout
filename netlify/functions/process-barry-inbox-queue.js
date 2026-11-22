@@ -33,6 +33,7 @@
  * httpMethod, and a manual POST still works for local testing.
  */
 
+import { withExistingContact } from './utils/contactWriteLifecycle.js';
 import { schedule } from '@netlify/functions';
 import { db } from './firebase-admin.js';
 import { alertOps } from './utils/alertOps.js';
@@ -141,13 +142,20 @@ export const processInboxQueue = async (event = {}) => {
         continue;
       }
 
+      const contactRef = db.collection('users').doc(idynifyUserId).collection('contacts').doc(contactId);
+      const skipDeleted = async () => {
+        await queueRef.update({ status: 'complete', reason: 'contact_deleted', updatedAt: FieldValue.serverTimestamp() });
+        results.skipped++;
+        results.entries.push({ messageRecordId, contactId, status: 'skipped', reason: 'contact_deleted' });
+      };
+
       try {
+        if (!(await contactRef.get()).exists) {
+          await skipDeleted();
+          continue;
+        }
         // ── Idempotency: check if already processed ───────────────────
-        const existingAnalysisSnap = await db
-          .collection('users').doc(idynifyUserId)
-          .collection('contacts').doc(contactId)
-          .collection('barry_analysis').doc(messageRecordId)
-          .get();
+        const existingAnalysisSnap = await contactRef.collection('barry_analysis').doc(messageRecordId).get();
 
         if (existingAnalysisSnap.exists) {
           results.skipped++;
@@ -163,11 +171,10 @@ export const processInboxQueue = async (event = {}) => {
         const analysis = await analyzeInboundMessage(db, { messageRecordId, contactId, idynifyUserId });
 
         // ── Step 3: Write barry_analysis document ─────────────────────
-        await db
-          .collection('users').doc(idynifyUserId)
-          .collection('contacts').doc(contactId)
-          .collection('barry_analysis').doc(messageRecordId)
-          .set({
+        const analysisRef = contactRef.collection('barry_analysis').doc(messageRecordId);
+        const contextRef = contactRef.collection('relationship_context').doc(idynifyUserId);
+        const analysisSaved = await withExistingContact(db, contactRef, (tx) => {
+          tx.set(analysisRef, {
             contactId,
             messageRecordId,
             gmailMessageId: analysis.sourceMessageId,
@@ -176,37 +183,34 @@ export const processInboxQueue = async (event = {}) => {
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
           });
-
-        // ── Step 4: Update relationship_context with Sprint 3 signals ─
-        const contextRef = db
-          .collection('users').doc(idynifyUserId)
-          .collection('contacts').doc(contactId)
-          .collection('relationship_context').doc(idynifyUserId);
-
-        await contextRef.set({
-          openQuestions: analysis.questionsAsked,
-          openCommitments: analysis.commitmentsMade,
-          objections: analysis.objections,
-          positiveSignals: analysis.positiveSignals,
-          informationShared: analysis.requestsMade,
-          recommendedAction: analysis.recommendedAction,
-          recommendedActionReason: analysis.recommendedActionReason,
-          suggestedFollowUpDate: analysis.suggestedFollowUpDate,
-          recommendedAt: FieldValue.serverTimestamp(),
-          lastAnalyzedAt: FieldValue.serverTimestamp(),
-          lastUpdatedAt: FieldValue.serverTimestamp(),
-          contextVersion: '2.0.0',
-        }, { merge: true });
+          tx.set(contextRef, {
+            openQuestions: analysis.questionsAsked,
+            openCommitments: analysis.commitmentsMade,
+            objections: analysis.objections,
+            positiveSignals: analysis.positiveSignals,
+            informationShared: analysis.requestsMade,
+            recommendedAction: analysis.recommendedAction,
+            recommendedActionReason: analysis.recommendedActionReason,
+            suggestedFollowUpDate: analysis.suggestedFollowUpDate,
+            recommendedAt: FieldValue.serverTimestamp(),
+            lastAnalyzedAt: FieldValue.serverTimestamp(),
+            lastUpdatedAt: FieldValue.serverTimestamp(),
+            contextVersion: '2.0.0',
+          }, { merge: true });
+          return true;
+        });
+        if (!analysisSaved) {
+          await skipDeleted();
+          continue;
+        }
 
         // ── Step 5: Run draft composer ────────────────────────────────
         const draft = await composeDraftReply(db, { analysis, messageRecordId, contactId, idynifyUserId });
 
         // ── Step 6: Write barry_drafts document ───────────────────────
-        await db
-          .collection('users').doc(idynifyUserId)
-          .collection('contacts').doc(contactId)
-          .collection('barry_drafts').doc(messageRecordId)
-          .set({
+        const draftRef = contactRef.collection('barry_drafts').doc(messageRecordId);
+        const draftSaved = await withExistingContact(db, contactRef, (tx) => {
+          tx.set(draftRef, {
             contactId,
             messageRecordId,
             idynifyUserId,
@@ -214,6 +218,12 @@ export const processInboxQueue = async (event = {}) => {
             createdAt: FieldValue.serverTimestamp(),
             updatedAt: FieldValue.serverTimestamp(),
           });
+          return true;
+        });
+        if (!draftSaved) {
+          await skipDeleted();
+          continue;
+        }
 
         // ── Step 7: Update timeline event ─────────────────────────────
         const timelineSnap = await db
@@ -233,10 +243,6 @@ export const processInboxQueue = async (event = {}) => {
         }
 
         // ── Step 8: Advance conversationState ─────────────────────────
-        const contactRef = db
-          .collection('users').doc(idynifyUserId)
-          .collection('contacts').doc(contactId);
-
         const contactSnap = await contactRef.get();
         if (contactSnap.exists) {
           // Read through the canonical accessor rather than off the document.

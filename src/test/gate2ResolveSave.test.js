@@ -22,6 +22,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 let TABLE = [];
 let WRITES = [];
+const DELETED = new Set();
 let QUERIES = [];
 
 // ── firebase-admin fake ─────────────────────────────────────────────────────
@@ -69,6 +70,7 @@ function contactsQuery(filters = [], cap = null) {
 
 vi.mock('../../netlify/functions/firebase-admin.js', () => ({
   db: {
+    doc: (path) => ({ get: async () => ({ exists: DELETED.has(path) }) }),
     collection: () => ({ doc: () => ({ collection: () => contactsQuery() }) }),
     // The deterministic-id create path (#754) decides against the document as
     // it is stored right now, not against what resolveOne saw earlier. `tx.get`
@@ -103,7 +105,7 @@ async function call(body) {
 const base = { userId: 'u1', authToken: 't', actor: 'barry' };
 const byRef = (r, ref) => r.body.results.find(x => x.clientRef === ref);
 
-beforeEach(() => { TABLE = []; WRITES = []; QUERIES = []; });
+beforeEach(() => { TABLE = []; WRITES = []; QUERIES = []; DELETED.clear(); });
 
 // ── 1. The model never supplies canonical identity ──────────────────────────
 
@@ -647,4 +649,14 @@ describe('8 — a deterministic id already occupied is refused, never merged int
     expect(byRef(r, 'ui_1').contactId).toBe('co_3_ap_9');
     expect(byRef(r, 'ui_2').contactId).toBe('co_3_ap_9');
   });
+});
+
+it('refuses a queued save under a deleted deterministic contact ID', async () => {
+  DELETED.add('contact_hub_deleted/u1/contacts/co_3_ap_9');
+  const result = await call({
+    ...base, commit: true, operationId: 'queued-operation',
+    candidates: [person('queued', { company_id: 'co_3', apollo_person_id: 'ap_9', email: 'queued@example.test' })],
+  });
+  expect(byRef(result, 'queued')).toMatchObject({ outcome: 'refused', reason: 'contact_deleted' });
+  expect(WRITES).toEqual([]);
 });

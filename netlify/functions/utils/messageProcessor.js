@@ -14,6 +14,7 @@
  *   7. Emit processing-complete signal to barry_processing_queue
  */
 
+import { appendContactChild } from './contactWriteLifecycle.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { createProcessingResult } from '../../../src/types/processingResult.js';
 import { validateNormalizedMessage } from '../../../src/types/normalizedMessage.js';
@@ -316,13 +317,9 @@ export async function processNormalizedMessage(db, message) {
           createdAt: FieldValue.serverTimestamp(),
         };
 
-        const timelineRef = await db
-          .collection('users').doc(message.idynifyUserId)
-          .collection('contacts').doc(contactId)
-          .collection('timeline')
-          .add(timelineEvent);
-
-        timelineEventId = timelineRef.id;
+        const contactRef = db.collection('users').doc(message.idynifyUserId).collection('contacts').doc(contactId);
+        const timelineRef = await appendContactChild(db, contactRef, 'timeline', timelineEvent);
+        timelineEventId = timelineRef?.id ?? null;
       } else {
         timelineEventId = existingTimelineSnap.docs[0].id;
       }

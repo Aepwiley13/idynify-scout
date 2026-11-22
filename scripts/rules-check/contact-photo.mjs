@@ -18,6 +18,7 @@ const env = await initializeTestEnvironment({ projectId, firestore: { rules: rea
 const person = 'users/owner/contacts/c1';
 const photo = person + '/private/photo';
 const { createContactHubDelete } = await import(pathToFileURL(resolve('netlify/functions/utils/contactHubDelete.js')));
+const { appendContactChild, deletedContactRef } = await import(pathToFileURL(resolve('netlify/functions/utils/contactWriteLifecycle.js')));
 const remove = createContactHubDelete({ db: adminDb, verifyToken: async () => ({ uid: 'owner' }) });
 try {
   await env.clearFirestore();
@@ -93,9 +94,16 @@ try {
     write(saved.version),
     remove({ httpMethod: 'POST', headers: { authorization: 'Bearer owner' },
       body: JSON.stringify({ uid: 'owner', contactIds: ['race'] }) }),
+    appendContactChild(adminDb, contact, 'timeline', { type: 'email_opened' }),
   ]);
   assert.equal(JSON.parse(deletion.body).results[0].status, 'deleted');
   assert.equal((await queue.get()).exists, false);
+  assert.equal((await contact.collection('timeline').get()).empty, true);
+  assert.equal(await appendContactChild(adminDb, contact, 'barry_drafts', { queued: true }), null);
+  const deletionMarker = deletedContactRef(adminDb, 'owner', 'race');
+  assert.equal((await deletionMarker.get()).exists, true);
+  await assertFails(getDoc(doc(owner, deletionMarker.path)));
+  await assertFails(setDoc(doc(owner, deletionMarker.path), { deleted: false }));
   await assertFails(setDoc(doc(owner, contact.path + '/timeline/late-event'), { type: 'note_added' }));
   assert.ok([200, 404].includes(writeDuringDeletion.statusCode), writeDuringDeletion.body);
   assert.equal((await override.get()).exists, false);

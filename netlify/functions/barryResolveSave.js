@@ -29,6 +29,7 @@
  * mechanism below need no storage.
  */
 
+import { deletedContactRef } from './utils/contactWriteLifecycle.js';
 import { db } from './firebase-admin.js';
 import { verifyAuthToken } from './utils/verifyAuthToken.js';
 import { logApiUsage } from './utils/logApiUsage.js';
@@ -345,7 +346,8 @@ async function commitResults(userId, results, candidatesByRef, { operationId, ac
       // as it is stored right now — never a blind merge into whatever is
       // there, which would silently overwrite a stranger's canonical fields.
       const outcome = await db.runTransaction(async (tx) => {
-        const snap = await tx.get(ref);
+        const [snap, deleted] = await Promise.all([tx.get(ref), tx.get(deletedContactRef(db, userId, id))]);
+        if (deleted.exists) return 'deleted';
         if (!snap.exists) {
           tx.set(ref, payload);
           return 'created';
@@ -354,11 +356,11 @@ async function commitResults(userId, results, candidatesByRef, { operationId, ac
         return 'occupied';
       });
 
-      if (outcome === 'occupied') {
+      if (outcome === 'occupied' || outcome === 'deleted') {
         result.outcome = OUTCOME.REFUSED;
         result.contactId = null;
-        result.reason = 'deterministic_id_occupied';
-        result.detail = 'another record already exists at this identity; nothing was changed';
+        result.reason = outcome === 'deleted' ? 'contact_deleted' : 'deterministic_id_occupied';
+        result.detail = outcome === 'deleted' ? 'this contact ID was deleted' : 'another record already exists at this identity; nothing was changed';
         continue;
       }
 

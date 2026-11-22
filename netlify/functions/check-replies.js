@@ -17,6 +17,7 @@
  * Rate limit: max 50 threads per call.
  */
 
+import { appendContactChild } from './utils/contactWriteLifecycle.js';
 import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
@@ -198,11 +199,7 @@ export const handler = async (event) => {
             updated_at: now,
           });
 
-          await db
-            .collection('users').doc(userId)
-            .collection('contacts').doc(reply.contactId)
-            .collection('timeline')
-            .add({
+          await appendContactChild(db, contactRef, 'timeline', {
               type: 'reply_received',
               actor: 'contact',
               preview: 'Reply received',

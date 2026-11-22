@@ -1,3 +1,4 @@
+import { deletedContactRef } from './utils/contactWriteLifecycle.js';
 import { logApiUsage } from './utils/logApiUsage.js';
 import { APOLLO_ENDPOINTS, getApolloApiKey, getApolloHeaders } from './utils/apolloConstants.js';
 import { logApolloError } from './utils/apolloErrorLogger.js';
@@ -48,22 +49,27 @@ const unmeteredHandler = async (event) => {
     if (contactData && companyId) {
       const contactDocId = `${companyId}_${contactId}`;
       const contactRef = db.collection('users').doc(userId).collection('contacts').doc(contactDocId);
-      await contactRef.set({
-        apollo_person_id: contactId,
-        name: contactData.name || 'Unknown',
-        title: contactData.title || '',
-        email: contactData.email || null,
-        phone: contactData.phone || null,
-        linkedin_url: contactData.linkedin_url || null,
-        photo_url: contactData.photo_url || null,
-        company_id: companyId,
-        company_name: contactData.company_name || '',
-        company_industry: contactData.company_industry || null,
-        lead_owner: userId,
-        status: 'pending_enrichment',
-        saved_at: new Date().toISOString(),
-        source: contactData.source || 'apollo_people_search',
+      const saved = await db.runTransaction(async (tx) => {
+        if ((await tx.get(deletedContactRef(db, userId, contactDocId))).exists) return false;
+        tx.set(contactRef, {
+          apollo_person_id: contactId,
+          name: contactData.name || 'Unknown',
+          title: contactData.title || '',
+          email: contactData.email || null,
+          phone: contactData.phone || null,
+          linkedin_url: contactData.linkedin_url || null,
+          photo_url: contactData.photo_url || null,
+          company_id: companyId,
+          company_name: contactData.company_name || '',
+          company_industry: contactData.company_industry || null,
+          lead_owner: userId,
+          status: 'pending_enrichment',
+          saved_at: new Date().toISOString(),
+          source: contactData.source || 'apollo_people_search',
+        });
+        return true;
       });
+      if (!saved) return { statusCode: 409, body: JSON.stringify({ error: 'contact_deleted' }) };
       console.log('✅ Initial contact document written:', contactDocId);
     }
 

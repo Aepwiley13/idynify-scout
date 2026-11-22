@@ -12,6 +12,7 @@
  * }
  */
 
+import { withExistingContact } from './utils/contactWriteLifecycle.js';
 import { schedule } from '@netlify/functions';
 
 /** Cron for this worker, exported so tests can assert it. */
@@ -160,31 +161,32 @@ async function processUserQueue(userId, results) {
         'Unknown';
       const companyName = contact.company_name || contact.current_company_name || contact.company || null;
 
-      // Update contact status to Awaiting Reply if not already there
-      if (contactStatus !== 'Awaiting Reply') {
-        const contactRef = db.collection('users').doc(userId).collection('contacts').doc(contactId);
-        // Awaiting Reply is an engaged state, so the record can no longer be
-        // a discovery suggestion. Merged into the same write.
-        await contactRef.update({
-          contact_status: 'Awaiting Reply',
-          contact_status_updated_at: admin.firestore.FieldValue.serverTimestamp(),
-          ...(await engagementPromotionPatch(contactRef, 'follow_up_due')),
+      const contactRef = contactSnap.ref;
+      const notification = db.collection('users').doc(userId).collection('notifications').doc();
+      const promotion = contactStatus === 'Awaiting Reply' ? {} : await engagementPromotionPatch(contactRef, 'follow_up_due');
+      const applied = await withExistingContact(db, contactRef, (tx) => {
+        if (contactStatus !== 'Awaiting Reply') {
+          tx.update(contactRef, {
+            contact_status: 'Awaiting Reply',
+            contact_status_updated_at: admin.firestore.FieldValue.serverTimestamp(),
+            ...promotion,
+          });
+        }
+        tx.set(notification, {
+          type: 'follow_up_due',
+          contactId,
+          contactName,
+          companyName,
+          reason: reason || 're_engage',
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          read: false,
         });
-      }
-
-      // Write follow_up_due notification
-      await db.collection('users').doc(userId).collection('notifications').add({
-        type: 'follow_up_due',
-        contactId,
-        contactName,
-        companyName,
-        reason: reason || 're_engage',
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        read: false
+        return true;
       });
 
       await markProcessed(queueDoc.ref);
-      results.notified++;
+      if (applied) results.notified++;
+      else results.skipped++;
     } catch (docErr) {
       console.error(`❌ process-barry-queue: queue doc ${queueDoc.id} for user ${userId} failed:`, docErr.message);
       results.failed++;

@@ -135,7 +135,7 @@ const CC_ITEMS = [
   { id: 'people',     label: 'People',       Icon: Users,     desc: 'Full contacts roster — all view'  },
   { id: 'companies',  label: 'Companies',    Icon: Building2, desc: 'Full accounts roster — all view'  },
   { id: 'missions',   label: 'Missions',     Icon: Zap,       desc: 'Create and manage missions'       },
-  { id: 'campaigns',  label: 'Campaigns',    Icon: Mail,      desc: 'Send emails to multiple contacts', route: '/hunter/campaign/new' },
+  { id: 'campaigns',  label: 'Campaigns',    Icon: Mail,      desc: 'Send emails to multiple contacts', route: '/hunter?tab=campaigns' },
   { id: 'cadences',   label: 'Cadences',     Icon: RefreshCw, desc: 'Bulk outreach history',            route: '/scout/cadences' },
   { id: 'go_to_war',  label: 'Go To War',    Icon: Swords,    desc: '8-phase bulk mission launcher'    },
   { id: 'weapons',    label: 'Weapons',      Icon: Crosshair, desc: 'Channel selector, message builder' },

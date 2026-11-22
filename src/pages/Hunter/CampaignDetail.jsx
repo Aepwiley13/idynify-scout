@@ -221,7 +221,7 @@ export default function CampaignDetail() {
           <h2 className="text-xl font-bold text-center mb-2">Error</h2>
           <p className="text-gray-500 text-center mb-6">{error}</p>
           <button
-            onClick={() => navigate('/hunter')}
+            onClick={() => navigate('/hunter?tab=campaigns')}
             className="w-full px-6 py-3 bg-gray-200 hover:bg-gray-300 rounded-lg font-bold transition-colors"
           >
             Back to Hunter
@@ -297,7 +297,7 @@ export default function CampaignDetail() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate('/hunter')}
+                onClick={() => navigate('/hunter?tab=campaigns')}
                 className="text-gray-500 hover:text-gray-900 transition-colors"
               >
                 <ArrowLeft className="w-5 h-5" />

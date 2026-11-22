@@ -245,7 +245,7 @@ export default function CreateCampaign() {
           <h2 className="text-xl font-bold text-center mb-2">Gmail Not Connected</h2>
           <p className="text-[color:var(--text-secondary)] text-center mb-6">{error}</p>
           <button
-            onClick={() => navigate('/hunter')}
+            onClick={() => navigate('/hunter?tab=campaigns')}
             className="w-full px-6 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-bold transition-colors"
           >
             Go to Hunter Dashboard
@@ -263,7 +263,7 @@ export default function CreateCampaign() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
-                onClick={() => navigate('/hunter')}
+                onClick={() => navigate('/hunter?tab=campaigns')}
                 className="text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors"
               >
                 <ArrowLeft className="w-5 h-5" />

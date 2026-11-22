@@ -21,5 +21,8 @@ project, and it belongs somewhere else.
 |---|-------|------|--------|
 | [001](001-global-brand-identity.md) | Global Brand Identity | Shared sidebar — brand mark | Merged (#825) |
 | [002](002-global-typography.md) | Global Typography & Visual Hierarchy | Platform-wide type system | Merged (#828) |
-| [002.1](002.1-hunter-theme-integrity.md) | Hunter Theme Integrity | Hunter → Create Campaign, Mission Setup | Ready for PR |
+| [002.1](002.1-hunter-theme-integrity.md) | Hunter Theme Integrity | Hunter → Create Campaign, Mission Setup | Merged (#829) |
+| 002.2 | CampaignDetail Theme | Hunter → campaign detail | Proposed — not started |
 | [003](003-compact-navigation.md) | Compact Navigation Labels | Collapsed sidebar rail | Proposed — not authorized |
+| [003 audit](003-navigation-audit.md) | Navigation & Visual Hierarchy audit | All modules | Complete |
+| [003.1 + 003.2](003-navigation-audit.md#0031--0032--campaigns-in-hunter-implemented-combined) | Campaigns in Hunter | Hunter, Command Center → Campaigns | Ready for PR |

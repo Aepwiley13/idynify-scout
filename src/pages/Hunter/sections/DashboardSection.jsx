@@ -29,17 +29,14 @@ import {
   groupContactsByStatus,
   buildCampaignSummaries,
   getRecentlyCompleted,
-  HEALTH_LABELS,
-  HEALTH_COLORS,
   ATTENTION_TYPE_LABELS,
   ATTENTION_TYPE_COLORS
 } from '../../../utils/dashboardEngine';
 import {
   getLabelById,
-  OUTCOME_GOALS,
-  OBJECTIVE_TYPES,
-  STRATEGIC_PRIORITIES
+  OUTCOME_GOALS
 } from '../../../constants/structuredFields';
+import CampaignCards from './CampaignCards';
 import './DashboardSection.css';
 import { getEffectiveUser } from '../../../context/ImpersonationContext';
 
@@ -434,60 +431,7 @@ export default function DashboardSection({ missions = [], campaigns = [] }) {
             <p>No campaigns yet. Create a campaign to organize your missions.</p>
           </div>
         ) : (
-          <div className="campaign-cards">
-            {campaignSummaries.map(campaign => {
-              const healthColors = HEALTH_COLORS[campaign.health] || HEALTH_COLORS.on_track;
-              const healthLabel = HEALTH_LABELS[campaign.health] || 'On Track';
-              const objectiveLabel = getLabelById(OBJECTIVE_TYPES, campaign.objective_type);
-              const priorityLabel = getLabelById(STRATEGIC_PRIORITIES, campaign.strategic_priority);
-
-              return (
-                <div
-                  key={campaign.id}
-                  className="campaign-card"
-                  onClick={() => navigate(`/hunter/campaign/${campaign.id}`)}
-                >
-                  <div className="campaign-card-top">
-                    <h3 className="campaign-card-name">{campaign.name}</h3>
-                    <span
-                      className="campaign-health-badge"
-                      style={{
-                        background: healthColors.bg,
-                        borderColor: healthColors.border,
-                        color: healthColors.text
-                      }}
-                    >
-                      {healthLabel}
-                    </span>
-                  </div>
-
-                  <div className="campaign-card-meta">
-                    {objectiveLabel && (
-                      <span className="campaign-meta-tag">{objectiveLabel}</span>
-                    )}
-                    {priorityLabel && (
-                      <span className="campaign-meta-tag priority">{priorityLabel}</span>
-                    )}
-                  </div>
-
-                  <div className="campaign-card-stats">
-                    <div className="campaign-stat">
-                      <Users className="w-4 h-4" />
-                      <span>{campaign.totalContacts} contacts</span>
-                    </div>
-                    <div className="campaign-stat">
-                      <Zap className="w-4 h-4" />
-                      <span>{campaign.activeMissions} active</span>
-                    </div>
-                    <div className="campaign-stat">
-                      <CheckCircle className="w-4 h-4" />
-                      <span>{campaign.completedMissions} done</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <CampaignCards summaries={campaignSummaries} />
         )}
       </div>
 

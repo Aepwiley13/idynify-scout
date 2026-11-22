@@ -95,6 +95,7 @@ export const MODULE_BOTTOM_NAV = {
       { id: 'followup',  label: 'Follow Up',  Icon: AlertTriangle, to: '/hunter?tab=followup', section: 'Follow Up Now' },
     ],
     overflow: [
+      { id: 'campaigns', label: 'Campaigns',   Icon: Mail,          to: '/hunter?tab=campaigns' },
       { id: 'today',   label: "Today's Actions", Icon: CalendarCheck, to: '/hunter?tab=today' },
       { id: 'replied', label: 'Replied',         Icon: Inbox,         to: '/hunter?tab=replied' },
       { id: 'active',  label: 'Active',          Icon: Sparkles,      to: '/hunter?tab=active' },
@@ -185,7 +186,7 @@ export const MODULE_BOTTOM_NAV = {
     primary: [
       { id: 'people',    label: 'People',    Icon: Users,   to: '/command-center?tab=people' },
       { id: 'missions',  label: 'Missions',  Icon: Zap,     to: '/command-center?tab=missions' },
-      { id: 'campaigns', label: 'Campaigns', Icon: Mail,    to: '/hunter/campaign/new' },
+      { id: 'campaigns', label: 'Campaigns', Icon: Mail,    to: '/hunter?tab=campaigns' },
       { id: 'arsenal',   label: 'Arsenal',   Icon: Archive, to: '/command-center?tab=arsenal' },
     ],
     overflow: [

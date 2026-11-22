@@ -27,6 +27,7 @@ import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 're
 import { Link, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { ArrowLeft, List, Mail, Phone, Search, Table2, Upload, UserPlus, Users, X } from 'lucide-react';
 import DeleteContactsDialog from './DeleteContactsDialog';
+import DuplicateReview from './duplicates/DuplicateReview';
 import { useImpersonation } from '../../context/ImpersonationContext';
 import { useT } from '../../theme/ThemeContext';
 import { useIsMobile } from '../../hooks/useIsMobile';
@@ -227,11 +228,12 @@ function AddPersonDialog({ onClose, onAdded }) {
 export default function HubPeople() {
   const { uid, removeContacts } = useOutletContext();
   const { isImpersonating, isReadOnly } = useImpersonation();
-  const canDelete = Boolean(contactDeletionEnabled() && uid && removeContacts && !isImpersonating && !isReadOnly);
-  return <HubPeopleList key={JSON.stringify([uid, canDelete])} canDelete={canDelete} />;
+  const readOnly = Boolean(isImpersonating || isReadOnly);
+  const canDelete = Boolean(contactDeletionEnabled() && uid && removeContacts && !readOnly);
+  return <HubPeopleList key={JSON.stringify([uid, readOnly])} canDelete={canDelete} readOnly={readOnly} />;
 }
 
-function HubPeopleList({ canDelete }) {
+function HubPeopleList({ canDelete, readOnly }) {
   const T = useT();
   const isMobile = useIsMobile();
   const {
@@ -450,6 +452,7 @@ function HubPeopleList({ canDelete }) {
             <div className="hub-tools">
               {searchField}
               {importButton}
+              {uid && status === HUB_STATUS.READY && <DuplicateReview contacts={people} stickers={stickers.byId} readOnly={readOnly} />}
               {canDelete && status === HUB_STATUS.READY && (
                 <button type="button" className="hub-secondary-btn" onClick={() => {
                   setSelecting(!selecting);

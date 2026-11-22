@@ -1,0 +1,51 @@
+.hub-duplicate-dialog {
+  width: min(54rem, calc(100% - 2rem));
+  max-height: 90dvh;
+  padding: clamp(.75rem, 3vw, 1.5rem);
+  border: 1px solid var(--duplicate-border, GrayText);
+  border-radius: 1rem;
+  background: var(--duplicate-card, Canvas);
+  color: var(--duplicate-text, CanvasText);
+  overflow: auto;
+}
+
+.hub-duplicate-dialog::backdrop { background: rgb(0 0 0 / 48%); }
+.hub-duplicate-dialog header, .hub-duplicate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem;
+}
+.hub-duplicate-dialog header { justify-content: space-between; }
+.hub-duplicate-dialog h2 { margin: 0; font-size: 1.25rem; }
+.hub-duplicate-dialog h3 { font-size: 1.1rem; }
+.hub-duplicate-dialog button { min-height: 44px; color: inherit; border-color: var(--duplicate-border); }
+.hub-duplicate-dialog button:disabled { opacity: .55; }
+.hub-duplicate-dialog :is(button, select):focus-visible { outline: 2px solid var(--duplicate-accent, Highlight); outline-offset: 2px; }
+.hub-duplicate-compare { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 1rem 0; }
+.hub-duplicate-compare caption { text-align: left; font-weight: 600; }
+.hub-duplicate-compare :is(th, td) {
+  padding: .5rem .25rem;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--duplicate-border);
+  overflow-wrap: anywhere;
+}
+.hub-duplicate-compare th:first-child { width: 25%; }
+.hub-duplicate-avatar { display: block; font-size: .8rem; color: var(--duplicate-text); opacity: .8; }
+.hub-duplicate-preview > div { display: grid; grid-template-columns: minmax(6rem, 1fr) minmax(0, 3fr); gap: .5rem; padding: .25rem 0; }
+.hub-duplicate-preview dt { font-weight: 600; }
+.hub-duplicate-preview dd { margin: 0; overflow-wrap: anywhere; }
+.hub-duplicate-preview select {
+  width: 100%;
+  min-height: 44px;
+  padding: .25rem;
+  color: inherit;
+  background: var(--duplicate-card);
+  border: 1px solid var(--duplicate-border);
+  border-radius: .5rem;
+}
+
+@media (max-width: 600px) {
+  .hub-duplicate-dialog { width: 100%; max-width: 100%; margin: auto 0 0; border-radius: 1rem 1rem 0 0; }
+}

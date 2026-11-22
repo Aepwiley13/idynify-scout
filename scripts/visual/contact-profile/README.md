@@ -118,3 +118,23 @@ Test real Free and Scout staging accounts with a controlled recipient. Verify co
 The trusted function reserves one send attempt per request ID. It limits attempts to five per UTC minute and thirty per UTC day per IDYNIFY account. Google applies its own sending limits. An unconfirmed Gmail response requires checking Gmail Sent before trying a new message. A confirmed send with a failed activity write is shown as sent with a warning. Neither case automatically retries Gmail.
 
 The new top-level collections are server-only under the current rules. Before any enrollment, set retention for expired OAuth records (`contact_hub_gmail_oauth.expiresAt`), integrate removal of private connection and send-ledger documents with account deletion, and review an account-level disconnect and revocation path for the new OAuth client. Send reservations and quota records incur Firestore transaction reads and writes. The relationship timeline stores the subject and Gmail message ID for confirmed sends. The message body is sent to Gmail and is not persisted by the Contact Hub function.
+
+## My People duplicate review fixture
+
+Start the fixture with its usual config on a separate port. Existing QA
+servers can keep running.
+
+```sh
+VITE_CONTACT_HUB_GMAIL=off VITE_CONTACT_HUB_PHOTO_OVERRIDES=off VITE_CONTACT_HUB_DELETE=off \
+  node node_modules/vite/bin/vite.js --config scripts/visual/contact-profile/vite.config.mjs \
+  --configLoader runner --host 127.0.0.1 --port 5317 --strictPort
+```
+
+Open `http://127.0.0.1:5317/scripts/visual/contact-profile/profile.html?duplicates=1`
+and choose **Review duplicates (2)**. The fixture supplies an exact match
+with conflicting job titles and a similar-name match. Add `&scout=1`,
+`&readonly=1`, or `&theme=dark` to exercise those views.
+
+```sh
+node scripts/visual/contact-profile/capture.mjs /tmp/idynify-duplicate-review-browser --duplicates
+```

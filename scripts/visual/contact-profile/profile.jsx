@@ -40,7 +40,8 @@ const CONTACTS = [
   { id: 'lee', name: 'Lee Park', title: 'CTO', company_name: 'Initech', company_id: 'co-9', city: 'Austin', state: 'TX', photo_url: portrait('avery'), phones: [{ id: '1', value: '(512) 555-0110', label: 'work' }], emails: [{ id: '0', value: 'lee@initech.example', label: 'work' }], linkedin_url: 'https://www.linkedin.com/in/lee-park-example', sticker_ids: ['S03', 'S04'] },
   { id: 'long', name: 'Bartholomew-Alexandrovich Featherstonehaugh-Cholmondeley-Wolfeschlegelsteinhausenbergerdorff', title: 'Senior Vice President of Global Strategic Partnerships, Ecosystem Development and Public Sector Alliances', company_name: 'The International Association of Analytical Engine Manufacturers and Allied Trades of the Northern Hemisphere', location: 'Wales, United Kingdom', photo_url: portrait('morgan'), phones: [{ id: '1', value: '+44 20 7946 0958', label: 'work' }], emails: [{ id: '0', value: 'bartholomew@internationalassociation.example', label: 'work' }], sticker_ids: ['S00', 'S01', 'S02', 'S03', 'S04', 'S05', 'S06', 'S07'] },
 ];
-const isWorkspace = params.get('workspace') === '1';
+const isDuplicateDemo = params.get('duplicates') === '1';
+const isWorkspace = isDuplicateDemo || params.get('workspace') === '1';
 const isAction = isWorkspace || params.get('action') === '1';
 const isGmailDemo = isAction && params.get('gmail_demo') === '1';
 const isPhotoDemo = isAction && params.get('photo') === '1';
@@ -48,6 +49,18 @@ const scout = params.get('scout') === '1' && !fixture.readonly;
 const uid = getEffectiveUser().uid;
 const dateAgo = (days) => new Date(Date.now() - days * 86400000).toISOString();
 const BY_ID = Object.fromEntries(CONTACTS.map((c) => [c.id, c]));
+if (isDuplicateDemo) {
+  BY_ID['jordan-import'] = {
+    id: 'jordan-import', name: 'Jordan Lee', title: 'Volunteer Coordinator', company_name: 'Community Partners of Salt Lake',
+    emails: ['jordan@communityslc.org', 'jordan.personal@example.org'], phone: '801-555-0101', source: 'csv_import',
+    sticker_ids: ['S02'], linkedin_url: 'https://www.linkedin.com/in/jordan-lee-example',
+    notes: [{ id: 'introduction', content: 'Introduced by a neighborhood partner' }],
+  };
+  BY_ID['avery-review'] = {
+    id: 'avery-review', name: 'Averi Quinn', company_name: 'Volunteer Network', title: 'Board Member',
+  };
+  BY_ID.avery = { ...BY_ID.avery, company_name: 'Volunteer Network', source: 'manual' };
+}
 if (isGmailDemo) {
   BY_ID.jordan = { ...BY_ID.jordan, emails: [
     { value: 'jordan@example.org', label: 'work' },
@@ -195,7 +208,7 @@ function WorkspaceDemo() {
   const account = { id: uid, hasCompletedPayment: scout };
   return (
     <div className="demo">
-      <p className="demo-banner"><strong>Isolated Contact Hub workspace.</strong> Synthetic data and local-only saves.</p>
+      <p className="demo-banner"><strong>{isDuplicateDemo ? 'Isolated duplicate review.' : 'Isolated Contact Hub workspace.'}</strong> Synthetic data and local-only saves.</p>
       <MemoryRouter initialEntries={['/contact-hub']}>
         <ShellProvider user={account} userData={account}>
           <AccountPlanContext.Provider value={scout ? PLAN.STARTER : PLAN.FREE}>

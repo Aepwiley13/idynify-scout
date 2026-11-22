@@ -21,12 +21,13 @@ import { join } from 'node:path';
 const OUT = process.argv[2];
 if (!OUT) { console.error('usage: captureEdit.mjs <output folder>'); process.exit(2); }
 mkdirSync(OUT, { recursive: true });
+const duplicateReview = process.argv.includes('--duplicates');
 const workspaceReview = process.argv.includes('--workspace');
 const gmailReview = process.argv.includes('--gmail');
-const origin = `http://127.0.0.1:${process.env.CONTACT_HUB_FIXTURE_PORT || (gmailReview ? 5312 : 5311)}`;
+const origin = `http://127.0.0.1:${process.env.CONTACT_HUB_FIXTURE_PORT || (duplicateReview ? 5317 : gmailReview ? 5312 : 5311)}`;
 const BASE = `${origin}/scripts/visual/contact-profile/profile.html`;
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
-const defaultDebugPort = workspaceReview ? 9365 : gmailReview ? 9364 : process.argv.includes('--action') ? 9363 : 9362;
+const defaultDebugPort = duplicateReview ? 9371 : workspaceReview ? 9365 : gmailReview ? 9364 : process.argv.includes('--action') ? 9363 : 9362;
 const PORT = Number(process.env.CONTACT_HUB_CHROME_PORT || defaultDebugPort);
 const FONT_HOSTS = [/^https:\/\/fonts\.googleapis\.com\//, /^https:\/\/fonts\.gstatic\.com\//];
 const PHOTO_HOST = 'images.fixture.test';
@@ -156,6 +157,44 @@ const load = async (query) => {
   await wait(500);
 };
 const pickContact = async (id) => { await click(demoBtn(id)); await until(`document.querySelector('.demo-btn[aria-pressed="true"]').textContent === ${JSON.stringify(id)}`); await wait(500); };
+
+if (duplicateReview) {
+  const dialog = "document.querySelector('.hub-duplicate-dialog[open]')";
+  for (const view of VIEWPORTS) {
+    for (const [theme, value] of THEMES) {
+      const label = `${view.id}-${theme}`;
+      await send('Emulation.setDeviceMetricsOverride', {
+        width: view.width, height: view.height, deviceScaleFactor: view.dpr, mobile: view.mobile,
+      });
+      await send('Page.navigate', { url: `${BASE}?duplicates=1&theme=${value}${view.mobile ? '&scout=1' : ''}` });
+      const ready = await until(byText('Review duplicates (2)'), 25_000);
+      check(label + ' finds two pairs', ready);
+      if (!ready) throw new Error(JSON.stringify({ body: await bodyText(), blocked: [...blocked], problems }));
+      await click(byText('Review duplicates (2)'));
+      check(label + ' compares both records', await until(`(${dialog})?.querySelectorAll('th[scope="col"]').length === 3`));
+      check(label + ' shows evidence', await evaluate(`(${dialog})?.innerText.includes('Same LinkedIn profile')`));
+      check(label + ' fits width', await evaluate(`(${dialog}).scrollWidth <= (${dialog}).clientWidth + 1`));
+      await shot(join(OUT, `duplicates-${label}.png`));
+      const choice = byLabel('Choose Job title');
+      // The browser's native picker is outside the page event surface.
+      await evaluate(`(() => { const field = ${choice}; field.value = '1'; field.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+      check(label + ' keeps preview choice', await evaluate(`(${choice})?.value === '1'`));
+      await click(byText('Not a duplicate', dialog));
+      check(label + ' moves to remaining pair', await until(`(${dialog})?.innerText.includes('Pair 1 of 1')`));
+      check(label + ' did not write', (await writeRows()).length === 0);
+    }
+  }
+  await send('Page.navigate', { url: `${BASE}?duplicates=1&readonly=1` });
+  await until(byText('Review duplicates (2)'));
+  await click(byText('Review duplicates (2)'));
+  check('read-only can compare', await until(`(${dialog})?.querySelector('table')`));
+  check('read-only has no dismissal', !await evaluate(byText('Not a duplicate', dialog)));
+  check('no browser exceptions', problems.length === 0);
+  check('no remote API requests', [...blocked].every((url) => FONT_HOSTS.some((re) => re.test(url))));
+  writeFileSync(join(OUT, 'duplicates-report.json'), JSON.stringify({ checks, blocked: [...blocked], problems }, null, 2));
+  console.log(`Duplicate review browser smoke: ${checks.filter(({ pass }) => pass).length}/${checks.length} passed`);
+  process.exit(checks.some(({ pass }) => !pass) ? 1 : 0);
+}
 
 if (workspaceReview) {
   const nav = (text) => byText(text, byLabel("Fixture navigation"));

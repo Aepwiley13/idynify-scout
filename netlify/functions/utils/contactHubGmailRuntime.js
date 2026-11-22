@@ -11,11 +11,11 @@ const SEND_SCOPE = 'https://www.googleapis.com/auth/gmail.send';
 const EMAIL_SCOPE = 'https://www.googleapis.com/auth/userinfo.email';
 const failed = (code) => Object.assign(new Error(code), { code });
 
-function oauth(legacy = false) {
-  const id = legacy ? process.env.GOOGLE_CLIENT_ID : process.env.CONTACT_HUB_GMAIL_CLIENT_ID;
-  const secret = legacy ? process.env.GOOGLE_CLIENT_SECRET : process.env.CONTACT_HUB_GMAIL_CLIENT_SECRET;
-  const redirect = legacy ? process.env.GOOGLE_REDIRECT_URI : process.env.CONTACT_HUB_GMAIL_REDIRECT_URI;
-  if (!id || !secret || (!legacy && !redirect)) throw new Error('Gmail OAuth unavailable');
+function oauth() {
+  const id = process.env.CONTACT_HUB_GMAIL_CLIENT_ID;
+  const secret = process.env.CONTACT_HUB_GMAIL_CLIENT_SECRET;
+  const redirect = process.env.CONTACT_HUB_GMAIL_REDIRECT_URI;
+  if (!id || !secret || !redirect || id === process.env.GOOGLE_CLIENT_ID) throw new Error('Gmail OAuth unavailable');
   return new google.auth.OAuth2(id, secret, redirect);
 }
 
@@ -35,15 +35,22 @@ const gmail = {
     const { data } = await google.oauth2({ version: 'v2', auth: client }).userinfo.get();
     if (!data.email || !data.verified_email) throw new Error('Gmail address unavailable');
     return {
-      accessToken: tokens.access_token, refreshToken: tokens.refresh_token,
-      expiresAt: tokens.expiry_date ?? 0, email: data.email,
+      refreshToken: tokens.refresh_token, email: data.email,
     };
   },
+  async revoke(refreshToken) {
+    try {
+      await oauth().revokeToken(refreshToken);
+    } catch (error) {
+      if (error.response?.status !== 400 || error.response?.data?.error !== 'invalid_token') throw error;
+    }
+  },
   async send(connection, message) {
+    if (connection.source !== 'contact_hub_manual') throw failed('connect_gmail');
     let token = connection.accessToken;
     if (!token || Date.now() >= (connection.expiresAt ?? 0) - 60_000) {
       try {
-        const refresh = oauth(connection.legacy);
+        const refresh = oauth();
         refresh.setCredentials({ refresh_token: connection.refreshToken });
         const { credentials } = await refresh.refreshAccessToken();
         token = credentials.access_token;
@@ -54,16 +61,6 @@ const gmail = {
     // Only give the transport an access token. The OAuth client cannot refresh and replay a send.
     const auth = new google.auth.OAuth2();
     auth.setCredentials({ access_token: token });
-    // The legacy Scout integration document is owner-writable. Confirm the
-    // real Google sender before using its token in Contact Hub.
-    if (connection.legacy) {
-      try {
-        const { data } = await google.oauth2({ version: 'v2', auth }).userinfo.get({}, { timeout: 5_000 });
-        if (!data.verified_email || data.email?.toLowerCase() !== connection.email.toLowerCase()) {
-          throw new Error('Google sender mismatch');
-        }
-      } catch { throw failed('connect_gmail'); }
-    }
     const raw = Buffer.from(buildPlainTextEmail(message), 'utf8').toString('base64url');
     try {
       const { data } = await google.gmail({ version: 'v1', auth }).users.messages.send(

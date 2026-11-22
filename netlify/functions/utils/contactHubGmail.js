@@ -32,19 +32,23 @@ const publicState = (entry) => ({ status: entry.status, ...(entry.reason ? { rea
 export function createContactHubGmail({ db, verifyToken, gmail, enabled, sendingEnabled, timestamp, now = Date.now }) {
   const refs = (uid, id) => ({
     owner: db.doc(`users/${uid}`),
-    contact: db.doc(`users/${uid}/contacts/${id}`),
+    contact: id ? db.doc(`users/${uid}/contacts/${id}`) : null,
     privateConnection: db.doc(`contact_hub_gmail/${uid}`),
-    existingConnection: db.doc(`users/${uid}/integrations/gmail`),
     sessions: db.collection('impersonationSessions').where('adminUserId', '==', uid).where('status', '==', 'active'),
   });
 
-  async function checkOwner(tx, refs) {
-    const [owner, contact, sessions] = await Promise.all([tx.get(refs.owner), tx.get(refs.contact), tx.get(refs.sessions)]);
+  async function checkAccount(tx, refs) {
+    const [owner, sessions] = await Promise.all([tx.get(refs.owner), tx.get(refs.sessions)]);
     if (sessions.docs.some((record) => {
       const expiry = record.data().expiresAt?.toMillis?.();
       return !Number.isFinite(expiry) || expiry > now();
     })) throw fail(403, 'read_only');
-    if (!owner.exists || !contact.exists) throw fail(404, 'contact_unavailable');
+    if (!owner.exists) throw fail(404, 'account_unavailable');
+  }
+
+  async function checkOwner(tx, refs) {
+    const [contact] = await Promise.all([tx.get(refs.contact), checkAccount(tx, refs)]);
+    if (!contact.exists) throw fail(404, 'contact_unavailable');
     const person = contact.data();
     if (hasArchiveSignal(person) || isDeferredRecord(person) || person.company_archived === true) throw fail(404, 'contact_unavailable');
     const recipient = emailOf(person)?.address;
@@ -53,12 +57,47 @@ export function createContactHubGmail({ db, verifyToken, gmail, enabled, sending
   }
 
   async function connectionFor(tx, refs) {
-    const [privateDoc, existing] = await Promise.all([tx.get(refs.privateConnection), tx.get(refs.existingConnection)]);
-    for (const doc of [privateDoc, existing]) {
-      const record = doc.data();
-      if (record?.status === 'connected' && record.refreshToken && GMAIL_ADDRESS.test(record.email ?? '')) return { ...record, legacy: doc === existing };
+    return connectedRecord((await tx.get(refs.privateConnection)).data());
+  }
+
+  function connectedRecord(record) {
+    return record?.source === SEND_SOURCE && record.status === 'connected' && record.refreshToken
+      && GMAIL_ADDRESS.test(record.email ?? '') ? record : null;
+  }
+
+  async function checkConnect(tx, scoped, generation) {
+    const [, snapshot] = await Promise.all([checkOwner(tx, scoped), tx.get(scoped.privateConnection)]);
+    const record = snapshot.data();
+    if (record?.status === 'connected' || record?.status === 'disconnecting') throw fail(409, 'disconnect_first');
+    const current = record?.generation ?? null;
+    if (generation !== undefined && generation !== current) throw fail(409, 'invalid_oauth');
+    return current;
+  }
+
+  async function disconnect(scoped) {
+    const generation = randomBytes(32).toString('base64url');
+    const record = await db.runTransaction(async (tx) => {
+      const [, snapshot] = await Promise.all([checkAccount(tx, scoped), tx.get(scoped.privateConnection)]);
+      const current = snapshot.data();
+      if (current?.status === 'disconnecting' && current.source === SEND_SOURCE && current.refreshToken) return current;
+      if (current?.source === SEND_SOURCE && current.status === 'connected' && current.refreshToken) {
+        const pending = { source: SEND_SOURCE, generation, status: 'disconnecting', refreshToken: current.refreshToken };
+        tx.set(scoped.privateConnection, pending);
+        return pending;
+      }
+      tx.set(scoped.privateConnection, { generation, status: 'disconnected' });
+      return null;
+    });
+    if (record) {
+      await gmail.revoke(record.refreshToken);
+      await db.runTransaction(async (tx) => {
+        const current = (await tx.get(scoped.privateConnection)).data();
+        if (current?.generation === record.generation && current.status === 'disconnecting') {
+          tx.set(scoped.privateConnection, { generation: record.generation, status: 'disconnected' });
+        }
+      });
     }
-    return null;
+    return json(200, { status: 'disconnected' });
   }
 
   async function reserve(refs, intent, limit, input) {
@@ -138,8 +177,9 @@ export function createContactHubGmail({ db, verifyToken, gmail, enabled, sending
     try {
       if (event.isBase64Encoded || typeof event.body !== 'string' || event.body.length > 55_000) throw fail(400, 'invalid_message');
       const input = JSON.parse(event.body);
-      if (!validId(input?.contactId)) throw fail(400, 'invalid_contact');
-      if (input.uid !== actor.uid) throw fail(403, 'read_only');
+      if (input?.uid !== actor.uid) throw fail(403, 'read_only');
+      if (input.action === 'disconnect') return await disconnect(refs(actor.uid));
+      if (!validId(input.contactId)) throw fail(400, 'invalid_contact');
       const scoped = refs(actor.uid, input.contactId);
       if (input.action === 'send') {
         if (!sendingEnabled()) throw fail(403, 'sending_disabled');
@@ -149,12 +189,13 @@ export function createContactHubGmail({ db, verifyToken, gmail, enabled, sending
         if (!SECRET.test(input.completion ?? '')) throw fail(400, 'invalid_oauth');
         await db.runTransaction(async (tx) => {
           const pending = db.doc(`contact_hub_gmail_oauth/${input.completion}`);
-          const [saved] = await Promise.all([tx.get(pending), checkOwner(tx, scoped)]);
+          const saved = await tx.get(pending);
           const data = saved.data();
           if (!data?.connection || data.uid !== actor.uid || data.contactId !== input.contactId
             || data.expiresAt.toMillis() <= now()) throw fail(403, 'invalid_oauth');
+          await checkConnect(tx, scoped, data.generation ?? null);
           tx.set(scoped.privateConnection, {
-            ...data.connection, source: SEND_SOURCE, status: 'connected', updatedAt: timestamp(),
+            ...data.connection, generation: data.generation ?? null, source: SEND_SOURCE, status: 'connected', updatedAt: timestamp(),
           });
           tx.delete(pending);
         });
@@ -163,8 +204,11 @@ export function createContactHubGmail({ db, verifyToken, gmail, enabled, sending
       if (input.action === 'status') {
         return await db.runTransaction(async (tx) => {
           const recipient = await checkOwner(tx, scoped);
-          const connection = await connectionFor(tx, scoped);
-          return json(200, { recipient, connected: !!connection, sender: connection?.email ?? null });
+          const record = (await tx.get(scoped.privateConnection)).data();
+          const connection = connectedRecord(record);
+          return json(200, { recipient, connected: !!connection, sender: connection?.email ?? null,
+            ...(record?.status === 'disconnecting' ? { disconnectPending: true } : {}),
+          });
         });
       }
       if (input.action !== 'connect') throw fail(400, 'invalid_action');
@@ -173,9 +217,9 @@ export function createContactHubGmail({ db, verifyToken, gmail, enabled, sending
       const browser = randomBytes(32).toString('base64url');
       const verifier = randomBytes(32).toString('base64url');
       await db.runTransaction(async (tx) => {
-        await checkOwner(tx, scoped);
+        const generation = await checkConnect(tx, scoped);
         tx.set(db.doc(`contact_hub_gmail_oauth/${state}`), {
-          uid: actor.uid, contactId: input.contactId, verifier, browserHash: hash(browser), expiresAt: timestamp(now() + OAUTH_AGE),
+          uid: actor.uid, contactId: input.contactId, generation, verifier, browserHash: hash(browser), expiresAt: timestamp(now() + OAUTH_AGE),
         });
       });
       return json(200, { url: gmail.connectUrl(state, verifier) }, { 'Set-Cookie': cookie(browser, OAUTH_AGE / 1000) });
@@ -199,7 +243,7 @@ export function createContactHubGmail({ db, verifyToken, gmail, enabled, sending
           || !/^[a-f0-9]{64}$/.test(saved.browserHash)
           || !timingSafeEqual(Buffer.from(saved.browserHash), Buffer.from(hash(browser)))) throw fail(403, 'invalid_oauth');
         const scoped = refs(saved.uid, saved.contactId);
-        await checkOwner(tx, scoped);
+        await checkConnect(tx, scoped, saved.generation ?? null);
         tx.delete(stateRef);
         return { saved, scoped };
       });
@@ -208,9 +252,9 @@ export function createContactHubGmail({ db, verifyToken, gmail, enabled, sending
       const connection = await gmail.exchange(code, claimed.saved.verifier);
       const completion = randomBytes(32).toString('base64url');
       await db.runTransaction(async (tx) => {
-        await checkOwner(tx, claimed.scoped);
+        await checkConnect(tx, claimed.scoped, claimed.saved.generation ?? null);
         tx.set(db.doc(`contact_hub_gmail_oauth/${completion}`), {
-          uid: claimed.saved.uid, contactId: claimed.saved.contactId, connection, expiresAt: timestamp(now() + OAUTH_AGE),
+          uid: claimed.saved.uid, contactId: claimed.saved.contactId, generation: claimed.saved.generation ?? null, connection, expiresAt: timestamp(now() + OAUTH_AGE),
         });
       });
       return redirect(`${pathFor(claimed.saved.contactId)}&gmail_connection=${completion}`);

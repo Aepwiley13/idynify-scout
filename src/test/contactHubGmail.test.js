@@ -9,6 +9,9 @@ function fixture({ sendingEnabled = true, now = () => 1_000 } = {}) {
     ['users/owner/contacts/sam', { email: 'sam@example.com' }],
     ['users/owner/integrations/gmail', { status: 'connected', email: 'me@example.com', refreshToken: 'private' }],
   ]);
+  records.set('contact_hub_gmail/owner', {
+    status: 'connected', source: 'contact_hub_manual', email: 'me@example.com', refreshToken: 'dedicated',
+  });
   const sessions = [];
   const timestamp = (ms = 1_000) => ({ toMillis: () => ms });
   const doc = (path) => ({
@@ -33,6 +36,7 @@ function fixture({ sendingEnabled = true, now = () => 1_000 } = {}) {
     },
   };
   const gmail = {
+    revoke: vi.fn(async () => {}),
     send: vi.fn(async () => 'gmail-id'),
     connectUrl: vi.fn((state) => `https://accounts.google.com/?state=${state}`),
     exchange: vi.fn(async () => ({ email: 'mine@example.com', refreshToken: 'new-private' })),
@@ -64,7 +68,7 @@ describe('Contact Hub manual Gmail', () => {
     await Promise.all([call(draft), call(draft)]);
     expect((await call(draft)).data).toEqual({ status: 'sent' });
     expect(gmail.send).toHaveBeenCalledTimes(1);
-    expect(gmail.send).toHaveBeenCalledWith({ ...integration, legacy: true }, { toEmail: 'alex@example.com', subject: 'Hello', body: 'Great to meet you' });
+    expect(gmail.send).toHaveBeenCalledWith(records.get('contact_hub_gmail/owner'), { toEmail: 'alex@example.com', subject: 'Hello', body: 'Great to meet you' });
     expect(records.get(`users/owner/contacts/alex/timeline/contact-hub-gmail-${draft.requestId}`)).toMatchObject({
       type: 'message_sent', actor: 'user', preview: 'Hello',
       metadata: { channel: 'email', source: 'contact_hub_manual', gmail_message_id: 'gmail-id' },
@@ -121,9 +125,40 @@ describe('Contact Hub manual Gmail', () => {
     expect(gmail.send).toHaveBeenCalledTimes(31);
   });
 
+  it('disconnects only the dedicated grant, retries revocation, and keeps sent activity', async () => {
+    const { records, sessions, gmail, call, message } = fixture();
+    const scout = records.get('users/owner/integrations/gmail');
+    expect((await call(message())).data.status).toBe('sent');
+    sessions.push({});
+    expect((await call({ action: 'disconnect' })).data.error).toBe('read_only');
+    sessions.pop();
+    gmail.revoke.mockRejectedValueOnce(new Error('temporary'));
+    expect((await call({ action: 'disconnect' })).statusCode).toBe(503);
+    expect((await call({ action: 'status' })).data).toMatchObject({ connected: false, disconnectPending: true });
+    expect((await call(message())).data.error).toBe('connect_gmail');
+    expect((await call({ action: 'connect' })).data.error).toBe('disconnect_first');
+    expect((await call({ action: 'disconnect', contactId: null })).data.status).toBe('disconnected');
+    expect(gmail.revoke.mock.calls).toEqual([['dedicated'], ['dedicated']]);
+    expect(records.get('contact_hub_gmail/owner')).toEqual({ generation: expect.any(String), status: 'disconnected' });
+    expect(records.get('users/owner/integrations/gmail')).toEqual(scout);
+    expect((await call({ action: 'status' })).data.connected).toBe(false);
+    expect([...records.keys()].some((key) => key.includes('/timeline/'))).toBe(true);
+  });
+
+  it('invalidates an OAuth attempt started before disconnect', async () => {
+    const { records, gmail, call, callback } = fixture();
+    records.delete('contact_hub_gmail/owner');
+    const started = await call({ action: 'connect' });
+    await call({ action: 'disconnect' });
+    const state = new URL(started.data.url).searchParams.get('state');
+    await callback({ httpMethod: 'GET', queryStringParameters: { state, code: 'oauth-code' },
+      headers: { cookie: started.headers['Set-Cookie'].split(';')[0] } });
+    expect(gmail.exchange).not.toHaveBeenCalled();
+  });
+
   it('finishes OAuth only in the originating browser, account, and contact', async () => {
     const { records, gmail, call, callback } = fixture();
-    records.delete('users/owner/integrations/gmail');
+    records.delete('contact_hub_gmail/owner');
     expect((await call({ action: 'status' })).data.connected).toBe(false);
     const started = await call({ action: 'connect' });
     const state = new URL(started.data.url).searchParams.get('state');

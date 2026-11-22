@@ -15,6 +15,7 @@ const feedback = {
   connect_gmail: 'Your Gmail connection needs attention. Connect Gmail to continue.',
   recipient_changed: 'The saved email address changed. Reopen the composer to check the new address.',
   sender_changed: 'The connected Gmail account changed. Reopen the composer to check the sending address.',
+  disconnect_first: 'Disconnect Gmail before connecting a different account.',
   read_only: 'Sending is unavailable in this session.',
   missing_email: 'This contact no longer has a usable saved email address.',
   activity_unavailable: 'Email sent. The activity entry could not be saved.',
@@ -105,6 +106,25 @@ function Compose({ uid, contactId, onClose, failedConnection, completion, openCo
     }
   }
 
+  async function disconnect() {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setBusy(true);
+    try {
+      await request(uid, contactId, 'disconnect', {}, () => active.current);
+      setConnection((previous) => ({ ...previous, connected: false, sender: null, disconnectPending: false }));
+      setNotice('Gmail disconnected.');
+    } catch {
+      if (active.current) {
+        setConnection((previous) => ({ ...previous, connected: false, disconnectPending: true }));
+        setNotice('Gmail disconnect could not be confirmed. Try again.');
+      }
+    } finally {
+      inFlight.current = false;
+      if (active.current) setBusy(false);
+    }
+  }
+
   async function send(event) {
     event.preventDefault();
     if (inFlight.current || needsReview || sent || !connection?.connected || !subject.trim() || !message.trim()) return;
@@ -120,14 +140,14 @@ function Compose({ uid, contactId, onClose, failedConnection, completion, openCo
       if (result.status === 'sent') {
         setSent(true);
       } else if (result.status !== 'rejected') setNeedsReview(true);
-      if (result.reason === 'connect_gmail') setConnection((previous) => ({ ...previous, connected: false }));
+      if (result.reason === 'connect_gmail') setConnection((previous) => ({ ...previous, connected: false, disconnectPending: true }));
       setNotice(result.status === 'sent' ? feedback[result.reason] || 'Email sent.' : feedback[result.reason] || '');
     } catch (error) {
       if (error.uncertain || !active.current) {
         if (active.current) setNeedsReview(true);
       } else {
         sessionStorage.removeItem(storageKey);
-        if (error.code === 'connect_gmail') setConnection((previous) => ({ ...previous, connected: false }));
+        if (error.code === 'connect_gmail') setConnection((previous) => ({ ...previous, connected: false, disconnectPending: true }));
         setNotice(feedback[error.code] || 'Email could not be sent. Try again.');
       }
     } finally {
@@ -162,7 +182,8 @@ function Compose({ uid, contactId, onClose, failedConnection, completion, openCo
             setSubject('');
             setMessage('');
           }}>I checked Gmail Sent</button>}
-          {!needsReview && connection && !connection.connected && <button type="button" disabled={busy} onClick={connect}>Connect Gmail</button>}
+          {(connection?.connected || connection?.disconnectPending) && <button type="button" disabled={busy} onClick={disconnect}>Disconnect Gmail</button>}
+          {!needsReview && connection && !connection.connected && !connection.disconnectPending && <button type="button" disabled={busy} onClick={connect}>Connect Gmail</button>}
           {!needsReview && connection?.connected && !sent && <button type="submit" disabled={busy || !subject.trim() || !message.trim()}>{busy ? 'Sending…' : 'Send email'}</button>}
         </div>
       </form>

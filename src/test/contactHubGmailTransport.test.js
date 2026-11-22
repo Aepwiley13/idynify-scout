@@ -32,24 +32,15 @@ beforeEach(() => {
 afterEach(() => vi.resetAllMocks());
 
 describe('Contact Hub Gmail transport', () => {
-  it.each([
-    { email: 'other@example.org', verified_email: true },
-    { email: 'sender@example.org', verified_email: false },
-  ])('stops a legacy send when Google identity is not verified for the selected sender', async (identity) => {
-    mocks.identity.mockResolvedValueOnce({ data: identity });
-    await expect(testTransport.current.send({ ...connection, legacy: true }, message)).rejects.toMatchObject({ code: 'connect_gmail' });
+  it('refuses Scout credentials at the transport boundary', async () => {
+    await expect(testTransport.current.send({ ...connection, legacy: true }, message))
+      .rejects.toMatchObject({ code: 'connect_gmail' });
     expect(mocks.deliver).not.toHaveBeenCalled();
   });
 
-  it('uses a verified legacy sender with transport retry disabled', async () => {
-    await expect(testTransport.current.send({ ...connection, legacy: true }, message)).resolves.toBe('fixture-id');
-    expect(mocks.identity).toHaveBeenCalledOnce();
-    expect(mocks.deliver).toHaveBeenCalledWith({ userId: 'me', requestBody: { raw: expect.any(String) } }, { retry: false, timeout: 12_000 });
-  });
-
-  it('uses the dedicated connection whose sender was verified during OAuth', async () => {
-    await expect(testTransport.current.send({ ...connection, legacy: false }, message)).resolves.toBe('fixture-id');
+  it('uses the verified dedicated sender with transport retry disabled', async () => {
+    await expect(testTransport.current.send({ ...connection, source: 'contact_hub_manual' }, message)).resolves.toBe('fixture-id');
     expect(mocks.identity).not.toHaveBeenCalled();
-    expect(mocks.deliver).toHaveBeenCalledOnce();
+    expect(mocks.deliver).toHaveBeenCalledWith({ userId: 'me', requestBody: { raw: expect.any(String) } }, { retry: false, timeout: 12_000 });
   });
 });

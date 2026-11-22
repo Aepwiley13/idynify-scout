@@ -207,22 +207,22 @@ export default function CampaignDetail() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="text-cyan-400 text-xl font-mono">Loading campaign...</div>
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+        <div className="text-[color:var(--text-secondary)] text-xl font-mono">Loading campaign...</div>
       </div>
     );
   }
 
   if (error && !campaign) {
     return (
-      <div className="min-h-screen bg-white text-gray-900 flex items-center justify-center">
-        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-8 max-w-md">
-          <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+      <div className="min-h-screen bg-[var(--bg-primary)] text-[color:var(--text-primary)] flex items-center justify-center">
+        <div className="bg-[var(--bg-card)] border border-[color:var(--border)] rounded-2xl p-8 max-w-md">
+          <AlertCircle className="w-12 h-12 text-[color:color-mix(in_srgb,#ef4444_70%,var(--text-primary))] mx-auto mb-4" />
           <h2 className="text-xl font-bold text-center mb-2">Error</h2>
-          <p className="text-gray-500 text-center mb-6">{error}</p>
+          <p className="text-[color:var(--text-secondary)] text-center mb-6">{error}</p>
           <button
             onClick={() => navigate('/hunter?tab=campaigns')}
-            className="w-full px-6 py-3 bg-gray-200 hover:bg-gray-300 rounded-lg font-bold transition-colors"
+            className="w-full px-6 py-3 bg-[var(--bg-secondary)] hover:bg-[var(--bg-card-2)] border border-[color:var(--border-2)] text-[color:var(--text-primary)] rounded-lg font-bold transition-colors"
           >
             Back to Hunter
           </button>
@@ -233,30 +233,30 @@ export default function CampaignDetail() {
 
   const stats = getCampaignStats();
   const statusColor = {
-    draft: 'text-gray-500 bg-gray-200',
-    in_progress: 'text-blue-400 bg-blue-500/20',
-    completed: 'text-green-400 bg-green-500/20'
-  }[campaign.status] || 'text-gray-500 bg-gray-200';
+    draft: 'text-[color:var(--text-secondary)] bg-[var(--bg-secondary)] border border-[color:var(--border-2)]',
+    in_progress: 'text-[color:var(--text-primary)] bg-[var(--accent-bg)] border border-[color:var(--accent-border)]',
+    completed: 'text-[color:var(--text-primary)] bg-[var(--status-success-bg)] border border-green-500/30'
+  }[campaign.status] || 'text-[color:var(--text-secondary)] bg-[var(--bg-secondary)] border border-[color:var(--border-2)]';
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
+    <div className="min-h-screen bg-[var(--bg-primary)] text-[color:var(--text-primary)]">
       {/* Send Confirmation Modal */}
       {showSendConfirm !== null && (() => {
         const items = campaign.contacts || campaign.messages;
         const currentMessage = items[showSendConfirm];
         return (
           <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-            <div className="bg-white border border-gray-200 rounded-2xl p-8 max-w-md w-full mx-4">
+            <div className="bg-[var(--bg-card)] border border-[color:var(--border)] rounded-2xl p-8 max-w-md w-full mx-4">
               <h3 className="text-xl font-bold mb-4">Send Email?</h3>
               <div className="mb-6">
-                <p className="text-gray-700 mb-2">
+                <p className="text-[color:var(--text-primary)] mb-2">
                   Send email to <span className="font-bold">{currentMessage.contactName || currentMessage.name}</span>?
                 </p>
-                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
-                  <div className="text-sm text-gray-500 mb-2">Subject:</div>
+                <div className="bg-[var(--bg-card-2)] border border-[color:var(--border)] rounded-lg p-4 mt-4">
+                  <div className="text-sm text-[color:var(--text-secondary)] mb-2">Subject:</div>
                   <div className="font-medium mb-3">{currentMessage.subject}</div>
-                  <div className="text-sm text-gray-500 mb-2">Preview:</div>
-                  <div className="text-sm text-gray-700 line-clamp-3">
+                  <div className="text-sm text-[color:var(--text-secondary)] mb-2">Preview:</div>
+                  <div className="text-sm text-[color:var(--text-primary)] line-clamp-3">
                     {currentMessage.body.substring(0, 150)}...
                   </div>
                 </div>
@@ -264,14 +264,14 @@ export default function CampaignDetail() {
             <div className="flex gap-4">
               <button
                 onClick={() => setShowSendConfirm(null)}
-                className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 rounded-lg font-bold transition-colors"
+                className="flex-1 px-6 py-3 bg-[var(--bg-secondary)] hover:bg-[var(--bg-card-2)] border border-[color:var(--border-2)] text-[color:var(--text-primary)] rounded-lg font-bold transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={() => handleSendEmail(showSendConfirm)}
                 disabled={sendingIndex !== null}
-                className="flex-1 px-6 py-3 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 rounded-lg font-bold transition-all flex items-center justify-center gap-2"
+                className="flex-1 px-6 py-3 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white rounded-lg font-bold transition-all flex items-center justify-center gap-2"
               >
                 {sendingIndex === showSendConfirm ? (
                   <>
@@ -292,13 +292,13 @@ export default function CampaignDetail() {
       })()}
 
       {/* Header */}
-      <div className="border-b border-gray-200 bg-gray-50 backdrop-blur-sm sticky top-0 z-10">
+      <div className="border-b border-[color:var(--border)] bg-[var(--bg-nav)] backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-5xl mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
               <button
                 onClick={() => navigate('/hunter?tab=campaigns')}
-                className="text-gray-500 hover:text-gray-900 transition-colors"
+                className="text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
@@ -309,7 +309,7 @@ export default function CampaignDetail() {
                     {campaign.status === 'in_progress' ? 'In Progress' : campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
                   </span>
                   {campaign.reconUsed && (
-                    <span className="flex items-center gap-1 px-3 py-1 bg-purple-500/20 border border-purple-500/30 rounded-full text-xs text-purple-400">
+                    <span className="flex items-center gap-1 px-3 py-1 bg-[var(--accent-bg)] border border-[color:var(--accent-border)] rounded-full text-xs text-[color:var(--text-primary)]">
                       <Sparkles className="w-3 h-3" />
                       RECON
                     </span>
@@ -322,15 +322,15 @@ export default function CampaignDetail() {
             <div className="flex items-center gap-6 text-sm">
               <div className="text-center">
                 <div className="text-2xl font-bold">{stats.total}</div>
-                <div className="text-gray-500">Total</div>
+                <div className="text-[color:var(--text-secondary)]">Total</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-green-400">{stats.sent}</div>
-                <div className="text-gray-500">Sent</div>
+                <div className="text-2xl font-bold text-[color:var(--text-primary)]">{stats.sent}</div>
+                <div className="text-[color:var(--text-secondary)]">Sent</div>
               </div>
               <div className="text-center">
-                <div className="text-2xl font-bold text-gray-500">{stats.pending}</div>
-                <div className="text-gray-500">Pending</div>
+                <div className="text-2xl font-bold text-[color:var(--text-secondary)]">{stats.pending}</div>
+                <div className="text-[color:var(--text-secondary)]">Pending</div>
               </div>
             </div>
           </div>
@@ -340,9 +340,9 @@ export default function CampaignDetail() {
       {/* Main Content */}
       <div className="max-w-5xl mx-auto px-6 py-8">
         {error && (
-          <div className="mb-6 bg-red-500/20 border border-red-500/30 rounded-lg p-4 flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-red-400" />
-            <span className="text-red-400">{error}</span>
+          <div className="mb-6 bg-[var(--status-error-bg)] border border-red-500/30 rounded-lg p-4 flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-[color:color-mix(in_srgb,#ef4444_70%,var(--text-primary))]" />
+            <span className="text-[color:var(--text-primary)]">{error}</span>
           </div>
         )}
 
@@ -352,10 +352,10 @@ export default function CampaignDetail() {
           {(campaign.contacts || campaign.messages).map((message, index) => (
             <div
               key={index}
-              className={`bg-gray-50 border rounded-xl p-6 transition-all ${
+              className={`bg-[var(--bg-card)] border rounded-xl p-6 transition-all ${
                 message.status === 'sent'
                   ? 'border-green-500/30'
-                  : 'border-gray-200'
+                  : 'border-[color:var(--border)]'
               }`}
             >
               {/* Message Header */}
@@ -364,24 +364,24 @@ export default function CampaignDetail() {
                   <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                     message.status === 'sent'
                       ? 'bg-green-500/20'
-                      : 'bg-purple-500/20'
+                      : 'bg-[var(--accent-bg)]'
                   }`}>
                     {message.status === 'sent' ? (
-                      <CheckCircle className="w-5 h-5 text-green-400" />
+                      <CheckCircle className="w-5 h-5 text-[color:color-mix(in_srgb,#16a34a_70%,var(--text-primary))]" />
                     ) : (
-                      <Mail className="w-5 h-5 text-purple-400" />
+                      <Mail className="w-5 h-5 text-[color:var(--accent)]" />
                     )}
                   </div>
                   <div>
                     <div className="font-medium">{message.contactName}</div>
-                    <div className="text-sm text-gray-500">{message.contactEmail}</div>
+                    <div className="text-sm text-[color:var(--text-secondary)]">{message.contactEmail}</div>
                   </div>
                 </div>
 
                 <div className="flex items-center gap-2">
                   {message.status === 'sent' ? (
                     <div className="flex items-center gap-4">
-                      <div className="text-sm text-green-400">
+                      <div className="text-sm text-[color:var(--text-primary)]">
                         ✓ Sent {new Date(message.sentAt).toLocaleString()}
                       </div>
                       {/* NEW: Outcome tracker for Phase 1 campaigns (only if using contacts structure) */}
@@ -397,14 +397,14 @@ export default function CampaignDetail() {
                     <>
                       <button
                         onClick={cancelEdit}
-                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                        className="px-4 py-2 bg-[var(--bg-secondary)] hover:bg-[var(--bg-card-2)] border border-[color:var(--border-2)] text-[color:var(--text-primary)] rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                       >
                         <X className="w-4 h-4" />
                         Cancel
                       </button>
                       <button
                         onClick={saveEdit}
-                        className="px-4 py-2 bg-blue-500 hover:bg-blue-600 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                       >
                         <Save className="w-4 h-4" />
                         Save
@@ -414,7 +414,7 @@ export default function CampaignDetail() {
                     <>
                       <button
                         onClick={() => startEditing(index)}
-                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
+                        className="px-4 py-2 bg-[var(--bg-secondary)] hover:bg-[var(--bg-card-2)] border border-[color:var(--border-2)] text-[color:var(--text-primary)] rounded-lg text-sm font-medium transition-colors flex items-center gap-2"
                       >
                         <Edit3 className="w-4 h-4" />
                         Edit
@@ -422,7 +422,7 @@ export default function CampaignDetail() {
                       <button
                         onClick={() => setShowSendConfirm(index)}
                         disabled={sendingIndex !== null}
-                        className="px-4 py-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 rounded-lg text-sm font-medium transition-all flex items-center gap-2"
+                        className="px-4 py-2 bg-gradient-to-r from-pink-600 to-purple-600 hover:from-pink-700 hover:to-purple-700 text-white rounded-lg text-sm font-medium transition-all flex items-center gap-2"
                       >
                         <Send className="w-4 h-4" />
                         Send Email
@@ -441,7 +441,7 @@ export default function CampaignDetail() {
                       type="text"
                       value={editedMessage.subject}
                       onChange={(e) => setEditedMessage({ ...editedMessage, subject: e.target.value })}
-                      className="w-full px-4 py-2 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 transition-colors"
+                      className="w-full px-4 py-2 bg-[var(--input-bg)] text-[color:var(--text-primary)] border border-[color:var(--input-border)] rounded-lg focus:outline-none focus:border-[color:var(--input-focus)] transition-colors"
                     />
                   </div>
                   <div>
@@ -450,19 +450,19 @@ export default function CampaignDetail() {
                       value={editedMessage.body}
                       onChange={(e) => setEditedMessage({ ...editedMessage, body: e.target.value })}
                       rows={10}
-                      className="w-full px-4 py-3 bg-white border border-gray-200 rounded-lg focus:outline-none focus:border-purple-500 transition-colors font-mono text-sm"
+                      className="w-full px-4 py-3 bg-[var(--input-bg)] text-[color:var(--text-primary)] border border-[color:var(--input-border)] rounded-lg focus:outline-none focus:border-[color:var(--input-focus)] transition-colors font-mono text-sm"
                     />
                   </div>
                 </div>
               ) : (
                 <div className="space-y-3">
                   <div>
-                    <div className="text-sm text-gray-500 mb-1">Subject:</div>
+                    <div className="text-sm text-[color:var(--text-secondary)] mb-1">Subject:</div>
                     <div className="font-medium">{message.subject}</div>
                   </div>
                   <div>
-                    <div className="text-sm text-gray-500 mb-1">Message:</div>
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 font-mono text-sm whitespace-pre-wrap">
+                    <div className="text-sm text-[color:var(--text-secondary)] mb-1">Message:</div>
+                    <div className="bg-[var(--bg-card-2)] border border-[color:var(--border)] rounded-lg p-4 font-mono text-sm whitespace-pre-wrap">
                       {message.body}
                     </div>
                   </div>

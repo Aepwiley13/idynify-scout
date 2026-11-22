@@ -30,13 +30,14 @@
   transition: opacity 0.15s, background 0.15s;
 }
 
-/* Same brand gradient as the wizard's primary buttons. */
+/* Same brand gradient as the wizard's primary buttons: pink-600 -> purple-600,
+   darkening to pink-700 -> purple-700 on hover. White stays >= 4.5:1 at every stop. */
 .campaigns-new-btn {
   color: #fff;
   border: none;
-  background: linear-gradient(to right, #ec4899, #9333ea);
+  background: linear-gradient(to right, #db2777, #9333ea);
 }
-.campaigns-new-btn:hover { opacity: 0.9; }
+.campaigns-new-btn:hover { background: linear-gradient(to right, #be185d, #7e22ce); }
 
 .campaigns-retry-btn {
   color: var(--text-primary);

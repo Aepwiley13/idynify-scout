@@ -138,3 +138,13 @@ with conflicting job titles and a similar-name match. Add `&scout=1`,
 ```sh
 node scripts/visual/contact-profile/capture.mjs /tmp/idynify-duplicate-review-browser --duplicates
 ```
+
+The trusted-merge UI demo uses the same server and synthetic contacts. Open
+`profile.html?duplicates=1&merge_demo=1`, select Jordan as the survivor, verify
+the preview, choose a job title, verify again, then confirm. The browser
+fixture simulates receipts, dismissals, and rollback. The Firestore emulator
+and backend tests verify the separate trusted implementation.
+
+```sh
+node scripts/visual/contact-profile/capture.mjs /tmp/idynify-trusted-merge-browser --merge
+```

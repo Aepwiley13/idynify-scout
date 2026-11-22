@@ -21,7 +21,8 @@ import { join } from 'node:path';
 const OUT = process.argv[2];
 if (!OUT) { console.error('usage: captureEdit.mjs <output folder>'); process.exit(2); }
 mkdirSync(OUT, { recursive: true });
-const duplicateReview = process.argv.includes('--duplicates');
+const mergeReview = process.argv.includes('--merge');
+const duplicateReview = process.argv.includes('--duplicates') || mergeReview;
 const workspaceReview = process.argv.includes('--workspace');
 const gmailReview = process.argv.includes('--gmail');
 const origin = `http://127.0.0.1:${process.env.CONTACT_HUB_FIXTURE_PORT || (duplicateReview ? 5317 : gmailReview ? 5312 : 5311)}`;
@@ -157,6 +158,47 @@ const load = async (query) => {
   await wait(500);
 };
 const pickContact = async (id) => { await click(demoBtn(id)); await until(`document.querySelector('.demo-btn[aria-pressed="true"]').textContent === ${JSON.stringify(id)}`); await wait(500); };
+
+if (mergeReview) {
+  const dialog = "document.querySelector('.hub-duplicate-dialog[open]')";
+  const select = (expr, value) => evaluate(`(() => { const field = ${expr}; field.value = ${JSON.stringify(value)};
+    field.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+  for (const view of VIEWPORTS) {
+    await send('Emulation.setDeviceMetricsOverride', { width: view.width, height: view.height, deviceScaleFactor: view.dpr, mobile: view.mobile });
+    await send('Page.navigate', { url: `${BASE}?duplicates=1&merge_demo=1${view.mobile ? '&scout=1&theme=dark' : ''}` });
+    await until(byText('Review duplicates (2)'), 25_000);
+    await click(byText('Review duplicates (2)'));
+    await select(`(${dialog}).querySelector('label select:not([aria-label])')`, 'jordan');
+    await click(byText('Verify merge preview', dialog));
+    await until(byLabel('Resolve title'));
+    await select(byLabel('Resolve title'), '1');
+    await click(byText('Verify merge preview', dialog));
+    check(view.id + ' verified before confirmation', await until(byText('Confirm merge', dialog)));
+    await shot(join(OUT, `trusted-merge-${view.id}-preview.png`));
+    await click(byText('Confirm merge', dialog));
+    check(view.id + ' merge receipt shown', await until(`(${dialog})?.innerText.includes('Contacts merged')`));
+    await click(byText('Check rollback eligibility', dialog));
+    await click(byText('Confirm rollback', dialog));
+    check(view.id + ' shows verified rollback outcome', await until(`(${dialog})?.innerText.includes('Merge rolled back')`));
+    check(view.id + ' did not call cloud fixture writes', (await writeRows()).length === 0);
+  }
+  await send('Page.navigate', { url: `${BASE}?duplicates=1&merge_demo=1` });
+  await until(byText('Review duplicates (2)'), 25_000);
+  await click(byText('Review duplicates (2)'));
+  await until(`!(${byText('Not a duplicate', dialog)})?.disabled`);
+  await click(byText('Not a duplicate', dialog));
+  check('dismissal updates count', await until(`(${dialog})?.innerText.includes('Pair 1 of 1')`));
+  await send('Page.reload');
+  check('dismissal survives reload', await until(byText('Review duplicates (1)'), 25_000));
+  await click(byText('Review duplicates (1)'));
+  await click(byText('Show dismissed pairs', dialog));
+  check('restoring a dismissal recovers the pair', await until(`(${dialog})?.innerText.includes('Pair 1 of 2')`));
+  check('no browser exceptions', problems.length === 0);
+  check('no remote API requests', [...blocked].every((url) => FONT_HOSTS.some((re) => re.test(url))));
+  writeFileSync(join(OUT, 'trusted-merge-report.json'), JSON.stringify({ checks, blocked: [...blocked], problems }, null, 2));
+  console.log(`Trusted merge browser smoke: ${checks.filter(({ pass }) => pass).length}/${checks.length} passed`);
+  process.exit(checks.some(({ pass }) => !pass) ? 1 : 0);
+}
 
 if (duplicateReview) {
   const dialog = "document.querySelector('.hub-duplicate-dialog[open]')";

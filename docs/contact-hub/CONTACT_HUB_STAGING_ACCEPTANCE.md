@@ -474,3 +474,28 @@ the local review state. Read-only users can compare available contacts.
 The review performs no additional Firestore or paid-provider calls.
 [Trusted merge execution proposal](TRUSTED_CONTACT_MERGE_PROPOSAL.md)
 requires separate approval.
+
+### Trusted merge local checkpoint
+
+Keep `VITE_CONTACT_HUB_MERGE`, `CONTACT_HUB_MERGE`, and
+`CONTACT_HUB_MERGE_EXECUTION` unset or off on the accepted staging candidate.
+The trusted Web function requires a server-only `CONTACT_HUB_MERGE_SECRET`
+of at least 32 characters when its review gate is enabled. Never use the
+fixture signing key outside its test process. Contact deletion, photo
+persistence and Gmail sending remain independently disabled.
+
+The gated atomic path handles bounded pairs with supported contact facts
+and timeline records. It refuses private photo overrides, reminder/queue
+data, unsupported worker records, unresolved Gmail attempts, and opt-outs
+that cannot be transferred under a verified downstream policy. New Contact
+Hub Gmail reservations store the contact ID from the authoritative document
+reference. Legacy ledger rows remain as written. Supported historical profile
+links use an owner-only resolution of the frozen retired record.
+
+Before any execution activation, verify adoption of the lifecycle fence by
+all remaining Admin writers, including Scout scheduling/provider claims, and
+complete unresolved reference/consent inventories. Approve cleanup and
+retention for recovery snapshots, retirement markers, and dismissals,
+including account removal. The UI reports blockers and automatically
+refuses rollback after intervening changes. Verify against production-like
+Firestore limits and QA account fixtures before approval.

@@ -16,7 +16,7 @@
  * WHAT IT REUSES (nothing is re-invented):
  *   name           utils/contactDisplayName   (the rule behind peopleRules' personName)
  *   photo          utils/contactPhoto         (hasRealContactPhoto, resolveContactPhotoSources)
- *   phones         utils/contactPhones        (readContactPhones, primaryPhone, phoneDisplay)
+ *   phones         utils/contactPhones        (preferredContactPhone, phoneDisplay)
  *   social         utils/socialProfiles       (readSocialProfiles: addresses are rebuilt from the
  *                                              platform's own rule, so only https links to the
  *                                              platform itself ever come out)
@@ -52,7 +52,7 @@
 import { emailOf } from '../../../utils/savedContactEmail.js';
 import { contactDisplayName, nameParts, UNKNOWN_CONTACT } from '../../../utils/contactDisplayName.js';
 import { resolveContactPhotoSources } from '../../../utils/contactPhoto.js';
-import { primaryPhone, phoneDisplay, readContactPhones } from '../../../utils/contactPhones.js';
+import { preferredContactPhone, phoneDisplay } from '../../../utils/contactPhones.js';
 import { readSocialProfiles, platformLabel } from '../../../utils/socialProfiles.js';
 import { STICKER_COLORS, visibleStickers } from '../../../services/stickers/stickerCore.js';
 
@@ -131,7 +131,7 @@ export function safeTelHref(value) {
 }
 
 function phoneOf(contact) {
-  const entry = primaryPhone(readContactPhones(contact));
+  const entry = preferredContactPhone(contact);
   if (!entry) return null;
   const href = safeTelHref(entry.value);
   if (!href) return null;

@@ -1,3 +1,4 @@
+import TrustedMergeReview from './TrustedMergeReview';
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useT } from '../../../theme/ThemeContext';
 import { getInitials } from '../../../utils/contactPhoto';
@@ -68,13 +69,38 @@ function Comparison({ pair, stickers }) {
   </>;
 }
 
-export default function DuplicateReview({ contacts, stickers, readOnly }) {
+export default function DuplicateReview({ contacts, stickers, readOnly, request, onMerged }) {
   const T = useT();
   const title = useId();
   const dialog = useRef(null);
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [dismissed, setDismissed] = useState([]);
+  const [notice, setNotice] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [latest, setLatest] = useState(null);
+  const [persisted, setPersisted] = useState(false);
+  const pending = useRef(false);
+  const live = useRef(false);
+  const pairId = (ids) => JSON.stringify([...ids].sort((a, b) => a.localeCompare(b)));
+  useEffect(() => { live.current = true; return () => { live.current = false; }; }, []);
+  useEffect(() => {
+    if (!request || readOnly || persisted) return undefined;
+    let active = true;
+    async function load() {
+      const saved = [];
+      let cursor;
+      do {
+        const page = await request('dismissals', { cursor }, () => active);
+        if (active && !cursor) setLatest(page.latest);
+        saved.push(...page.pairs.map(pairId));
+        cursor = page.cursor;
+      } while (cursor && active);
+      if (active) { setDismissed(saved); setPersisted(true); }
+    }
+    load().catch(() => { if (active) setNotice('Saved dismissals could not be loaded. Reopen to retry.'); });
+    return () => { active = false; };
+  }, [open, request, readOnly, persisted]);
   const pairs = useMemo(() => detectPossibleDuplicates(contacts), [contacts]);
   const visible = pairs.filter((pair) => !dismissed.includes(pair.id));
   const index = Math.max(0, visible.findIndex((pair) => pair.id === selected));
@@ -87,6 +113,28 @@ export default function DuplicateReview({ contacts, stickers, readOnly }) {
     return () => element.close?.();
   }, [open]);
 
+  async function saveDismissal(action, targets) {
+    if (pending.current) return;
+    pending.current = true;
+    setSaving(true);
+    setNotice('');
+    try {
+      for (const key of targets) {
+        if (request) {
+          const [sourceId, survivorId] = JSON.parse(key);
+          await request(action, { sourceId, survivorId }, () => live.current);
+        }
+        if (!live.current) return;
+        setDismissed((previous) => action === 'dismiss' ? [...new Set([...previous, key])] : previous.filter((id) => id !== key));
+      }
+    } catch {
+      if (live.current) setNotice('Dismissal could not be updated. Try again.');
+    } finally {
+      pending.current = false;
+      if (live.current) setSaving(false);
+    }
+  }
+
   return <>
     <button type="button" className="hub-secondary-btn" onClick={() => setOpen(true)}>
       Review duplicates ({visible.length})
@@ -98,19 +146,26 @@ export default function DuplicateReview({ contacts, stickers, readOnly }) {
       <header><h2 id={title}>Possible duplicates</h2>
         <button type="button" className="hub-secondary-btn" autoFocus onClick={() => setOpen(false)}>Close</button>
       </header>
+      {notice && <p role="alert">{notice}</p>}
       <p role="status">{pair ? `Pair ${index + 1} of ${visible.length}` : 'No possible duplicates to review.'}</p>
       {pair && <>
         <nav className="hub-duplicate-actions" aria-label="Duplicate pairs">
           <button type="button" className="hub-secondary-btn" disabled={index === 0} onClick={() => setSelected(visible[index - 1].id)}>Previous</button>
           <button type="button" className="hub-secondary-btn" disabled={index + 1 === visible.length} onClick={() => setSelected(visible[index + 1].id)}>Next</button>
-          {!readOnly && <button type="button" className="hub-secondary-btn" onClick={() => {
-            setDismissed((previous) => [...previous, pair.id]);
-            setSelected(visible[index + 1]?.id ?? visible[index - 1]?.id ?? null);
-          }}>Not a duplicate</button>}
+          {!readOnly && <button type="button" className="hub-secondary-btn" disabled={saving || (request && !persisted)} onClick={() => saveDismissal('dismiss', [pair.id])}>Not a duplicate</button>}
         </nav>
         <Comparison key={pair.id} pair={pair} stickers={stickers} />
+        {request && !readOnly && <TrustedMergeReview key={pair.id} pair={pair} request={request} onMerged={() => {
+          setOpen(false);
+          onMerged?.();
+        }} />}
       </>}
-      {!readOnly && dismissed.length > 0 && <button type="button" className="hub-secondary-btn" onClick={() => setDismissed([])}>Show dismissed pairs</button>}
+      {request && latest?.status === 'merged' && latest.rollbackUntil > Date.now() && <details>
+        <summary>Recent merge recovery</summary>
+        <TrustedMergeReview key={latest.operationId} existingReceipt={latest} request={request}
+          onMerged={() => { setOpen(false); onMerged?.(); }} />
+      </details>}
+      {!readOnly && dismissed.length > 0 && <button type="button" className="hub-secondary-btn" disabled={saving} onClick={() => saveDismissal('restore', dismissed)}>Show dismissed pairs</button>}
     </dialog>}
   </>;
 }

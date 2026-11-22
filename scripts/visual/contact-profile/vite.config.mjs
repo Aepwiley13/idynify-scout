@@ -29,6 +29,7 @@ export default defineConfig({
   plugins: [react()],
   resolve: {
     alias: [
+      { find: /^(?:\.\/)?(?:duplicates\/)?mergeApi$/, replacement: stub('contactMerge.js') },
       { find: 'firebase/firestore', replacement: stub('firestore.js') },
       { find: /^(?:\.\.?\/)+firebase\/config$/, replacement: stub('firebaseConfig.js') },
       { find: /^(?:\.\.?\/)+context\/ImpersonationContext$/, replacement: stub('impersonation.js') },

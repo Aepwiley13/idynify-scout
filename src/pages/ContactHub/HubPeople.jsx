@@ -23,10 +23,11 @@
  * With no one in My People yet there is nothing to search, filter or sort, so
  * none of that is drawn: one friendly message and one action.
  */
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useOutletContext } from 'react-router-dom';
 import { ArrowLeft, List, Mail, Phone, Search, Table2, Upload, UserPlus, Users, X } from 'lucide-react';
 import DeleteContactsDialog from './DeleteContactsDialog';
+import { mergeRequest, mergeReviewEnabled } from './duplicates/mergeApi';
 import DuplicateReview from './duplicates/DuplicateReview';
 import { useImpersonation } from '../../context/ImpersonationContext';
 import { useT } from '../../theme/ThemeContext';
@@ -240,6 +241,7 @@ function HubPeopleList({ canDelete, readOnly }) {
     uid, status, contacts, reload, addContacts, removeContacts, applyStickerChange,
     searchTerm, setSearchTerm, stickerId, setStickerId, listPath,
   } = useOutletContext();
+  const requestMerge = useCallback((action, data, active) => mergeRequest(uid, action, data, active), [uid]);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState([]);
   const [deleting, setDeleting] = useState(null);
@@ -452,7 +454,8 @@ function HubPeopleList({ canDelete, readOnly }) {
             <div className="hub-tools">
               {searchField}
               {importButton}
-              {uid && status === HUB_STATUS.READY && <DuplicateReview contacts={people} stickers={stickers.byId} readOnly={readOnly} />}
+              {uid && status === HUB_STATUS.READY && <DuplicateReview contacts={people} stickers={stickers.byId} readOnly={readOnly}
+                request={mergeReviewEnabled() && !readOnly ? requestMerge : undefined} onMerged={reload} />}
               {canDelete && status === HUB_STATUS.READY && (
                 <button type="button" className="hub-secondary-btn" onClick={() => {
                   setSelecting(!selecting);

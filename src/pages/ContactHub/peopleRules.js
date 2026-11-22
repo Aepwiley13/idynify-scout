@@ -8,7 +8,7 @@
  */
 import { hasArchiveSignal, isDeferredRecord } from '../../constants/statusModel';
 import { contactDisplayName } from '../../utils/contactDisplayName';
-import { readContactPhones, primaryPhone } from '../../utils/contactPhones';
+import { preferredContactPhone } from '../../utils/contactPhones';
 import { hasSticker, matchesStickerName } from '../../components/stickers/peopleStickers';
 
 /**
@@ -19,7 +19,7 @@ import { hasSticker, matchesStickerName } from '../../components/stickers/people
  * archived) has been put away on purpose.
  */
 export function isListedInMyPeople(contact) {
-  if (!contact || !contact.id) return false;
+  if (!contact || !contact.id || contact.contact_hub_lifecycle?.status === 'retired') return false;
   if (isDeferredRecord(contact)) return false;
   if (hasArchiveSignal(contact)) return false;
   if (contact.company_archived === true) return false;
@@ -104,7 +104,7 @@ export const emailOf = (contact) => contact?.email || contact?.work_email || '';
 
 /** The number a "call" button should dial, or ''. */
 export function phoneOf(contact) {
-  const best = primaryPhone(readContactPhones(contact));
+  const best = preferredContactPhone(contact);
   return best?.value || '';
 }
 

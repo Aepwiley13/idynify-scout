@@ -8,13 +8,14 @@
  * cold (a refresh, a bookmark) waits for that load; a person who is not in My
  * People, or does not exist, gets a plain "not here" with a way back.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
-import { canUseContactHubScout, contactDeletionEnabled, CONTACT_HUB_PATH } from '../../constants/contactHub';
+import { canUseContactHubScout, contactDeletionEnabled, contactHubPersonPath, CONTACT_HUB_PATH } from '../../constants/contactHub';
 import ContactHubGmailHeader from './ContactHubGmailHeader';
 import ContactActionCenter from './actionCenter/ContactActionCenter';
+import { mergeRequest, mergeReviewEnabled } from './duplicates/mergeApi';
 import DeleteContactsDialog from './DeleteContactsDialog';
 import { useImpersonation } from '../../context/ImpersonationContext';
 import { useShell, useShellEntity } from '../../context/ShellContext';
@@ -57,6 +58,17 @@ export default function HubPerson() {
     stage: null,
     label: shown ? personName(shown) : null,
   });
+
+  useEffect(() => {
+    if (readOnly || !uid || !mergeReviewEnabled() || status !== HUB_STATUS.READY
+      || contact?.contact_hub_lifecycle?.status !== 'retired') return undefined;
+    let active = true;
+    mergeRequest(uid, 'redirect', { sourceId: contactId }, () => active)
+      .then(({ survivorId }) => {
+        if (active && survivorId) navigate(contactHubPersonPath(survivorId), { replace: true });
+      }).catch(() => {});
+    return () => { active = false; };
+  }, [contact, contactId, navigate, readOnly, status, uid]);
 
   if (status === HUB_STATUS.LOADING) {
     return (

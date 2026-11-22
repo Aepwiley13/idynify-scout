@@ -22,7 +22,7 @@
 }
 
 .contact-preview {
-  background: white;
+  background: var(--bg-card);
   padding: 1.5rem;
   border-radius: 8px;
   margin-bottom: 2rem;
@@ -64,18 +64,18 @@
 .mission-footer {
   margin-top: 2rem;
   padding: 1.25rem;
-  background: rgba(250,170,32,0.08);
+  background: var(--status-warning-bg);
   border: 1px solid rgba(245,158,11,0.25);
   border-radius: 8px;
 }
 
 .guidance-text {
   margin: 0;
-  color: #92400e;
+  color: var(--text-primary);
   font-size: 0.95rem;
   line-height: 1.6;
 }
 
 .guidance-text strong {
-  color: #78350f;
+  color: var(--text-primary);
 }

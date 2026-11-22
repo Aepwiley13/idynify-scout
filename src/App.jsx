@@ -562,7 +562,7 @@ function App() {
 
         {/* Redirect old /hunter/* setup routes → /command-center with matching tab.
             /command-center itself now lives in the shell group above. */}
-        <Route path="/hunter/missions"  element={<Navigate to="/command-center?tab=missions"  replace />} />
+        <Route path="/hunter/missions"  element={<Navigate to="/hunter?tab=missions"          replace />} />
         <Route path="/hunter/weapons"   element={<Navigate to="/command-center?tab=weapons"   replace />} />
         <Route path="/hunter/arsenal"   element={<Navigate to="/command-center?tab=arsenal"   replace />} />
         <Route path="/hunter/outcomes"  element={<Navigate to="/command-center?tab=outcomes"  replace />} />

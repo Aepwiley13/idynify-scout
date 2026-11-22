@@ -40,6 +40,7 @@ import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
 import ModuleSubNav from '../../components/layout/ModuleSubNav';
 import AllLeads from '../Scout/AllLeads';
 import CampaignsSection from './sections/CampaignsSection';
+import MissionsHost from './sections/MissionsHost';
 
 // ─── ThemePicker ─────────────────────────────────────────────────────────────
 function ThemePicker() {
@@ -125,6 +126,7 @@ function Av({ initials, color = BRAND.purple, size = 24 }) {
 const HUNTER_ITEMS = [
   { id: 'blitz',     label: 'Blitz Mode',      Icon: Zap,           desc: 'Rapid engagement — 10 contacts in 60s', route: '/hunter/blitz' },
   { id: 'campaigns', label: 'Campaigns',       Icon: Mail,          desc: 'Your campaigns — open one or start new'                          },
+  { id: 'missions',  label: 'Missions',        Icon: Zap,           desc: 'Every mission — active, paused and completed'                    },
   { id: 'all',       label: 'All People',      Icon: Users,         desc: 'Engagement card feed — work your board', filter: 'all'         },
   { id: 'companies', label: 'Companies',       Icon: Building2,     desc: 'Companies with engaged contacts'                               },
   { id: 'followup',  label: 'Follow Up Now',   Icon: AlertTriangle, desc: 'Overdue engagement queue',           filter: 'follow_up_due' },
@@ -148,6 +150,7 @@ const TAB_MAP = {
   all:       'all',
   companies: 'companies',
   campaigns: 'campaigns',
+  missions:  'missions',
 };
 
 
@@ -191,6 +194,13 @@ function HunterShellInner() {
   const activeFilter = activeItem.filter;
 
   const renderMain = () => {
+    if (activeTab === 'missions') {
+      return (
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <MissionsHost />
+        </div>
+      );
+    }
     if (activeTab === 'campaigns') {
       return (
         <div style={{ flex: 1, overflow: 'auto' }}>

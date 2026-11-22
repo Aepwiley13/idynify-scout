@@ -365,10 +365,11 @@ export default function CreateMission() {
   };
 
   return (
+    <div className="flex-1 min-h-0 overflow-y-auto">
     <div className="create-mission">
       {/* Header */}
       <div className="create-mission-header">
-        <button className="btn-back" onClick={() => navigate('/hunter')}>
+        <button className="btn-back" onClick={() => navigate('/hunter?tab=missions')}>
           <ArrowLeft className="w-5 h-5" />
           Back to Hunter
         </button>
@@ -984,6 +985,7 @@ export default function CreateMission() {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 }

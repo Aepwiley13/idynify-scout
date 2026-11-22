@@ -1,0 +1,69 @@
+/* Hunter → Campaigns. Panel, cards and empty state come from DashboardSection.css;
+   this file only adds the header actions and the phone-width grid. */
+
+.campaigns-section {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.campaigns-count {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.125rem 0.5rem;
+}
+
+.campaigns-new-btn,
+.campaigns-retry-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 8px;
+  padding: 0.5rem 0.875rem;
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  transition: opacity 0.15s, background 0.15s;
+}
+
+/* Same brand gradient as the wizard's primary buttons. */
+.campaigns-new-btn {
+  color: #fff;
+  border: none;
+  background: linear-gradient(to right, #ec4899, #9333ea);
+}
+.campaigns-new-btn:hover { opacity: 0.9; }
+
+.campaigns-retry-btn {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-2);
+}
+.campaigns-retry-btn:hover { background: var(--bg-card-2); }
+
+.campaigns-new-btn:focus-visible,
+.campaigns-retry-btn:focus-visible,
+.campaigns-section .campaign-card:focus-visible {
+  outline: 2px solid var(--input-focus);
+  outline-offset: 2px;
+}
+
+/* Readable body text: the shared empty state uses --text-faint. */
+.campaigns-section .campaigns-note {
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+}
+
+/* Cards never force a horizontal scroll at phone width. */
+.campaigns-section .campaign-cards {
+  grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr));
+}
+
+@media (max-width: 768px) {
+  .campaigns-section { padding: 1rem; }
+  .campaigns-section .dashboard-panel-header { flex-wrap: wrap; gap: 0.75rem; }
+}

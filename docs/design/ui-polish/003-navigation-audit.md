@@ -1,6 +1,6 @@
 # Desktop UI Polish #003 — Navigation & Visual Hierarchy: audit
 
-**Status: read-only audit. Nothing implemented; no routes changed.**
+**Status: audit complete. 003.1 + 003.2 implemented (below); 003.3–003.5 deferred.**
 Audited on `main` at `33dc078e`. Companion to `003-compact-navigation.md` (rail labels).
 
 ## 003.1 — first improvement (direction approved)
@@ -10,6 +10,39 @@ not from Hunter**, although campaign creation lives at `/hunter/campaign/*` and 
 Hunter activity.
 
 Approved direction: add Campaigns to Hunter's sub-nav, keep it in Command Center for now.
+
+## 003.1 + 003.2 — Campaigns in Hunter (implemented, combined)
+
+Approved as one change: one canonical campaign list at **`/hunter?tab=campaigns`**.
+
+- **Entry points:** Hunter sub-nav (desktop, after Blitz Mode), Hunter's mobile "More" sheet, and
+  Command Center → Campaigns (desktop and mobile) all open the list. None open the wizard directly.
+- **List:** `pages/Hunter/sections/CampaignsSection.jsx`. One read-only query,
+  `users/{getEffectiveUser().uid}/campaigns` ordered by `createdAt` desc, the same path
+  `CampaignDetail` reads. Loading, empty (with New Campaign) and error (with retry) states.
+- **Cards:** `CampaignCards.jsx`, extracted from the unrouted `DashboardSection` "Active Campaigns"
+  panel, so both render the same cards. A card shows the campaign's real status (Draft /
+  In Progress / Completed, CampaignDetail's wording). Mission health and mission counts appear only
+  when linked mission data is passed in. Hunter doesn't load missions, so wizard campaigns never
+  show a fabricated "On Track".
+- **Routes unchanged:** New Campaign → `/hunter/campaign/new`; card → `/hunter/campaign/:id`. The
+  wizard's and detail page's Back buttons now return to `/hunter?tab=campaigns` instead of `/hunter`.
+- **Isolation:** Firestore rules allow `users/{uid}/**` only to `request.auth.uid == uid`. While an
+  admin is impersonating, the client asks for the target's campaigns and the rules deny it, so
+  the list shows its error state. That's the same behaviour as Hunter's other client-side reads.
+- **No new** collections, queries beyond the one above, dependencies or backend functions.
+
+- **Tests:** `src/test/hunterCampaigns.test.jsx` (9) and `mobileNavigation.test.jsx` (Hunter's pinned
+  overflow list gains "Campaigns"). Some existing tests are timing-sensitive under a full local
+  run: `cadenceResendHistory`, `stickerWritePaths`, `bulkComposeImportedGroup`,
+  `allPeopleNavigation` and `peopleCardRefresh` can time out. Each passes on its own, and the first
+  two also fail on unmodified `main` under the same load. None covers a file this change touches.
+
+### #002.2 — CampaignDetail theme (follow-up, not in this change)
+
+`CampaignDetail.jsx` still hardcodes light greys (for example, its status pill uses `text-gray-500 bg-gray-200`), the same
+defect class #002.1 fixed in the wizard. Users now reach it from the list, so it gets a
+separate #002.2 entry.
 
 ## Where navigation is defined
 

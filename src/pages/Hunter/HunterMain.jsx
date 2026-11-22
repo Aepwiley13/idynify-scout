@@ -31,7 +31,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Users, CalendarCheck, AlertTriangle, Inbox, Zap, Sparkles,
-  Building2, Palette, Check,
+  Building2, Palette, Check, Mail,
   Settings as SettingsIcon,
 } from 'lucide-react';
 import SharedCompaniesView from '../../components/shared/SharedCompaniesView';
@@ -39,6 +39,7 @@ import { useT, useThemeCtx } from '../../theme/ThemeContext';
 import { BRAND, THEMES, ASSETS } from '../../theme/tokens';
 import ModuleSubNav from '../../components/layout/ModuleSubNav';
 import AllLeads from '../Scout/AllLeads';
+import CampaignsSection from './sections/CampaignsSection';
 
 // ─── ThemePicker ─────────────────────────────────────────────────────────────
 function ThemePicker() {
@@ -123,6 +124,7 @@ function Av({ initials, color = BRAND.purple, size = 24 }) {
 // These mirror the ACTION_LENSES in AllLeads for execution-focused workflow.
 const HUNTER_ITEMS = [
   { id: 'blitz',     label: 'Blitz Mode',      Icon: Zap,           desc: 'Rapid engagement — 10 contacts in 60s', route: '/hunter/blitz' },
+  { id: 'campaigns', label: 'Campaigns',       Icon: Mail,          desc: 'Your campaigns — open one or start new'                          },
   { id: 'all',       label: 'All People',      Icon: Users,         desc: 'Engagement card feed — work your board', filter: 'all'         },
   { id: 'companies', label: 'Companies',       Icon: Building2,     desc: 'Companies with engaged contacts'                               },
   { id: 'followup',  label: 'Follow Up Now',   Icon: AlertTriangle, desc: 'Overdue engagement queue',           filter: 'follow_up_due' },
@@ -145,6 +147,7 @@ const TAB_MAP = {
   new:       'new',
   all:       'all',
   companies: 'companies',
+  campaigns: 'campaigns',
 };
 
 
@@ -188,6 +191,13 @@ function HunterShellInner() {
   const activeFilter = activeItem.filter;
 
   const renderMain = () => {
+    if (activeTab === 'campaigns') {
+      return (
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <CampaignsSection />
+        </div>
+      );
+    }
     if (activeTab === 'companies') {
       return (
         <div style={{ flex: 1, overflow: 'auto' }}>

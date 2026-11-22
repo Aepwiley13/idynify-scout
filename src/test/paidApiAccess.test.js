@@ -247,13 +247,20 @@ describe('captureLinkedIn (Relationship Capture)', () => {
 
 describe('daily-leads-refresh (scheduled)', () => {
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.stubEnv('DISCOVERY_CRON_ENABLED', 'true');
     seedAccounts();
     for (const uid of [FREE, LAPSED, PAID, ADMIN]) {
       state.docs.set(`users/${uid}/companyProfile/current`, { industries: ['Computer Software'], companySizes: ['11-50'], locations: ['United States'] });
     }
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('runs only for accounts with paid access (and admins): Free and lapsed accounts are skipped as not_paid', async () => {
+    vi.setSystemTime(new Date(2026, 0, 5, 12)); // Monday in the runner's local timezone
     const { refreshDailyLeads } = await import('../../netlify/functions/daily-leads-refresh.js');
     const res = await refreshDailyLeads({});
     const body = JSON.parse(res.body);
@@ -265,6 +272,18 @@ describe('daily-leads-refresh (scheduled)', () => {
     expect(state.customTokens).not.toContain(FREE);
     expect(state.customTokens).not.toContain(LAPSED);
     expect(apolloCalls).toEqual([]); // the refresh itself never calls Apollo; search-companies does, behind its own guard
+  });
+
+  it.each([['Saturday', 10], ['Sunday', 11]])('skips the refresh on %s', async (_day, date) => {
+    vi.setSystemTime(new Date(2026, 0, date, 12));
+    const { refreshDailyLeads } = await import('../../netlify/functions/daily-leads-refresh.js');
+    const res = await refreshDailyLeads({});
+
+    expect(res.statusCode).toBe(200);
+    expect(JSON.parse(res.body)).toMatchObject({ success: true, message: 'Weekend - no refresh needed', processedUsers: 0 });
+    expect(state.customTokens).toEqual([]);
+    expect(apolloCalls).toEqual([]);
+    expect(otherCalls).toEqual([]);
   });
 });
 

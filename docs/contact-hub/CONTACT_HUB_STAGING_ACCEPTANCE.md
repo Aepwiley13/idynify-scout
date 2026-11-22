@@ -485,9 +485,9 @@ fixture signing key outside its test process. Contact deletion, photo
 persistence and Gmail sending remain independently disabled.
 
 The gated atomic path handles bounded pairs with supported contact facts
-and timeline records. It refuses private photo overrides, reminder/queue
-data, unsupported worker records, unresolved Gmail attempts, and opt-outs
-that cannot be transferred under a verified downstream policy. New Contact
+and timeline records. It refuses unsupported photo or reminder variants,
+unsupported worker records, unresolved Gmail attempts, and opt-outs that
+cannot be transferred under a verified downstream policy. New Contact
 Hub Gmail reservations store the contact ID from the authoritative document
 reference. Legacy ledger rows remain as written. Supported historical profile
 links use an owner-only resolution of the frozen retired record.
@@ -499,3 +499,32 @@ retention for recovery snapshots, retirement markers, and dismissals,
 including account removal. The UI reports blockers and automatically
 refuses rollback after intervening changes. Verify against production-like
 Firestore limits and QA account fixtures before approval.
+
+### Relationship merge verification checkpoint
+
+The trusted plan now includes private photo and Contact Hub manual reminder
+versions. Choose the display photo independently of the original imported
+source. Keep private override before-images in server-only merge provenance.
+Keep one active reminder, transfer its queue row, and preserve the other as
+dismissed with an explicit merge disposition. Unsupported Barry/legacy
+reminder states, malformed photo overrides, unknown subcollections, and
+unresolved provider operations still block execution.
+
+The emulator scenario in `scripts/rules-check/contact-photo.mjs` seeds a
+synthetic pair with three distinct email addresses, two phones, notes,
+colliding Activity IDs, stickers and provenance, two private overrides,
+two active manual reminders, and an authoritative suppressed address. The
+test checks merged documents and rollback, including the private photo and
+both queue rows. It never calls Gmail or an external provider.
+
+Merge consults the existing server-only `emailSuppressionList` by normalized
+address and carries restrictions forward. Contact Hub Gmail checks the
+authoritative list during new send reservation while preserving prior send
+receipts and recorded contact IDs. Consent and provider-specific restrictions
+whose meaning or enforcement cannot be verified remain blockers. Scout
+scheduled sends reject retired contacts and merged contacts with stored
+suppression. The independently owned Scout quick send, waves, cadence,
+follow-up and Barry provider reservations still require end-to-end lifecycle
+and suppression verification before merge activation. Keep all gates closed
+until that work, staging rules/rollout approval, and private recovery retention
+and account cleanup are complete.

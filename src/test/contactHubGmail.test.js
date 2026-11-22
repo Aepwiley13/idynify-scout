@@ -99,6 +99,16 @@ describe('Contact Hub manual Gmail', () => {
     expect(gmail.send).not.toHaveBeenCalled();
   });
 
+  it('enforces normalized authoritative suppression without changing an existing receipt', async () => {
+    const { records, gmail, call, message } = fixture();
+    const sent = message();
+    expect((await call(sent)).data.status).toBe('sent');
+    records.set('emailSuppressionList/alex@example.com', { reason: 'unsubscribe' });
+    expect((await call(sent)).data.status).toBe('sent');
+    expect((await call(message())).data.error).toBe('email_suppressed');
+    expect(gmail.send).toHaveBeenCalledTimes(1);
+  });
+
   it('never replays an unconfirmed send and gives quota feedback', async () => {
     const { gmail, call, message } = fixture();
     gmail.send.mockRejectedValueOnce(new Error('timeout'));

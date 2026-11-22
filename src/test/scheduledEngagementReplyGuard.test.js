@@ -137,6 +137,11 @@ beforeEach(() => {
 afterAll(() => { delete process.env.FIREBASE_PROJECT_ID; });
 
 describe('isSendSuppressed', () => {
+  it('suppresses retired references and merged contacts with a stored restriction', () => {
+    expect(isSendSuppressed({ contact_hub_lifecycle: { status: 'retired' } })).toEqual({ reason: 'contact_deleted' });
+    expect(isSendSuppressed({ contact_hub_email_suppressed: ['blocked@example.test'] })).toEqual({ reason: 'contact_email_suppressed' });
+  });
+
   it('returns null for an ordinary eligible contact', () => {
     expect(isSendSuppressed({ hunter_status: 'awaiting_reply' })).toBeNull();
   });

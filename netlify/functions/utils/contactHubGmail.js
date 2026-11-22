@@ -109,6 +109,13 @@ export function createContactHubGmail({ db, verifyToken, gmail, enabled, sending
         if (previous.data().fingerprint !== input.fingerprint) throw fail(409, 'intent_changed');
         return { previous: previous.data() };
       }
+      const person = (await tx.get(refs.contact)).data();
+      const recipient = to;
+      if (recipient.includes('/') || person.email_opt_out || person.unsubscribed || person.do_not_email
+        || person.contact_hub_email_suppressed?.includes(recipient.toLowerCase())
+        || (await tx.get(db.doc(`emailSuppressionList/${recipient.toLowerCase()}`))).exists) {
+        throw fail(403, 'email_suppressed');
+      }
       // Compare with the address the user saw. The recipient is always selected from Firestore.
       if (input.recipient !== to) throw fail(409, 'recipient_changed');
       if (!connection) throw fail(409, 'connect_gmail');

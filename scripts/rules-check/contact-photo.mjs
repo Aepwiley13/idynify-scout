@@ -159,6 +159,64 @@ try {
     assert.ok(['merge_blocked', 'preview_changed'].includes(racingMerge.error), JSON.stringify(racingMerge));
     assert.equal((await duplicate.collection('private').doc('photo').get()).exists, true);
   }
+  const c = adminDb.doc('users/owner/contacts/relationship-survivor');
+  const d = adminDb.doc('users/owner/contacts/relationship-source');
+  const due = '2030-01-01T12:00:00.000Z';
+  const step = (id, action) => ({ id, action, type: 'follow_up', status: 'confirmed', user_confirmed: true,
+    due_at: due, metadata: { source: 'contact_hub' } });
+  const stepA = step('fixture-queue-a', 'Call Jordan');
+  const stepB = step('fixture-queue-b', 'Send the event details');
+  const qa = adminDb.doc('users/owner/nbs_queue/' + stepA.id);
+  const qb = adminDb.doc('users/owner/nbs_queue/' + stepB.id);
+  const photoA = c.collection('private').doc('photo');
+  const photoB = d.collection('private').doc('photo');
+  const oldA = { kind: 'hidden', updatedAt: Timestamp.fromMillis(100) };
+  const oldB = { kind: 'url', url: 'https://example.test/fixture.jpg', updatedAt: Timestamp.fromMillis(200) };
+  const base = { name: 'Synthetic Relationship', email: 'synthetic@example.test', next_step_due: due, next_step_type: 'follow_up' };
+  const makeQueue = (row, ownerId) => ({ contact_id: ownerId, contact_name: base.name, nbs: row, status: 'confirmed', due_at: due });
+  await Promise.all([
+    c.set({ ...base, emails: [base.email, 'first@example.test'], phone: '8015550101', sticker_ids: ['a'],
+      sticker_assignments: { a: { assigned_by: 'manual' } }, notes: [{ id: 'a', content: 'First note' }], source: 'manual',
+      contact_hub_photo: 'hidden', next_best_step: stepA }),
+    d.set({ ...base, emails: [base.email, 'second@example.test'], phone: '8015550102', sticker_ids: ['b'],
+      sticker_assignments: { b: { assigned_by: 'manual' } }, notes: [{ id: 'b', content: 'Second note' }], source: 'csv_import',
+      contact_hub_photo: 'custom', next_best_step: stepB }),
+    c.collection('timeline').doc('note').set({ type: 'note_added', preview: 'first' }),
+    d.collection('timeline').doc('note').set({ type: 'message_sent', preview: 'second' }),
+    photoA.set(oldA), photoB.set(oldB), qa.set(makeQueue(stepA, c.id)), qb.set(makeQueue(stepB, d.id)),
+    adminDb.doc('emailSuppressionList/second@example.test').set({ reason: 'unsubscribe' }),
+  ]);
+  const complex = { survivorId: c.id, sourceId: d.id, operationId: 'b81cb80a-4ca2-4bb3-9461-927db498df00',
+    choices: { primary_phone: 1, photo_display: 1, active_reminder: 1 } };
+  const relationshipPreview = await mergeRequest('preview', complex);
+  assert.ok(relationshipPreview.token, JSON.stringify(relationshipPreview));
+  assert.deepEqual(relationshipPreview.combined.suppressedEmails, ['second@example.test']);
+  const relationshipCommit = await mergeRequest('commit', { ...complex, token: relationshipPreview.token });
+  assert.equal(relationshipCommit.receipt?.status, 'merged', JSON.stringify(relationshipCommit));
+  const combined = (await c.get()).data();
+  assert.equal(combined.emails.length, 3);
+  assert.equal(combined.phones.length, 2);
+  assert.deepEqual(combined.sticker_ids, ['a', 'b']);
+  assert.deepEqual(combined.identity_sources, ['manual', 'csv_import']);
+  assert.equal(combined.notes.length, 2);
+  assert.equal((await c.collection('timeline').get()).size, 2);
+  assert.equal(combined.next_best_step.id, stepB.id);
+  assert.equal((await qa.get()).data().nbs.disposition, 'superseded_by_merge');
+  assert.equal((await qb.get()).data().contact_id, c.id);
+  assert.equal((await photoA.get()).data().url, oldB.url);
+  assert.equal((await photoB.get()).data().url, oldB.url);
+  const backup = adminDb.doc(`contact_hub_merges/owner/operations/${complex.operationId}/photo/survivor`);
+  assert.deepEqual((await backup.get()).data(), oldA);
+  const relationshipUndo = await mergeRequest('preview_rollback', complex);
+  assert.ok(relationshipUndo.token, JSON.stringify(relationshipUndo));
+  const undone = await mergeRequest('rollback', { ...complex, token: relationshipUndo.token });
+  assert.equal(undone.receipt?.status, 'rolled_back', JSON.stringify(undone));
+  assert.deepEqual((await photoA.get()).data(), oldA);
+  assert.equal((await qa.get()).data().status, 'confirmed');
+  assert.equal((await qb.get()).data().contact_id, d.id);
+  assert.equal((await c.collection('timeline').get()).size, 1);
+  assert.equal((await backup.get()).exists, false);
+  console.log('Synthetic relationship merge and rollback passed: 3 emails, 2 phones, 2 stickers, 2 notes, 2 Activity rows, private photo provenance, both reminder queue rows and an authoritative opt-out.');
   const account = adminDb.doc('users/purge-fixture');
   const purgePhoto = account.collection('contacts').doc('c1').collection('private').doc('photo');
   await account.set({ name: 'Purge fixture' });

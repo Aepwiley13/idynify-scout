@@ -106,6 +106,7 @@ export default function TrustedMergeReview({ pair, request, onMerged, existingRe
       {options.map((option, index) => <option value={index} key={index}>{String(option)}</option>)}
     </select></label>)}
     {plan?.combined && <p>{plan.combined.name} · {plan.combined.emails.join(', ')} · {plan.combined.phones.join(', ')} · {plan.combined.notes} notes · {plan.activityCount} Activity records to copy</p>}
+    {plan?.combined?.suppressedEmails?.length > 0 && <p>Existing email suppression stays in place for {plan.combined.suppressedEmails.join(', ')}.</p>}
     {plan?.blockers.length > 0 && <ul>{plan.blockers.map((reason) => <li key={reason}>{BLOCKERS[reason] ?? 'This data needs a verified transfer.'}</li>)}</ul>}
     <button type="button" disabled={busy || !survivor || uncertain} onClick={preview}>Verify merge preview</button>
     {plan?.token && <button type="button" disabled={busy} onClick={commit}>{uncertain ? 'Retry same merge' : 'Confirm merge'}</button>}

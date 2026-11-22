@@ -8,6 +8,7 @@ import './ContactHubGmail.css';
 
 const enabled = import.meta.env.VITE_CONTACT_HUB_GMAIL === 'on';
 const feedback = {
+  email_suppressed: 'This saved email address is suppressed. No email was sent.',
   sending_disabled: 'Sending is disabled in this environment.',
   app_limit: 'You’ve reached the Contact Hub sending limit. Try again later.',
   gmail_quota: 'Gmail’s sending limit has been reached. Try again later.',

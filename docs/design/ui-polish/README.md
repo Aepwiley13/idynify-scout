@@ -20,4 +20,5 @@ project, and it belongs somewhere else.
 | # | Title | Area | Status |
 |---|-------|------|--------|
 | [001](001-global-brand-identity.md) | Global Brand Identity | Shared sidebar — brand mark | Ready for PR |
-| 002 | Global Typography & Visual Hierarchy | Platform-wide type system | Audit in progress |
+| [002](002-global-typography.md) | Global Typography & Visual Hierarchy | Platform-wide type system | Phases 2A + 2B implemented — ready to close |
+| [003](003-compact-navigation.md) | Compact Navigation Labels | Collapsed sidebar rail | Proposed — not authorized |

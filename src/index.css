@@ -12,6 +12,51 @@
   animation: spin 1s linear infinite;
 }
 
+/* ─── TYPOGRAPHY TOKENS ───────────────────────────────────────────────────────
+   The source of truth for type. Deliberately on bare :root and NOT inside any
+   html[data-theme] block — no theme varies type, so all seven share these.
+
+   They live here, as CSS custom properties, for one evidenced reason: the JS
+   `TYPE` token in theme/tokens.js has existed all along and is imported by
+   zero files, while the colour custom properties below it are used everywhere.
+   A CSS author will reach for a var(); they will not import a JS object.
+
+   Scale: nine steps replacing the 52 distinct rendered sizes the audit found.
+   Dense at the small end because this product is — 12/13/14px account for
+   roughly half of all existing declarations.
+
+   Units are rem throughout. A px font-size is now the signal that a file has
+   not been migrated; scripts/typography-baseline.json tracks the remainder.
+   ─────────────────────────────────────────────────────────────────────────── */
+:root {
+  --text-2xs:  0.6875rem;  /* 11px — the floor. Micro-labels, badges, metadata */
+  --text-xs:   0.75rem;    /* 12px — supporting labels, timestamps            */
+  --text-sm:   0.8125rem;  /* 13px — dense UI, secondary body                 */
+  --text-base: 0.875rem;   /* 14px — DEFAULT body                             */
+  --text-md:   1rem;       /* 16px — emphasised body, and every form control  */
+  --text-lg:   1.125rem;   /* 18px — card titles                              */
+  --text-xl:   1.25rem;    /* 20px — section headings                         */
+  --text-2xl:  1.5rem;     /* 24px — page headings                            */
+  --text-3xl:  2rem;       /* 32px — display / hero                           */
+
+  /* Four weight roles. 800 is NOT here: it survives only as a brand exception
+     (the wordmark fallback, Contact Hub's titles), and giving it a token name
+     would invite it back into ordinary use. 650 is not a loaded weight and is
+     not a role — it snaps to 700. */
+  --weight-regular:  400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+  --weight-bold:     700;
+
+  /* Four, replacing nineteen. `line-height: 1` is not among them: it clips
+     descenders, and its 64 existing uses are mostly icon alignment that should
+     say so some other way. */
+  --leading-tight:   1.2;   /* display and page headings  */
+  --leading-snug:    1.35;  /* card/section headings, nav */
+  --leading-normal:  1.5;   /* body — the default         */
+  --leading-relaxed: 1.65;  /* long-form: Barry, help text */
+}
+
 /* ─── THEME CSS CUSTOM PROPERTIES ─────────────────────────────────────────────
    Set on html[data-theme="..."] by ThemeContext.jsx.
    CSS files reference these vars so all 7 themes work without JS hooks.
@@ -321,6 +366,37 @@ html, body {
   color: var(--text-primary);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
 }
+/* NOTE: no font-size here, deliberately, and it is not an oversight.
+   `--text-*` are rem values, so setting `html { font-size: var(--text-base) }`
+   redefines what 1rem means and silently rescales every rem font-size in the
+   codebase — and because this rule covers html AND body, the 0.875 applied
+   twice and resolved to 12.25px. Measured, not theorised: the specimen caught
+   it. The root stays at the browser's 16px; --text-base is what components ask
+   for, not what the document defaults to. */
+
+/* ── Heading defaults ──
+   Tailwind's preflight resets headings to inherit both size and weight, so an
+   unstyled <h2> currently renders as body text. These give the elements a
+   default worth having.
+
+   Margins are deliberately NOT set. Preflight zeroed them and 441 headings
+   have been laid out since on that basis; restoring them would move every one.
+
+   This is a floor, not a takeover: all 92 existing `.card h3`-style rules are
+   more specific and keep winning, as does every inline style. Nothing that is
+   already deliberately styled changes. */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: var(--weight-semibold);
+  line-height: var(--leading-snug);
+  /* No color here: headings inherit their surface's foreground, as before
+     #002. A global color fights pages that hardcode their own surface. */
+}
+
+h1 { font-size: var(--text-2xl); line-height: var(--leading-tight); font-weight: var(--weight-bold); }
+h2 { font-size: var(--text-xl); }
+h3 { font-size: var(--text-lg); }
+h4 { font-size: var(--text-base); }
+h5, h6 { font-size: var(--text-sm); }
 
 /* ── Global scrollbar follows theme ── */
 * { scrollbar-width: thin; scrollbar-color: var(--scrollbar) var(--scrollbar-track); }
@@ -369,3 +445,29 @@ button, a, [role="button"] {
   to   { opacity: 1; }
 }
 
+
+/* ─── iOS INPUT ZOOM GUARD ───────────────────────────────────────────────────
+   Mobile Safari zooms the whole viewport when a text field smaller than 16px
+   takes focus, then leaves the page zoomed. 81 live form controls sit under
+   16px, so this fires on most of the product's typing surfaces.
+
+   One rule rather than 81 edits. Scoped to the app's own mobile breakpoint, so
+   desktop is untouched and every component keeps the size it chose there —
+   which is the whole point: the controls are not too small, they are too small
+   *for iOS*, and only on a phone.
+
+   `!important` is deliberate and is the reason this is one rule. Component
+   rules are all of the form `.search-bar input`, which outranks a bare element
+   selector; without it this would have to be 81 separate overrides, each of
+   which could drift. Keep it narrow: text-entry controls only, mobile only.
+
+   This block is self-contained. Deleting it restores the previous behaviour
+   exactly and changes nothing else.
+   ─────────────────────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']),
+  textarea,
+  select {
+    font-size: var(--text-md) !important;
+  }
+}

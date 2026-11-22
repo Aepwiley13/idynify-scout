@@ -95,8 +95,8 @@
 }
 
 .page-title {
-  font-size: 1.5rem;
-  font-weight: 600;
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-semibold);
   color: var(--text-primary);
   margin: 0;
 }
@@ -370,8 +370,8 @@
 }
 
 .more-sheet-title {
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
   color: var(--text-primary);
 }
 
@@ -580,8 +580,8 @@
   border: none;
   border-radius: 0.25rem;
   color: var(--text-secondary);
-  font-size: 0.9375rem;
-  font-weight: 500;
+  font-size: var(--text-base);
+  font-weight: var(--weight-medium);
   font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
@@ -596,8 +596,10 @@
 .shell-breadcrumb-current {
   padding: 0.125rem 0.25rem;
   color: var(--text-primary);
-  font-size: 1.0625rem;
-  font-weight: 650;
+  /* 17px/650 — neither on the scale nor a loaded weight; 650 snapped to 700,
+     so "current" and the module error title shouted at the same volume. */
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -749,8 +751,8 @@
 
 .module-error-title {
   margin: 0;
-  font-size: 1.0625rem;
-  font-weight: 700;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
   color: var(--text-primary);
 }
 
@@ -902,8 +904,8 @@
 }
 
 .linkedin-quick-add-title {
-  font-size: 15px;
-  font-weight: 700;
+  font-size: var(--text-md);
+  font-weight: var(--weight-semibold);
   color: var(--text-primary);
 }
 

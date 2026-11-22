@@ -25,7 +25,7 @@
 .intent-option {
   display: block;
   padding: 1.25rem;
-  background: white;
+  background: var(--bg-card);
   border: 2px solid var(--border);
   border-radius: 8px;
   cursor: pointer;

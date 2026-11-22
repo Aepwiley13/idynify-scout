@@ -14,7 +14,13 @@ import {
 } from 'firebase/firestore';
 import { Globe, Linkedin, Check, X, RefreshCw, Loader, Settings, RotateCcw, MessageCircle, ArrowRight, MapPin, User, List, ChevronDown, Flame, Trophy, Info } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
-import { BRAND, STATUS, ASSETS } from '../../theme/tokens';
+import { BRAND, STATUS, ASSETS, TYPE } from '../../theme/tokens';
+
+/* Daily Discoveries styles inline rather than in CSS — DailyLeads.css exists
+   but no module imports it, so everything visible here is a style object.
+   SZ is the approved scale (see :root in index.css); use it rather than a
+   bare number so this screen stays on the system as it is edited. */
+const SZ = TYPE.size;
 import ScorePip from '../../components/scout/ScorePip';
 import { UNSCORED_LABEL } from '../../utils/scoreDisplay';
 import { compareByFit, pickTopMatch } from '../../utils/fitRanking';
@@ -190,7 +196,7 @@ function PhoneDecision({ onReject, onMatch, T, compact = false, padding }) {
   const button = (color, ink) => ({
     flex: 1, height: compact ? 48 : 50, borderRadius: 12, cursor: 'pointer',
     border: `1.5px solid ${color}45`, background: `${color}0f`, color: ink,
-    fontSize: 15, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+    fontSize: SZ.md, fontWeight: TYPE.weights.semibold, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
   });
   return (
     <div style={{ flexShrink: 0, display: 'flex', gap: 10, padding: padding ?? (compact ? '10px 12px 12px' : '14px 14px 14px') }}>
@@ -202,7 +208,7 @@ function PhoneDecision({ onReject, onMatch, T, compact = false, padding }) {
 
 /** A small uppercase label over a section of the sheet. */
 function SheetHeading({ children, T }) {
-  return <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.6, color: T.textMuted, margin: '16px 18px 8px' }}>{children}</div>;
+  return <div style={{ fontSize: SZ['2xs'], fontWeight: TYPE.weights.semibold, letterSpacing: 0.6, color: T.textMuted, margin: '16px 18px 8px' }}>{children}</div>;
 }
 
 /**
@@ -278,7 +284,7 @@ function RejectionFeedbackFace({ entityName, reasons, setReasons, note, setNote,
       <div style={{ fontSize: wide ? 12 : 11, color: T.textMuted, textAlign: 'center', lineHeight: 1.55 }}>
         Why isn't <strong>{entityName}</strong> a match?
         <br />
-        <span style={{ fontSize: 10, color: T.textFaint }}>Help Barry send better matches your way.</span>
+        <span style={{ fontSize: SZ['2xs'], color: T.textFaint }}>Help Barry send better matches your way.</span>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center', width: '100%' }}>
         {REJECTION_REASONS.map(r => (
@@ -343,12 +349,12 @@ function FeedbackFace({ entityName, reasons, setReasons, note, setNote, score, s
       <div style={{ fontSize: wide ? 12 : 11, color: T.textMuted, textAlign: 'center', lineHeight: 1.55 }}>
         Why is <strong>{entityName}</strong> a good fit?
         <br />
-        <span style={{ fontSize: 10, color: T.textFaint }}>Help Barry find more matches like this.</span>
+        <span style={{ fontSize: SZ['2xs'], color: T.textFaint }}>Help Barry find more matches like this.</span>
       </div>
 
       {/* 1-10 Score Selector */}
       <div style={{ width: '100%' }}>
-        <div style={{ fontSize: 10, color: T.textFaint, textAlign: 'center', marginBottom: 7, fontWeight: 600, letterSpacing: '0.06em' }}>
+        <div style={{ fontSize: SZ['2xs'], color: T.textFaint, textAlign: 'center', marginBottom: 7, fontWeight: 600, letterSpacing: '0.06em' }}>
           HOW STRONG IS THIS FIT?
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', gap: wide ? 5 : 4 }}>
@@ -373,7 +379,7 @@ function FeedbackFace({ entityName, reasons, setReasons, note, setNote, score, s
           })}
         </div>
         {score && (
-          <div style={{ textAlign: 'center', marginTop: 5, fontSize: 10, color: scoreColor(score), fontWeight: 600 }}>
+          <div style={{ textAlign: 'center', marginTop: 5, fontSize: SZ['2xs'], color: scoreColor(score), fontWeight: 600 }}>
             {score <= 3 ? 'Weak fit' : score <= 6 ? 'Decent fit' : score <= 8 ? 'Strong fit' : 'Perfect fit'} — {score}/10
           </div>
         )}
@@ -660,7 +666,7 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
           // column past the card — ~4px at 360px wide, which the card's
           // clipping now cuts instead of scrolling sideways.
           <div key={l} style={{ minWidth: 0, padding: wide ? '10px 18px' : '8px 14px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
-            <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>{l}</div>
+            <div style={{ fontSize: SZ['2xs'], letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>{l}</div>
             <div title={full} style={{ fontSize: wide ? 12 : 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
           </div>
         );
@@ -681,20 +687,20 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
       }}
     >
       <div>
-        <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>ICP MATCH SCORE</div>
+        <div style={{ fontSize: SZ['2xs'], letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>ICP MATCH SCORE</div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           {/* G1-06: an unmeasured score is not 0/100 — 0 is a verdict. */}
-          <span data-testid="icp-match-score" style={{ fontSize: wide ? 20 : 18, fontWeight: 800, color: sc }}>{isScored ? score : '—'}</span>
-          {isScored && <span style={{ fontSize: 10, color: T.textFaint }}>/100</span>}
+          <span data-testid="icp-match-score" style={{ fontSize: wide ? SZ.xl : SZ.lg, fontWeight: TYPE.weights.bold, color: sc }}>{isScored ? score : '—'}</span>
+          {isScored && <span style={{ fontSize: SZ['2xs'], color: T.textFaint }}>/100</span>}
           <span style={{
-            fontSize: 9, color: sc, fontWeight: 700,
+            fontSize: SZ['2xs'], color: sc, fontWeight: 700,
             padding: '2px 7px', background: `${sc}15`, borderRadius: 5,
             border: `1px solid ${sc}40`,
           }}>{scoreLabel}</span>
         </div>
       </div>
       {breakdown && (
-        <div style={{ fontSize: 10, color: T.textFaint, display: 'flex', alignItems: 'center', gap: 3 }}>
+        <div style={{ fontSize: SZ['2xs'], color: T.textFaint, display: 'flex', alignItems: 'center', gap: 3 }}>
           Details
           <ChevronDown size={12} style={{ transform: showBreakdown ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
         </div>
@@ -730,7 +736,7 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
                 ? `${label}: no data available for this company — not included in the score`
                 : `${label}: ${data.match}% match`}
               style={{
-                fontSize: 9,
+                fontSize: SZ['2xs'],
                 fontWeight: 600,
                 padding: '2px 7px',
                 borderRadius: 7,
@@ -745,7 +751,7 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
           );
         })}
         {coverageNote && (
-          <span style={{ fontSize: 9, color: T.textFaint, alignSelf: 'center', marginLeft: 2 }}>
+          <span style={{ fontSize: SZ['2xs'], color: T.textFaint, alignSelf: 'center', marginLeft: 2 }}>
             {coverageNote}
           </span>
         )}
@@ -793,7 +799,7 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
     <div style={{ padding: wide ? '12px 18px' : '10px 14px', borderBottom: `1px solid ${T.border}`, background: T.accentBg }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
         <BarryAvatar size={18} />
-        <span style={{ fontSize: 9, letterSpacing: 2, color: BRAND.pink, fontWeight: 700 }}>BARRY INTEL</span>
+        <span style={{ fontSize: SZ['2xs'], letterSpacing: 2, color: BRAND.pink, fontWeight: 700 }}>BARRY INTEL</span>
       </div>
       <p style={{ margin: 0, fontSize: wide ? 12 : 11, color: T.isDark ? '#d0a0c0' : T.textMuted, lineHeight: 1.6 }}>
         {barryText}
@@ -856,7 +862,7 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
       <div style={{ flex: '1 1 auto', minHeight: 0, position: 'relative', overflow: 'hidden', background: T.cardBg2, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14 }}>
         <div style={{
           ...(compact ? { order: 1 } : { position: 'absolute', top: 14, right: 14 }), zIndex: 6,
-          fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: inkFor(T, confidence === 'High' ? 'matched' : confidence === 'Medium' ? 'partial' : 'missed'),
+          fontSize: SZ['2xs'], fontWeight: TYPE.weights.semibold, letterSpacing: 0.4, textTransform: 'uppercase', color: inkFor(T, confidence === 'High' ? 'matched' : confidence === 'Medium' ? 'partial' : 'missed'),
           padding: '4px 9px', background: `${confColor}18`, border: `1px solid ${confColor}50`, borderRadius: 6,
         }}>{confidence} confidence</div>
         <div style={{ borderRadius: compact ? 22 : 32, overflow: 'hidden', flexShrink: 0, boxShadow: `0 14px 34px ${T.isDark ? '#00000066' : '#12082a14'}` }}>
@@ -865,12 +871,12 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
       </div>
       <div style={{ flexShrink: 0, padding: compact ? '10px 16px 0' : '14px 18px 0' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-          <div title={company.name} style={{ minWidth: 0, fontSize: compact ? 22 : 25, fontWeight: 800, letterSpacing: -0.3, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.name}</div>
+          <div title={company.name} style={{ minWidth: 0, fontSize: compact ? SZ['2xl'] : 28, fontWeight: TYPE.weights.bold, letterSpacing: -0.3, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.name}</div>
           <DetailsButton T={T} onOpen={() => setDetailsOpen(true)} />
         </div>
         {whereLine && <div title={whereLine} style={{ fontSize: 14, color: T.textMuted, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{whereLine}</div>}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: compact ? 8 : 12 }}>
-          <span data-testid="icp-match-chip" style={{ fontSize: 14, fontWeight: 800, color: matchInk, background: `${sc}18`, border: `1px solid ${sc}50`, borderRadius: 8, padding: '4px 10px', whiteSpace: 'nowrap' }}>
+          <span data-testid="icp-match-chip" style={{ fontSize: SZ.base, fontWeight: TYPE.weights.bold, color: matchInk, background: `${sc}18`, border: `1px solid ${sc}50`, borderRadius: 8, padding: '4px 10px', whiteSpace: 'nowrap' }}>
             {isScored ? `${score}% ICP match` : 'ICP match —'}
           </span>
           <span style={{ fontSize: 13, fontWeight: 600, color: matchInk, whiteSpace: 'nowrap' }}>{scoreLabel}</span>
@@ -989,14 +995,14 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
               </div>
             )}
             {hqLocation && hqLocation.toLowerCase() !== 'unknown' && (
-              <div title={hqLocation} style={{ fontSize: 10, color: T.textFaint, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              <div title={hqLocation} style={{ fontSize: SZ['2xs'], color: T.textFaint, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 <MapPin size={10} style={{ flexShrink: 0 }} />{hqLocation}
               </div>
             )}
           </div>
           <div style={{
             position: 'absolute', top: 12, right: 14, zIndex: 6,
-            fontSize: 9, color: confColor, fontWeight: 700, letterSpacing: 1,
+            fontSize: SZ['2xs'], color: confColor, fontWeight: TYPE.weights.semibold, letterSpacing: 0.4,
             padding: '3px 8px', background: `${confColor}18`, borderRadius: 5,
             border: `1px solid ${confColor}40`,
           }}>
@@ -1026,7 +1032,7 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
             <>
               <CompanyLogo company={company} size="small" />
               <div style={{ minWidth: 0 }}>
-                <div title={company.name} style={{ fontSize: 18, fontWeight: 800, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.name}</div>
+                <div title={company.name} style={{ fontSize: SZ.lg, fontWeight: TYPE.weights.bold, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{company.name}</div>
                 {whereLine && <div title={whereLine} style={{ fontSize: 12, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{whereLine}</div>}
               </div>
             </>
@@ -1035,7 +1041,7 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
         >
           <SheetHeading T={T}>ICP MATCH</SheetHeading>
           <div style={{ padding: '0 18px 10px', display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 30, fontWeight: 800, color: matchInk }}>{isScored ? score : '—'}</span>
+            <span style={{ fontSize: SZ['3xl'], fontWeight: TYPE.weights.bold, color: matchInk }}>{isScored ? score : '—'}</span>
             {isScored && <span style={{ fontSize: 13, color: T.textMuted }}>/100</span>}
             <span style={{ fontSize: 12, fontWeight: 700, color: matchInk, background: `${sc}18`, border: `1px solid ${sc}50`, borderRadius: 6, padding: '2px 8px' }}>{scoreLabel}</span>
             <span style={{ marginLeft: 'auto', fontSize: 12, color: T.textMuted }}>{confidence} confidence</span>
@@ -1178,7 +1184,7 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
           ['LOCATION',  person.city ? `${person.city}${person.state ? ', ' + person.state : ''}` : 'N/A'],
         ].map(([l, v]) => (
           <div key={l} style={{ padding: wide ? '13px 20px' : '10px 15px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
-            <div style={{ fontSize: 9, letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>{l}</div>
+            <div style={{ fontSize: SZ['2xs'], letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>{l}</div>
             <div style={{ fontSize: wide ? 13 : 11, color: T.textMuted }}>{v}</div>
           </div>
         ))}
@@ -1208,7 +1214,7 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
   );
   const personHint = (
     <>
-      <div style={{ textAlign: 'center', padding: '4px 0 12px', fontSize: 10, color: T.textGhost }}>
+      <div style={{ textAlign: 'center', padding: '4px 0 12px', fontSize: SZ['2xs'], color: T.textGhost }}>
         Drag left or right, or use the buttons above
       </div>
     </>
@@ -1263,8 +1269,8 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
         <div aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: '62%', background: 'linear-gradient(180deg, #12082a00 0%, #12082a99 55%, #12082ae0 100%)', pointerEvents: 'none' }} />
         <div style={{ position: 'absolute', left: 18, right: 14, bottom: compact ? 12 : 16, color: '#ffffff', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 10 }}>
           <div style={{ minWidth: 0 }}>
-            <div title={personName} style={{ fontSize: compact ? 23 : 27, fontWeight: 800, letterSpacing: -0.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{personName}</div>
-            {roleLine && <div title={roleLine} style={{ fontSize: 15, fontWeight: 500, marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{roleLine}</div>}
+            <div title={personName} style={{ fontSize: compact ? SZ['2xl'] : 28, fontWeight: TYPE.weights.bold, letterSpacing: -0.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{personName}</div>
+            {roleLine && <div title={roleLine} style={{ fontSize: SZ.md, fontWeight: TYPE.weights.medium, marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{roleLine}</div>}
             {city && <div style={{ fontSize: 13, marginTop: 3, color: '#ffffffd9' }}>{city}</div>}
           </div>
           <DetailsButton T={T} onDark onOpen={() => setDetailsOpen(true)} />
@@ -1272,7 +1278,7 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
       </div>
       <div style={{ flexShrink: 0, padding: compact ? '10px 16px 0' : '14px 18px 0' }}>
         {matchText && (
-          <span title={matchText} style={{ display: 'inline-block', maxWidth: '100%', fontSize: 14, fontWeight: 800, color: inkFor(T, targetKind), background: `${targetKind === 'matched' ? STATUS.green : STATUS.amber}18`, border: `1px solid ${targetKind === 'matched' ? STATUS.green : STATUS.amber}50`, borderRadius: 8, padding: '4px 10px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>{matchText}</span>
+          <span title={matchText} style={{ display: 'inline-block', maxWidth: '100%', fontSize: SZ.base, fontWeight: TYPE.weights.bold, color: inkFor(T, targetKind), background: `${targetKind === 'matched' ? STATUS.green : STATUS.amber}18`, border: `1px solid ${targetKind === 'matched' ? STATUS.green : STATUS.amber}50`, borderRadius: 8, padding: '4px 10px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', boxSizing: 'border-box' }}>{matchText}</span>
         )}
         {signals.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: compact ? 5 : 6, marginTop: matchText ? (compact ? 8 : 12) : 0 }}>
@@ -1360,7 +1366,7 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
                 ? <img src={photo} alt="" style={{ width: 44, height: 44, borderRadius: 22, objectFit: 'cover', flexShrink: 0 }} />
                 : <Av initials={phoneInitials} color={color} size={44} />}
               <div style={{ minWidth: 0 }}>
-                <div title={personName} style={{ fontSize: 18, fontWeight: 800, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{personName}</div>
+                <div title={personName} style={{ fontSize: SZ.lg, fontWeight: TYPE.weights.bold, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{personName}</div>
                 {roleLine && <div title={roleLine} style={{ fontSize: 12, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{roleLine}</div>}
               </div>
             </>
@@ -1391,7 +1397,7 @@ export function PersonSwipeCard({ person, company, matchText, onAccept, onReject
             <div style={{ margin: '12px 18px 0', padding: '12px 14px', borderRadius: 12, background: T.accentBg, border: `1px solid ${BRAND.pink}2e` }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 5 }}>
                 <BarryAvatar size={18} />
-                <span style={{ fontSize: 9, letterSpacing: 2, color: BRAND.pink, fontWeight: 700 }}>BARRY INTEL</span>
+                <span style={{ fontSize: SZ['2xs'], letterSpacing: 2, color: BRAND.pink, fontWeight: 700 }}>BARRY INTEL</span>
               </div>
               <p style={{ margin: 0, fontSize: 13, color: T.isDark ? '#d0a0c0' : T.textMuted, lineHeight: 1.6 }}>{companyIntel}</p>
             </div>
@@ -1491,7 +1497,7 @@ export function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo,
           <div style={{ padding: '8px 18px 10px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
             <div>
               <div style={{ fontSize: 12, fontWeight: 700, color: T.text }}>Queue</div>
-              <div style={{ fontSize: 10, color: T.textFaint }}>{upcoming.length} remaining</div>
+              <div style={{ fontSize: SZ['2xs'], color: T.textFaint }}>{upcoming.length} remaining</div>
             </div>
             <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textFaint, fontSize: 20, lineHeight: 1 }}>×</button>
           </div>
@@ -1512,7 +1518,7 @@ export function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo,
                     <div style={{ fontSize: 12, fontWeight: i === 0 ? 700 : 500, color: i === 0 ? BRAND.pink : T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {i === 0 && '▶ '}{co.name}
                     </div>
-                    <div style={{ fontSize: 10, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getDisplayIndustry(co, '—')}</div>
+                    <div style={{ fontSize: SZ['2xs'], color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getDisplayIndustry(co, '—')}</div>
                   </div>
                   <ScorePip score={co.fit_score ?? co.score ?? null} />
                 </div>
@@ -1523,7 +1529,7 @@ export function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo,
             </div>
             {rejected.length > 0 && (
               <>
-                <div style={{ padding: '8px 18px 4px', fontSize: 9, letterSpacing: 2, color: T.textFaint, fontWeight: 700, borderTop: `1px solid ${T.border}` }}>
+                <div style={{ padding: '8px 18px 4px', fontSize: SZ['2xs'], letterSpacing: 2, color: T.textFaint, fontWeight: 700, borderTop: `1px solid ${T.border}` }}>
                   NOT A MATCH THIS SESSION
                 </div>
                 {rejected.map(co => (
@@ -1535,7 +1541,7 @@ export function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo,
                     <CompanyLogo company={co} size="small" />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ fontSize: 12, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
-                      <div style={{ fontSize: 10, color: T.textFaint }}>Re-review</div>
+                      <div style={{ fontSize: SZ['2xs'], color: T.textFaint }}>Re-review</div>
                     </div>
                     <ScorePip score={co.fit_score ?? co.score ?? null} />
                   </div>
@@ -1560,7 +1566,7 @@ export function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo,
       <div style={{ padding: '16px 18px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div>
           <div style={{ fontSize: 12, fontWeight: 700, color: T.text }}>Queue</div>
-          <div style={{ fontSize: 10, color: T.textFaint }}>{upcoming.length} remaining</div>
+          <div style={{ fontSize: SZ['2xs'], color: T.textFaint }}>{upcoming.length} remaining</div>
         </div>
         <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: T.textFaint, fontSize: 20, lineHeight: 1 }}>×</button>
       </div>
@@ -1585,7 +1591,7 @@ export function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo,
                 <div style={{ fontSize: 12, fontWeight: i === 0 ? 700 : 500, color: i === 0 ? BRAND.pink : T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {i === 0 && '▶ '}{co.name}
                 </div>
-                <div style={{ fontSize: 10, color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getDisplayIndustry(co, '—')}</div>
+                <div style={{ fontSize: SZ['2xs'], color: T.textFaint, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getDisplayIndustry(co, '—')}</div>
               </div>
               <ScorePip score={co.fit_score ?? co.score ?? null} />
             </div>
@@ -1598,7 +1604,7 @@ export function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo,
         {/* Rejected */}
         {rejected.length > 0 && (
           <>
-            <div style={{ padding: '8px 18px 4px', fontSize: 9, letterSpacing: 2, color: T.textFaint, fontWeight: 700, borderTop: `1px solid ${T.border}` }}>
+            <div style={{ padding: '8px 18px 4px', fontSize: SZ['2xs'], letterSpacing: 2, color: T.textFaint, fontWeight: 700, borderTop: `1px solid ${T.border}` }}>
               NOT A MATCH THIS SESSION
             </div>
             {rejected.map(co => (
@@ -1615,7 +1621,7 @@ export function QueueListPanel({ companies, currentIndex, rejectedIds, onJumpTo,
                 <CompanyLogo company={co} size="small" />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 12, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
-                  <div style={{ fontSize: 10, color: T.textFaint }}>Re-review</div>
+                  <div style={{ fontSize: SZ['2xs'], color: T.textFaint }}>Re-review</div>
                 </div>
                 <ScorePip score={co.fit_score ?? co.score ?? null} />
               </div>
@@ -1652,7 +1658,7 @@ function SessionSummaryScreen({ reviewed, saved, rejected, streak, savedCompanie
         ].map(([label, value, color, bg]) => (
           <div key={label} style={{ padding: '12px 14px', background: bg, borderRadius: 12, border: `1px solid ${T.border2}`, textAlign: 'center' }}>
             <div style={{ fontSize: 22, fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
-            <div style={{ fontSize: 10, color: T.textFaint, marginTop: 4 }}>{label}</div>
+            <div style={{ fontSize: SZ['2xs'], color: T.textFaint, marginTop: 4 }}>{label}</div>
           </div>
         ))}
       </div>
@@ -1662,9 +1668,9 @@ function SessionSummaryScreen({ reviewed, saved, rejected, streak, savedCompanie
         <div style={{ width: '100%', padding: '12px 14px', background: T.surface, borderRadius: 12, border: `1px solid ${T.border2}`, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
           <CompanyLogo company={topMatch} size="default" />
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 9, letterSpacing: 1.5, color: T.textFaint, marginBottom: 2 }}>TOP MATCH</div>
+            <div style={{ fontSize: SZ['2xs'], letterSpacing: 1.5, color: T.textFaint, marginBottom: 2 }}>TOP MATCH</div>
             <div style={{ fontSize: 13, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{topMatch.name}</div>
-            <div style={{ fontSize: 10, color: T.textFaint }}>{topMatch.industry || '—'}</div>
+            <div style={{ fontSize: SZ['2xs'], color: T.textFaint }}>{topMatch.industry || '—'}</div>
           </div>
           {/* pickTopMatch only ever returns a measured, qualifying score, so
               there is no unscored case to render here. */}
@@ -2027,7 +2033,7 @@ function LayoutDebugOverlay({ isDesktop }) {
     <div style={{
       position: 'fixed', top: 4, right: 4, zIndex: 9999,
       background: 'rgba(0,0,0,0.85)', color: '#0f0',
-      fontFamily: 'monospace', fontSize: 9, lineHeight: 1.4,
+      fontFamily: 'monospace', fontSize: SZ['2xs'], lineHeight: 1.4,
       padding: '6px 8px', borderRadius: 6,
       pointerEvents: 'none', maxWidth: 220,
       whiteSpace: 'pre',
@@ -3268,7 +3274,7 @@ export default function DailyLeads({ onNavigate }) {
               <span>{d}</span>
             </div>
           ))}
-          <button onClick={() => setShowKeyHint(false)} style={{ marginTop: 8, width: '100%', padding: '4px 0', background: 'none', border: 'none', color: T.textFaint, fontSize: 10, cursor: 'pointer' }}>Got it</button>
+          <button onClick={() => setShowKeyHint(false)} style={{ marginTop: 8, width: '100%', padding: '4px 0', background: 'none', border: 'none', color: T.textFaint, fontSize: SZ['2xs'], cursor: 'pointer' }}>Got it</button>
         </div>
       )}
 
@@ -3293,8 +3299,8 @@ export default function DailyLeads({ onNavigate }) {
               so on mobile they stay stacked and the saving comes from the
               padding around them instead. */}
           <div style={{ display: 'flex', alignItems: 'baseline', flexWrap: 'wrap', gap: isDesktop ? 10 : 0, minWidth: 0, flexShrink: 0, ...(isDesktop ? null : { display: 'block' }) }}>
-            <h2 style={{ margin: 0, fontSize: isDesktop ? 22 : 18, fontWeight: 700, color: T.text }}>Daily Discoveries</h2>
-            <p style={{ margin: isDesktop ? 0 : '2px 0 0', fontSize: isDesktop ? 13 : 11, color: T.textFaint }}>
+            <h2 style={{ margin: 0, fontSize: isDesktop ? SZ['2xl'] : 18, fontWeight: TYPE.weights.semibold, color: T.text }}>Daily Discoveries</h2>
+            <p style={{ margin: isDesktop ? 0 : '2px 0 0', fontSize: isDesktop ? SZ.sm : SZ['2xs'], color: T.textFaint }}>
               Matches based on {icpList.length > 1 ? (icpList.find(i => i.id === activeICPId)?.name || 'your ICP') : 'your ICP'}
             </p>
           </div>
@@ -3304,7 +3310,7 @@ export default function DailyLeads({ onNavigate }) {
                 cluster rather than the subtitle, so it costs no height and no
                 width that a narrow viewport would have to wrap. */}
             {progressLabel && (
-              <span style={{ fontSize: 10, color: T.textFaint, whiteSpace: 'nowrap' }}>{progressLabel}</span>
+              <span style={{ fontSize: SZ['2xs'], color: T.textFaint, whiteSpace: 'nowrap' }}>{progressLabel}</span>
             )}
             {/* The queue, at every width. Phones used to get a floating button
                 instead, fixed over the bottom nav and the card's Match button. */}
@@ -3628,7 +3634,7 @@ export default function DailyLeads({ onNavigate }) {
                       <RotateCcw size={13} />Undo last skip
                     </button>
                   )}
-                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, fontSize: 10, color: T.textGhost, ...(isDesktop ? null : { flexShrink: 0, height: 40 }) }}>
+                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, fontSize: SZ['2xs'], color: T.textGhost, ...(isDesktop ? null : { flexShrink: 0, height: 40 }) }}>
                     <span>← Sharpens targeting</span>
                     {/* Skip is below the card on a phone; on desktop it is on the card. */}
                     {!isDesktop && (
@@ -3708,7 +3714,7 @@ export default function DailyLeads({ onNavigate }) {
                       skipRef={personSkipRef}
                     />
                   </div>
-                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, fontSize: 10, color: T.textGhost, ...(isDesktop ? null : { flexShrink: 0, height: 40 }) }}>
+                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, fontSize: SZ['2xs'], color: T.textGhost, ...(isDesktop ? null : { flexShrink: 0, height: 40 }) }}>
                     <span>← Not this person</span>
                     {!isDesktop && (
                       <button
@@ -3739,9 +3745,9 @@ export default function DailyLeads({ onNavigate }) {
             {/* Daily progress bar */}
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <div style={{ fontSize: 9, letterSpacing: 2, fontWeight: 700, color: T.textFaint }}>TODAY'S PROGRESS</div>
+                <div style={{ fontSize: SZ['2xs'], letterSpacing: 2, fontWeight: 700, color: T.textFaint }}>TODAY'S PROGRESS</div>
                 {streakDays > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 10, fontWeight: 700, color: STATUS.amber }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: SZ['2xs'], fontWeight: 700, color: STATUS.amber }}>
                     <Flame size={12} color={STATUS.amber} />{streakDays}d
                   </div>
                 )}
@@ -3762,7 +3768,7 @@ export default function DailyLeads({ onNavigate }) {
 
             {/* Session stats — 4-up grid */}
             <div>
-              <div style={{ fontSize: 9, letterSpacing: 2, fontWeight: 700, color: T.textFaint, marginBottom: 8 }}>THIS SESSION</div>
+              <div style={{ fontSize: SZ['2xs'], letterSpacing: 2, fontWeight: 700, color: T.textFaint, marginBottom: 8 }}>THIS SESSION</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 7 }}>
                 {[
                   ['REVIEWED', sessionReviewed, T.text, T.surface],
@@ -3771,7 +3777,7 @@ export default function DailyLeads({ onNavigate }) {
                   ['MATCH %', sessionReviewed > 0 ? `${Math.round((sessionSaved / sessionReviewed) * 100)}%` : '—', STATUS.green, `${STATUS.green}10`],
                 ].map(([label, value, color, bg]) => (
                   <div key={label} style={{ padding: '8px 10px', background: bg, borderRadius: 9, border: `1px solid ${T.border2}` }}>
-                    <div style={{ fontSize: 9, letterSpacing: 1.5, color: T.textFaint, marginBottom: 4 }}>{label}</div>
+                    <div style={{ fontSize: SZ['2xs'], letterSpacing: 1.5, color: T.textFaint, marginBottom: 4 }}>{label}</div>
                     <div style={{ fontSize: 18, fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
                   </div>
                 ))}
@@ -3781,7 +3787,7 @@ export default function DailyLeads({ onNavigate }) {
             {/* Queue count */}
             <div style={{ padding: '10px 12px', background: T.surface, borderRadius: 10, border: `1px solid ${T.border2}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>
-                <div style={{ fontSize: 9, letterSpacing: 1.5, color: T.textFaint, marginBottom: 4 }}>IN QUEUE</div>
+                <div style={{ fontSize: SZ['2xs'], letterSpacing: 1.5, color: T.textFaint, marginBottom: 4 }}>IN QUEUE</div>
                 <div style={{ fontSize: 22, fontWeight: 800, color: T.text, lineHeight: 1 }}>{Math.max(0, companies.length - currentIndex)}</div>
               </div>
               <button
@@ -3800,7 +3806,7 @@ export default function DailyLeads({ onNavigate }) {
                   onClick={() => setSavedTodayOpen(o => !o)}
                   style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', marginBottom: savedTodayOpen ? 8 : 0 }}
                 >
-                  <div style={{ fontSize: 9, letterSpacing: 2, fontWeight: 700, color: T.textFaint }}>SAVED TODAY ({sessionSavedCompanies.length})</div>
+                  <div style={{ fontSize: SZ['2xs'], letterSpacing: 2, fontWeight: 700, color: T.textFaint }}>SAVED TODAY ({sessionSavedCompanies.length})</div>
                   <ChevronDown size={12} color={T.textFaint} style={{ transform: savedTodayOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
                 </div>
                 {savedTodayOpen && (
@@ -3812,13 +3818,13 @@ export default function DailyLeads({ onNavigate }) {
                           <div style={{ fontSize: 11, fontWeight: 600, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{co.name}</div>
                           {/* G1-06: "0/100" is a measured verdict; an unscored
                               company has not earned one. */}
-                          <div style={{ fontSize: 10, color: T.textFaint }}>
+                          <div style={{ fontSize: SZ['2xs'], color: T.textFaint }}>
                             {co.fit_score == null ? UNSCORED_LABEL : `${co.fit_score}/100`}
                           </div>
                         </div>
                         <button
                           onClick={() => navigate('/recon', { state: { companyId: co.id } })}
-                          style={{ padding: '3px 7px', borderRadius: 5, background: T.accentBg, border: `1px solid ${T.accentBdr}`, color: BRAND.pink, fontSize: 9, fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          style={{ padding: '3px 7px', borderRadius: 5, background: T.accentBg, border: `1px solid ${T.accentBdr}`, color: BRAND.pink, fontSize: SZ['2xs'], fontWeight: 600, cursor: 'pointer', whiteSpace: 'nowrap' }}
                         >
                           Recon
                         </button>
@@ -3840,7 +3846,7 @@ export default function DailyLeads({ onNavigate }) {
 
             {/* Keyboard shortcuts reference */}
             <div>
-              <div style={{ fontSize: 9, letterSpacing: 2, fontWeight: 700, color: T.textFaint, marginBottom: 8 }}>SHORTCUTS</div>
+              <div style={{ fontSize: SZ['2xs'], letterSpacing: 2, fontWeight: 700, color: T.textFaint, marginBottom: 8 }}>SHORTCUTS</div>
               {[
                 ['→ / L', 'Save'],
                 ['← / J', 'Skip'],
@@ -3868,7 +3874,7 @@ export default function DailyLeads({ onNavigate }) {
                 <BarryAvatar size={28} />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: BRAND.pink }}>Chat with Barry</div>
-                  <div style={{ fontSize: 9, color: T.textFaint }}>Refine your ICP targeting</div>
+                  <div style={{ fontSize: SZ['2xs'], color: T.textFaint }}>Refine your ICP targeting</div>
                 </div>
                 <ArrowRight size={13} color={BRAND.pink} />
               </button>

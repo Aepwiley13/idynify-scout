@@ -22,8 +22,8 @@
 }
 
 .brc-bear {
-  font-size: 16px;
-  line-height: 1.2;
+  font-size: var(--text-md);
+  line-height: var(--leading-tight);
   flex-shrink: 0;
 }
 
@@ -33,16 +33,16 @@
 }
 
 .brc-title {
-  font-size: 13px;
+  font-size: var(--text-sm);
   font-weight: 700;
   color: #9d174d;
-  line-height: 1.35;
+  line-height: var(--leading-snug);
 }
 
 .brc-subtitle {
-  font-size: 11px;
+  font-size: var(--text-2xs);
   color: #6b7280;
-  line-height: 1.4;
+  line-height: var(--leading-snug);
   margin-top: 2px;
 }
 
@@ -59,9 +59,9 @@
 }
 
 .brc-summary {
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: #374151;
-  line-height: 1.5;
+  line-height: var(--leading-normal);
   margin: 0 0 8px;
 }
 
@@ -81,7 +81,7 @@
 
 .brc-badge {
   display: inline-block;
-  font-size: 10px;
+  font-size: var(--text-2xs);
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: capitalize;
@@ -105,7 +105,7 @@
 }
 
 .brc-signal-label {
-  font-size: 10px;
+  font-size: var(--text-2xs);
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
@@ -122,9 +122,9 @@
 }
 
 .brc-signal-item {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: #374151;
-  line-height: 1.45;
+  line-height: var(--leading-normal);
 }
 
 /* ── Zone 3: the draft ──────────────────────────────────── */
@@ -133,7 +133,7 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 11px;
+  font-size: var(--text-2xs);
   font-weight: 600;
   color: #9d174d;
   margin-bottom: 6px;
@@ -155,8 +155,8 @@
   border-radius: 10px;
   background: #ffffff;
   font-family: inherit;
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
   color: #1f2937;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
@@ -182,7 +182,7 @@
 }
 
 .brc-count {
-  font-size: 10px;
+  font-size: var(--text-2xs);
   color: #9ca3af;
 }
 
@@ -192,7 +192,7 @@
 }
 
 .brc-recipient {
-  font-size: 10px;
+  font-size: var(--text-2xs);
   color: #9ca3af;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -210,9 +210,9 @@
   border-radius: 8px;
   background: #fef2f2;
   border: 1px solid #fecaca;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: #b91c1c;
-  line-height: 1.4;
+  line-height: var(--leading-snug);
 }
 
 .brc-error-icon {
@@ -237,7 +237,7 @@
   justify-content: center;
   gap: 5px;
   font-family: inherit;
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 600;
   padding: 8px 12px;
   border-radius: 9px;

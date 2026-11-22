@@ -118,7 +118,7 @@
   border-radius: 10px;
   background: linear-gradient(135deg, #e8197d, #00c4cc);
   color: #fff;
-  font-size: 0.75rem;
+  font-size: var(--text-xs);
   font-weight: 800;
   font-style: italic;
   letter-spacing: 0.02em;
@@ -188,8 +188,8 @@
   border-radius: 9px;
   color: var(--text-secondary);
   font-family: inherit;
-  font-size: 0.8125rem;
-  font-weight: 500;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
   text-align: left;
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
@@ -221,7 +221,10 @@
 .sidebar-module.active {
   background: #7c3aed;
   color: #ffffff;
-  font-weight: 650;
+  /* Was 650 — not a loaded weight, so it snapped to 700 and the distinction
+     from an inactive item was carried by the violet pill alone. 600 is a real
+     step above the list's 500 and renders the weight it asks for. */
+  font-weight: var(--weight-semibold);
   box-shadow: 0 2px 10px rgba(124, 58, 237, 0.32);
 }
 
@@ -240,13 +243,30 @@
   white-space: nowrap;
 }
 
+/* The rail is 64px, but the nav's 10px side padding was spending a third of it
+   on whitespace either side of a centred icon. Compact gets 3px back instead,
+   which widens every rail label by 14px — enough for FALLBACK, and useful for
+   the rest. Wide mode keeps its 10px; the padding there sits beside text, not
+   a centred glyph, and does real work. */
+.sidebar.compact .sidebar-nav {
+  padding-left: 3px;
+  padding-right: 3px;
+}
+
 .sidebar.compact .sidebar-module-label {
   flex: none;
   width: 100%;
-  font-size: 7px;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  line-height: 1;
+  /* 7px. The rail's labels were decorative rather than legible — this is the
+     floor, and the one place in the sidebar where the old value was not a
+     style choice but an accident of fitting text into 64px.
+
+     At 11px the longest labels ellipsis; see the note on .sidebar.compact
+     .sidebar-nav below for what was reclaimed and what cannot be. Compact
+     items already carry the full name as a title tooltip. */
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0;
+  line-height: var(--leading-tight);
   padding: 0 1px;
 }
 
@@ -326,10 +346,10 @@
 .barry-card-name {
   flex: 1;
   min-width: 0;
-  font-size: 0.8125rem;
-  font-weight: 700;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
   color: var(--text-primary);
-  line-height: 1.2;
+  line-height: var(--leading-tight);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -346,9 +366,10 @@
    not offered two "Global navigation" landmarks. */
 .sidebar-group-label {
   padding: 12px 12px 4px;
-  font-size: 0.6875rem;
-  font-weight: 700;
-  letter-spacing: 0.14em;
+  font-size: var(--text-2xs);
+  font-weight: var(--weight-semibold);
+  /* 0.14em on an all-caps label reads as strain, not emphasis. */
+  letter-spacing: 0.06em;
   color: var(--text-secondary);
   opacity: 0.65;
 }
@@ -411,7 +432,7 @@
     border-radius: 9px;
   }
 
-  .sidebar-mark-fallback { font-size: 0.6875rem; }
+  .sidebar-mark-fallback { font-size: var(--text-2xs); }
 
   /* The drawer is full height and the bottom bar is fixed on top of it, so
      without this the Barry card at the drawer's foot sits underneath the bar —

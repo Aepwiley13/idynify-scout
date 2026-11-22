@@ -23,13 +23,13 @@
 
 .barry-insights-label {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--text-sm);
   color: #15803d;
 }
 
 .barry-insights-count {
   margin-left: auto;
-  font-size: 11px;
+  font-size: var(--text-2xs);
   color: #86efac;
   font-weight: 500;
 }
@@ -44,9 +44,9 @@
   display: flex;
   align-items: flex-start;
   gap: 6px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: #374151;
-  line-height: 1.4;
+  line-height: var(--leading-snug);
 }
 
 .barry-insight-row-icon {

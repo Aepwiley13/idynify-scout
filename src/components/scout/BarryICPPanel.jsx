@@ -239,7 +239,7 @@ export default function BarryICPPanel({ userId, icpProfile, onClose, onSearchCom
       <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 498, background: 'rgba(0,0,0,0.4)' }} />
 
       {/* Side panel */}
-      <div style={{
+      <div role="region" aria-label="Barry's ICP conversation" style={{
         position: 'fixed', top: 0, right: 0, bottom: 0, width: 380, maxWidth: '100vw', zIndex: 499,
         background: T.cardBg, borderLeft: `1px solid ${T.border}`,
         display: 'flex', flexDirection: 'column',

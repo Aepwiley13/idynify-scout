@@ -102,7 +102,7 @@ export default function BarryInsightsCard({ contactId }) {
   if (!insights && !contactInsights) return null;
 
   return (
-    <div className="barry-insights-card">
+    <div className="barry-insights-card" role="region" aria-label="Barry's Playbook">
       <div className="barry-insights-header">
         <Zap className="barry-insights-icon" />
         <span className="barry-insights-label">Barry's Playbook</span>

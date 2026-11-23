@@ -33,7 +33,7 @@ export default function BarryMorningBrief({ orientation, openBarry, T }) {
   const isReady = safe.status === 'ready';
 
   return (
-    <div style={{
+    <div role="region" aria-label="Barry's morning brief" style={{
       borderRadius: 14,
       background: T.cardBg,
       border: `1px solid ${T.border}`,

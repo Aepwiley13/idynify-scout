@@ -278,7 +278,7 @@ export default function CadenceDetail() {
     return (
       <div style={{
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: T.appBg, fontFamily: 'Inter, system-ui, sans-serif', minHeight: '100dvh',
+        background: T.appBg, fontFamily: 'Inter, system-ui, sans-serif', minHeight: 0,
       }}>
         <RefreshCw size={24} color={T.textFaint} style={{ animation: 'spin 1.5s linear infinite' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
@@ -292,7 +292,7 @@ export default function CadenceDetail() {
       <div style={{
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
         flexDirection: 'column', gap: 12,
-        background: T.appBg, fontFamily: 'Inter, system-ui, sans-serif', minHeight: '100dvh',
+        background: T.appBg, fontFamily: 'Inter, system-ui, sans-serif', minHeight: 0,
       }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>Cadence not found</div>
         <button
@@ -336,7 +336,7 @@ export default function CadenceDetail() {
   return (
     <div style={{
       flex: 1, background: T.appBg, fontFamily: 'Inter, system-ui, sans-serif',
-      minHeight: '100dvh', overflowY: 'auto',
+      minHeight: 0, overflowY: 'auto',
     }}>
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '24px 24px 48px' }}>
 

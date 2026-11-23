@@ -110,6 +110,25 @@ The fixed-height shell needs each page to scroll itself (fixed for campaigns in 
 These are root-pattern measurements. Each page needs confirming before a fix, because a page may
 have an inner scroll area. Recon, Barry and Settings weren't checked yet.
 
+### 004.1 — implemented
+
+Same cause and approach as #831/#832. Company Leads is untouched, pending Contact Hub.
+
+| Page | Change |
+|---|---|
+| Total Market | loading and main roots wrapped in `flex-1 min-h-0 overflow-y-auto`; `.total-market` `min-height: 100vh` → `100%` |
+| Scout Game | both roots wrapped; `.scout-game-page` `min-height: 100vh` → `100%` |
+| Cadences list | `minHeight: '100dvh'` → `0` on the main and loading roots (already `flex: 1; overflow-y: auto`) |
+| Cadence detail | `minHeight: '100dvh'` → `0` on the main, loading and not-found roots |
+
+`min-height: 100%` fills the scroll area exactly. With `100vh` (taller than the area), even short pages
+scrolled by the top bar's height (64–105px). Widths are unchanged.
+
+**Verified in Chrome** with the compiled CSS at 1280×720, 1920×1080 and 390×844: short content
+needs no scroll (0px) and long content is fully reachable on all four pages. Cadences also works
+inside Scout's `.scout-list` host. Before, Cadences clipped the last row at every size.
+**Regression:** `src/test/shellReachability.test.js` (8).
+
 ### Ranked recommendations
 
 Impact = user effect; effort and risk as estimated from the source.

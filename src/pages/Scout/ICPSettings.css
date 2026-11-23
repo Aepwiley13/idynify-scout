@@ -1605,3 +1605,77 @@ html[data-theme="theForce"] .advanced-scoring {
   --status-error-text: #fca5a5;
   --status-error-bg:   rgba(220,38,38,0.10);
 }
+
+/* ========================================
+   #006.8 — PROFILE STATUS, REFINE WITH BARRY, WHO YOU'RE LOOKING FOR
+   ======================================== */
+.icp-profile-status {
+  flex-wrap: wrap;
+}
+
+.icp-profile-status-text {
+  flex: 1 1 16rem;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+.icp-profile-status-main {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.icp-profile-status--active {
+  border-color: var(--status-success, #059669);
+}
+
+/* The accent pink is under 4.5:1 for 15px text in several themes; the
+   heading uses the primary text colour and the icon carries the accent. */
+h2.barry-title {
+  font-size: 0.9375rem;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.icp-targeting {
+  margin: 0;
+}
+
+.icp-group-intro {
+  margin: 0 0 1rem 0;
+}
+
+.icp-group-heading {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text-primary);
+}
+
+.icp-group-description {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.icp-more-settings {
+  margin-top: 1.5rem;
+}
+
+/* Keep "Who you're looking for" below the page title, which shrinks on phones. */
+@media (max-width: 768px) {
+  .icp-group-heading {
+    font-size: 1.125rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .icp-group-heading {
+    font-size: 1rem;
+  }
+}

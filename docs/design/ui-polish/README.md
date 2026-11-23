@@ -27,4 +27,8 @@ project, and it belongs somewhere else.
 | [003 audit](003-navigation-audit.md) | Navigation & Visual Hierarchy audit | All modules | Complete |
 | [003.1 + 003.2](003-navigation-audit.md#0031--0032--campaigns-in-hunter-implemented-combined) | Campaigns in Hunter | Hunter, Command Center → Campaigns | Merged (#830) |
 | [003.3](003-navigation-audit.md#0033--missions-in-hunter-implemented) | Missions in Hunter | Hunter, Command Center → Missions; mission page scrolling | Merged (#832) |
-| [003.4 / 003.5 / 004 audit](004-audit-and-003.4-003.5.md) | Outcomes, Cadences, Desktop Screen Utilization | Navigation; all module layouts | Audit — awaiting approval |
+| [003.4 / 003.5 / 004 audit](004-audit-and-003.4-003.5.md) | Outcomes, Cadences, Desktop Screen Utilization | Navigation; all module layouts | Audit approved |
+| [004.1](004-audit-and-003.4-003.5.md#0041--implemented) | Reachability | Total Market, Scout Game, Cadences | Ready for PR |
+| [003.4](004-audit-and-003.4-003.5.md#0034--implemented) | Mission Outcomes in Hunter; Sales Outcomes | Hunter, Command Center, Sniper | Ready for PR |
+| [003.5](004-audit-and-003.4-003.5.md#0035--implemented) | Cadences in Hunter | Hunter, Scout, Command Center | Ready for PR |
+| [004.2 / 004.5](004-audit-and-003.4-003.5.md#planning-approved-for-preparation-not-implemented) | Workflow width; density audit; Hunter grouping | Workflow pages; people views | Proposal — awaiting approval |

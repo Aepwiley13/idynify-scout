@@ -176,3 +176,52 @@ Impact = user effect; effort and risk as estimated from the source.
 | 6 | **004.4** Laptop chrome: start the sidebar compact below ~1366px (+156px width) | Medium–high on laptops | Medium | Medium: shell change affecting all modules; needs explicit approval |
 | 7 | **004.5** Density pass (card sizes, list rows, empty space inside modules) from logged-in screenshots at 1280 / 1440 / 1920 | Unknown until measured | Low to measure | None (read-only) |
 | — | Hunter sub-nav grouping, 003.6 (Go To War / Weapons / Arsenal), Campaigns vs Cadences consolidation | — | — | Deferred, or a product decision |
+
+## Planning (approved for preparation; not implemented)
+
+Visual version, drawn to scale: the "Workflow Width Proposal" artifact.
+
+### 004.2 — workflow width, ~1200px candidate
+
+One shared cap for four workflow page roots. Recon prose, Settings, forms and dialogs stay narrow.
+
+| Page | Today | Proposed | Unused at 1920, today → proposed |
+|---|---|---|---|
+| Mission detail | 800px | 1200px | 53% → 29% |
+| Create Mission | 1000px | 1200px | 41% → 29% |
+| Campaign wizard / detail | 1024px | 1200px | 40% → 29% |
+
+Detail pages have no section panel, so the area is the screen minus the 220px sidebar: 1060px at
+1280, 1220px at 1440, 1700px at 1920. Below about 1420px wide the cap doesn't bind. Mission Setup
+(wizard step 2) keeps its 900px setup width, centred. Before sign-off, each page's inner grids need a
+look at 1920.
+
+### 004.5 — density audit (read-only)
+
+Measured from the layout source; confirm with logged-in screenshots at 1280 / 1440 / 1920.
+
+| Finding | Measured | Impact | Effort | Risk |
+|---|---|---|---|---|
+| People cards (`AllLeads`, shared by Scout, Hunter and Command Center): 260px photo, 320px-minimum columns, 1.5rem gaps | 2 columns at 1280, 3 at 1440; about 1 row above the fold at 720p | High | Low | Medium: shared with Command Center People, so Contact Hub sign-off |
+| `.all-leads` `min-height: 100vh` inside a shorter scroll area (the 004.1 pattern) | 64–80px of empty scroll on every people list | Medium | Low | Medium: same sign-off |
+| Shell chrome on laptops (sidebar + section panel) | 410px = 32% of a 1280 screen | High | Medium | Medium (004.4, on hold) |
+| Card and panel padding: missions 1.5rem, campaigns 1.25rem, panel headers 1.25 × 1.5rem, empty states 3rem | about 40–56px per card | Low | Low | Low |
+| Top bar 64 → 72 / 80px at ≥1280 / ≥1536 | 8–16px of height | Low | Low | Low (004.3, on hold) |
+
+Recommended first: on laptops, a shorter people-card photo (about 160px) or the existing List mode as
+the default, with Contact Hub's agreement. Then one step less padding on Hunter's own cards, alongside
+004.2.
+
+### Hunter section grouping
+
+Hunter's panel now lists 12 items. Recommendation: an optional `group` field on sub-nav items, with
+`ModuleSubNav` printing a small label (the sidebar's existing 11px group-label style) before the first
+item of each group. No collapsing, no new state, and modules without groups are unchanged.
+
+- **Blitz Mode** (first, ungrouped: Hunter's headline action)
+- **People:** All People (the default view), Follow Up Now, Today's Actions, Replied, Active, New (Unengaged), Companies
+- **Outreach:** Campaigns, Cadences, Missions, Mission Outcomes
+
+Mobile: the bottom bar is unchanged (Blitz, All People, Companies, Follow Up); the "More" sheet can
+show the same labels.
+

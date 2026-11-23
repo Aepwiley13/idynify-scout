@@ -13,6 +13,8 @@ import {
   setDoc, updateDoc,
 } from 'firebase/firestore';
 import { Globe, Linkedin, Check, X, RefreshCw, Loader, Settings, RotateCcw, MessageCircle, ArrowRight, MapPin, User, List, ChevronDown, Flame, Trophy, Info } from 'lucide-react';
+import DiscoveryStatusPanel from '../../components/scout/DiscoveryStatusPanel';
+import { describeDiscovery, RUN } from '../../utils/discoveryStatus';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, ASSETS, TYPE } from '../../theme/tokens';
 
@@ -2077,6 +2079,10 @@ export default function DailyLeads({ onNavigate }) {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshMessage, setRefreshMessage] = useState('');
   const [barrySearching, setBarrySearching] = useState(false);
+  // #006.1 — the stored search status (barryState + companiesFoundCount, read with
+  // the user doc) and what this page saw from its own search request.
+  const [discoveryState, setDiscoveryState] = useState({ barryState: null, companiesFoundCount: null });
+  const [lastRun, setLastRun] = useState(null);
   const [actionToast, setActionToast] = useState(null); // { message, type: 'success'|'info' }
 
   // ── ICP profile (for score breakdown) ───────────────────────────────────────
@@ -2214,6 +2220,10 @@ export default function DailyLeads({ onNavigate }) {
       const userSnap = await getDoc(doc(db, 'users', user.uid));
       const barryState = userSnap.exists() ? userSnap.data().barryState : null;
       setBarrySearching(barryState === 'SEARCHING');
+      setDiscoveryState({
+        barryState: barryState ?? null,
+        companiesFoundCount: userSnap.exists() ? (userSnap.data().companiesFoundCount ?? null) : null,
+      });
 
       // Load RECON confidence to scale search queue size
       const dashSnap = await getDoc(doc(db, 'dashboards', user.uid));
@@ -2392,6 +2402,7 @@ export default function DailyLeads({ onNavigate }) {
     const user = getEffectiveUser();
     if (!user || isRefreshing) return;
     setIsRefreshing(true);
+    setLastRun({ kind: RUN.RUNNING });
     setRefreshMessage('Barry is finding new targets...');
     try {
       const authToken = await user.getIdToken();
@@ -2402,6 +2413,7 @@ export default function DailyLeads({ onNavigate }) {
       const searchIcp = await resolveSearchIcp(user);
       if (!searchIcp.icpId) {
         setRefreshMessage(explainUnresolved({ reason: searchIcp.reason }));
+        setLastRun(null);
         setIsRefreshing(false);
         return;
       }
@@ -2440,18 +2452,22 @@ export default function DailyLeads({ onNavigate }) {
       const data = await response.json();
       if (data.success) {
         if (data.companiesAdded > 0) {
+          setLastRun({ kind: RUN.ADDED, added: data.companiesAdded, at: Date.now() });
           setRefreshMessage(`Found ${data.companiesAdded} new targets.`);
           setTimeout(() => { setRefreshMessage(''); loadTodayLeads(); }, 1500);
         } else {
+          setLastRun({ kind: data.currentQueueSize > 0 ? RUN.FULL : RUN.NONE, added: 0, at: Date.now() });
           setRefreshMessage(data.currentQueueSize > 0 ? 'Queue is already full.' : 'No new matches found. Try adjusting your ICP.');
           setTimeout(() => setRefreshMessage(''), 4000);
         }
       } else {
+        setLastRun({ kind: RUN.FAILED, at: Date.now() });
         setRefreshMessage(data.error || 'Refresh failed. Try again.');
         setTimeout(() => setRefreshMessage(''), 4000);
       }
     } catch (error) {
       console.error('Error refreshing leads:', error);
+      setLastRun({ kind: error.name === 'AbortError' ? RUN.TIMEOUT : RUN.FAILED, at: Date.now() });
       const msg = error.name === 'AbortError'
         ? 'Search timed out. Barry is still working — check back in a minute.'
         : 'Refresh failed. Try again.';
@@ -2461,6 +2477,29 @@ export default function DailyLeads({ onNavigate }) {
       setIsRefreshing(false);
     }
   };
+
+  // #006.1 — "Check for results": re-read the stored status and the queue with the
+  // existing loader. It never starts a search, so it can't duplicate one.
+  const checkDiscovery = async () => {
+    setLastRun(null);
+    await loadTodayLeads();
+  };
+  const checkDiscoveryRef = useRef(checkDiscovery);
+  checkDiscoveryRef.current = checkDiscovery;
+  const isRefreshingRef = useRef(isRefreshing);
+  isRefreshingRef.current = isRefreshing;
+
+  // While a search is in progress or unconfirmed, look again when the user comes
+  // back to this tab. No timer: barryState has no timestamp to judge age by.
+  const awaitingSearch = barrySearching || lastRun?.kind === RUN.TIMEOUT;
+  useEffect(() => {
+    if (!awaitingSearch) return undefined;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && !isRefreshingRef.current) checkDiscoveryRef.current();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [awaitingSearch]);
 
   // ── ICP Switching ─────────────────────────────────────────────────────────
   const handleICPSwitch = useCallback((icpId) => {
@@ -3434,23 +3473,23 @@ export default function DailyLeads({ onNavigate }) {
                       {icpUnresolvedReason === 'none-active' ? 'Choose Profile' : 'Set Up Targeting'}
                     </button>
                   </div>
-                ) : barrySearching ? (
-                  <div style={{ textAlign: 'center', padding: 50, color: T.textMuted }}>
-                    <div style={{ fontSize: 44, marginBottom: 12 }}>🔍</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.pink, marginBottom: 8 }}>BARRY IS SEARCHING</div>
-                    <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 16 }}>Barry is finding companies that match your targeting. This usually takes a moment.</p>
-                    <Loader size={20} style={{ animation: 'spin 1s linear infinite', color: BRAND.pink, margin: '0 auto' }} />
-                  </div>
                 ) : (
-                  <div style={{ textAlign: 'center', padding: 50, color: T.textMuted }}>
-                    <div style={{ fontSize: 44, marginBottom: 12 }}>🎯</div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: BRAND.pink, marginBottom: 8 }}>QUEUE EMPTY</div>
-                    <p style={{ fontSize: 12, color: T.textFaint, marginBottom: 16 }}>No pending companies. Barry will find new targets.</p>
-                    <button onClick={handleManualRefresh} disabled={isRefreshing} style={{ padding: '10px 22px', borderRadius: 10, background: `linear-gradient(135deg,${BRAND.pink},#c0146a)`, border: 'none', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8, margin: '0 auto' }}>
-                      {isRefreshing ? <Loader size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <RefreshCw size={14} />}
-                      Find More Targets
-                    </button>
-                  </div>
+                  // #006.1 — searching, found, no new matches, all reviewed, failed,
+                  // still working or unknown: never "empty" for a failed search, and
+                  // no retry while a search is running.
+                  <DiscoveryStatusPanel
+                    status={describeDiscovery({
+                      barryState: barrySearching ? 'SEARCHING' : discoveryState.barryState,
+                      companiesFoundCount: discoveryState.companiesFoundCount,
+                      queueLength: 0,
+                      lastRun,
+                    })}
+                    T={T}
+                    busy={isRefreshing}
+                    onRetry={handleManualRefresh}
+                    onCheck={checkDiscovery}
+                    onEditIcp={() => onNavigate ? onNavigate('icpsettings') : navigate('/scout', { state: { activeTab: 'icp-settings' } })}
+                  />
                 )
               ) : showSessionSummary || currentIndex >= companies.length ? (
                 <SessionSummaryScreen

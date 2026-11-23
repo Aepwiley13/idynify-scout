@@ -565,7 +565,7 @@ function App() {
         <Route path="/hunter/missions"  element={<Navigate to="/hunter?tab=missions"          replace />} />
         <Route path="/hunter/weapons"   element={<Navigate to="/command-center?tab=weapons"   replace />} />
         <Route path="/hunter/arsenal"   element={<Navigate to="/command-center?tab=arsenal"   replace />} />
-        <Route path="/hunter/outcomes"  element={<Navigate to="/command-center?tab=outcomes"  replace />} />
+        <Route path="/hunter/outcomes"  element={<Navigate to="/hunter?tab=outcomes"          replace />} />
         <Route path="/hunter/companies" element={<Navigate to="/command-center?tab=companies" replace />} />
         <Route path="/hunter/people"    element={<Navigate to="/command-center?tab=people"    replace />} />
 

@@ -140,7 +140,7 @@ const CC_ITEMS = [
   { id: 'go_to_war',  label: 'Go To War',    Icon: Swords,    desc: '8-phase bulk mission launcher'    },
   { id: 'weapons',    label: 'Weapons',      Icon: Crosshair, desc: 'Channel selector, message builder' },
   { id: 'arsenal',    label: 'Arsenal',      Icon: Archive,   desc: 'Saved message templates library'  },
-  { id: 'outcomes',   label: 'Outcomes',     Icon: BarChart3, desc: 'Mission performance analytics'    },
+  { id: 'outcomes',   label: 'Mission Outcomes', Icon: BarChart3, desc: 'Mission performance analytics', route: '/hunter?tab=outcomes' },
 ];
 
 // ─── Tab → URL param mapping ──────────────────────────────────────────────────

@@ -97,6 +97,7 @@ export const MODULE_BOTTOM_NAV = {
     overflow: [
       { id: 'campaigns', label: 'Campaigns',   Icon: Mail,          to: '/hunter?tab=campaigns' },
       { id: 'missions',  label: 'Missions',    Icon: Zap,           to: '/hunter?tab=missions' },
+      { id: 'outcomes',  label: 'Mission Outcomes', Icon: BarChart3, to: '/hunter?tab=outcomes' },
       { id: 'today',   label: "Today's Actions", Icon: CalendarCheck, to: '/hunter?tab=today' },
       { id: 'replied', label: 'Replied',         Icon: Inbox,         to: '/hunter?tab=replied' },
       { id: 'active',  label: 'Active',          Icon: Sparkles,      to: '/hunter?tab=active' },
@@ -114,7 +115,7 @@ export const MODULE_BOTTOM_NAV = {
     overflow: [
       { id: 'touches',   label: 'Touches',   Icon: Activity,  to: '/sniper?tab=touches' },
       { id: 'playbooks', label: 'Playbooks', Icon: BookOpen,  to: '/sniper?tab=playbooks' },
-      { id: 'outcomes',  label: 'Outcomes',  Icon: BarChart3, to: '/sniper?tab=outcomes' },
+      { id: 'outcomes',  label: 'Sales Outcomes', Icon: BarChart3, to: '/sniper?tab=outcomes' },
     ],
   },
 
@@ -195,7 +196,7 @@ export const MODULE_BOTTOM_NAV = {
       { id: 'cadences',  label: 'Cadences',  Icon: RefreshCw,  to: '/scout/cadences' },
       { id: 'weapons',   label: 'Weapons',   Icon: Crosshair,  to: '/command-center?tab=weapons' },
       { id: 'go_to_war', label: 'Go To War', Icon: Swords,     to: '/command-center?tab=go_to_war' },
-      { id: 'outcomes',  label: 'Outcomes',  Icon: BarChart3,  to: '/command-center?tab=outcomes' },
+      { id: 'outcomes',  label: 'Mission Outcomes', Icon: BarChart3, to: '/hunter?tab=outcomes' },
     ],
   },
 

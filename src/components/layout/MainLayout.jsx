@@ -29,7 +29,7 @@
 
 import React, { useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { useLocation, useNavigate, Outlet } from 'react-router-dom';
-import { Menu, History, Search, ChevronRight, LifeBuoy, Linkedin } from 'lucide-react';
+import { Menu, History, Search, ChevronRight, LifeBuoy, Linkedin, Maximize2 } from 'lucide-react';
 import Sidebar from './Sidebar';
 import UserMenu from './UserMenu';
 import BottomNav from './BottomNav';
@@ -411,6 +411,19 @@ function ShellChrome({ children, user, barryAvailable = true }) {
             tabIndex={-1}
             onKeyDown={(e) => { if (e.key === 'Escape') closeBarry(); }}
           >
+            {/* #005.5: the full-page workspace was reachable only from first run
+                or a typed URL. This control lives inside the panel, which is
+                only mounted for accounts with Barry access, so who can reach
+                /barry is unchanged (the route keeps its own payment gate). */}
+            <button
+              type="button"
+              className="barry-host-expand"
+              onClick={() => { closeBarry(); navigate('/barry'); }}
+              aria-label="Open the full Barry workspace"
+              title="Open full workspace"
+            >
+              <Maximize2 size={18} aria-hidden="true" />
+            </button>
             <button
               type="button"
               className="barry-host-close"

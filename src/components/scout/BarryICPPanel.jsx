@@ -277,7 +277,7 @@ export default function BarryICPPanel({ userId, icpProfile, onClose, onSearchCom
         </div>
 
         {/* Messages */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }} role="log" aria-live="polite" aria-label="Conversation with Barry">
           {!historyLoaded ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Loader size={20} color={BRAND.pink} style={{ animation: 'spin 1s linear infinite' }} />
@@ -307,7 +307,8 @@ export default function BarryICPPanel({ userId, icpProfile, onClose, onSearchCom
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <BarryAvatar size={26} style={{ flexShrink: 0 }} />
               <div style={{ padding: '10px 14px', borderRadius: '16px 16px 16px 4px', background: T.surface, border: `1px solid ${T.border2}` }}>
-                <Loader size={14} color={BRAND.pink} style={{ animation: 'spin 1s linear infinite' }} />
+                <Loader size={14} color={BRAND.pink} style={{ animation: 'spin 1s linear infinite' }} aria-hidden="true" />
+                <span className="sr-only">Barry is typing…</span>
               </div>
             </div>
           )}

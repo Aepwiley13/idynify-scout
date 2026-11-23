@@ -1490,6 +1490,7 @@ export default function BarryChatPanel({
                 ref={threadRef}
                 className="px-5 py-4 overflow-y-auto flex flex-col gap-3"
                 style={{ maxHeight: '65vh' }}
+                role="log"
                 aria-live="polite"
                 aria-label="Conversation with Barry"
               >
@@ -1817,10 +1818,11 @@ export default function BarryChatPanel({
 
                 {/* Typing indicator */}
                 {sending && (
-                  <div className="flex gap-2" aria-label="Barry is typing">
+                  <div className="flex gap-2">
+                    <span className="sr-only">Barry is typing…</span>
                     <span className="text-xl flex-shrink-0 mt-0.5" aria-hidden="true">🐻</span>
                     <div className="rounded-2xl rounded-tl-sm px-4 py-3" style={{ background: T.cardBg, border: `1px solid ${T.border}` }}>
-                      <div className="flex gap-1 items-center">
+                      <div className="flex gap-1 items-center" aria-hidden="true">
                         <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: T.textMuted, animationDelay: '0ms' }} />
                         <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: T.textMuted, animationDelay: '120ms' }} />
                         <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ background: T.textMuted, animationDelay: '240ms' }} />

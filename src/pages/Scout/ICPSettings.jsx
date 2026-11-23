@@ -5,7 +5,7 @@ import { db, auth } from '../../firebase/config';
 import { APOLLO_INDUSTRIES } from '../../constants/apolloIndustries';
 import { US_STATES } from '../../constants/usStates';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Building2, Users, MapPin, Search, X, Save, RefreshCw, CheckCircle, AlertCircle, Globe, Filter, Sliders, TrendingUp, Brain, MessageSquare, Calendar, FileText, Zap } from 'lucide-react';
+import { Building2, Users, MapPin, Search, X, Save, RefreshCw, CheckCircle, AlertCircle, Globe, Filter, Sliders, TrendingUp, Brain, MessageSquare, Calendar, FileText, Zap, ChevronDown } from 'lucide-react';
 import { SAVE_OUTCOME, SAVE_OUTCOME_COPY, saveOutcomeFor } from '../../utils/icpSaveOutcome';
 import NumericRangeFilter from '../../components/scout/NumericRangeFilter';
 import { DEFAULT_WEIGHTS } from '../../utils/icpScoring';
@@ -48,6 +48,14 @@ export default function ICPSettings() {
 
   const savedCriteriaRef = useRef(null);
   const discoveryInFlightRef = useRef(false);
+  // #006.9 — scoring weights live in a collapsed "Advanced" section. A save
+  // blocked by an invalid total opens it and moves focus to the message.
+  const [advancedScoringOpen, setAdvancedScoringOpen] = useState(false);
+  const [weightsSaveBlocked, setWeightsSaveBlocked] = useState(0);
+  const weightsErrorRef = useRef(null);
+  useEffect(() => {
+    if (weightsSaveBlocked) weightsErrorRef.current?.focus();
+  }, [weightsSaveBlocked]);
 
   const companySizeOptions = [
     "1-10", "11-20", "21-50", "51-100", "101-200", "201-500",
@@ -237,10 +245,12 @@ export default function ICPSettings() {
 
       // Validate weights if they exist
       if (profile.scoringWeights && totalWeight !== 100) {
-        alert(`Scoring weights must total 100%. Currently at ${totalWeight}%.`);
+        setAdvancedScoringOpen(true);
+        setWeightsSaveBlocked(n => n + 1);
         setSaving(false);
         return;
       }
+      setWeightsSaveBlocked(0);
 
       const updatedProfile = {
         ...profile,
@@ -1018,16 +1028,30 @@ export default function ICPSettings() {
         </div>
 
         {/* ICP Scoring Weights Section */}
-        <div className="setting-section scoring-weights-section">
+        <div className="setting-section scoring-weights-section advanced-scoring">
           <div className="section-header">
-            <div className="section-title-group">
-              <Sliders className="section-icon" />
-              <h3>ICP Scoring Weights</h3>
-            </div>
+            <h3 className="advanced-scoring-heading">
+              <button
+                type="button"
+                className="advanced-scoring-toggle"
+                aria-expanded={advancedScoringOpen}
+                aria-controls="advanced-scoring-panel"
+                onClick={() => setAdvancedScoringOpen(open => !open)}
+              >
+                <Sliders className="section-icon" aria-hidden="true" />
+                <span>Advanced: How Matches Are Scored</span>
+                <ChevronDown className="advanced-scoring-chevron" aria-hidden="true" />
+              </button>
+            </h3>
             <span className={`selection-count ${totalWeight !== 100 ? 'error' : ''}`}>
-              {totalWeight}%
+              {totalWeight !== 100 ? `Weights must total 100% · now ${totalWeight}%` : `${totalWeight}%`}
             </span>
           </div>
+          <p className="section-description advanced-scoring-intro">
+            Adjust how important each factor is when Scout evaluates companies. Most users can leave these settings as they are.
+          </p>
+
+          <div id="advanced-scoring-panel" className="advanced-scoring-panel" hidden={!advancedScoringOpen}>
           <p className="section-description">
             Adjust how much each criterion contributes to the lead score. Total must equal 100%.
           </p>
@@ -1038,7 +1062,7 @@ export default function ICPSettings() {
               <div className="weight-control">
                 <div className="weight-header">
                   <Building2 className="w-5 h-5" style={{ color: 'var(--accent)' }} />
-                  <label className="weight-label">Industry Match</label>
+                  <label className="weight-label" htmlFor="weight-industry">Industry Match</label>
                   <span className="weight-value">{profile.scoringWeights.industry}%</span>
                 </div>
                 <input
@@ -1048,15 +1072,21 @@ export default function ICPSettings() {
                   value={profile.scoringWeights.industry}
                   onChange={(e) => handleWeightChange('industry', e.target.value)}
                   className="weight-slider"
+                  aria-label="Industry Match weight (slider)"
+                  aria-invalid={totalWeight !== 100 || undefined}
+                  aria-describedby={totalWeight !== 100 ? 'weights-total-error' : undefined}
                 />
                 <div className="weight-input-group">
                   <input
                     type="number"
                     min="0"
                     max="100"
+                    id="weight-industry"
                     value={profile.scoringWeights.industry}
                     onChange={(e) => handleWeightChange('industry', e.target.value)}
                     className="weight-input"
+                    aria-invalid={totalWeight !== 100 || undefined}
+                    aria-describedby={totalWeight !== 100 ? 'weights-total-error' : undefined}
                   />
                   <span className="weight-unit">%</span>
                 </div>
@@ -1066,7 +1096,7 @@ export default function ICPSettings() {
               <div className="weight-control">
                 <div className="weight-header">
                   <MapPin className="w-5 h-5" style={{ color: 'var(--accent)' }} />
-                  <label className="weight-label">Location Match</label>
+                  <label className="weight-label" htmlFor="weight-location">Location Match</label>
                   <span className="weight-value">{profile.scoringWeights.location}%</span>
                 </div>
                 <input
@@ -1076,15 +1106,21 @@ export default function ICPSettings() {
                   value={profile.scoringWeights.location}
                   onChange={(e) => handleWeightChange('location', e.target.value)}
                   className="weight-slider"
+                  aria-label="Location Match weight (slider)"
+                  aria-invalid={totalWeight !== 100 || undefined}
+                  aria-describedby={totalWeight !== 100 ? 'weights-total-error' : undefined}
                 />
                 <div className="weight-input-group">
                   <input
                     type="number"
                     min="0"
                     max="100"
+                    id="weight-location"
                     value={profile.scoringWeights.location}
                     onChange={(e) => handleWeightChange('location', e.target.value)}
                     className="weight-input"
+                    aria-invalid={totalWeight !== 100 || undefined}
+                    aria-describedby={totalWeight !== 100 ? 'weights-total-error' : undefined}
                   />
                   <span className="weight-unit">%</span>
                 </div>
@@ -1094,7 +1130,7 @@ export default function ICPSettings() {
               <div className="weight-control">
                 <div className="weight-header">
                   <Users className="w-5 h-5" style={{ color: 'var(--accent)' }} />
-                  <label className="weight-label">Employee Size Match</label>
+                  <label className="weight-label" htmlFor="weight-employeeSize">Employee Size Match</label>
                   <span className="weight-value">{profile.scoringWeights.employeeSize}%</span>
                 </div>
                 <input
@@ -1104,15 +1140,21 @@ export default function ICPSettings() {
                   value={profile.scoringWeights.employeeSize}
                   onChange={(e) => handleWeightChange('employeeSize', e.target.value)}
                   className="weight-slider"
+                  aria-label="Employee Size Match weight (slider)"
+                  aria-invalid={totalWeight !== 100 || undefined}
+                  aria-describedby={totalWeight !== 100 ? 'weights-total-error' : undefined}
                 />
                 <div className="weight-input-group">
                   <input
                     type="number"
                     min="0"
                     max="100"
+                    id="weight-employeeSize"
                     value={profile.scoringWeights.employeeSize}
                     onChange={(e) => handleWeightChange('employeeSize', e.target.value)}
                     className="weight-input"
+                    aria-invalid={totalWeight !== 100 || undefined}
+                    aria-describedby={totalWeight !== 100 ? 'weights-total-error' : undefined}
                   />
                   <span className="weight-unit">%</span>
                 </div>
@@ -1122,7 +1164,7 @@ export default function ICPSettings() {
               <div className="weight-control">
                 <div className="weight-header">
                   <TrendingUp className="w-5 h-5" style={{ color: 'var(--accent)' }} />
-                  <label className="weight-label">Revenue Match</label>
+                  <label className="weight-label" htmlFor="weight-revenue">Revenue Match</label>
                   <span className="weight-value">{profile.scoringWeights.revenue}%</span>
                 </div>
                 <input
@@ -1132,15 +1174,21 @@ export default function ICPSettings() {
                   value={profile.scoringWeights.revenue}
                   onChange={(e) => handleWeightChange('revenue', e.target.value)}
                   className="weight-slider"
+                  aria-label="Revenue Match weight (slider)"
+                  aria-invalid={totalWeight !== 100 || undefined}
+                  aria-describedby={totalWeight !== 100 ? 'weights-total-error' : undefined}
                 />
                 <div className="weight-input-group">
                   <input
                     type="number"
                     min="0"
                     max="100"
+                    id="weight-revenue"
                     value={profile.scoringWeights.revenue}
                     onChange={(e) => handleWeightChange('revenue', e.target.value)}
                     className="weight-input"
+                    aria-invalid={totalWeight !== 100 || undefined}
+                    aria-describedby={totalWeight !== 100 ? 'weights-total-error' : undefined}
                   />
                   <span className="weight-unit">%</span>
                 </div>
@@ -1149,14 +1197,23 @@ export default function ICPSettings() {
           )}
 
           {totalWeight !== 100 && (
-            <div className="weight-warning">
-              <X className="w-5 h-5" />
+            <div
+              id="weights-total-error"
+              className="weight-warning"
+              ref={weightsErrorRef}
+              tabIndex={-1}
+              role={weightsSaveBlocked ? 'alert' : undefined}
+              data-testid="weights-total-error"
+            >
+              <X className="w-5 h-5" aria-hidden="true" />
               <span>
+                {weightsSaveBlocked ? 'Not saved. ' : ''}
                 Total must equal 100%. Currently at {totalWeight}%.
                 {totalWeight > 100 ? ` Reduce by ${totalWeight - 100}%.` : ` Add ${100 - totalWeight}%.`}
               </span>
             </div>
           )}
+          </div>
         </div>
 
         {/* Notes Section */}

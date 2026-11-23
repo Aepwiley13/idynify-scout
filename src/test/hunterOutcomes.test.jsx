@@ -5,10 +5,13 @@
  * existing OutcomesSection, so the calculations are unchanged.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
+
+const here = dirname(fileURLToPath(import.meta.url));
 
 const getDocsMock = vi.fn();
 const collectionMock = vi.fn((...path) => ({ name: path[path.length - 1], path: path.slice(1).join('/') }));
@@ -56,12 +59,64 @@ describe('Hunter → Mission Outcomes', () => {
   });
 
   it('error state with a working retry', async () => {
-    getDocsMock.mockRejectedValueOnce(new Error('denied'));
-    renderHost();
-    expect(await screen.findByRole('alert')).toBeTruthy();
-    getDocsMock.mockImplementation(byCollection({}));
-    fireEvent.click(screen.getByRole('button', { name: /Try again/ }));
-    expect(await screen.findByText('No Data Yet')).toBeTruthy();
+    // Both reads must return promises. A single mockRejectedValueOnce leaves
+    // the second read undefined, throwing synchronously before Promise.all
+    // attaches a rejection handler to the first promise.
+    const denied = new Error('denied');
+    getDocsMock
+      .mockImplementationOnce(() => Promise.reject(denied))
+      .mockImplementationOnce(() => Promise.resolve(snap([])));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      renderHost();
+      expect(await screen.findByRole('alert')).toBeTruthy();
+      expect(log).toHaveBeenCalledWith('[OutcomesHost] Failed to load outcomes:', denied);
+      expect(getDocsMock).toHaveBeenCalledTimes(2);
+
+      getDocsMock.mockImplementation(byCollection({}));
+      fireEvent.click(screen.getByRole('button', { name: /Try again/ }));
+      expect(await screen.findByText('No Data Yet')).toBeTruthy();
+      expect(getDocsMock).toHaveBeenCalledTimes(4);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it('handles rejections from both concurrent reads', async () => {
+    const denied = new Error('denied');
+    getDocsMock.mockImplementation(() => Promise.reject(denied));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      renderHost();
+      expect(await screen.findByRole('alert')).toBeTruthy();
+      expect(getDocsMock).toHaveBeenCalledTimes(2);
+      expect(log).toHaveBeenCalledTimes(1);
+      expect(log).toHaveBeenCalledWith('[OutcomesHost] Failed to load outcomes:', denied);
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it('ignores a late failure after unmounting without an unhandled rejection', async () => {
+    let rejectMissions;
+    let resolveCampaigns;
+    const missions = new Promise((_, reject) => { rejectMissions = reject; });
+    const campaigns = new Promise((resolve) => { resolveCampaigns = resolve; });
+    getDocsMock.mockImplementation(ref => ref.name === 'missions' ? missions : campaigns);
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const { unmount } = renderHost();
+      expect(getDocsMock).toHaveBeenCalledTimes(2);
+      unmount();
+      await act(async () => {
+        rejectMissions(new Error('denied'));
+        resolveCampaigns(snap([]));
+        await Promise.allSettled([missions, campaigns]);
+      });
+      expect(log).not.toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
+    }
   });
 
   it('no signed-in user: error, no query', async () => {
@@ -73,7 +128,7 @@ describe('Hunter → Mission Outcomes', () => {
 });
 
 describe('entry points and labels', () => {
-  const src = (p) => readFileSync(resolve(__dirname, '..', p), 'utf8');
+  const src = (p) => readFileSync(resolve(here, '..', p), 'utf8');
   const all = (s) => [...(s.primary || []), ...(s.overflow || [])];
 
   it('Hunter has the Mission Outcomes tab; Command Center links to it; /hunter/outcomes redirects there', () => {

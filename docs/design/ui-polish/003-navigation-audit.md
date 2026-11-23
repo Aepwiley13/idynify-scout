@@ -1,6 +1,6 @@
 # Desktop UI Polish #003 — Navigation & Visual Hierarchy: audit
 
-**Status: audit complete. 003.1 + 003.2 merged (#830); 003.3 implemented (below); 003.4–003.5 deferred.**
+**Status: audit complete. 003.1 + 003.2 merged (#830); 003.3 merged (#832); 003.4–003.5 in audit.**
 Audited on `main` at `33dc078e`. Companion to `003-compact-navigation.md` (rail labels).
 
 ## 003.1 — first improvement (direction approved)

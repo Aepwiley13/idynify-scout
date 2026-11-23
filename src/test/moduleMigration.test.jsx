@@ -109,7 +109,7 @@ const MIGRATED = [
     storageKey: 'sniper_subnav_collapsed',
     sections: [
       'People', 'Companies', 'Pipeline', 'Targets',
-      'Touches', 'Playbooks', 'Outcomes',
+      'Touches', 'Playbooks', 'Sales Outcomes',
     ],
     descriptions: ['Conversion board', 'Win/loss analytics'],
     activeTab: { query: '?tab=playbooks', expect: 'Playbooks' },
@@ -182,7 +182,7 @@ const MIGRATED = [
     // them.
     sections: [
       'People', 'Companies', 'Missions', 'Campaigns', 'Cadences',
-      'Go To War', 'Weapons', 'Arsenal', 'Outcomes',
+      'Go To War', 'Weapons', 'Arsenal', 'Mission Outcomes',
     ],
     descriptions: ['8-phase bulk mission launcher', 'Saved message templates library'],
     activeTab: { query: '?tab=arsenal', expect: 'Arsenal' },

@@ -24,6 +24,20 @@ Hunter home as Campaigns and Missions.
 - Sniper → Outcomes relabels to **Win/Loss**, matching its own description ("Win/loss analytics").
   Same destination.
 
+### 003.4 — implemented
+
+Approved with **Sales Outcomes**, not "Win/Loss", for Sniper.
+- Hunter → **Mission Outcomes** at `/hunter?tab=outcomes`, on desktop (after Missions) and mobile.
+  `pages/Hunter/sections/OutcomesHost.jsx` runs Command Center's existing two read-only queries
+  (`users/{effective uid}/missions` and `/campaigns`, newest first) and renders the existing
+  `OutcomesSection` unchanged. It adds loading and error (with retry) states. Every calculation is
+  the one users already see.
+- Command Center → Outcomes is relabelled **Mission Outcomes** and links to Hunter (desktop and
+  mobile). `/command-center?tab=outcomes` still renders Command Center's own view for old links.
+  `/hunter/outcomes` now redirects to `/hunter?tab=outcomes`.
+- Sniper → Outcomes is relabelled **Sales Outcomes** (desktop and mobile). Same view, same data.
+- Tests: `hunterOutcomes.test.jsx` (7). `moduleMigration` and `mobileNavigation` pinned lists updated.
+
 ### Cadences: outreach, housed under Scout
 
 Cadences are bulk email sends. They're launched from Scout's people list (`AllLeads` bulk compose) and

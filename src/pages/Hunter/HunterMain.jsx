@@ -31,7 +31,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Users, CalendarCheck, AlertTriangle, Inbox, Zap, Sparkles,
-  Building2, Palette, Check, Mail,
+  Building2, Palette, Check, Mail, BarChart3,
   Settings as SettingsIcon,
 } from 'lucide-react';
 import SharedCompaniesView from '../../components/shared/SharedCompaniesView';
@@ -41,6 +41,7 @@ import ModuleSubNav from '../../components/layout/ModuleSubNav';
 import AllLeads from '../Scout/AllLeads';
 import CampaignsSection from './sections/CampaignsSection';
 import MissionsHost from './sections/MissionsHost';
+import OutcomesHost from './sections/OutcomesHost';
 
 // ─── ThemePicker ─────────────────────────────────────────────────────────────
 function ThemePicker() {
@@ -127,6 +128,7 @@ const HUNTER_ITEMS = [
   { id: 'blitz',     label: 'Blitz Mode',      Icon: Zap,           desc: 'Rapid engagement — 10 contacts in 60s', route: '/hunter/blitz' },
   { id: 'campaigns', label: 'Campaigns',       Icon: Mail,          desc: 'Your campaigns — open one or start new'                          },
   { id: 'missions',  label: 'Missions',        Icon: Zap,           desc: 'Every mission — active, paused and completed'                    },
+  { id: 'outcomes',  label: 'Mission Outcomes', Icon: BarChart3,      desc: 'Reply rate by approach style and campaign results'               },
   { id: 'all',       label: 'All People',      Icon: Users,         desc: 'Engagement card feed — work your board', filter: 'all'         },
   { id: 'companies', label: 'Companies',       Icon: Building2,     desc: 'Companies with engaged contacts'                               },
   { id: 'followup',  label: 'Follow Up Now',   Icon: AlertTriangle, desc: 'Overdue engagement queue',           filter: 'follow_up_due' },
@@ -151,6 +153,7 @@ const TAB_MAP = {
   companies: 'companies',
   campaigns: 'campaigns',
   missions:  'missions',
+  outcomes:  'outcomes',
 };
 
 
@@ -194,6 +197,13 @@ function HunterShellInner() {
   const activeFilter = activeItem.filter;
 
   const renderMain = () => {
+    if (activeTab === 'outcomes') {
+      return (
+        <div style={{ flex: 1, overflow: 'auto' }}>
+          <OutcomesHost />
+        </div>
+      );
+    }
     if (activeTab === 'missions') {
       return (
         <div style={{ flex: 1, overflow: 'auto' }}>

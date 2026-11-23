@@ -133,7 +133,7 @@ const SNIPER_ITEMS = [
   { id: 'targets',   label: 'Targets',   Icon: Users,          desc: 'All contacts'         },
   { id: 'touches',   label: 'Touches',   Icon: Activity,       desc: 'Follow-up log'        },
   { id: 'playbooks', label: 'Playbooks', Icon: BookOpen,       desc: 'Conversion sequences' },
-  { id: 'outcomes',  label: 'Outcomes',  Icon: BarChart3,      desc: 'Win/loss analytics'   },
+  { id: 'outcomes',  label: 'Sales Outcomes', Icon: BarChart3, desc: 'Win/loss analytics'   },
 ];
 
 const SETTINGS_ORANGE = '#faaa20';

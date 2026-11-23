@@ -317,7 +317,7 @@ describe('the two More surfaces stay distinct', () => {
     const sheet = screen.getByRole('dialog');
 
     expect(within(sheet).getAllByRole('button').map(b => b.textContent))
-      .toEqual(['', 'Campaigns', 'Missions', "Today's Actions", 'Replied', 'Active', 'New (Unengaged)']);
+      .toEqual(['', 'Campaigns', 'Missions', 'Mission Outcomes', "Today's Actions", 'Replied', 'Active', 'New (Unengaged)']);
   });
 
   it('contains no module names at all', () => {

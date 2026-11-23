@@ -29,40 +29,26 @@ describe('DailyLeads — barrySearching state', () => {
     expect(source).toMatch(/['"]SEARCHING['"]/);
   });
 
-  it('renders a searching state when barrySearching is true', () => {
-    expect(source).toMatch(/barrySearching\s*\?/);
-    expect(source).toMatch(/BARRY IS SEARCHING/);
+  // #006.1: the searching / empty / failed copy moved into DiscoveryStatusPanel,
+  // driven by describeDiscovery(). The guarantees below are the same ones this
+  // file always held; the state rules themselves are covered in discoveryStatus.test.jsx.
+  it('renders the status panel with SEARCHING whenever barrySearching is true', () => {
+    expect(source).toMatch(/<DiscoveryStatusPanel/);
+    expect(source).toMatch(/barryState: barrySearching \? 'SEARCHING' : discoveryState\.barryState/);
   });
 
-  it('QUEUE EMPTY only renders when barrySearching is false (else branch)', () => {
-    const barryTernary = source.indexOf('barrySearching ?');
-    const queueEmptyBlock = source.indexOf('QUEUE EMPTY');
-    expect(barryTernary).toBeGreaterThan(-1);
-    expect(queueEmptyBlock).toBeGreaterThan(-1);
-    const between = source.slice(barryTernary, queueEmptyBlock);
-    expect(between).toMatch(/:\s*\(/);
+  it('a searching status can never read as an empty queue, and offers no new search', async () => {
+    const { describeDiscovery, STATUS } = await import('../utils/discoveryStatus');
+    const s = describeDiscovery({ barryState: 'SEARCHING', queueLength: 0 });
+    expect(s.kind).toBe(STATUS.SEARCHING);
+    expect(s.action).not.toBe('retry');
+    expect(s.title).not.toMatch(/empty|no companies/i);
   });
 
-  it('searching state appears before the QUEUE EMPTY fallback in the conditional chain', () => {
-    const searchingIdx = source.indexOf('BARRY IS SEARCHING');
-    const queueEmptyIdx = source.indexOf('QUEUE EMPTY');
-    expect(searchingIdx).toBeGreaterThan(-1);
-    expect(queueEmptyIdx).toBeGreaterThan(-1);
-    expect(searchingIdx).toBeLessThan(queueEmptyIdx);
-  });
-
-  it('does not show Find More Targets button during searching state', () => {
-    const searchingStart = source.indexOf('BARRY IS SEARCHING');
-    const queueEmptyStart = source.indexOf('QUEUE EMPTY');
-    const searchingBlock = source.slice(searchingStart, queueEmptyStart);
-    expect(searchingBlock).not.toMatch(/Find More Targets/);
-  });
-
-  it('shows a loading indicator during searching state', () => {
-    const searchingStart = source.indexOf('BARRY IS SEARCHING');
-    const queueEmptyStart = source.indexOf('QUEUE EMPTY');
-    const searchingBlock = source.slice(searchingStart, queueEmptyStart);
-    expect(searchingBlock).toMatch(/Loader/);
+  it('shows a loading indicator during the searching state', () => {
+    const panel = readFileSync(resolve(here, '../components/scout/DiscoveryStatusPanel.jsx'), 'utf8');
+    expect(panel).toMatch(/status\.kind === STATUS\.SEARCHING/);
+    expect(panel).toMatch(/<Loader/);
   });
 });
 

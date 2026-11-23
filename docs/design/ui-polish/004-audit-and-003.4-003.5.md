@@ -60,6 +60,25 @@ them side by side.
 - **Decision:** whether Scout keeps a Cadences entry (a link to Hunter's list) or drops it.
   `scoutSubNav.test.jsx` pins Scout's section list either way, so it needs updating.
 
+### 003.5 — implemented
+
+- Hunter → **Cadences** at `/hunter?tab=cadences`, desktop (after Campaigns) and mobile. It hosts the
+  existing `CadencesList` unchanged, in a flex column it can fill (the list scrolls itself). Checked
+  in Chrome at 1280×720, 1920×1080 and 390×844: reachable, and no extra scroll on short lists.
+- Command Center → Cadences (desktop and mobile) opens Hunter's list.
+- **Scout's duplicate entry is removed** from the desktop sub-nav and the mobile "More" sheet. An old
+  `/scout?tab=cadences` link redirects to `/hunter?tab=cadences`.
+- **Hunter is highlighted on cadence pages:** a `resolveModule` rule maps `/scout/cadence…` to Hunter,
+  so `/scout/cadences` and `/scout/cadence/:id` show Hunter in the sidebar, breadcrumb and mobile bar.
+  The routes themselves are unchanged.
+- Cadence detail's two Back buttons return to `/hunter?tab=cadences`.
+- **Contextual shortcuts kept:** the list's View actions and the failed-cadence insight still open
+  `/scout/cadence/:id`. Bulk compose and cadence sending (`AllLeads`, `ScoutPlus`, `BulkSendExecutor`,
+  `cadenceSend`, `CadencePickerModal`) aren't touched, so sending, scheduling, permissions and
+  suppression are unchanged.
+- Tests: `hunterCadences.test.js` (12). `scoutSubNav` now asserts Cadences is absent from Scout.
+  `mobileNavigation`'s pinned Hunter list gains it.
+
 ### Redundant navigation and clicks
 
 | Task (desktop) | Today | After 003.4 + 003.5 |

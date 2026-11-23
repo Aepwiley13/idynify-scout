@@ -27,9 +27,9 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate, useSearchParams, Outlet, useParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, Outlet, useParams, Navigate } from 'react-router-dom';
 import {
-  Users, Building2, Zap, Plus, Settings, RefreshCw, TrendingUp, Gamepad2,
+  Users, Building2, Zap, Plus, Settings, TrendingUp, Gamepad2,
 } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import DailyLeads from './DailyLeads';
@@ -38,7 +38,6 @@ import AllLeads from './AllLeads';
 import CompanyProfileView from './CompanyProfileView';
 import ScoutPlus from './ScoutPlus';
 import ICPSettings from './ICPSettings';
-import CadencesList from './CadencesList';
 import ModuleSubNav from '../../components/layout/ModuleSubNav';
 import './ScoutMain.css';
 
@@ -56,7 +55,6 @@ const SCOUT_VIEWS = [
   { id: 'all',         label: 'People',            Icon: Users,      desc: 'My leads' },
   { id: 'saved',       label: 'Saved Companies',   Icon: Building2,  desc: 'Hunt list' },
   { id: 'scoutplus',   label: 'Scout+',            Icon: Plus,       desc: 'Add contacts' },
-  { id: 'cadences',    label: 'Cadences',          Icon: RefreshCw,  desc: 'Bulk outreach history' },
   { id: 'totalmarket', label: 'Total Market',      Icon: TrendingUp, desc: 'Full addressable market', route: '/scout/total-market' },
   { id: 'icpsettings', label: 'ICP Settings',      Icon: Settings,   desc: 'Targeting criteria' },
   { id: 'game',        label: 'Game Mode',         Icon: Gamepad2,   desc: '15 in 30 — beta', route: '/scout/game' },
@@ -170,7 +168,8 @@ function ScoutShellInner() {
     if (activeView === 'all')         return <AllLeads mode="scout" />;
     if (activeView === 'scoutplus')   return <ScoutPlus />;
     if (activeView === 'icpsettings') return <ICPSettings />;
-    if (activeView === 'cadences')    return <CadencesList />;
+    // Cadences moved to Hunter (#003.5). Old ?tab=cadences links still land there.
+    if (activeView === 'cadences')    return <Navigate to="/hunter?tab=cadences" replace />;
     return null;
   };
 

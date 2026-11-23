@@ -328,6 +328,10 @@ export function resolveModule(pathname) {
   if (pathname.startsWith('/mission-control-v2/recon')) {
     return MODULES.find(m => m.id === 'recon');
   }
+  // Cadences live in Hunter (#003.5) but keep their /scout/cadence… routes.
+  if (pathname.startsWith('/scout/cadence')) {
+    return MODULES.find(m => m.id === 'hunter');
+  }
 
   let best = null;
   for (const dest of ALL_DESTINATIONS) {

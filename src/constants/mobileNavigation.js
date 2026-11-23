@@ -77,7 +77,6 @@ export const MODULE_BOTTOM_NAV = {
       { id: 'scoutplus', label: 'Scout+',  Icon: Plus,      to: '/scout?tab=scout-plus' },
     ],
     overflow: [
-      { id: 'cadences',    label: 'Cadences',     Icon: RefreshCw,  to: '/scout?tab=cadences' },
       { id: 'totalmarket', label: 'Total Market', Icon: TrendingUp, to: '/scout/total-market' },
       { id: 'icpsettings', label: 'ICP Settings', Icon: Settings,   to: '/scout?tab=icp-settings' },
       { id: 'game',        label: 'Game Mode',    Icon: Gamepad2,   to: '/scout/game' },
@@ -96,6 +95,7 @@ export const MODULE_BOTTOM_NAV = {
     ],
     overflow: [
       { id: 'campaigns', label: 'Campaigns',   Icon: Mail,          to: '/hunter?tab=campaigns' },
+      { id: 'cadences',  label: 'Cadences',    Icon: RefreshCw,     to: '/hunter?tab=cadences' },
       { id: 'missions',  label: 'Missions',    Icon: Zap,           to: '/hunter?tab=missions' },
       { id: 'outcomes',  label: 'Mission Outcomes', Icon: BarChart3, to: '/hunter?tab=outcomes' },
       { id: 'today',   label: "Today's Actions", Icon: CalendarCheck, to: '/hunter?tab=today' },
@@ -193,7 +193,7 @@ export const MODULE_BOTTOM_NAV = {
     ],
     overflow: [
       { id: 'companies', label: 'Companies', Icon: Building2,  to: '/command-center?tab=companies' },
-      { id: 'cadences',  label: 'Cadences',  Icon: RefreshCw,  to: '/scout/cadences' },
+      { id: 'cadences',  label: 'Cadences',  Icon: RefreshCw,  to: '/hunter?tab=cadences' },
       { id: 'weapons',   label: 'Weapons',   Icon: Crosshair,  to: '/command-center?tab=weapons' },
       { id: 'go_to_war', label: 'Go To War', Icon: Swords,     to: '/command-center?tab=go_to_war' },
       { id: 'outcomes',  label: 'Mission Outcomes', Icon: BarChart3, to: '/hunter?tab=outcomes' },

@@ -31,7 +31,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import {
   Users, CalendarCheck, AlertTriangle, Inbox, Zap, Sparkles,
-  Building2, Palette, Check, Mail, BarChart3,
+  Building2, Palette, Check, Mail, BarChart3, RefreshCw,
   Settings as SettingsIcon,
 } from 'lucide-react';
 import SharedCompaniesView from '../../components/shared/SharedCompaniesView';
@@ -42,6 +42,7 @@ import AllLeads from '../Scout/AllLeads';
 import CampaignsSection from './sections/CampaignsSection';
 import MissionsHost from './sections/MissionsHost';
 import OutcomesHost from './sections/OutcomesHost';
+import CadencesList from '../Scout/CadencesList';
 
 // ─── ThemePicker ─────────────────────────────────────────────────────────────
 function ThemePicker() {
@@ -127,6 +128,7 @@ function Av({ initials, color = BRAND.purple, size = 24 }) {
 const HUNTER_ITEMS = [
   { id: 'blitz',     label: 'Blitz Mode',      Icon: Zap,           desc: 'Rapid engagement — 10 contacts in 60s', route: '/hunter/blitz' },
   { id: 'campaigns', label: 'Campaigns',       Icon: Mail,          desc: 'Your campaigns — open one or start new'                          },
+  { id: 'cadences',  label: 'Cadences',        Icon: RefreshCw,     desc: 'Bulk outreach history'                                            },
   { id: 'missions',  label: 'Missions',        Icon: Zap,           desc: 'Every mission — active, paused and completed'                    },
   { id: 'outcomes',  label: 'Mission Outcomes', Icon: BarChart3,      desc: 'Reply rate by approach style and campaign results'               },
   { id: 'all',       label: 'All People',      Icon: Users,         desc: 'Engagement card feed — work your board', filter: 'all'         },
@@ -154,6 +156,7 @@ const TAB_MAP = {
   campaigns: 'campaigns',
   missions:  'missions',
   outcomes:  'outcomes',
+  cadences:  'cadences',
 };
 
 
@@ -197,6 +200,15 @@ function HunterShellInner() {
   const activeFilter = activeItem.filter;
 
   const renderMain = () => {
+    if (activeTab === 'cadences') {
+      // CadencesList scrolls itself (flex: 1; minHeight: 0; overflowY: auto),
+      // so its host is a flex column it can fill, not a scrolling block.
+      return (
+        <div style={{ flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
+          <CadencesList />
+        </div>
+      );
+    }
     if (activeTab === 'outcomes') {
       return (
         <div style={{ flex: 1, overflow: 'auto' }}>

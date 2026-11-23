@@ -20,6 +20,7 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db } from '../../firebase/config';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, ASSETS } from '../../theme/tokens';
+import { BARRY_TEXT } from '../../theme/barryColors';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 function BarryAvatar({ size = 28 }) {
@@ -219,7 +220,7 @@ export default function BarryReconCoach({ sectionId, sectionLabel, existingAnswe
           <BarryAvatar size={36} />
           <div style={{ flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: 14, color: T.text }}>Barry</div>
-            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: BRAND.pink, marginTop: 1 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1.5, color: BARRY_TEXT.pink, marginTop: 1 }}>
               COACH — {isSection0 ? 'USER PROFILE' : sectionLabel?.toUpperCase()}
             </div>
           </div>
@@ -282,7 +283,7 @@ export default function BarryReconCoach({ sectionId, sectionLabel, existingAnswe
                 display: 'flex', alignItems: 'center', gap: 8,
               }}>
                 <CheckCircle size={15} color={BRAND.pink} style={{ flexShrink: 0 }} />
-                <div style={{ fontSize: 12, fontWeight: 700, color: BRAND.pink }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: BARRY_TEXT.pink }}>
                   {isSection0 ? 'Profile saved' : 'Section complete'}
                 </div>
               </div>

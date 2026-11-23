@@ -62,7 +62,7 @@ export default function BarryReasoningDisplay({ reasoning, compact = false }) {
 
       <div className="barry-reasoning-item">
         <div className="barry-reasoning-label">
-          <MessageCircle className="w-3.5 h-3.5 text-purple-400" />
+          <MessageCircle className="w-3.5 h-3.5 text-[color:color-mix(in_srgb,#7c3aed_60%,var(--text-primary))]" />
           <span>Rationale</span>
         </div>
         <p className="barry-reasoning-text barry-reasoning-rationale">{rationale}</p>

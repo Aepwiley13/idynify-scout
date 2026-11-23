@@ -19,6 +19,7 @@
 import { useState } from 'react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
+import { BARRY_TEXT } from '../../theme/barryColors';
 import { OUTCOME } from '../../utils/resolutionContract';
 import './BarryStructuredTurn.css';
 
@@ -98,7 +99,7 @@ export default function BarryResolutionPreview({ preview, onApprove, onCancel, s
                 {answered === 'neither'
                   ? `Neither — I'll treat ${r.name} as someone new.`
                   : `Got it — ${r.candidates.find(o => o.contactId === answered)?.company_name}.`}
-                <button type="button" className="bst-linkbtn" style={{ color: BRAND.pink }} onClick={() => setExpanded(r.clientRef)}>
+                <button type="button" className="bst-linkbtn" style={{ color: BARRY_TEXT.pink }} onClick={() => setExpanded(r.clientRef)}>
                   change
                 </button>
               </p>
@@ -129,7 +130,7 @@ export default function BarryResolutionPreview({ preview, onApprove, onCancel, s
                 </button>
               </div>
             ) : (
-              <button type="button" className="bst-linkbtn" style={{ color: BRAND.pink }} onClick={() => setExpanded(r.clientRef)}>
+              <button type="button" className="bst-linkbtn" style={{ color: BARRY_TEXT.pink }} onClick={() => setExpanded(r.clientRef)}>
                 Help me sort this one
               </button>
             )}

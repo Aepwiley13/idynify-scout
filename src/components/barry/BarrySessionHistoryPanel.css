@@ -56,7 +56,7 @@
 }
 
 .bsh-header-icon {
-  color: #9333ea;
+  color: color-mix(in srgb, #7c3aed 60%, var(--text-primary));
 }
 
 .bsh-header-title {
@@ -143,7 +143,7 @@
   height: 24px;
   border-radius: 50%;
   border: 2px solid var(--border);
-  border-top-color: #9333ea;
+  border-top-color: #7c3aed;
   animation: bsh-spin 0.7s linear infinite;
 }
 
@@ -187,7 +187,7 @@
 }
 
 .bsh-row:focus-visible {
-  outline: 2px solid #9333ea;
+  outline: 2px solid #7c3aed;
   outline-offset: -2px;
 }
 
@@ -204,9 +204,9 @@
   margin-top: 0.1rem;
 }
 
-.bsh-row-icon.recon  { color: #6366f1; }
-.bsh-row-icon.mission { color: #9333ea; }
-.bsh-row-icon.hunter  { color: #ec4899; }
+.bsh-row-icon.recon  { color: color-mix(in srgb, #4f46e5 60%, var(--text-primary)); }
+.bsh-row-icon.mission { color: color-mix(in srgb, #7c3aed 60%, var(--text-primary)); }
+.bsh-row-icon.hunter  { color: color-mix(in srgb, #e8197d 60%, var(--text-primary)); }
 
 .bsh-row-body {
   flex: 1;

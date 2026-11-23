@@ -187,7 +187,7 @@ try {
     adminDb.doc('emailSuppressionList/second@example.test').set({ reason: 'unsubscribe' }),
   ]);
   const complex = { survivorId: c.id, sourceId: d.id, operationId: 'b81cb80a-4ca2-4bb3-9461-927db498df00',
-    choices: { primary_phone: 1, photo_display: 1, active_reminder: 1 } };
+    choices: { primary_email: 0, primary_phone: 1, photo_display: 1, active_reminder: 1 } };
   const relationshipPreview = await mergeRequest('preview', complex);
   assert.ok(relationshipPreview.token, JSON.stringify(relationshipPreview));
   assert.deepEqual(relationshipPreview.combined.suppressedEmails, ['second@example.test']);

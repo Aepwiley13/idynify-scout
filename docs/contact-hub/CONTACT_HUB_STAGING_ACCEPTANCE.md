@@ -500,6 +500,52 @@ including account removal. The UI reports blockers and automatically
 refuses rollback after intervening changes. Verify against production-like
 Firestore limits and QA account fixtures before approval.
 
+### Additive affiliations and merge staging gates
+
+The additive-affiliation checkpoint is emulator-verified only. It does not
+change the accepted `2f4697fa` staging candidate. No new composite index is
+required by the affiliation writer; its impersonation check is a two-equality
+query on `impersonationSessions`, exercised against the emulator.
+
+Before enabling affiliation writes in an isolated staging deploy:
+
+1. Deploy the reviewed Firestore rules that deny client create/update of
+   `contact_affiliations` while retaining owner reads and ordinary scalar
+   compatibility writes. Do not activate the endpoint before those rules are
+   effective.
+2. Deploy the Netlify functions `contact-hub-affiliations` and
+   `contact-hub-merge` from the same reviewed checkpoint. Keep server flags
+   off during deploy.
+3. For affiliation editing, set `CONTACT_HUB_AFFILIATIONS=on` only in the
+   isolated staging function environment. The trusted writer checks owner,
+   active contact, impersonation state and exact document version. It uses no
+   new secret.
+4. To stage duplicate review without allowing execution, set
+   `VITE_CONTACT_HUB_MERGE=on` and `CONTACT_HUB_MERGE=on`, provision a
+   server-only `CONTACT_HUB_MERGE_SECRET` with at least 32 random characters,
+   and leave `CONTACT_HUB_MERGE_EXECUTION` unset or `off`. Preview tokens are
+   signed, owner-bound, version-bound and expire after ten minutes; merge
+   requests remain denied while execution is off.
+5. Enable `CONTACT_HUB_MERGE_EXECUTION=on` only after separate approval and
+   closure of lifecycle-writer, pending-provider-operation, unresolved-send,
+   suppression/consent, cleanup/retention and supported-record inventories.
+   Emulator results do not close those staging-wide dependencies.
+
+The synthetic emulator acceptance uses the local rules file:
+
+```sh
+JAVA_HOME="$JDK21_HOME" firebase emulators:exec \
+  --config firebase.contact-hub-emulator.json \
+  --only firestore --project demo-contact-hub-merge \
+  "node scripts/rules-check/contact-hub-merge.mjs"
+```
+
+Keep photo persistence, Gmail connection/sending and contact deletion gates
+independent and closed. To roll back the merge UI, turn off
+`VITE_CONTACT_HUB_MERGE`; to stop server review, turn off
+`CONTACT_HUB_MERGE`; to stop commits immediately, turn off
+`CONTACT_HUB_MERGE_EXECUTION`. Preserve recovery and retirement records.
+
 ### Relationship merge verification checkpoint
 
 The trusted plan now includes private photo and Contact Hub manual reminder

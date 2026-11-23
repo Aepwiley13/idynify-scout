@@ -25,6 +25,11 @@ const json = (statusCode, body) => ({ statusCode, headers: { 'Content-Type': 'ap
 const version = (snap) => snap.updateTime?.toDate?.().toISOString() + ':' + snap.updateTime?.nanoseconds;
 const list = (x) => Array.isArray(x) ? x : [];
 const union = (values, key) => [...new Map(values.map((item) => [key(item), item])).values()];
+const unionKeepingFirst = (values, key) => {
+  const unique = new Map();
+  for (const item of values) if (!unique.has(key(item))) unique.set(key(item), item);
+  return [...unique.values()];
+};
 const fields = ['name', 'first_name', 'last_name', 'title', 'job_title', 'company_name', 'company_id', 'city', 'state', 'country', 'location', 'address', 'linkedin_url', 'apollo_person_id'];
 const nonempty = (x) => x !== null && x !== undefined && x !== '';
 const contactPath = (uid, cid) => `users/${uid}/contacts/${cid}`;
@@ -87,7 +92,9 @@ function applyPlan(a, b, choices, blockers, privatePhotos, identityConfirmed = f
     const normalize = key.startsWith('linkedin') ? normalizeLinkedInUrl : String;
     if (a[key] && b[key] && normalize(a[key]) !== normalize(b[key])) blockers.add('conflicting_identity');
   }
-  const addresses = union([...emails(a), ...emails(b)], (entry) => normalizeEmail(entry.value));
+  // When one address exists on both records, keep the survivor's canonical label.
+  // The source record's original label remains in sourceHistory/source_provenance.
+  const addresses = unionKeepingFirst([...emails(a), ...emails(b)], (entry) => normalizeEmail(entry.value));
   addresses.forEach((entry, index) => { entry.id = `merge_${digest([normalizeEmail(entry.value), entry.label ?? null, index]).slice(0, 20)}`; });
   const primaryEmail = choose('primary_email', addresses.map((entry) => entry.value));
   if (addresses.length) {
@@ -97,7 +104,9 @@ function applyPlan(a, b, choices, blockers, privatePhotos, identityConfirmed = f
     merged.email = chosenEmail;
     merged.email_normalized = normalizeEmail(chosenEmail);
   }
-  const numbers = union([...readContactPhones(a), ...readContactPhones(b)], (phone) => phone.normalized ?? `${phoneDisplay(phone)}:${phone.label}`);
+  // As with email, preserve the survivor's label for a shared number; the retired
+  // source and merge provenance retain its independently observed label.
+  const numbers = unionKeepingFirst([...readContactPhones(a), ...readContactPhones(b)], (phone) => phone.normalized ?? `${phoneDisplay(phone)}:${phone.label}`);
   const primaryPhone = choose('primary_phone', numbers.filter((number) => number.label !== 'fax').map(phoneDisplay));
   if (numbers.length) {
     Object.assign(merged, buildPhoneWrite(numbers.map((phone, index) => ({ ...phone, id: `merged-${index}` }))));

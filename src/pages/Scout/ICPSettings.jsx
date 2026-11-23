@@ -17,6 +17,7 @@ import { setActiveIcpProfile, nextLifecycleState } from '../../utils/setActiveIc
 import { buildIcpCriteriaWrite } from '../../utils/icpProfileWrite';
 import { resolveActiveIcp, isResolved } from '../../utils/resolveActiveIcp';
 import { criteriaChanged } from '../../utils/normalizeIcpCriteria';
+import { describeIcpProfile, PROFILE_STATE } from '../../utils/icpProfileState';
 
 export default function ICPSettings() {
   const navigate = useNavigate();
@@ -130,6 +131,8 @@ export default function ICPSettings() {
       targetTitles: icp.targetTitles || [],
     });
     savedCriteriaRef.current = icp;
+    // A blocked save belongs to the profile it was attempted on (#006.8).
+    setWeightsSaveBlocked(0);
   }
 
   function selectICP(icp) {
@@ -504,7 +507,7 @@ export default function ICPSettings() {
     : 100;
 
   const selectedIcpData = icpList.find(i => i.id === selectedICPId) || null;
-  const showProfileActionBar = selectedIcpData && !(selectedIcpData.isActive && selectedIcpData.status === 'active');
+  const profileState = describeIcpProfile(selectedIcpData, profile);
 
   if (loading) {
     return (
@@ -605,33 +608,41 @@ export default function ICPSettings() {
           </button>
         </div>
 
-        {/* Profile action bar — shown for non-active selected profiles */}
-        {showProfileActionBar && (
-          <div className="icp-profile-actions">
-            {selectedIcpData.status === 'pending' && (
-              <>
-                <span className="icp-profile-action-note">
-                  Messaging setup {selectedIcpData.messagingProgress || 0}% complete
+        {/* Profile status (#006.8): one explanation for the selected profile,
+            with the existing Finish setup / Set as Active action beside it. */}
+        {profileState && (
+          <div
+            className={`icp-profile-actions icp-profile-status icp-profile-status--${profileState.state}`}
+            data-testid="icp-profile-status"
+            data-state={profileState.state}
+          >
+            <p className="icp-profile-status-text">
+              <span className="icp-profile-status-main">{profileState.text}</span>
+              {profileState.state === PROFILE_STATE.SETUP && (
+                <span className="icp-profile-status-detail">
+                  {' '}Messaging setup {selectedIcpData.messagingProgress || 0}% complete.
                 </span>
-                <button
-                  className="icp-finish-setup-btn"
-                  onClick={() => { setMessagingFlowIcpId(selectedICPId); setShowMessagingFlow(true); }}
-                >
-                  Finish setup
-                </button>
-              </>
+              )}
+              {profileState.managedText && (
+                <span className="icp-profile-status-managed">{' '}{profileState.managedText}</span>
+              )}
+            </p>
+            {profileState.canFinishSetup && (
+              <button
+                className="icp-finish-setup-btn"
+                onClick={() => { setMessagingFlowIcpId(selectedICPId); setShowMessagingFlow(true); }}
+              >
+                Finish setup
+              </button>
             )}
-            {selectedIcpData.status === 'inactive' && (
-              <>
-                <span className="icp-profile-action-note">Ready to activate</span>
-                <button
-                  className="icp-set-active-btn"
-                  onClick={() => handleSetActive(selectedICPId)}
-                >
-                  <Zap size={13} />
-                  Set as Active
-                </button>
-              </>
+            {profileState.canActivate && (
+              <button
+                className="icp-set-active-btn"
+                onClick={() => handleSetActive(selectedICPId)}
+              >
+                <Zap size={13} />
+                Set as Active
+              </button>
             )}
           </div>
         )}
@@ -672,62 +683,44 @@ export default function ICPSettings() {
         </div>
       </div>
 
-      {/* Managed by Barry Banner */}
-      {profile?.managedByBarry && (
-        <div className="barry-managed-banner">
-          <div className="barry-managed-content">
-            <div className="barry-icon">
-              <Brain className="w-5 h-5" />
-            </div>
-            <div className="barry-text">
-              <p className="barry-title">Managed by Barry</p>
-              <p className="barry-subtitle">
-                Your ICP was configured by Barry. Barry will begin refining this over time as you use Scout and Hunter.
-              </p>
-              {/* Show lookalike strategy info if present */}
-              {profile.lookalikeSeed?.name && (
-                <p className="barry-subtitle barry-lookalike-info">
-                  Search strategy: Finding companies similar to <strong>{profile.lookalikeSeed.name}</strong>
-                </p>
-              )}
-              <p className="barry-subtitle barry-override-note">
-                Changes made here will override Barry's settings.
-              </p>
-            </div>
-            <button
-              onClick={() => setShowBarryPanel(true)}
-              className="edit-with-barry-btn"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>Edit with Barry</span>
-            </button>
+      {/* Refine with Barry (#006.8): the one Barry entry on this page. It opens
+          the same BarryICPPanel the two earlier cards opened. */}
+      <div className="barry-cta-banner barry-refine" data-testid="refine-with-barry">
+        <div className="barry-cta-content">
+          <div className="barry-icon" aria-hidden="true">
+            <Brain className="w-5 h-5" />
           </div>
+          <div className="barry-text">
+            <h2 className="barry-title" id="refine-with-barry-title">Refine with Barry</h2>
+            <p className="barry-subtitle">
+              Describe your best customers in your own words. Barry will help you define and refine who Scout looks for.
+            </p>
+            {profile?.managedByBarry && profile.lookalikeSeed?.name && (
+              <p className="barry-subtitle barry-lookalike-info">
+                Search strategy: Finding companies similar to <strong>{profile.lookalikeSeed.name}</strong>
+              </p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowBarryPanel(true)}
+            className="use-barry-btn"
+            aria-describedby="refine-with-barry-title"
+          >
+            <MessageSquare className="w-4 h-4" aria-hidden="true" />
+            <span>Ask Barry</span>
+          </button>
         </div>
-      )}
+      </div>
 
-      {/* Edit with Barry CTA (when not managed by Barry) */}
-      {!profile?.managedByBarry && (
-        <div className="barry-cta-banner">
-          <div className="barry-cta-content">
-            <div className="barry-icon">
-              <Brain className="w-5 h-5" />
-            </div>
-            <div className="barry-text">
-              <p className="barry-title">Want Barry to help?</p>
-              <p className="barry-subtitle">
-                Let Barry guide you through defining your ICP conversationally.
-              </p>
-            </div>
-            <button
-              onClick={() => setShowBarryPanel(true)}
-              className="use-barry-btn"
-            >
-              <MessageSquare className="w-4 h-4" />
-              <span>Ask Barry</span>
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Who you're looking for (#006.8): the targeting fields under one heading. */}
+      <section className="icp-targeting" aria-labelledby="icp-targeting-heading">
+      <div className="icp-group-intro">
+        <h2 className="icp-group-heading" id="icp-targeting-heading">Who you&apos;re looking for</h2>
+        <p className="icp-group-description">
+          The companies and people Scout should find for you. Barry searches with these choices.
+        </p>
+      </div>
 
       {/* Summary Cards */}
       <div className="summary-cards">
@@ -1027,6 +1020,10 @@ export default function ICPSettings() {
           </p>
         </div>
 
+      </div>
+      </section>
+
+      <div className="settings-content icp-more-settings">
         {/* ICP Scoring Weights Section */}
         <div className="setting-section scoring-weights-section advanced-scoring">
           <div className="section-header">

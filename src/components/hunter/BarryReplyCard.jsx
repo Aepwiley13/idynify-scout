@@ -200,7 +200,7 @@ export default function BarryReplyCard({
   if (!draft) return null;
 
   return (
-    <div className="barry-reply-card">
+    <div className="barry-reply-card" role="region" aria-label="Barry's drafted reply">
       {/* Header */}
       <div className="brc-header">
         <span className="brc-bear">🐻</span>

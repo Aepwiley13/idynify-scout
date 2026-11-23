@@ -118,7 +118,11 @@ export default function BarryRecommendationCard({
   }
 
   return (
-    <div className={`rounded-xl border ${style.border} ${style.bg} p-4 relative backdrop-blur-sm`}>
+    <div
+      className={`rounded-xl border ${style.border} ${style.bg} p-4 relative backdrop-blur-sm`}
+      role="region"
+      aria-label={`Barry's recommendation: ${style.label}`}
+    >
       {/* Header */}
       <div className="flex items-start justify-between gap-3 mb-3">
         <div className="flex items-start gap-2.5 flex-1 min-w-0">

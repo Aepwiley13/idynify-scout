@@ -192,7 +192,7 @@ export default function BarryReconCoach({ sectionId, sectionLabel, existingAnswe
       />
 
       {/* Panel */}
-      <div style={{
+      <div role="region" aria-label="Barry's Recon coaching" style={{
         position: 'fixed', top: 0, right: 0, bottom: 0, width: 400, maxWidth: '100vw',
         zIndex: 499,
         background: T.cardBg,

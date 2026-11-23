@@ -77,6 +77,8 @@ export default function BarryWarningCard({ warning, contactId, onAction, onDismi
   return (
     <div
       className="barry-warning-card"
+      role="region"
+      aria-label="Barry's warning"
       style={{
         background: `${color}14`,
         border: `1.5px solid ${color}4D`,

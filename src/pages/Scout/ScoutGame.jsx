@@ -379,16 +379,19 @@ export default function ScoutGame() {
   // Loading state
   if (loadingCards && gamePhase !== 'start') {
     return (
+      <div className="flex-1 min-h-0 overflow-y-auto">
       <div className="scout-game-page">
         <div className="scout-game-loading">
           <Loader className="w-6 h-6 spin" />
           <p>Loading your card stack...</p>
         </div>
       </div>
+      </div>
     );
   }
 
   return (
+    <div className="flex-1 min-h-0 overflow-y-auto">
     <div className="scout-game-page">
       {/* Session bar (visible during play + engage + review) */}
       {session.isActive && gamePhase !== 'start' && gamePhase !== 'summary' && (
@@ -524,6 +527,7 @@ export default function ScoutGame() {
           onExit={handleExit}
         />
       )}
+    </div>
     </div>
   );
 }

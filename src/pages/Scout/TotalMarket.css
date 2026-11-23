@@ -8,7 +8,8 @@
   margin: 0 auto;
   padding: 2rem 1.5rem;
   background: var(--bg-primary);
-  min-height: 100vh;
+  /* Fill the shell's scroll area exactly (was 100vh: taller than the area, so every visit scrolled). */
+  min-height: 100%;
 }
 
 /* ========================================

@@ -150,7 +150,7 @@ export default function CadencesList() {
     return (
       <div style={{
         flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        background: T.appBg, fontFamily: 'Inter, system-ui, sans-serif', minHeight: '100dvh',
+        background: T.appBg, fontFamily: 'Inter, system-ui, sans-serif', minHeight: 0,
       }}>
         <RefreshCw size={24} color={T.textFaint} style={{ animation: 'spin 1.5s linear infinite' }} />
         <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
@@ -161,7 +161,7 @@ export default function CadencesList() {
   return (
     <div style={{
       flex: 1, background: T.appBg, fontFamily: 'Inter, system-ui, sans-serif',
-      minHeight: '100dvh', overflowY: 'auto',
+      minHeight: 0, overflowY: 'auto',
     }}>
       <style>{`
         .cd-kpi-row { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; }

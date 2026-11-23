@@ -122,14 +122,17 @@ export default function TotalMarket() {
 
   if (loading) {
     return (
+      <div className="flex-1 min-h-0 overflow-y-auto">
       <div className="total-market-loading">
         <div className="loading-spinner"></div>
         <p className="loading-text">Loading total addressable market...</p>
+      </div>
       </div>
     );
   }
 
   return (
+    <div className="flex-1 min-h-0 overflow-y-auto">
     <div className="total-market">
       {/* Enterprise Header */}
       <div className="enterprise-header">
@@ -389,6 +392,7 @@ export default function TotalMarket() {
           <p className="pagination-hint">Use filters to narrow down results</p>
         </div>
       )}
+    </div>
     </div>
   );
 }

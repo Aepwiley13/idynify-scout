@@ -32,7 +32,8 @@ project, and it belongs somewhere else.
 | [003.4](004-audit-and-003.4-003.5.md#0034--implemented) | Mission Outcomes in Hunter; Sales Outcomes | Hunter, Command Center, Sniper | Merged (#835) |
 | [003.5](004-audit-and-003.4-003.5.md#0035--implemented) | Cadences in Hunter | Hunter, Scout, Command Center | Merged (#836) |
 | [004.2 / 004.5](004-audit-and-003.4-003.5.md#planning-approved-for-preparation-not-implemented) | Workflow width; density audit; Hunter grouping | Workflow pages; people views | Proposal — awaiting approval (docs #837) |
-| [003.6](003.6-unified-navigation.md) | Unified Navigation | Sidebar + every module's section panel | Audit — awaiting approval; gated on Contact Hub merge |
+| [003.6](003.6-unified-navigation.md) | Unified Navigation | Sidebar + every module's section panel | Direction approved; implementation gated on Contact Hub ([coordination](003.6-contact-hub-coordination.md)) |
+| [005 audit](005-barry-audit.md) | Barry's Visual Experience | Every Barry surface | Audit — awaiting approval |
 
 ## Roadmap
 
@@ -40,7 +41,7 @@ project, and it belongs somewhere else.
 |---|---|
 | #001 Global Brand Identity | Done (#825) |
 | #002 Global Typography, with 002.1 / 002.2 theme integrity | Done (#828, #829, #831) |
-| #003 Navigation & Visual Hierarchy | 003.1–003.5 done (#830, #832, #835, #836). **003.6 Unified Navigation: proposal** |
+| #003 Navigation & Visual Hierarchy | 003.1–003.5 done (#830, #832, #835, #836). **003.6 Unified Navigation: approved, waiting on Contact Hub** |
 | #004 Desktop Screen Utilization | 004.1 done (#834). 004.2 width and 004.5 density: proposals. 004.3 / 004.4 on hold (004.4 largely absorbed by 003.6) |
-| #005 Barry's Visual Experience | Not started |
+| #005 Barry's Visual Experience | Audit ready for approval |
 

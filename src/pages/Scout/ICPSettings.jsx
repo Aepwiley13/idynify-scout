@@ -5,7 +5,8 @@ import { db, auth } from '../../firebase/config';
 import { APOLLO_INDUSTRIES } from '../../constants/apolloIndustries';
 import { US_STATES } from '../../constants/usStates';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Building2, Users, MapPin, Search, X, Save, RefreshCw, CheckCircle, Globe, Filter, Sliders, TrendingUp, Brain, MessageSquare, Calendar, FileText, Zap } from 'lucide-react';
+import { Building2, Users, MapPin, Search, X, Save, RefreshCw, CheckCircle, AlertCircle, Globe, Filter, Sliders, TrendingUp, Brain, MessageSquare, Calendar, FileText, Zap } from 'lucide-react';
+import { SAVE_OUTCOME, SAVE_OUTCOME_COPY, saveOutcomeFor } from '../../utils/icpSaveOutcome';
 import NumericRangeFilter from '../../components/scout/NumericRangeFilter';
 import { DEFAULT_WEIGHTS } from '../../utils/icpScoring';
 import './ICPSettings.css';
@@ -25,7 +26,10 @@ export default function ICPSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  // #006.2 — what a save actually did about discovery. Kept until the next save,
+  // because 'Barry is searching' is only true until the search ends.
+  const [saveOutcome, setSaveOutcome] = useState(null); // { kind: SAVE_OUTCOME.* } | null
+  const [autoSearching, setAutoSearching] = useState(false);
   const [refreshResult, setRefreshResult] = useState(null); // { count: number } | null
 
   // Multi-ICP state
@@ -292,8 +296,11 @@ export default function ICPSettings() {
       // demand against the ICP it is actually showing, so saving one ICP can no
       // longer overwrite another ICP's stored scores.
 
-      if (isActiveProfile && !discoveryInFlightRef.current && criteriaChanged(savedCriteriaRef.current, updatedProfile)) {
+      const changed = criteriaChanged(savedCriteriaRef.current, updatedProfile);
+      setSaveOutcome({ kind: saveOutcomeFor({ isActiveProfile, changed, searchAlreadyRunning: discoveryInFlightRef.current }) });
+      if (isActiveProfile && !discoveryInFlightRef.current && changed) {
         discoveryInFlightRef.current = true;
+        setAutoSearching(true);
         await setDoc(doc(db, 'users', user.uid), {
           barryState: 'SEARCHING',
           companiesFoundCount: 0,
@@ -309,16 +316,18 @@ export default function ICPSettings() {
             icpId: selectedICPId,
             forceRefresh: true,
           }),
-        }).then(() => {
+        }).then((res) => {
           discoveryInFlightRef.current = false;
+          setAutoSearching(false);
+          setSaveOutcome({ kind: res?.ok ? SAVE_OUTCOME.SEARCH_FINISHED : SAVE_OUTCOME.SEARCH_FAILED });
         }).catch(() => {
           discoveryInFlightRef.current = false;
+          setAutoSearching(false);
+          setSaveOutcome({ kind: SAVE_OUTCOME.SEARCH_FAILED });
         });
       }
 
       savedCriteriaRef.current = updatedProfile;
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
       setSaving(false);
     } catch (error) {
       console.error('Failed to save ICP:', error);
@@ -351,6 +360,8 @@ export default function ICPSettings() {
    */
 
   async function handleRefreshResults() {
+    // #006.2 — a save may have just started a search; never start a second one.
+    if (refreshing || discoveryInFlightRef.current) return;
     try {
       setRefreshing(true);
       setRefreshResult(null);
@@ -642,7 +653,8 @@ export default function ICPSettings() {
           )}
           <button
             onClick={handleRefreshResults}
-            disabled={refreshing || saving || !profile}
+            disabled={refreshing || saving || autoSearching || !profile}
+            title={autoSearching ? 'Barry is already searching with your saved changes' : undefined}
             className="header-refresh-btn"
           >
             <RefreshCw className={`w-4 h-4 ${refreshing ? 'spinning' : ''}`} />
@@ -1170,12 +1182,26 @@ export default function ICPSettings() {
 
         {/* Action Buttons */}
         <div className="action-section">
-          {saveSuccess && (
-            <div className="success-message">
-              <CheckCircle className="w-5 h-5" />
+          {saveOutcome && (
+            <div
+              className={SAVE_OUTCOME_COPY[saveOutcome.kind].tone === 'error' ? 'error-message' : 'success-message'}
+              role={SAVE_OUTCOME_COPY[saveOutcome.kind].tone === 'error' ? 'alert' : 'status'}
+              data-save-outcome={saveOutcome.kind}
+            >
+              {SAVE_OUTCOME_COPY[saveOutcome.kind].tone === 'error'
+                ? <AlertCircle className="w-5 h-5" aria-hidden="true" />
+                : <CheckCircle className="w-5 h-5" aria-hidden="true" />}
               <span>
-                Settings saved successfully! Click "Refresh Results" to fetch new companies.
+                {SAVE_OUTCOME_COPY[saveOutcome.kind].text}
                 {profile.foundedAgeRange && ' Note: companies without founding year data will still appear — look for the Year unknown badge.'}
+                {SAVE_OUTCOME_COPY[saveOutcome.kind].link && (
+                  <>
+                    {' '}
+                    <button type="button" className="inline-link" onClick={() => navigate('/scout?tab=daily-leads')}>
+                      Go to Daily Discoveries
+                    </button>
+                  </>
+                )}
               </span>
             </div>
           )}
@@ -1192,7 +1218,8 @@ export default function ICPSettings() {
 
             <button
               onClick={handleRefreshResults}
-              disabled={refreshing || saving}
+              disabled={refreshing || saving || autoSearching}
+              title={autoSearching ? 'Barry is already searching with your saved changes' : undefined}
               className="refresh-btn"
             >
               <RefreshCw className={`w-5 h-5 ${refreshing ? 'spinning' : ''}`} />
@@ -1202,7 +1229,7 @@ export default function ICPSettings() {
 
           <p className="action-hint">
             <Filter className="w-4 h-4" />
-            <span>Save your changes first, then click "Refresh Results" to fetch new companies</span>
+            <span>Saving changes to your active profile starts a new search automatically. Use Refresh Results to search again with your current settings.</span>
           </p>
         </div>
       </div>

@@ -23,12 +23,24 @@ project, and it belongs somewhere else.
 | [002](002-global-typography.md) | Global Typography & Visual Hierarchy | Platform-wide type system | Merged (#828) |
 | [002.1](002.1-hunter-theme-integrity.md) | Hunter Theme Integrity | Hunter → Create Campaign, Mission Setup | Merged (#829) |
 | [002.2](002.2-campaign-detail-theme.md) | Campaign Detail Theme Integrity | Hunter → campaign detail; shared campaign buttons and icons; campaign page scrolling | Merged (#831) |
-| [003](003-compact-navigation.md) | Compact Navigation Labels | Collapsed sidebar rail | Proposed — not authorized |
+| [003](003-compact-navigation.md) | Compact Navigation Labels | Collapsed sidebar rail | Superseded by 003.6 (compact rail flyout) |
 | [003 audit](003-navigation-audit.md) | Navigation & Visual Hierarchy audit | All modules | Complete |
 | [003.1 + 003.2](003-navigation-audit.md#0031--0032--campaigns-in-hunter-implemented-combined) | Campaigns in Hunter | Hunter, Command Center → Campaigns | Merged (#830) |
 | [003.3](003-navigation-audit.md#0033--missions-in-hunter-implemented) | Missions in Hunter | Hunter, Command Center → Missions; mission page scrolling | Merged (#832) |
-| [003.4 / 003.5 / 004 audit](004-audit-and-003.4-003.5.md) | Outcomes, Cadences, Desktop Screen Utilization | Navigation; all module layouts | Audit approved |
-| [004.1](004-audit-and-003.4-003.5.md#0041--implemented) | Reachability | Total Market, Scout Game, Cadences | Ready for PR |
-| [003.4](004-audit-and-003.4-003.5.md#0034--implemented) | Mission Outcomes in Hunter; Sales Outcomes | Hunter, Command Center, Sniper | Ready for PR |
-| [003.5](004-audit-and-003.4-003.5.md#0035--implemented) | Cadences in Hunter | Hunter, Scout, Command Center | Ready for PR |
-| [004.2 / 004.5](004-audit-and-003.4-003.5.md#planning-approved-for-preparation-not-implemented) | Workflow width; density audit; Hunter grouping | Workflow pages; people views | Proposal — awaiting approval |
+| [003.4 / 003.5 / 004 audit](004-audit-and-003.4-003.5.md) | Outcomes, Cadences, Desktop Screen Utilization | Navigation; all module layouts | Audit approved (#833, #837) |
+| [004.1](004-audit-and-003.4-003.5.md#0041--implemented) | Reachability | Total Market, Scout Game, Cadences | Merged (#834) |
+| [003.4](004-audit-and-003.4-003.5.md#0034--implemented) | Mission Outcomes in Hunter; Sales Outcomes | Hunter, Command Center, Sniper | Merged (#835) |
+| [003.5](004-audit-and-003.4-003.5.md#0035--implemented) | Cadences in Hunter | Hunter, Scout, Command Center | Merged (#836) |
+| [004.2 / 004.5](004-audit-and-003.4-003.5.md#planning-approved-for-preparation-not-implemented) | Workflow width; density audit; Hunter grouping | Workflow pages; people views | Proposal — awaiting approval (docs #837) |
+| [003.6](003.6-unified-navigation.md) | Unified Navigation | Sidebar + every module's section panel | Audit — awaiting approval; gated on Contact Hub merge |
+
+## Roadmap
+
+| Initiative | Status |
+|---|---|
+| #001 Global Brand Identity | Done (#825) |
+| #002 Global Typography, with 002.1 / 002.2 theme integrity | Done (#828, #829, #831) |
+| #003 Navigation & Visual Hierarchy | 003.1–003.5 done (#830, #832, #835, #836). **003.6 Unified Navigation: proposal** |
+| #004 Desktop Screen Utilization | 004.1 done (#834). 004.2 width and 004.5 density: proposals. 004.3 / 004.4 on hold (004.4 largely absorbed by 003.6) |
+| #005 Barry's Visual Experience | Not started |
+

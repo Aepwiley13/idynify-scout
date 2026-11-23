@@ -31,6 +31,7 @@ import { useShell } from '../../context/ShellContext';
 import { appendTurn, loadOrSeedRecentTurns } from '../../utils/barryCanonical';
 import { confirmAndActivateIcp, effectiveTargeting, formatCompanySizeRange } from '../../utils/confirmAndActivateIcp';
 import { BRAND, STATUS } from '../../theme/tokens';
+import { BARRY_TEXT } from '../../theme/barryColors';
 
 const DEFAULT_TOKENS = {
   appBg:     '#000000',
@@ -251,12 +252,12 @@ const MODE_CONFIG = {
   },
   SUGGEST: {
     label: 'SUGGEST',
-    pillStyle: { background: `${BRAND.cyan}33`, color: BRAND.cyan, border: `1px solid ${BRAND.cyan}4d` },
+    pillStyle: { background: `${BRAND.cyan}33`, color: BARRY_TEXT.cyan, border: `1px solid ${BRAND.cyan}4d` },
     dotColor: BRAND.cyan,
   },
   GROWTH: {
     label: 'GROWTH',
-    pillStyle: { background: `${BRAND.purple}33`, color: BRAND.purple, border: `1px solid ${BRAND.purple}4d` },
+    pillStyle: { background: `${BRAND.purple}33`, color: BARRY_TEXT.purple, border: `1px solid ${BRAND.purple}4d` },
     dotColor: BRAND.purple,
   },
 };
@@ -302,7 +303,7 @@ export function PipelineMoveRow({ move, onExecute, T = DEFAULT_TOKENS }) {
         <div className="text-xs mt-0.5" style={{ color: T.textMuted }}>
           <span style={{ color: T.textFaint }}>{stageLabels[move.current_stage] || move.current_stage}</span>
           <span className="mx-1" style={{ color: T.textFaint }}>→</span>
-          <span style={{ color: BRAND.cyan }}>{stageLabels[move.recommended_stage] || move.recommended_stage}</span>
+          <span style={{ color: BARRY_TEXT.cyan }}>{stageLabels[move.recommended_stage] || move.recommended_stage}</span>
           {move.reason && <span className="ml-2" style={{ color: T.textFaint }}>· {move.reason}</span>}
         </div>
       </div>
@@ -311,7 +312,7 @@ export function PipelineMoveRow({ move, onExecute, T = DEFAULT_TOKENS }) {
           <button
             onClick={handleMove}
             className="px-2.5 py-1 rounded-lg text-xs font-mono transition-all"
-            style={{ background: `${BRAND.cyan}26`, border: `1px solid ${BRAND.cyan}4d`, color: BRAND.cyan }}
+            style={{ background: `${BRAND.cyan}26`, border: `1px solid ${BRAND.cyan}4d`, color: BARRY_TEXT.cyan }}
           >
             Move →
           </button>

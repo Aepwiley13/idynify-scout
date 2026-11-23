@@ -16,6 +16,7 @@
 import { useState } from 'react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND } from '../../theme/tokens';
+import { BARRY_TEXT } from '../../theme/barryColors';
 import './BarryStructuredTurn.css';
 
 export default function BarryResultSet({ resultSet, onConfirmSelection, disabled = false, settled = null }) {
@@ -66,7 +67,7 @@ export default function BarryResultSet({ resultSet, onConfirmSelection, disabled
           className="bst-linkbtn"
           onClick={toggleAll}
           disabled={disabled}
-          style={{ color: BRAND.pink }}
+          style={{ color: BARRY_TEXT.pink }}
         >
           {allSelected ? 'Clear selection' : `Select all ${results.length}`}
         </button>

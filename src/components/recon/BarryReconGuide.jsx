@@ -14,6 +14,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Send, ChevronDown, ChevronRight, AlertTriangle, Sparkles } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, ASSETS } from '../../theme/tokens';
+import { BARRY_TEXT } from '../../theme/barryColors';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 // ─── Barry typing indicator ───────────────────────────────────────────────────
@@ -165,7 +166,7 @@ function CoachingCard({ coaching, T }) {
                 onClick={() => setPreviewOpen(v => !v)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 4,
-                  fontSize: 11, fontWeight: 600, color: BRAND.cyan,
+                  fontSize: 11, fontWeight: 600, color: BARRY_TEXT.cyan,
                   background: 'none', border: 'none', padding: 0, cursor: 'pointer',
                 }}
               >
@@ -358,7 +359,7 @@ export default function BarryReconGuide({
         <div style={{
           display: 'flex', alignItems: 'center', gap: 4,
           fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
-          color: BRAND.cyan, opacity: 0.8,
+          color: BARRY_TEXT.cyan,
         }}>
           <Sparkles size={10} />
           RECON
@@ -431,7 +432,7 @@ export default function BarryReconGuide({
             marginTop: 8, padding: '8px 10px',
             background: T.surface,
             borderRadius: 8,
-            fontSize: 11, color: BRAND.cyan,
+            fontSize: 11, color: BARRY_TEXT.cyan,
             animation: 'brg-pulse 1.5s ease-in-out infinite',
           }}>
             Barry is reviewing your context...

@@ -29,25 +29,25 @@ const CATEGORY_STYLES = {
   stalled_engagement: {
     border: 'border-amber-500/40',
     bg: 'bg-amber-500/5',
-    badge: 'bg-amber-500/20 text-amber-300',
+    badge: 'bg-amber-500/20 text-[color:color-mix(in_srgb,#d97706_60%,var(--text-primary))]',
     label: 'Stalled Engagement'
   },
   high_value_contact: {
     border: 'border-pink-500/40',
     bg: 'bg-pink-500/5',
-    badge: 'bg-pink-500/20 text-pink-300',
+    badge: 'bg-pink-500/20 text-[color:color-mix(in_srgb,#e8197d_60%,var(--text-primary))]',
     label: 'High-Value Contact'
   },
   mission_momentum: {
     border: 'border-purple-500/40',
     bg: 'bg-purple-500/5',
-    badge: 'bg-purple-500/20 text-purple-300',
+    badge: 'bg-purple-500/20 text-[color:color-mix(in_srgb,#7c3aed_60%,var(--text-primary))]',
     label: 'Mission Momentum'
   },
   strategic_gap: {
     border: 'border-cyan-500/40',
     bg: 'bg-cyan-500/5',
-    badge: 'bg-cyan-500/20 text-cyan-300',
+    badge: 'bg-cyan-500/20 text-[color:color-mix(in_srgb,#00c4cc_45%,var(--text-primary))]',
     label: 'Strategic Gap'
   }
 };
@@ -92,13 +92,13 @@ export default function BarryRecommendationCard({
             <div className="flex items-center gap-2 mt-2">
               <button
                 onClick={handleAction}
-                className="text-xs font-mono font-semibold px-3 py-1 rounded-md bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 transition-colors"
+                className="text-xs font-mono font-semibold px-3 py-1 rounded-md bg-cyan-500/20 text-[color:color-mix(in_srgb,#00c4cc_45%,var(--text-primary))] hover:bg-cyan-500/30 transition-colors"
               >
                 {recommendation.action.label}
               </button>
               <button
                 onClick={() => setShowDismissOptions(true)}
-                className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+                className="text-xs text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] transition-colors"
               >
                 Dismiss
               </button>
@@ -129,11 +129,11 @@ export default function BarryRecommendationCard({
                 {style.label}
               </span>
             )}
-            <p className="text-sm text-gray-200 leading-snug">
+            <p className="text-sm text-[color:var(--text-primary)] leading-snug">
               {recommendation.reasoning.observed}
             </p>
             {recommendation.contactName && (
-              <p className="text-xs text-gray-500 font-mono mt-1">
+              <p className="text-xs text-[color:var(--text-secondary)] font-mono mt-1">
                 {recommendation.contactName}
                 {recommendation.missionName ? ` · ${recommendation.missionName}` : ''}
                 {recommendation.campaignName && !recommendation.missionName ? ` · ${recommendation.campaignName}` : ''}
@@ -144,7 +144,7 @@ export default function BarryRecommendationCard({
 
         <button
           onClick={() => setShowDismissOptions(true)}
-          className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-gray-600 hover:text-gray-300 rounded transition-colors"
+          className="flex-shrink-0 w-6 h-6 flex items-center justify-center text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] rounded transition-colors"
           title="Dismiss"
         >
           <X className="w-3.5 h-3.5" />
@@ -154,7 +154,7 @@ export default function BarryRecommendationCard({
       {/* Expandable reasoning */}
       <button
         onClick={() => setExpanded(!expanded)}
-        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-300 font-mono mb-3 transition-colors"
+        className="flex items-center gap-1.5 text-xs text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] font-mono mb-3 transition-colors"
       >
         {expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
         {expanded ? 'Hide reasoning' : "Barry's reasoning"}
@@ -169,7 +169,7 @@ export default function BarryRecommendationCard({
       {/* Action CTA */}
       <button
         onClick={handleAction}
-        className="w-full py-2 rounded-lg bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 text-cyan-300 text-sm font-mono font-semibold hover:from-cyan-500/30 hover:to-purple-500/30 transition-all"
+        className="w-full py-2 rounded-lg bg-gradient-to-r from-cyan-500/20 to-purple-500/20 border border-cyan-500/30 text-[color:color-mix(in_srgb,#00c4cc_45%,var(--text-primary))] text-sm font-mono font-semibold hover:from-cyan-500/30 hover:to-purple-500/30 transition-all"
       >
         {recommendation.action.label}
       </button>
@@ -188,15 +188,15 @@ export default function BarryRecommendationCard({
 
 function DismissOverlay({ onDismiss, onCancel, dismissing }) {
   return (
-    <div className="absolute inset-0 bg-black/90 backdrop-blur-sm rounded-xl flex flex-col items-center justify-center p-4 z-10">
-      <p className="text-xs text-gray-400 font-mono mb-3">Why are you dismissing this?</p>
+    <div className="absolute inset-0 bg-[color:color-mix(in_srgb,var(--bg-card)_95%,transparent)] backdrop-blur-sm rounded-xl flex flex-col items-center justify-center p-4 z-10">
+      <p className="text-xs text-[color:var(--text-secondary)] font-mono mb-3">Why are you dismissing this?</p>
       <div className="flex flex-col gap-2 w-full max-w-xs">
         {DISMISS_REASONS.map(reason => (
           <button
             key={reason.id}
             onClick={() => onDismiss(reason.id)}
             disabled={dismissing}
-            className="text-xs text-gray-500 hover:text-gray-900 py-2 px-3 rounded-lg border border-gray-200 hover:border-gray-400 transition-colors font-mono disabled:opacity-50"
+            className="text-xs text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] py-2 px-3 rounded-lg border border-[color:var(--border)] hover:border-[color:var(--border-2)] transition-colors font-mono disabled:opacity-50"
           >
             {reason.label}
           </button>
@@ -204,7 +204,7 @@ function DismissOverlay({ onDismiss, onCancel, dismissing }) {
         <button
           onClick={onCancel}
           disabled={dismissing}
-          className="text-xs text-gray-600 hover:text-gray-400 py-1.5 transition-colors"
+          className="text-xs text-[color:var(--text-secondary)] hover:text-[color:var(--text-primary)] py-1.5 transition-colors"
         >
           Cancel
         </button>

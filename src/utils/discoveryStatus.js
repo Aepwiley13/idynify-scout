@@ -109,3 +109,37 @@ export function describeDiscovery({ barryState = null, companiesFoundCount = nul
   }
   return pick(STATUS.UNKNOWN);
 }
+
+/**
+ * The last search, as one persistent line (#006.3). It stays until the next
+ * search instead of vanishing after a few seconds.
+ *
+ * Only facts the page actually has are shown: this page's own result (with the
+ * time it finished), or — after a reload — the stored status and count. The
+ * stored status has no timestamp, so no time is shown for it.
+ *
+ * @returns {{ tone: 'info'|'success'|'error', text: string, action: 'retry'|'check'|null } | null}
+ */
+export function describeLastSearch({ lastRun = null, barryState = null, companiesFoundCount = null, formatTime = defaultTime }) {
+  const at = lastRun?.at ? ` · ${formatTime(lastRun.at)}` : '';
+  if (lastRun) {
+    switch (lastRun.kind) {
+      case RUN.RUNNING: return null; // the running message is shown by the page itself
+      case RUN.ADDED: return { tone: 'success', action: null, text: `Last search: Barry added ${lastRun.added} new ${lastRun.added === 1 ? 'company' : 'companies'}${at}` };
+      case RUN.NONE: return { tone: 'info', action: 'retry', text: `Last search found no new companies${at}` };
+      case RUN.FULL: return { tone: 'info', action: null, text: `Last search: your queue already has companies waiting${at}` };
+      case RUN.FAILED: return { tone: 'error', action: 'retry', text: `Last search didn't finish${at}` };
+      case RUN.TIMEOUT: return { tone: 'info', action: 'check', text: `Last search is taking longer than usual${at}` };
+      default: return null;
+    }
+  }
+  if (barryState === 'ERROR') return { tone: 'error', action: 'retry', text: "Barry's last search didn't finish" };
+  if (barryState === 'READY' && Number.isFinite(companiesFoundCount) && companiesFoundCount > 0) {
+    return { tone: 'info', action: null, text: `Barry's last search found ${companiesFoundCount} ${companiesFoundCount === 1 ? 'company' : 'companies'}` };
+  }
+  return null;
+}
+
+function defaultTime(ms) {
+  return new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}

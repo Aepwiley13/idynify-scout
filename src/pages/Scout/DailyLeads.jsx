@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import { Globe, Linkedin, Check, X, RefreshCw, Loader, Settings, RotateCcw, MessageCircle, ArrowRight, MapPin, User, List, ChevronDown, Flame, Trophy, Info } from 'lucide-react';
 import DiscoveryStatusPanel from '../../components/scout/DiscoveryStatusPanel';
-import { describeDiscovery, RUN } from '../../utils/discoveryStatus';
+import { describeDiscovery, describeLastSearch, RUN } from '../../utils/discoveryStatus';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, ASSETS, TYPE } from '../../theme/tokens';
 
@@ -2453,26 +2453,20 @@ export default function DailyLeads({ onNavigate }) {
       if (data.success) {
         if (data.companiesAdded > 0) {
           setLastRun({ kind: RUN.ADDED, added: data.companiesAdded, at: Date.now() });
-          setRefreshMessage(`Found ${data.companiesAdded} new targets.`);
-          setTimeout(() => { setRefreshMessage(''); loadTodayLeads(); }, 1500);
+          setRefreshMessage('');
+          setTimeout(() => { loadTodayLeads(); }, 1500);
         } else {
           setLastRun({ kind: data.currentQueueSize > 0 ? RUN.FULL : RUN.NONE, added: 0, at: Date.now() });
-          setRefreshMessage(data.currentQueueSize > 0 ? 'Queue is already full.' : 'No new matches found. Try adjusting your ICP.');
-          setTimeout(() => setRefreshMessage(''), 4000);
+          setRefreshMessage('');
         }
       } else {
         setLastRun({ kind: RUN.FAILED, at: Date.now() });
-        setRefreshMessage(data.error || 'Refresh failed. Try again.');
-        setTimeout(() => setRefreshMessage(''), 4000);
+        setRefreshMessage('');
       }
     } catch (error) {
       console.error('Error refreshing leads:', error);
       setLastRun({ kind: error.name === 'AbortError' ? RUN.TIMEOUT : RUN.FAILED, at: Date.now() });
-      const msg = error.name === 'AbortError'
-        ? 'Search timed out. Barry is still working — check back in a minute.'
-        : 'Refresh failed. Try again.';
-      setRefreshMessage(msg);
-      setTimeout(() => setRefreshMessage(''), 5000);
+      setRefreshMessage('');
     } finally {
       setIsRefreshing(false);
     }
@@ -3392,10 +3386,41 @@ export default function DailyLeads({ onNavigate }) {
           </div>
         )}
         {refreshMessage && (
-          <div style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: T.accentBg, border: `1px solid ${T.accentBdr}`, color: BRAND.pink, fontSize: 12 }}>
+          <div role="status" style={{ marginBottom: 10, padding: '8px 12px', borderRadius: 8, background: T.accentBg, border: `1px solid ${T.accentBdr}`, color: T.text, fontSize: 12 }}>
             {refreshMessage}
           </div>
         )}
+        {(() => {
+          // #006.3 — the last search stays visible until the next one.
+          const last = !refreshMessage && describeLastSearch({ lastRun, ...discoveryState });
+          if (!last) return null;
+          const isError = last.tone === 'error';
+          const run = last.action === 'retry' ? handleManualRefresh : last.action === 'check' ? checkDiscovery : null;
+          return (
+            <div
+              role={isError ? 'alert' : 'status'}
+              data-last-search={last.tone}
+              style={{
+                marginBottom: 10, padding: '8px 12px', borderRadius: 8, fontSize: 12, color: T.text,
+                display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+                background: isError ? 'color-mix(in srgb, #dc2626 10%, var(--bg-card))' : T.accentBg,
+                border: `1px solid ${isError ? 'color-mix(in srgb, #dc2626 35%, transparent)' : T.accentBdr}`,
+              }}
+            >
+              <span style={{ flex: 1, minWidth: 0 }}>{last.text}</span>
+              {run && (
+                <button
+                  type="button"
+                  onClick={run}
+                  disabled={isRefreshing}
+                  style={{ background: 'none', border: 'none', padding: 0, font: 'inherit', fontWeight: 600, color: T.text, textDecoration: 'underline', cursor: isRefreshing ? 'not-allowed' : 'pointer' }}
+                >
+                  {last.action === 'retry' ? (isError ? 'Try again' : 'Search again') : 'Check for results'}
+                </button>
+              )}
+            </div>
+          );
+        })()}
         {feedbackImpactMsg && !showBatchEnd && (
           <div style={{
             marginBottom: 10, padding: '8px 12px', borderRadius: 8,

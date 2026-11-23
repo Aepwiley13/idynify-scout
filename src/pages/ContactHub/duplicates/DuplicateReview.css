@@ -116,6 +116,10 @@
 .hub-merge-choice > span:not(.hub-merge-keep-badge) { display: flex; flex: 1 1 auto; flex-direction: column; gap: 2px; min-width: 0; }
 .hub-merge-choice strong { overflow-wrap: anywhere; font-size: 14px; }
 .hub-merge-choice small { color: var(--text-secondary); font-size: 12px; line-height: 1.4; }
+.hub-merge-identity-confirmation { display: flex; align-items: flex-start; gap: 12px; padding: 14px; margin: 12px 0; border: 1px solid var(--duplicate-border); border-radius: 12px; background: var(--duplicate-card); cursor: pointer; }
+.hub-merge-identity-confirmation input { flex: 0 0 auto; width: 20px; height: 20px; accent-color: var(--duplicate-accent); }
+.hub-merge-identity-confirmation span { display: grid; gap: 4px; }
+.hub-merge-identity-confirmation small { color: var(--text-secondary); line-height: 1.45; }
 .hub-merge-keep-badge { flex: 0 0 auto; padding: 4px 8px; border-radius: 999px; background: var(--duplicate-card); font-size: 11px; font-weight: 700; }
 .hub-merge-conflicts { display: grid; gap: 16px; }
 .hub-merge-conflict { min-width: 0; margin: 0; padding: 14px; border: 1px solid var(--duplicate-border); border-radius: 15px; }

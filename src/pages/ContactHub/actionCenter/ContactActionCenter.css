@@ -247,6 +247,18 @@
 .ac-details .idc-entry-val { flex: 1 1 16ch; white-space: normal; overflow-wrap: anywhere; }
 .ac-details .idc-entry-actions { margin-inline-start: auto; }
 .ac-details .idc-entry-actions button { min-width: 44px; padding-inline: 0; }
+.ac-affiliations { margin-top: 18px; border-top: 1px solid var(--ac-border); padding-top: 14px; }
+.ac-affiliations__heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ac-affiliations__heading h3 { margin: 0; font-size: 1rem; }
+.ac-affiliations > ul { list-style: none; padding: 0; margin: 8px 0; }
+.ac-affiliations > ul > li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--ac-border); }
+.ac-affiliations > ul > li > div { display: grid; gap: 3px; min-width: 0; }
+.ac-affiliations > ul > li span, .ac-affiliations > ul > li small { color: var(--ac-muted); }
+.ac-affiliations__primary { flex: 1 0 100%; }
+.ac-affiliations__form { padding: 12px; border: 1px solid var(--ac-border); border-radius: 12px; }
+.ac-affiliations__form label:not(.ac-affiliations__primary) { display: grid; flex: 1 1 180px; align-items: start; }
+.ac-affiliations__form input:not([type="checkbox"]), .ac-affiliations__form select { width: 100%; }
+@media (max-width: 480px) { .ac-affiliations > ul > li { align-items: flex-start; } }
 
 @media (max-width: 720px) {
   .ac { gap: 12px; }

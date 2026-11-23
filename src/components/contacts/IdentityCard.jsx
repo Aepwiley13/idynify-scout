@@ -30,8 +30,8 @@ import {
   Loader, ChevronDown, RefreshCw, X, Plus, Tag,
   Instagram, Facebook,
 } from 'lucide-react';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db, auth } from '../../firebase/config';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { db } from '../../firebase/config';
 import { BRIGADES, BRIGADE_MAP } from './BrigadeSelector';
 import { onBrigadeChange } from '../../utils/brigadeSystem';
 import {
@@ -46,6 +46,7 @@ import { BRAND } from '../../theme/tokens';
 import { getUniqueTags } from '../../services/peopleService';
 import './IdentityCard.css';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
+import { affiliationsForContact, projectPrimaryAffiliation, saveContactAffiliations } from '../../utils/contactAffiliations';
 import ContactPhones from './ContactPhones';
 import ContactIdentityViewer from './ContactIdentityViewer';
 import ContactStickersRow from '../stickers/ContactStickersRow';
@@ -508,9 +509,23 @@ export default function IdentityCard({
     try {
       const user = getEffectiveUser();
       if (!user) return;
-      await updateDoc(doc(db, 'users', user.uid, 'contacts', contact.id), {
-        [field]: trimmed, updated_at: new Date().toISOString(),
-      });
+      const ref = doc(db, 'users', user.uid, 'contacts', contact.id);
+      if (['title', 'company_name'].includes(field) && Array.isArray(contact.contact_affiliations)) {
+        const snapshot = await getDoc(ref);
+        const current = { ...snapshot.data(), id: contact.id };
+        const affiliations = affiliationsForContact(current);
+        const primary = affiliations.find((item) => item.primary);
+        if (primary) {
+          const next = affiliations.map((item) => item.id !== primary.id ? item : {
+            ...item,
+            ...(field === 'title' ? { title: trimmed || null } : { organization_name: trimmed || null, company_id: null }),
+          });
+          const expectedVersion = snapshot.updateTime ? `${snapshot.updateTime.seconds}:${snapshot.updateTime.nanoseconds}` : null;
+          const saved = await saveContactAffiliations(user.uid, contact.id, expectedVersion, next);
+          onUpdate?.({ ...contact, [field]: trimmed, contact_affiliations: saved.affiliations,
+            ...projectPrimaryAffiliation(saved.affiliations), _contactHubVersion: saved.contactVersion });
+        } else await updateDoc(ref, { [field]: trimmed, updated_at: new Date().toISOString() });
+      } else await updateDoc(ref, { [field]: trimmed, updated_at: new Date().toISOString() });
     } catch (err) {
       console.error('[IdentityCard] Save failed:', err);
       onUpdate?.(contact);

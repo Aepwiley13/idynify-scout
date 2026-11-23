@@ -42,13 +42,14 @@ function Comparison({ pair, stickers }) {
   </>;
 }
 
-export default function DuplicateReview({ contacts, stickers, readOnly, request, onMerged }) {
+export default function DuplicateReview({ contacts, stickers, readOnly, request, onMerged, manualContacts, onManualCancel }) {
   const T = useT();
   const title = useId();
   const dialog = useRef(null);
   const trigger = useRef(null);
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [manualPair, setManualPair] = useState(null);
   const [dismissed, setDismissed] = useState([]);
   const [notice, setNotice] = useState('');
   const [saving, setSaving] = useState(false);
@@ -61,6 +62,12 @@ export default function DuplicateReview({ contacts, stickers, readOnly, request,
   const pairId = (ids) => JSON.stringify([...ids].sort((a, b) => a.localeCompare(b)));
 
   useEffect(() => { live.current = true; return () => { live.current = false; }; }, []);
+  useEffect(() => {
+    if (manualContacts?.length !== 2) return;
+    setManualPair({ id: `manual:${pairId(manualContacts.map((contact) => contact.id))}`, confidence: 'You selected these contacts',
+      evidence: ['Review their details and confirm if they represent the same person'], conflicts: [], contacts: manualContacts, shared: false });
+    setSelected(null); setNotice(''); setHasDraft(false); setOpen(true);
+  }, [manualContacts]);
   useEffect(() => {
     if (!request || readOnly || persisted) return undefined;
     let active = true;
@@ -82,7 +89,8 @@ export default function DuplicateReview({ contacts, stickers, readOnly, request,
   const pairs = useMemo(() => detectPossibleDuplicates(contacts), [contacts]);
   const visible = pairs.filter((pair) => !dismissed.includes(pair.id));
   const index = Math.max(0, visible.findIndex((pair) => pair.id === selected));
-  const pair = visible[index];
+  const pair = manualPair ?? visible[index];
+  const isManualPair = Boolean(manualPair);
   const busy = saving || mergeBusy;
 
   useEffect(() => {
@@ -94,6 +102,7 @@ export default function DuplicateReview({ contacts, stickers, readOnly, request,
   }, [open]);
 
   function showDialog() {
+    setManualPair(null);
     setSelected(null);
     setNotice('');
     setHasDraft(false);
@@ -105,6 +114,7 @@ export default function DuplicateReview({ contacts, stickers, readOnly, request,
     if (hasDraft && !window.confirm('Discard your merge choices and close this review? The contacts will not be changed.')) return;
     setHasDraft(false);
     setOpen(false);
+    if (manualPair) { setManualPair(null); onManualCancel?.(); }
     requestAnimationFrame(() => (trigger.current ?? document.getElementById('hub-people-heading'))?.focus?.());
   }
 
@@ -166,8 +176,8 @@ export default function DuplicateReview({ contacts, stickers, readOnly, request,
       </header>
 
       <div className="hub-duplicate-pairbar">
-        <p role="status">{pair ? `Possible match ${index + 1} of ${visible.length}` : 'No possible duplicates to review.'}</p>
-        {pair && <nav className="hub-duplicate-actions" aria-label="Possible matches">
+        <p role="status">{pair ? (isManualPair ? 'Manual contact comparison' : `Possible match ${index + 1} of ${visible.length}`) : 'No possible duplicates to review.'}</p>
+        {pair && !isManualPair && <nav className="hub-duplicate-actions" aria-label="Possible matches">
           <button type="button" className="hub-merge-button hub-merge-button--quiet" disabled={busy || index === 0} onClick={() => changePair(visible[index - 1].id)}>Previous</button>
           <button type="button" className="hub-merge-button hub-merge-button--quiet" disabled={busy || index + 1 === visible.length} onClick={() => changePair(visible[index + 1].id)}>Next</button>
           {!readOnly && <button type="button" className="hub-merge-button hub-merge-button--quiet" disabled={busy} onClick={() => {
@@ -187,6 +197,7 @@ export default function DuplicateReview({ contacts, stickers, readOnly, request,
             pair={pair}
             request={request}
             comparison={comparison}
+            stickers={stickers}
             onCancel={closeDialog}
             onComplete={() => {
               setNotice('Contacts merged. The contact you chose remains in My People.');

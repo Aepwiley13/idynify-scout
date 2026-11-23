@@ -169,13 +169,14 @@ if (mergeReview) {
   const dialog = "document.querySelector('.hub-duplicate-dialog[open]')";
   for (const view of VIEWPORTS) {
     await send('Emulation.setDeviceMetricsOverride', { width: view.width, height: view.height, deviceScaleFactor: view.dpr, mobile: view.mobile });
-    await send('Page.navigate', { url: `${BASE}?duplicates=1&merge_demo=1${view.mobile ? '&scout=1&theme=dark' : ''}` });
-    await until(byText('Review possible duplicates 2'), 25_000);
-    await click(byText('Review possible duplicates 2'));
+    const navigation = await send('Page.navigate', { url: `${BASE}?duplicates=1&merge_demo=1${view.mobile ? '&scout=1&theme=dark' : ''}` });
+    if (navigation.errorText) throw new Error(`Fixture navigation failed: ${navigation.errorText}`);
+    if (!await until("document.querySelector('.hub-duplicate-trigger')", 25_000)) throw new Error(`My People trigger missing: ${String(await evaluate('document.body.innerText')).slice(0, 1200)}; errors=${problems.join(' | ')}; blocked=${[...blocked].join(' | ')}`);
+    await click("document.querySelector('.hub-duplicate-trigger')");
     await click(`(${dialog}).querySelector('.hub-merge-survivor input[value="jordan"]').closest('label')`);
     await click(byText('Continue', dialog));
     await until(`(${dialog}).querySelector('input[name^="conflict-"]')`);
-    await click(`(${dialog}).querySelector('input[name^="conflict-"][value="1"]').closest('label')`);
+    await evaluate(`document.querySelectorAll('.hub-duplicate-dialog input[name^="conflict-"][value="1"]').forEach((input) => input.closest('label').click())`);
     await click(byText('Review combined contact', dialog));
     check(view.id + ' verified before confirmation', await until(byText('Merge contacts', dialog)));
     check(view.id + ' merge footer stays reachable while content scrolls', await evaluate(`(() => {
@@ -192,20 +193,28 @@ if (mergeReview) {
     await shot(join(OUT, `trusted-merge-${view.id}-preview.png`));
     await click(byText('Merge contacts', dialog));
     check(view.id + ' merge receipt shown', await until(`(${dialog})?.innerText.includes('Contacts merged')`));
+    check(view.id + ' committed survivor retains additive facts', await evaluate(`(() => {
+      const survivor = window.__mergeFixtureState?.survivor;
+      return survivor?.emails?.length === 2 && survivor?.phones?.length === 2 && survivor?.sticker_ids?.length === 4
+        && survivor?.notes?.length >= 2 && survivor?.contact_affiliations?.length === 2
+        && survivor.title === 'Director' && survivor.company_name === 'T-Mobile' && survivor.company_id === 'tmobile-example'
+        && survivor.identity_sources?.includes('community_import') && Object.keys(survivor.sticker_assignments ?? {}).length === 4;
+    })()`));
     await click(byText('Check recovery options', dialog));
     await click(byText('Confirm recovery', dialog));
     check(view.id + ' shows verified rollback outcome', await until(`(${dialog})?.innerText.includes('Merge rolled back')`));
+    check(view.id + ' rollback restores both contacts and source history', await evaluate(`Boolean(window.__mergeFixtureState?.rolledBack && window.__mergeFixtureState.source?.contact_hub_lifecycle == null && window.__mergeFixtureState.survivor?.contact_affiliations?.length === 1)`));
     check(view.id + ' did not call cloud fixture writes', (await writeRows()).length === 0);
   }
   await send('Page.navigate', { url: `${BASE}?duplicates=1&merge_demo=1` });
-  await until(byText('Review possible duplicates 2'), 25_000);
-  await click(byText('Review possible duplicates 2'));
+  if (!await until("document.querySelector('.hub-duplicate-trigger')", 25_000)) throw new Error(`My People trigger missing: ${String(await evaluate('document.body.innerText')).slice(0, 1200)}`);
+  await click("document.querySelector('.hub-duplicate-trigger')");
   await until(`!(${byText('Not a duplicate', dialog)})?.disabled`);
   await click(byText('Not a duplicate', dialog));
   check('dismissal updates count', await until(`(${dialog})?.innerText.includes('Possible match 1 of 1')`));
   await send('Page.reload');
-  check('dismissal survives reload', await until(byText('Review possible duplicates 1'), 25_000));
-  await click(byText('Review possible duplicates 1'));
+  check('dismissal survives reload', await until("document.querySelector('.hub-duplicate-trigger')", 25_000));
+  await click("document.querySelector('.hub-duplicate-trigger')");
   await click(byText('Restore dismissed matches', dialog));
   check('restoring a dismissal recovers the pair', await until(`(${dialog})?.innerText.includes('Possible match 1 of 2')`));
   await key('Escape');

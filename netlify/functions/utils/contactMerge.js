@@ -6,6 +6,7 @@ import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { safeEmail } from '../../../src/utils/savedContactEmail.js';
 import { readContactPhones, buildPhoneWrite, phoneDisplay } from '../../../src/utils/contactPhones.js';
 import { normalizeEmail, normalizeLinkedInUrl } from '../../../src/utils/identityNormalization.js';
+import { combineContactAffiliations, projectPrimaryAffiliation, validateContactAffiliations } from '../../../src/utils/contactAffiliations.js';
 
 const MINUTE = 60_000;
 const WEEK = 7 * 24 * 60 * MINUTE;
@@ -28,16 +29,29 @@ const fields = ['name', 'first_name', 'last_name', 'title', 'job_title', 'compan
 const nonempty = (x) => x !== null && x !== undefined && x !== '';
 const contactPath = (uid, cid) => `users/${uid}/contacts/${cid}`;
 const frozen = (person) => person?.contact_hub_lifecycle?.status === 'retired';
+const sourceHistoryFor = (contact, contactId) => ({ contact_id: contactId,
+  source: contact.source ?? null, identity_source: contact.identity_source ?? null,
+  added_from: contact.addedFrom ?? contact.added_from ?? null,
+  source_detail: contact.addedFromSource ?? contact.added_from_source ?? null,
+  identity_sources: list(contact.identity_sources),
+  email_facts: emails(contact), phone_facts: readContactPhones(contact) });
 
 function emails(person) {
   const values = [...list(person.emails), person.email, person.work_email, person.email_address];
-  return values.flatMap((entry) => {
+  const facts = values.flatMap((entry) => {
     const address = safeEmail(typeof entry === 'string' ? entry : entry?.value)?.address;
     return address ? [{ ...(typeof entry === 'object' ? entry : {}), value: address }] : [];
   });
+  const byAddress = new Map();
+  for (const fact of facts) {
+    const key = normalizeEmail(fact.value);
+    const prior = byAddress.get(key);
+    byAddress.set(key, prior ? { ...fact, ...prior, value: prior.value } : fact);
+  }
+  return [...byAddress.values()];
 }
 
-function applyPlan(a, b, choices, blockers, privatePhotos) {
+function applyPlan(a, b, choices, blockers, privatePhotos, identityConfirmed = false) {
   const merged = { ...a };
   if ([a, b].some((entry) => entry.contact_hub_merge_origin)) blockers.add('previous_merge_requires_review');
   const conflicts = [];
@@ -48,6 +62,7 @@ function applyPlan(a, b, choices, blockers, privatePhotos) {
     return Number.isInteger(selected) && selected >= 0 && selected < values.length ? values[selected] : undefined;
   };
   for (const key of fields) {
+    if (['title', 'job_title', 'company_name', 'company_id'].includes(key)) continue;
     const values = union([a[key], b[key]].filter(nonempty), canonical);
     const value = choose(key, values);
     if (value !== undefined) merged[key] = value;
@@ -67,21 +82,23 @@ function applyPlan(a, b, choices, blockers, privatePhotos) {
   const corroborated = ['apolloPersonId', 'linkedinUrl', 'phone'].some((key) => leftIds[key] && leftIds[key] === rightIds[key])
     || emails(a).some((entry) => emails(b).some((other) => normalizeEmail(other.value) === normalizeEmail(entry.value)))
     || (leftIds.name && leftIds.company && leftIds.name === rightIds.name && leftIds.company === rightIds.company);
-  if (!corroborated) blockers.add('identity_not_verified');
+  if (!corroborated && !identityConfirmed) blockers.add('identity_not_verified');
   for (const key of ['apollo_person_id', 'linkedin_url_normalized', 'linkedin_url']) {
     const normalize = key.startsWith('linkedin') ? normalizeLinkedInUrl : String;
     if (a[key] && b[key] && normalize(a[key]) !== normalize(b[key])) blockers.add('conflicting_identity');
   }
-  const addresses = union([...emails(b), ...emails(a)], (entry) => normalizeEmail(entry.value));
-  const primaryEmail = choose('primary_email', union([emails(a)[0]?.value, emails(b)[0]?.value].filter(Boolean), normalizeEmail));
-  if (primaryEmail) {
-    addresses.sort((x, y) => Number(normalizeEmail(y.value) === normalizeEmail(primaryEmail)) - Number(normalizeEmail(x.value) === normalizeEmail(primaryEmail)));
+  const addresses = union([...emails(a), ...emails(b)], (entry) => normalizeEmail(entry.value));
+  addresses.forEach((entry, index) => { entry.id = `merge_${digest([normalizeEmail(entry.value), entry.label ?? null, index]).slice(0, 20)}`; });
+  const primaryEmail = choose('primary_email', addresses.map((entry) => entry.value));
+  if (addresses.length) {
+    const chosenEmail = primaryEmail ?? a.email ?? addresses[0].value;
+    addresses.sort((x, y) => Number(normalizeEmail(y.value) === normalizeEmail(chosenEmail)) - Number(normalizeEmail(x.value) === normalizeEmail(chosenEmail)));
     merged.emails = addresses;
-    merged.email = primaryEmail;
-    merged.email_normalized = normalizeEmail(primaryEmail);
+    merged.email = chosenEmail;
+    merged.email_normalized = normalizeEmail(chosenEmail);
   }
-  const numbers = union([...readContactPhones(b), ...readContactPhones(a)], phoneDisplay);
-  const primaryPhone = choose('primary_phone', union([readContactPhones(a).find((number) => number.label !== 'fax'), readContactPhones(b).find((number) => number.label !== 'fax')].filter(Boolean).map(phoneDisplay), String));
+  const numbers = union([...readContactPhones(a), ...readContactPhones(b)], (phone) => phone.normalized ?? `${phoneDisplay(phone)}:${phone.label}`);
+  const primaryPhone = choose('primary_phone', numbers.filter((number) => number.label !== 'fax').map(phoneDisplay));
   if (numbers.length) {
     Object.assign(merged, buildPhoneWrite(numbers.map((phone, index) => ({ ...phone, id: `merged-${index}` }))));
     if (primaryPhone) {
@@ -89,7 +106,12 @@ function applyPlan(a, b, choices, blockers, privatePhotos) {
       merged.contact_hub_primary_phone = primaryPhone;
     }
   }
-  const allowed = new Set([...fields, 'photo_url', 'photo_source', 'contact_hub_photo', 'email', 'emails', 'email_normalized', 'work_email', 'email_address', 'phones', 'phone', 'phone_normalized', 'phone_mobile', 'phone_direct', 'phone_work', 'phone_home', 'notes', 'sticker_ids', 'sticker_assignments', 'source', 'identity_source', 'identity_sources', 'addedFrom', 'addedAt', 'saved_at', 'created_at', 'createdAt', 'updated_at', 'status', 'lead_owner', 'linkedin_url_normalized', 'email_status', 'email_opt_out', 'unsubscribed', 'do_not_email', 'next_best_step', 'next_step_due', 'next_step_type', 'next_best_step_history']);
+  const affiliations = combineContactAffiliations(a, b);
+  if (affiliations.length > 20) blockers.add('affiliation_limit');
+  if (!validateContactAffiliations(affiliations).ok) blockers.add('invalid_affiliations');
+  merged.contact_affiliations = affiliations;
+  Object.assign(merged, projectPrimaryAffiliation(affiliations));
+  const allowed = new Set([...fields, 'contact_affiliations', 'photo_url', 'photo_source', 'contact_hub_photo', 'email', 'emails', 'email_normalized', 'work_email', 'email_address', 'phones', 'phone', 'phone_normalized', 'phone_mobile', 'phone_direct', 'phone_work', 'phone_home', 'notes', 'sticker_ids', 'sticker_assignments', 'source', 'identity_source', 'identity_sources', 'addedFrom', 'addedFromSource', 'added_from', 'added_from_source', 'addedAt', 'saved_at', 'created_at', 'createdAt', 'updated_at', 'status', 'lead_owner', 'linkedin_url_normalized', 'email_status', 'email_opt_out', 'unsubscribed', 'do_not_email', 'next_best_step', 'next_step_due', 'next_step_type', 'next_best_step_history']);
   for (const key of Object.keys(b)) {
     if (!allowed.has(key) && canonical(a[key]) !== canonical(b[key])) blockers.add('unclassified_source_fields');
   }
@@ -100,6 +122,9 @@ function applyPlan(a, b, choices, blockers, privatePhotos) {
   ], canonical);
   merged.sticker_ids = union([...list(a.sticker_ids), ...list(b.sticker_ids)], String);
   merged.sticker_assignments = { ...b.sticker_assignments, ...a.sticker_assignments };
+  merged.sticker_assignments = Object.fromEntries(merged.sticker_ids
+    .filter((stickerId) => Object.hasOwn(merged.sticker_assignments, stickerId))
+    .map((stickerId) => [stickerId, merged.sticker_assignments[stickerId]]));
   if (merged.sticker_ids.length > 50) blockers.add('sticker_limit');
   merged.identity_sources = union([...list(a.identity_sources), ...list(b.identity_sources), a.source, b.source].filter(Boolean), String);
   if (merged.linkedin_url) merged.linkedin_url_normalized = normalizeLinkedInUrl(merged.linkedin_url);
@@ -111,7 +136,7 @@ function applyPlan(a, b, choices, blockers, privatePhotos) {
   })) blockers.add('email_permission_requires_review');
   if ([a, b].some((entry) => hasArchiveSignal(entry) || isDeferredRecord(entry) || entry.company_archived)) blockers.add('unsupported_contact_status');
   if ([a, b].some((entry) => entry.status && !['active', 'saved', 'new'].includes(entry.status))) blockers.add('unsupported_contact_status');
-  return { merged, conflicts, choose };
+  return { merged, conflicts, choose, affiliations };
 }
 
 export function createContactMerge({ db, verifyToken, secret, enabled, executionEnabled = () => false, inspectCollections = async () => [], timestamp, now = Date.now }) {
@@ -252,7 +277,9 @@ export function createContactMerge({ db, verifyToken, secret, enabled, execution
         }
         if (!['preview', 'commit'].includes(action) || !id(survivorId) || !id(sourceId) || sourceId === survivorId
           || (action === 'commit' && !op) || !input.choices || Array.isArray(input.choices) || typeof input.choices !== 'object') throw fail(400, 'invalid_request');
-        const requestHash = digest([survivorId, sourceId, input.choices]);
+        const identityConfirmed = input.identityConfirmed === true;
+        if (identityConfirmed && !uuid(operationId)) throw fail(400, 'invalid_request');
+        const requestHash = digest([survivorId, sourceId, input.choices, identityConfirmed, identityConfirmed ? operationId : null]);
         if (prior && action === 'commit') {
           if (prior.requestHash !== requestHash) throw fail(409, 'operation_conflict');
           return json(200, { receipt: prior.receipt });
@@ -269,7 +296,7 @@ export function createContactMerge({ db, verifyToken, secret, enabled, execution
         const names = (await Promise.all([inspectCollections(a), inspectCollections(b)])).flat();
         if (names.some((name) => !['timeline', 'private'].includes(name))) blockers.add('unclassified_child_records');
         const related = await readMergeRelationships(tx, db, uid, [a, b]);
-        const plan = applyPlan(left.data(), right.data(), input.choices, blockers, related.some(({ photo }) => photo.exists));
+        const plan = applyPlan(left.data(), right.data(), input.choices, blockers, related.some(({ photo }) => photo.exists), identityConfirmed);
         const relationships = planMergeRelationships({ current: [left.data(), right.data()], related,
           merged: plan.merged, choose: plan.choose, blockers, canonical, now, survivorId });
         const unresolved = plan.conflicts.some(({ key, options }) => !Number.isInteger(input.choices[key])
@@ -300,8 +327,8 @@ export function createContactMerge({ db, verifyToken, secret, enabled, execution
           || Buffer.byteLength(canonical([left.data(), right.data(), plan.merged])) > 120_000
           || writes.some(([, data]) => Buffer.byteLength(canonical(data)) > 256 * 1024)
           || Buffer.byteLength(canonical(writes.map(([, data]) => data))) > 3 * 1024 * 1024) blockers.add('plan_limit');
-        if (action === 'preview') return json(200, { conflicts: plan.conflicts, blockers: [...blockers], activityCount: writes.length,
-          combined: { name: plan.merged.name ?? null, emails: emails(plan.merged).map((row) => row.value), phones: readContactPhones(plan.merged).map(phoneDisplay), notes: plan.merged.notes.length, stickers: plan.merged.sticker_ids.length, suppressedEmails: suppressed },
+        if (action === 'preview') return json(200, { conflicts: plan.conflicts, blockers: [...blockers], activityCount: writes.length + into.docs.length,
+          combined: { name: plan.merged.name ?? null, emails: emails(plan.merged).map((row) => ({ ...row, primary: normalizeEmail(row.value) === normalizeEmail(plan.merged.email) })), phones: readContactPhones(plan.merged).map((row) => ({ ...row, primary: phoneDisplay(row) === plan.merged.phone })), notes: plan.merged.notes, stickers: plan.merged.sticker_ids.map((stickerId) => ({ id: stickerId, assignment: plan.merged.sticker_assignments?.[stickerId] ?? null })), affiliations: plan.affiliations, sources: plan.merged.identity_sources, sourceHistory: [sourceHistoryFor(left.data(), survivorId), sourceHistoryFor(right.data(), sourceId)], suppressedEmails: suppressed },
           token: !unresolved && !blockers.size ? tokenFor(uid, 'commit', hash) : null });
         if (!executionEnabled()) throw fail(403, 'execution_disabled');
         if (unresolved || blockers.size) throw fail(409, 'merge_blocked');
@@ -310,6 +337,8 @@ export function createContactMerge({ db, verifyToken, secret, enabled, execution
         const merged = { ...plan.merged, contact_hub_merge_origin: { source_id: sourceId, operation_id: operationId,
           previous_original: { url: left.data().photo_url ?? null, source: left.data().photo_source ?? null },
           previous_assignments: left.data().sticker_assignments ?? {}, previous_emails: emails(left.data()),
+          sticker_assignment_provenance: { [survivorId]: left.data().sticker_assignments ?? {}, [sourceId]: right.data().sticker_assignments ?? {} },
+          source_provenance: [sourceHistoryFor(left.data(), survivorId), sourceHistoryFor(right.data(), sourceId)],
           previous_source: left.data().source ?? null, previous_fields: Object.fromEntries(fields.filter((key) => nonempty(left.data()[key])).map((key) => [key, left.data()[key]])),
           previous_phone_facts: readContactPhones(left.data()) } };
         const markerData = { merged_into: survivorId, operation_id: operationId, retired_at: timestamp() };
@@ -342,7 +371,8 @@ export function createContactMerge({ db, verifyToken, secret, enabled, execution
           queueHash: digest([futureQueue, []]),
           timelineHash: digest([...into.docs.map((row) => row.ref.path), ...writes.map(([ref]) => ref.path)].sort()),
         });
-        tx.set(op, { requestHash, receipt, committedAt: now(), rollbackUntil: receipt.rollbackUntil });
+        tx.set(op, { requestHash, receipt, committedAt: now(), rollbackUntil: receipt.rollbackUntil,
+          identityConfirmation: identityConfirmed ? { actorUid: uid, confirmedAt: timestamp(), contactIds: [survivorId, sourceId], versions: [version(left), version(right)] } : null });
         return json(200, { receipt });
       });
     } catch (error) {

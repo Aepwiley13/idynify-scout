@@ -2,13 +2,18 @@
 import { fixture, wait, log } from './fixture.js';
 
 const dataByPath = new Map();
+const versions = new Map();
 const listeners = new Map();
 const union = Symbol('arrayUnion');
 const remove = Symbol('arrayRemove');
 let pending = Promise.resolve();
 
-export const clearFixtureDocs = () => dataByPath.clear();
-export const seedFixtureDoc = (path, data) => dataByPath.set(path, data);
+export const clearFixtureDocs = () => { dataByPath.clear(); versions.clear(); };
+export const seedFixtureDoc = (path, data) => { dataByPath.set(path, data); versions.set(path, (versions.get(path) ?? 0) + 1); };
+export const getFixtureDoc = (path) => dataByPath.get(path) ?? null;
+export const getFixtureVersion = (path) => `${versions.get(path) ?? 1}:0`;
+export const listFixtureDocs = (prefix) => [...dataByPath.entries()].filter(([path]) => path.startsWith(prefix + '/'));
+export const deleteFixtureDoc = (path) => dataByPath.delete(path);
 export const doc = (parent, ...segments) => ({ path: [parent?.path, ...segments].filter(Boolean).join('/') });
 export const collection = doc;
 export const query = (ref) => ref;
@@ -23,7 +28,7 @@ export const Timestamp = { now: () => {
   return { toDate: () => time, toMillis: () => time.getTime() };
 } };
 
-const snapshot = (path) => ({ id: path.split('/').at(-1), exists: () => dataByPath.has(path), data: () => dataByPath.get(path) });
+const snapshot = (path) => ({ id: path.split('/').at(-1), exists: () => dataByPath.has(path), data: () => dataByPath.get(path), updateTime: { seconds: versions.get(path) ?? 1, nanoseconds: 0 } });
 export const getDoc = async (ref) => snapshot(ref.path);
 const list = (path) => [...dataByPath.keys()]
   .filter((key) => key.startsWith(path + '/') && !key.slice(path.length + 1).includes('/'))
@@ -47,6 +52,7 @@ function commit(ref, updates, merge) {
     return [field, value];
   });
   dataByPath.set(ref.path, { ...(merge ? current : {}), ...Object.fromEntries(entries) });
+  versions.set(ref.path, (versions.get(ref.path) ?? 0) + 1);
 }
 
 const record = (ref, data) => log({
@@ -84,7 +90,7 @@ export const addDoc = async (ref, data) => {
   await setDoc(child, data);
   return { id: child.path.split('/').at(-1) };
 };
-export const deleteDoc = async (ref) => { dataByPath.delete(ref.path); notifyCollections([ref]); };
+export const deleteDoc = async (ref) => { dataByPath.delete(ref.path); versions.delete(ref.path); notifyCollections([ref]); };
 
 export function runTransaction(_db, apply) {
   const result = pending.then(async () => {

@@ -51,10 +51,22 @@ const dateAgo = (days) => new Date(Date.now() - days * 86400000).toISOString();
 const BY_ID = Object.fromEntries(CONTACTS.map((c) => [c.id, c]));
 if (isDuplicateDemo) {
   BY_ID['jordan-import'] = {
-    id: 'jordan-import', name: 'Jordan Lee', title: 'Volunteer Coordinator', company_name: 'Community Partners of Salt Lake',
-    emails: ['jordan@communityslc.org', 'jordan.personal@example.org'], phone: '801-555-0101', source: 'csv_import',
-    sticker_ids: ['S02'], linkedin_url: 'https://www.linkedin.com/in/jordan-lee-example',
-    notes: [{ id: 'introduction', content: 'Introduced by a neighborhood partner' }],
+    id: 'jordan-import', name: 'Jordan Lee', title: 'Basketball Coach', company_name: 'Salt Lake Youth League',
+    emails: [{ id: '2', value: 'jordan.personal@example.org', label: 'personal', labelSource: 'user' }],
+    email: 'jordan.personal@example.org',
+    phones: [{ id: '2', value: '801-555-0101', label: 'home', labelSource: 'user', observedLabel: 'Personal' }],
+    phone: '801-555-0101', source: 'csv_import', identity_source: 'community_import',
+    identity_sources: ['community_import', 'jordan-import-csv'],
+    sticker_ids: ['S02'], sticker_assignments: { S02: { assigned_at: '2026-11-20T11:00:00.000Z', assigned_by: 'csv_import' } },
+    linkedin_url: 'https://www.linkedin.com/in/jordan-lee-example',
+    notes: [{ id: 'introduction', content: 'Introduced by a neighborhood partner', created_at: dateAgo(3), source: 'community_import' }],
+    contact_affiliations: [{ id: 'jordan-coach-role', organization_name: 'Salt Lake Youth League', company_id: null, title: 'Basketball Coach', type: 'Volunteer', status: 'current', primary: false, provenance: [{ source: 'community_import', contact_id: 'jordan-import' }] }],
+  };
+  BY_ID.jordan = { ...BY_ID.jordan, title: 'Director', company_name: 'T-Mobile', company_id: 'tmobile-example',
+    phones: BY_ID.jordan.phones.map((phone) => ({ ...phone, labelSource: 'card' })),
+    emails: BY_ID.jordan.emails.map((email) => ({ ...email, labelSource: 'card' })),
+    contact_affiliations: [{ id: 'jordan-director-role', organization_name: 'T-Mobile', company_id: 'tmobile-example', title: 'Director', type: 'Employment', status: 'current', primary: true, provenance: [{ source: 'business_card', contact_id: 'jordan' }] }],
+    sticker_assignments: { S01: { assigned_at: '2026-11-20T10:00:00.000Z', assigned_by: 'user' }, S06: { assigned_at: '2026-11-20T10:05:00.000Z', assigned_by: 'user' }, S07: { assigned_at: '2026-11-20T10:10:00.000Z', assigned_by: 'user' } },
   };
   BY_ID['avery-review'] = {
     id: 'avery-review', name: 'Averi Quinn', company_name: 'Volunteer Network', title: 'Board Member',
@@ -79,6 +91,7 @@ if (isAction) {
   const historyPath = `users/${uid}/contacts/jordan/timeline/`;
   seedFixtureDoc(historyPath + 'call', { type: 'outreach_logged', preview: 'Jordan offered to introduce the volunteer coordinator.', metadata: { channel: 'call' }, createdAt: dateAgo(2) });
   seedFixtureDoc(historyPath + 'email', { type: 'message_sent', preview: 'Shared the volunteer sign-up link.', metadata: { channel: 'email' }, createdAt: dateAgo(1) });
+  if (isDuplicateDemo) seedFixtureDoc(`users/${uid}/contacts/jordan-import/timeline/import-meeting`, { type: 'outreach_logged', preview: 'Discussed coaching and the summer league.', metadata: { channel: 'meeting', source: 'community_import' }, createdAt: dateAgo(6) });
   seedFixtureDoc(`users/${uid}/card/main`, {
     firstName: 'Jordan', lastName: 'Lee', photoUrl: 'https://images.fixture.test/jordan.svg',
     title: 'Community Partnerships Director', organization: 'Community Partners of Salt Lake',

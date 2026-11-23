@@ -419,11 +419,11 @@ service cloud.firestore {
       // client that could write it could mark any LinkedIn member as its own.
       // Only the trusted writer publishes this small Contact Hub display state.
       function contactPhotoCreateOk(coll) {
-        return coll != 'contacts' || !request.resource.data.keys().hasAny(['contact_hub_photo', 'contact_hub_lifecycle', 'contact_hub_merge_origin', 'contact_hub_primary_phone', 'contact_hub_email_suppressed']);
+        return coll != 'contacts' || !request.resource.data.keys().hasAny(['contact_hub_photo', 'contact_hub_lifecycle', 'contact_hub_merge_origin', 'contact_hub_primary_phone', 'contact_hub_email_suppressed', 'contact_affiliations']);
       }
       function contactPhotoUpdateOk(coll) {
         return coll != 'contacts' || (contactIsActive(resource.data)
-          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['contact_hub_photo', 'contact_hub_lifecycle', 'contact_hub_merge_origin', 'contact_hub_primary_phone', 'contact_hub_email_suppressed']));
+          && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['contact_hub_photo', 'contact_hub_lifecycle', 'contact_hub_merge_origin', 'contact_hub_primary_phone', 'contact_hub_email_suppressed', 'contact_affiliations']));
       }
       function contactIsActive(data) {
         return data.get('contact_hub_lifecycle', {}).get('status', '') != 'retired';

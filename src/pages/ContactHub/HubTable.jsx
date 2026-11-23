@@ -26,7 +26,7 @@ import { contactHubPersonPath } from '../../constants/contactHub';
 import ContactCardStickersInteractive from '../../components/stickers/ContactCardStickersInteractive';
 import { personName, emailOf, phoneOf, companyOf } from './peopleRules';
 
-export default function HubTable({ rows, showStickers, tight = false, stickerMax, onStickerChange, renderAvatar }) {
+export default function HubTable({ rows, showStickers, tight = false, stickerMax, onStickerChange, renderAvatar, selection }) {
   const T = useT();
   const none = <span aria-hidden="true" style={{ color: T.textMuted }}>—</span>;
 
@@ -39,6 +39,7 @@ export default function HubTable({ rows, showStickers, tight = false, stickerMax
     >
       <div role="rowgroup">
         <div className="hub-tr hub-tr--head" role="row" style={{ color: T.textMuted, borderColor: T.border }}>
+          {selection && <span role="columnheader" aria-label="Select contact" />}
           <span role="columnheader">Name</span>
           <span role="columnheader">Company</span>
           <span role="columnheader">Email</span>
@@ -54,6 +55,7 @@ export default function HubTable({ rows, showStickers, tight = false, stickerMax
           const company = companyOf(contact);
           return (
             <div key={contact.id} className="hub-tr" role="row" style={{ borderColor: T.border }}>
+              {selection && <span className="hub-td hub-td--select" role="cell">{selection(contact)}</span>}
               <span className="hub-td hub-td--name" role="cell">
                 {renderAvatar(contact, name)}
                 <Link className="hub-row-link" to={contactHubPersonPath(contact.id)} style={{ color: T.text }}>

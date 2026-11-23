@@ -9,8 +9,8 @@ function fixture(options = {}) {
   const a = 'users/owner/contacts/a';
   const b = 'users/owner/contacts/b';
   put('users/owner', {});
-  put(a, { name: 'Jordan Lee', title: 'Director', email: 'jordan@example.test', notes: [{ id: 'one' }] });
-  put(b, { name: 'Jordan Lee', title: 'Coordinator', email: 'jordan@example.test', notes: [{ id: 'two' }] });
+  put(a, { name: 'Jordan Lee', title: 'Director', email: 'jordan@example.test', notes: [{ id: 'one' }], ...(options.left ?? {}) });
+  put(b, { name: 'Jordan Lee', title: 'Coordinator', email: 'jordan@example.test', notes: [{ id: 'two' }], ...(options.right ?? {}) });
   put(b + '/timeline/event', { type: 'message_sent' });
   const doc = (path) => ({
     path, id: path.split('/').at(-1), collection: (name) => query(path + '/' + name),
@@ -56,7 +56,7 @@ function fixture(options = {}) {
   const request = async (action, extra = {}, bearer = 'owner') => {
     const result = await handler({
       httpMethod: 'POST', headers: { authorization: `Bearer ${bearer}` },
-      body: JSON.stringify({ uid: 'owner', survivorId: 'a', sourceId: 'b', choices: { title: 1 }, operationId, action, ...extra }),
+      body: JSON.stringify({ uid: 'owner', survivorId: 'a', sourceId: 'b', choices: {}, operationId, action, ...extra }),
     });
     return { status: result.statusCode, ...JSON.parse(result.body) };
   };
@@ -67,13 +67,17 @@ describe('trusted Contact Hub merge', () => {
   it('previews with no mutations, commits and redirects, retries, then conditionally rolls back', async () => {
     const { a, b, request, records } = fixture();
     const before = records.size;
-    expect((await request('preview', { choices: {} })).token).toBeNull();
+    expect((await request('preview', { choices: {} })).token).toBeTruthy();
     const verified = await request('preview');
-    expect(verified).toMatchObject({ status: 200, blockers: [], activityCount: 1, combined: { notes: 2 } });
+    expect(verified).toMatchObject({ status: 200, blockers: [], activityCount: 1,
+      combined: { notes: expect.arrayContaining([expect.objectContaining({ id: 'one' }), expect.objectContaining({ id: 'two' })]) } });
     expect(records.size).toBe(before);
     const merged = await request('commit', { token: verified.token });
     expect(merged.receipt).toMatchObject({ status: 'merged', survivorId: 'a', sourceId: 'b' });
-    expect(records.get(a).value.title).toBe('Coordinator');
+    expect(records.get(a).value.title).toBe('Director');
+    expect(records.get(a).value.contact_affiliations.map((item) => [item.title, item.organization_name])).toEqual([
+      ['Director', null], ['Coordinator', null],
+    ]);
     expect(records.get(a + '/timeline/event').value.contact_hub_merge_origin.contact_id).toBe('b');
     expect(records.get(b).value.contact_hub_lifecycle.status).toBe('retired');
     expect((await request('redirect')).survivorId).toBe('a');
@@ -84,6 +88,67 @@ describe('trusted Contact Hub merge', () => {
     expect(records.get(a).value.title).toBe('Director');
     expect(records.has(a + '/timeline/event')).toBe(false);
     expect(records.get(b).value.contact_hub_lifecycle).toBeUndefined();
+  });
+
+  it('previews, commits and conditionally restores additive relationship facts and two affiliations', async () => {
+    const left = {
+      emails: [{ id: 'work', value: 'casey@tmobile.test', label: 'work', labelSource: 'card' }],
+      email: 'casey@tmobile.test',
+      phones: [{ id: 'mobile', value: '801-555-0101', label: 'mobile', labelSource: 'user' }],
+      phone: '801-555-0101', sticker_ids: ['S01', 'S02'],
+      sticker_assignments: { S01: { assigned_by: 'user', assigned_at: 'now-1' }, S02: { assigned_by: 'user', assigned_at: 'now-2' } },
+      contact_affiliations: [{ id: 'director', organization_name: 'T-Mobile', company_id: 'company-tmo', title: 'Director', type: 'Employment', status: 'current', primary: true, provenance: [{ source: 'business_card', contact_id: 'a' }] }],
+      identity_sources: ['business_card'], source: 'business_card', notes: [{ id: 'n-left', content: 'Met at conference' }],
+      linkedin_url: 'https://www.linkedin.com/in/casey-example',
+    };
+    const right = {
+      emails: [{ id: 'personal', value: 'casey.personal@example.test', label: 'personal', labelSource: 'user' }],
+      email: 'casey.personal@example.test',
+      phones: [{ id: 'home', value: '801-555-0102', label: 'home', labelSource: 'user', observedLabel: 'Personal' }],
+      phone: '801-555-0102', sticker_ids: ['S03', 'S04'],
+      sticker_assignments: { S03: { assigned_by: 'csv_import', assigned_at: 'now-3' }, S04: { assigned_by: 'user', assigned_at: 'now-4' } },
+      contact_affiliations: [{ id: 'coach', organization_name: 'Salt Lake Youth League', company_id: null, title: 'Basketball Coach', type: 'Volunteer', status: 'current', primary: false, provenance: [{ source: 'community_import', contact_id: 'b' }] }],
+      identity_sources: ['community_import'], source: 'community_import', notes: [{ id: 'n-right', content: 'Coaches on Saturdays' }],
+      linkedin_url: 'https://www.linkedin.com/in/casey-example',
+    };
+    const { a, b, request, records } = fixture({ left, right });
+    records.set('users/owner/contacts/a/timeline/call', { value: { type: 'outreach_logged', preview: 'Conference call' }, v: 10 });
+    records.set('users/owner/contacts/b/timeline/meeting', { value: { type: 'outreach_logged', preview: 'League meeting' }, v: 11 });
+    const preview = await request('preview');
+    expect(preview.combined).toMatchObject({
+      emails: expect.arrayContaining([
+        expect.objectContaining({ value: 'casey@tmobile.test', label: 'work' }),
+        expect.objectContaining({ value: 'casey.personal@example.test', label: 'personal' }),
+      ]),
+      phones: expect.arrayContaining([expect.objectContaining({ value: '801-555-0101', label: 'mobile' }), expect.objectContaining({ value: '801-555-0102', label: 'home' })]),
+      stickers: expect.arrayContaining([{ id: 'S01', assignment: left.sticker_assignments.S01 }, { id: 'S02', assignment: left.sticker_assignments.S02 }, { id: 'S03', assignment: right.sticker_assignments.S03 }, { id: 'S04', assignment: right.sticker_assignments.S04 }]),
+      affiliations: expect.arrayContaining([expect.objectContaining({ id: 'director', title: 'Director', organization_name: 'T-Mobile', primary: true }), expect.objectContaining({ id: 'coach', title: 'Basketball Coach', organization_name: 'Salt Lake Youth League' })]),
+      notes: expect.arrayContaining([expect.objectContaining({ id: 'n-left' }), expect.objectContaining({ id: 'n-right' })]),
+      sourceHistory: expect.arrayContaining([expect.objectContaining({ contact_id: 'a', source: 'business_card' }), expect.objectContaining({ contact_id: 'b', source: 'community_import' })]),
+    });
+    const tokenized = await request('preview', { choices: { primary_email: 1, primary_phone: 1 } });
+    expect(tokenized.token).toBeTruthy();
+    await request('commit', { choices: { primary_email: 1, primary_phone: 1 }, token: tokenized.token });
+    const stored = records.get(a).value;
+    expect(stored.emails.map((item) => item.value)).toEqual(['casey.personal@example.test', 'casey@tmobile.test']);
+    expect(stored.email).toBe('casey.personal@example.test');
+    expect(stored.phones).toHaveLength(2);
+    expect(stored.phone).toBe('801-555-0102');
+    expect(stored.sticker_ids).toEqual(['S01', 'S02', 'S03', 'S04']);
+    expect(Object.keys(stored.sticker_assignments)).toHaveLength(4);
+    expect(stored.contact_affiliations.map(({ title, organization_name }) => [title, organization_name])).toEqual([
+      ['Director', 'T-Mobile'], ['Basketball Coach', 'Salt Lake Youth League'],
+    ]);
+    expect([stored.title, stored.company_name, stored.company_id]).toEqual(['Director', 'T-Mobile', 'company-tmo']);
+    expect(stored.identity_sources).toEqual(expect.arrayContaining(['business_card', 'community_import']));
+    expect(stored.contact_hub_merge_origin.source_provenance).toHaveLength(2);
+    expect(records.has(a + '/timeline/meeting')).toBe(true);
+    const rollback = await request('preview_rollback');
+    expect((await request('rollback', { token: rollback.token })).receipt.status).toBe('rolled_back');
+    expect(records.get(a).value.contact_affiliations).toEqual(left.contact_affiliations);
+    expect(records.get(b).value.contact_affiliations).toEqual(right.contact_affiliations);
+    expect(records.has(a + '/timeline/meeting')).toBe(false);
+    expect(records.has(b + '/timeline/meeting')).toBe(true);
   });
 
   it('rejects expired and stale previews and denies wrong-account and read-only requests', async () => {
@@ -98,6 +163,24 @@ describe('trusted Contact Hub merge', () => {
     expect((await request('preview', {}, 'custom')).status).toBe(403);
     put('impersonationSessions/session', { adminUserId: 'owner', status: 'active' });
     expect((await request('preview')).status).toBe(403);
+  });
+
+  it('allows an owner-confirmed incomplete identity only when the signed preview and operation id agree', async () => {
+    const { a, b, request, put, records } = fixture({ left: { email: 'first@example.test', company_name: 'First Org' }, right: { email: 'second@example.test', company_name: 'Second Org' } });
+    put(a, { ...records.get(a).value, email: 'first@example.test', company_name: 'First Org' });
+    put(b, { ...records.get(b).value, email: 'second@example.test', company_name: 'Second Org' });
+    const blocked = await request('preview');
+    expect(blocked.blockers).toContain('identity_not_verified');
+    expect(blocked.token).toBeNull();
+    const choices = { primary_email: 0 };
+    const attested = await request('preview', { identityConfirmed: true, choices });
+    expect(attested.blockers).not.toContain('identity_not_verified');
+    expect(attested.token).toBeTruthy();
+    expect((await request('commit', { identityConfirmed: true, choices, operationId: '11111111-1111-4111-8111-111111111111', token: attested.token })).error).toBe('preview_changed');
+    const bound = await request('preview', { identityConfirmed: true, choices, operationId: 'ff379c19-3d0e-4416-aa6e-281a820d9000' });
+    expect((await request('commit', { identityConfirmed: true, choices, token: bound.token })).receipt.status).toBe('merged');
+    const operation = records.get('contact_hub_merges/owner/operations/ff379c19-3d0e-4416-aa6e-281a820d9000').value;
+    expect(operation.identityConfirmation).toMatchObject({ actorUid: 'owner', contactIds: ['a', 'b'] });
   });
 
   it('blocks conflicts, opt-outs, private photos, reminders and un-attributed provider operations', async () => {

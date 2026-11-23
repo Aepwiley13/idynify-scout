@@ -244,14 +244,16 @@ function HubPeopleList({ canDelete, readOnly }) {
   } = useOutletContext();
   const requestMerge = useCallback((action, data, active) => mergeRequest(uid, action, data, active), [uid]);
   const [selecting, setSelecting] = useState(false);
+  const [selectionPurpose, setSelectionPurpose] = useState('delete');
   const [selected, setSelected] = useState([]);
+  const [manualMergeContacts, setManualMergeContacts] = useState(null);
   const [deleting, setDeleting] = useState(null);
 
   function selectionFor(contact) {
     const checked = selected.includes(contact.id);
     return <label className="hub-select-contact">
       <input type="checkbox" aria-label={`Select ${personName(contact)}`} checked={checked}
-        disabled={!checked && selected.length >= DELETE_SELECTION_LIMIT}
+        disabled={!checked && selected.length >= (selectionPurpose === 'merge' ? 2 : DELETE_SELECTION_LIMIT)}
         onChange={() => setSelected((ids) => checked ? ids.filter((id) => id !== contact.id) : [...ids, contact.id])} />
     </label>;
   }
@@ -456,13 +458,25 @@ function HubPeopleList({ canDelete, readOnly }) {
               <div className="hub-tools-actions">
               {importButton}
               {uid && status === HUB_STATUS.READY && <DuplicateReview contacts={people} stickers={stickers.byId} readOnly={readOnly}
-                request={mergeReviewEnabled() && !readOnly ? requestMerge : undefined} onMerged={reload} />}
-              {canDelete && status === HUB_STATUS.READY && (
+                request={mergeReviewEnabled() && !readOnly ? requestMerge : undefined} onMerged={() => { setManualMergeContacts(null); setSelecting(false); setSelected([]); reload(); }}
+                manualContacts={manualMergeContacts} onManualCancel={() => setManualMergeContacts(null)} />}
+              {mergeReviewEnabled() && !readOnly && !manualMergeContacts && <button type="button" className="hub-secondary-btn" onClick={() => {
+                setSelectionPurpose('merge'); setSelecting(true); setSelected([]);
+              }}>Select two to merge</button>}
+              {canDelete && status === HUB_STATUS.READY && selectionPurpose !== 'merge' && (
                 <button type="button" className="hub-secondary-btn" onClick={() => {
+                  setSelectionPurpose('delete');
                   setSelecting(!selecting);
                   setSelected([]);
                 }}>{selecting ? 'Cancel selection' : 'Select contacts'}</button>
               )}
+              {selecting && selectionPurpose === 'merge' && <>
+                <button type="button" className="hub-secondary-btn" onClick={() => { setSelecting(false); setSelected([]); }}>Cancel</button>
+                <button type="button" className="hub-primary-btn" disabled={selected.length !== 2} onClick={() => {
+                  setManualMergeContacts(people.filter((contact) => selected.includes(contact.id)));
+                  setSelecting(false);
+                }}>Review merge ({selected.length}/2)</button>
+              </>}
               {selecting && <button type="button" className="hub-secondary-btn" disabled={!selected.length}
                 onClick={() => setDeleting(selected)}>Delete selected ({selected.length})</button>}
               {viewToggle}
@@ -563,7 +577,7 @@ function HubPeopleList({ canDelete, readOnly }) {
           </div>
         )}
 
-        {status === HUB_STATUS.READY && !showWall && shown.length > 0 && (asTable && !selecting ? (
+        {status === HUB_STATUS.READY && !showWall && shown.length > 0 && (asTable ? (
           <HubTable
             rows={page.drawn}
             tight={tightTable}
@@ -571,6 +585,7 @@ function HubPeopleList({ canDelete, readOnly }) {
             stickerMax={ROW_STICKER_MAX}
             onStickerChange={applyStickerChange}
             renderAvatar={(contact, name) => <Avatar contact={contact} name={name} />}
+            selection={selecting ? selectionFor : null}
           />
         ) : (
           <ul className="hub-list" aria-label="My People">

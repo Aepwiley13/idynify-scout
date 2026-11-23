@@ -43,6 +43,8 @@ import { useEffect, useRef, useState } from 'react';
 import { getEffectiveUser, useImpersonation } from '../../../context/ImpersonationContext';
 import { saveContactFields } from '../../../services/contactFields';
 import { STORE_FIELD, isEditable, planEdit, startValue } from './identityEditRules';
+import { affiliationsForContact, projectPrimaryAffiliation } from '../../../utils/contactAffiliations';
+import { saveContactAffiliations } from '../../../utils/contactAffiliations';
 
 function liveAccount() {
   try {
@@ -144,7 +146,18 @@ export function useContactIdentityEdit({ contact, onPatch }) {
     patch(id, { [storeField]: value });
 
     try {
-      await saveContactFields(id, { [storeField]: value }, { expectUid: ownerUid });
+      if (['title', 'company_name'].includes(storeField) && current._contactHubVersion) {
+        const affiliations = affiliationsForContact(current);
+        const primary = affiliations.find((item) => item.primary);
+        const next = primary ? affiliations.map((item) => item.id === primary.id
+          ? { ...item, ...(storeField === 'title' ? { title: value || null } : { organization_name: value || null, company_id: null }) }
+          : item) : affiliations;
+        if (primary) {
+          const saved = await saveContactAffiliations(ownerUid, id, current._contactHubVersion, next);
+          patch(id, { contact_affiliations: saved.affiliations, _contactHubVersion: saved.contactVersion,
+            ...projectPrimaryAffiliation(saved.affiliations) });
+        } else await saveContactFields(id, { [storeField]: value }, { expectUid: ownerUid });
+      } else await saveContactFields(id, { [storeField]: value }, { expectUid: ownerUid });
       if (seq > entry.confirmedSeq) {
         entry.confirmed = value;
         entry.confirmedSeq = seq;

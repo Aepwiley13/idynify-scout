@@ -70,7 +70,8 @@ export default function ContactHubMain() {
     getDocs(collection(db, 'users', uid, 'contacts'))
       .then((snapshot) => {
         if (!live) return;
-        setContacts(snapshot.docs.map((d) => ({ ...d.data(), id: d.id })));
+        setContacts(snapshot.docs.map((d) => ({ ...d.data(), id: d.id,
+          _contactHubVersion: d.updateTime ? `${d.updateTime.seconds}:${d.updateTime.nanoseconds}` : null })));
         setOutcome({ key: loadKey, status: HUB_STATUS.READY });
       })
       .catch((err) => {

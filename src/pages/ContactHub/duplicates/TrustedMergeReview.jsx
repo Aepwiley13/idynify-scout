@@ -18,6 +18,8 @@ const BLOCKERS = {
   unsupported_worker_history: 'Some background update history cannot be moved safely yet.',
   plan_limit: 'There is too much saved history to combine safely in one operation.',
   sticker_limit: 'The combined contact would exceed the 50-sticker limit.',
+  affiliation_limit: 'These contacts have more roles than can be safely combined at once.',
+  invalid_affiliations: 'Some role or organization details need correction before they can be combined.',
   invalid_email_fact: 'One contact has an email address that needs correction first.',
   timeline_collision: 'Some activity records could not be combined without a conflict.',
 };
@@ -64,19 +66,20 @@ function StepHeading({ number, title, description }) {
   </header>;
 }
 
-function PreservationSummary({ plan, survivorName }) {
+function PreservationSummary({ plan, survivorName, stickers }) {
   const combined = plan?.combined;
-  const values = [
-    ['Name', combined?.name || survivorName],
-    ['Email addresses', combined?.emails?.join(', ') || 'None saved'],
-    ['Phone numbers', combined?.phones?.join(', ') || 'None saved'],
-    ['Notes', `${combined?.notes ?? 0} notes`],
-    ['Activity', `${plan?.activityCount ?? 0} activity records`],
-    ['Stickers', `${combined?.stickers ?? 0} stickers`],
-  ];
   return <>
     <dl className="hub-merge-summary">
-      {values.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+      <div><dt>Name</dt><dd>{combined?.name || survivorName}</dd></div>
+      <div><dt>Email addresses</dt><dd>{combined?.emails?.length ? <ul>{combined.emails.map((item, index) => <li key={`${item.value}:${index}`}>{item.value}{item.label ? ` · ${item.label}` : ''}{item.primary ? ' · Primary' : ''}</li>)}</ul> : 'None saved'}</dd></div>
+      <div><dt>Phone numbers</dt><dd>{combined?.phones?.length ? <ul>{combined.phones.map((item, index) => <li key={`${item.normalized ?? item.value}:${item.label}:${index}`}>{item.value}{item.extension ? ` x${item.extension}` : ''} · {item.label}{item.labelSource ? ` (${item.labelSource})` : ''}{item.primary ? ' · Primary' : ''}</li>)}</ul> : 'None saved'}</dd></div>
+      <div><dt>Affiliations</dt><dd>{combined?.affiliations?.length ? <ul>{combined.affiliations.map((item, index) => <li key={`${item.id}:${index}`}>{[item.title, item.organization_name].filter(Boolean).join(' · ')}{item.primary ? ' · Primary' : ''}{item.status === 'former' ? ' · Former' : ''}</li>)}</ul> : 'None saved'}</dd></div>
+      <div><dt>Notes</dt><dd>{combined?.notes?.length ? <ul>{combined.notes.map((item, index) => <li key={`${item.id ?? 'note'}:${index}`}>{item.content ?? item.text ?? 'Saved note'}</li>)}</ul> : 'None saved'}</dd></div>
+      <div><dt>Activity</dt><dd>{plan?.activityCount ? `${plan.activityCount} activity records will be retained` : 'No activity records to transfer'}</dd></div>
+      <div><dt>Stickers</dt><dd>{combined?.stickers?.length ? <ul>{combined.stickers.map((item) => <li key={item.id}>{stickers?.[item.id]?.name ?? stickers?.get?.(item.id)?.name ?? item.name ?? item.id}{item.assignment?.assigned_by ? ` · assigned by ${item.assignment.assigned_by}` : ''}</li>)}</ul> : 'None saved'}</dd></div>
+      <div><dt>Source history</dt><dd>{combined?.sourceHistory?.length ? <ul>{combined.sourceHistory.map((entry) => <li key={entry.contact_id}>
+        {entry.contact_id}: {[entry.source, entry.added_from, entry.source_detail, entry.identity_source, ...(entry.identity_sources ?? [])].filter(Boolean).filter((value, index, all) => all.indexOf(value) === index).join(' · ') || 'Origin record retained'}
+      </li>)}</ul> : (combined?.sources?.join(', ') || 'No source history saved')}</dd></div>
       {combined?.suppressedEmails?.length > 0 && <div className="hub-merge-summary__restriction">
         <dt>Existing email opt-outs</dt><dd>Will remain in place for {combined.suppressedEmails.join(', ')}</dd>
       </div>}
@@ -89,7 +92,7 @@ function PreservationSummary({ plan, survivorName }) {
   </>;
 }
 
-export default function TrustedMergeReview({ pair, request, comparison, onCancel, onComplete, onBusyChange, onDraftChange, existingReceipt }) {
+export default function TrustedMergeReview({ pair, request, comparison, stickers, onCancel, onComplete, onBusyChange, onDraftChange, existingReceipt }) {
   const stepTitleId = useId();
   const [step, setStep] = useState(1);
   const [survivor, setSurvivor] = useState('');
@@ -100,13 +103,18 @@ export default function TrustedMergeReview({ pair, request, comparison, onCancel
   const [receipt, setReceipt] = useState(existingReceipt ?? null);
   const [rollbackPlan, setRollbackPlan] = useState(null);
   const [uncertain, setUncertain] = useState(false);
+  const [identityConfirmed, setIdentityConfirmed] = useState(false);
+  const [needsIdentityConfirmation, setNeedsIdentityConfirmation] = useState(false);
+  const [hasConflictingIdentity, setHasConflictingIdentity] = useState(false);
   const intent = useRef(null);
+  const attestationOperationId = useRef(null);
   const pending = useRef(false);
   const live = useRef(false);
   const contacts = pair?.contacts ?? [];
   const survivorContact = contacts.find((contact) => contact.id === survivor);
   const sourceContact = contacts.find((contact) => contact.id !== survivor);
-  const inputs = { survivorId: survivor, sourceId: sourceContact?.id, choices };
+  const inputs = { survivorId: survivor, sourceId: sourceContact?.id, choices, identityConfirmed,
+    ...(identityConfirmed ? { operationId: attestationOperationId.current } : {}) };
   const hasChoices = Boolean(survivor || Object.keys(choices).length);
 
   useEffect(() => { live.current = true; return () => { live.current = false; }; }, []);
@@ -138,6 +146,10 @@ export default function TrustedMergeReview({ pair, request, comparison, onCancel
     setNotice('');
     setStep(1);
     intent.current = null;
+    attestationOperationId.current = null;
+    setIdentityConfirmed(false);
+    setNeedsIdentityConfirmation(false);
+    setHasConflictingIdentity(false);
   }
   function chooseConflict(key, value) {
     setChoices((previous) => ({ ...previous, [key]: value }));
@@ -152,6 +164,8 @@ export default function TrustedMergeReview({ pair, request, comparison, onCancel
       const result = await call('preview', { ...inputs, choices: {} });
       if (!live.current) return;
       setPlan(result);
+      setNeedsIdentityConfirmation(result.blockers?.includes('identity_not_verified') ?? false);
+      setHasConflictingIdentity(result.blockers?.includes('conflicting_identity') ?? false);
       if (!result.blockers?.length) setStep(2);
     });
   }
@@ -162,12 +176,14 @@ export default function TrustedMergeReview({ pair, request, comparison, onCancel
       const result = await call('preview', { ...inputs, choices });
       if (!live.current) return;
       setPlan(result);
+      setNeedsIdentityConfirmation(result.blockers?.includes('identity_not_verified') ?? false);
+      setHasConflictingIdentity(result.blockers?.includes('conflicting_identity') ?? false);
       if (!result.blockers?.length && result.token) setStep(3);
     });
   }
   function commit() {
     if (!plan?.token || uncertain || !survivor) return;
-    intent.current ??= { ...inputs, token: plan.token, operationId: crypto.randomUUID() };
+    intent.current ??= { ...inputs, token: plan.token, operationId: attestationOperationId.current ?? crypto.randomUUID() };
     return run(async () => {
       const result = await call('commit', intent.current);
       if (live.current) { setReceipt(result.receipt); setUncertain(false); }
@@ -221,6 +237,16 @@ export default function TrustedMergeReview({ pair, request, comparison, onCancel
             {survivor === contact.id && <span className="hub-merge-keep-badge">Will remain</span>}
           </label>)}
         </fieldset>
+        {needsIdentityConfirmation && !hasConflictingIdentity && <label className="hub-merge-identity-confirmation">
+          <input type="checkbox" checked={identityConfirmed} disabled={busy || uncertain} onChange={(event) => {
+            const confirmed = event.target.checked;
+            setIdentityConfirmed(confirmed);
+            attestationOperationId.current = confirmed ? crypto.randomUUID() : null;
+            intent.current = null;
+            setPlan(null);
+          }} />
+          <span><strong>I know these records are the same person.</strong><small>This confirmation is recorded with this merge. Differences in verified identifiers still block the merge.</small></span>
+        </label>}
         <BlockerList blockers={plan?.blockers} />
       </>}
 
@@ -232,11 +258,14 @@ export default function TrustedMergeReview({ pair, request, comparison, onCancel
               <legend>{friendlyField(key)}</legend>
               <div className="hub-merge-conflict-options">
                 {options.map((option, index) => {
-                  const origin = index === 0 ? survivorContact : sourceContact;
-                  const isSurvivor = origin?.id === survivor;
+                  const origin = key === 'primary_email'
+                    ? contacts.filter((contact) => (contact.emails ?? []).some((item) => (typeof item === 'string' ? item : item.value)?.toLowerCase() === String(option).toLowerCase()) || [contact.email, contact.work_email, contact.email_address].some((value) => value?.toLowerCase() === String(option).toLowerCase()))
+                    : key === 'primary_phone'
+                      ? contacts.filter((contact) => contact.phones?.some((item) => item.value === option) || contact.phone === option || [contact.phone_mobile, contact.phone_direct, contact.phone_work, contact.phone_home].includes(option))
+                      : [index === 0 ? survivorContact : sourceContact];
                   return <label key={`${key}-${index}`} className={`hub-merge-choice${choices[key] === index ? ' is-selected' : ''}`}>
                     <input type="radio" name={`conflict-${pair.id}-${key}`} value={index} checked={choices[key] === index} disabled={busy || uncertain} onChange={() => chooseConflict(key, index)} />
-                    <span><strong>{printable(option)}</strong><small>From {personLabel(origin)}{isSurvivor ? ' · contact that will remain' : ' · information will be transferred'}</small></span>
+                    <span><strong>{printable(option)}</strong><small>{origin.length > 0 ? `From ${origin.map(personLabel).join(' and ')}` : 'Saved contact information'}{origin.some((contact) => contact.id === survivor) ? ' · includes the contact that will remain' : ' · information will be retained'}</small></span>
                   </label>;
                 })}
               </div>
@@ -250,7 +279,7 @@ export default function TrustedMergeReview({ pair, request, comparison, onCancel
       {step === 3 && <>
         <StepHeading number="3" title="Review the combined contact" description="Check what will remain before you confirm the merge." />
         <div className="hub-merge-survivor-summary"><span>Contact that will remain</span><strong>{survivorName}</strong></div>
-        <PreservationSummary plan={plan} survivorName={survivorName} />
+        <PreservationSummary plan={plan} survivorName={survivorName} stickers={stickers} />
         <BlockerList blockers={plan?.blockers} />
         <p className="hub-merge-note">The other contact will be retired and its profile will point to the contact you selected. Recovery is conditional and will be checked after the merge.</p>
       </>}

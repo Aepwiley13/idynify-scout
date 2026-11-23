@@ -56,6 +56,34 @@ describe('account snapshot duplicate evidence', () => {
 describe('Duplicate review', () => {
   afterEach(() => vi.restoreAllMocks());
 
+  it('reviews an explicitly selected pair and binds owner identity confirmation to its signed merge operation', async () => {
+    const user = userEvent.setup();
+    const left = { id: 'manual-a', name: 'Jamie Example' };
+    const right = { id: 'manual-b', name: 'Jamie Example' };
+    const request = vi.fn(async (action, fields) => {
+      if (action === 'dismissals') return { pairs: [], latest: null };
+      if (action === 'preview' && !fields.identityConfirmed) return { blockers: ['identity_not_verified'], conflicts: [], token: null };
+      if (action === 'preview') return { blockers: [], conflicts: [], combined: { name: 'Jamie Example', emails: [], phones: [], notes: [], stickers: [], affiliations: [], sources: [], sourceHistory: [] }, activityCount: 0, token: 'signed-manual-preview' };
+      if (action === 'commit') return { receipt: { status: 'merged', operationId: fields.operationId } };
+      throw new Error(`Unexpected ${action}`);
+    });
+    render(<DuplicateReview contacts={[left, right]} request={request} manualContacts={[left, right]} />);
+    const dialog = within(await screen.findByRole('dialog'));
+    expect(dialog.getByText('Manual contact comparison')).toBeInTheDocument();
+    await user.click(dialog.getAllByRole('radio', { name: /Jamie Example/ })[0]);
+    await user.click(dialog.getByRole('button', { name: 'Continue' }));
+    const confirmation = await dialog.findByRole('checkbox', { name: /I know these records are the same person/ });
+    await user.click(confirmation);
+    await user.click(dialog.getByRole('button', { name: 'Continue' }));
+    await user.click(dialog.getByRole('button', { name: 'Review combined contact' }));
+    await user.click(dialog.getByRole('button', { name: 'Merge contacts' }));
+    const previewCalls = request.mock.calls.filter(([action]) => action === 'preview').map(([, fields]) => fields);
+    const commitFields = request.mock.calls.find(([action]) => action === 'commit')[1];
+    expect(previewCalls.at(-1)).toMatchObject({ identityConfirmed: true, operationId: expect.any(String), survivorId: 'manual-a', sourceId: 'manual-b' });
+    expect(commitFields.operationId).toBe(previewCalls.at(-1).operationId);
+    expect(await dialog.findByRole('heading', { name: 'Contacts merged' })).toBeInTheDocument();
+  });
+
   it('compares contacts and persists a false-match dismissal locally when no trusted service is supplied', async () => {
     const user = userEvent.setup();
     render(<DuplicateReview contacts={[a, b]} />);

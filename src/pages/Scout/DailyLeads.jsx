@@ -15,6 +15,7 @@ import {
 import { Globe, Linkedin, Check, X, RefreshCw, Loader, Settings, RotateCcw, MessageCircle, ArrowRight, MapPin, User, List, ChevronDown, Flame, Trophy, Info } from 'lucide-react';
 import DiscoveryStatusPanel from '../../components/scout/DiscoveryStatusPanel';
 import { describeDiscovery, describeLastSearch, RUN } from '../../utils/discoveryStatus';
+import { explainFactors, strongestReasons, summarizeFactors, STATE_LABEL, STATE_SYMBOL } from '../../utils/matchReasons';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS, ASSETS, TYPE } from '../../theme/tokens';
 
@@ -105,38 +106,21 @@ const inkFor = (T, kind) => {
   if (kind === 'missed') return T.isDark ? STATUS.red : '#b91c1c';
   return T.textMuted;
 };
-const REASON_SYMBOL = { matched: '✓', partial: '≈', missed: '✗', neutral: '•' };
-
-/** One line of "why": a symbol for what kind of evidence it is, then the words. */
-function ReasonLine({ kind, text, T }) {
+/**
+ * One line of "why" (#006.5): a decorative symbol, the state in words for screen
+ * readers, then the reason. It wraps instead of truncating, so nothing important
+ * hides behind a hover tooltip.
+ */
+function ReasonLine({ kind, text, T, announceState = false }) {
   return (
-    <div data-reason={kind} title={text} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: T.text, minWidth: 0 }}>
-      <span aria-hidden="true" style={{ width: 16, flexShrink: 0, textAlign: 'center', fontWeight: 800, color: inkFor(T, kind) }}>{REASON_SYMBOL[kind]}</span>
-      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{text}</span>
+    <div data-reason={kind} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, lineHeight: 1.35, color: T.text, minWidth: 0 }}>
+      <span aria-hidden="true" style={{ width: 16, flexShrink: 0, textAlign: 'center', fontWeight: 800, color: inkFor(T, kind) }}>{STATE_SYMBOL[kind]}</span>
+      <span style={{ minWidth: 0, overflowWrap: 'anywhere' }}>
+        {announceState && STATE_LABEL[kind] && <span className="sr-only">{STATE_LABEL[kind]}: </span>}
+        {text}
+      </span>
     </div>
   );
-}
-
-/**
- * The company's strongest ICP reasons: matched factors in weight order, then
- * near ones, then misses. A factor with no data is not a reason either way.
- */
-function strongestReasons(factorPills) {
-  const TEXT = {
-    industry: { matched: () => 'In your target industry', partial: () => 'Related to your target industry', missed: () => 'Outside your target industries' },
-    location: { matched: v => (v ? `In your target region: ${v}` : 'In your target region'), partial: () => 'Near your target region', missed: () => 'Outside your target region' },
-    employeeSize: { matched: () => 'Size fits your range', partial: () => 'Size near your range', missed: () => 'Size outside your range' },
-    revenue: { matched: () => 'Revenue fits your range', partial: () => 'Revenue near your range', missed: () => 'Revenue outside your range' },
-  };
-  const reasons = factorPills
-    .filter(({ data }) => !data.unknown)
-    .map(({ key, data }) => {
-      const kind = data.match === 100 ? 'matched' : data.match === 50 ? 'partial' : 'missed';
-      const value = typeof data.value === 'string' ? data.value : null;
-      return { key, kind, text: TEXT[key][kind](value) };
-    });
-  const rank = { matched: 0, partial: 1, missed: 2 };
-  return reasons.sort((a, b) => rank[a.kind] - rank[b.kind]);
 }
 
 const SENIORITY_LABELS = {
@@ -605,11 +589,8 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
     { key: 'revenue', label: 'Revenue', data: breakdown.revenue },
   ].filter(f => f.data && f.data.active) : [];
 
-  // "2 of 4 factors measured" — keeps the score from overstating its own basis.
-  const measuredCount = factorPills.filter(f => !f.data.unknown).length;
-  const coverageNote = factorPills.length > 0
-    ? `${measuredCount} of ${factorPills.length} factor${factorPills.length === 1 ? '' : 's'} measured`
-    : null;
+  // The score's basis is stated by matchSummary below ("Matches 2 of 4 criteria ·
+  // 1 unknown"), which replaced the "2 of 4 factors measured" note (#006.5).
 
   // HQ and CEO — try multiple Apollo field names
   const hqLocation = [
@@ -710,56 +691,25 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
     </div>
     </>
   );
-  const factorPillsRow = (
-    <>
-    {/* ICP Factor Pills — always visible */}
-    {factorPills.length > 0 && (
-      <div style={{
-        padding: wide ? '8px 18px' : '6px 14px',
-        borderBottom: `1px solid ${T.border}`,
-        display: 'flex', flexWrap: 'wrap', gap: 5,
-      }}>
-        {factorPills.map(({ key, label, data }) => {
-          // G1-06: three visual states. `unknown` is deliberately NOT red —
-          // we did not evaluate this dimension, so showing it as a failed
-          // match would assert something we never checked.
-          const pillColor = data.unknown ? T.textFaint
-            : data.match === 100 ? STATUS.green
-            : data.match === 50 ? STATUS.amber
-            : STATUS.red;
-          const symbol = data.unknown ? '–'
-            : data.match === 100 ? '✓'
-            : data.match === 50 ? '≈'
-            : '✗';
-          return (
-            <span
-              key={key}
-              title={data.unknown
-                ? `${label}: no data available for this company — not included in the score`
-                : `${label}: ${data.match}% match`}
-              style={{
-                fontSize: SZ['2xs'],
-                fontWeight: 600,
-                padding: '2px 7px',
-                borderRadius: 7,
-                background: data.unknown ? 'transparent' : `${pillColor}18`,
-                border: `1px ${data.unknown ? 'dashed' : 'solid'} ${pillColor}${data.unknown ? '55' : '30'}`,
-                color: pillColor,
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {label} {symbol}{data.unknown ? ' n/a' : ''}
-            </span>
-          );
-        })}
-        {coverageNote && (
-          <span style={{ fontSize: SZ['2xs'], color: T.textFaint, alignSelf: 'center', marginLeft: 2 }}>
-            {coverageNote}
-          </span>
-        )}
+  // #006.5 — every criterion this ICP sets, in words: matches, close, doesn't
+  // match, or not available (no data — never shown as a miss).
+  const explainedFactors = explainFactors(factorPills);
+  const matchSummary = summarizeFactors(explainedFactors);
+  const factorPillsRow = explainedFactors.length > 0 && (
+    <div data-testid="match-explanation" style={{
+      padding: wide ? '10px 18px' : '8px 14px',
+      borderBottom: `1px solid ${T.border}`,
+      display: 'grid', gap: 6,
+    }}>
+      {matchSummary && (
+        <div data-testid="match-summary" style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{matchSummary.text}</div>
+      )}
+      <div role="list" aria-label="Why this company matches your ICP" style={{ display: 'grid', gap: 5 }}>
+        {explainedFactors.map(r => (
+          <div role="listitem" key={r.key}><ReasonLine kind={r.kind} text={r.text} T={T} announceState /></div>
+        ))}
       </div>
-    )}
-    </>
+    </div>
   );
   const breakdownPanel = (
     <>
@@ -776,17 +726,20 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
           ['Revenue', breakdown.revenue],
         ].map(([label, data]) => {
           const matchColor = data.match === 100 ? STATUS.green : data.match === 50 ? STATUS.amber : STATUS.red;
-          // The sheet has the room to say what the card's pills say: a factor
-          // with no data was not measured, and each counts for its weight.
-          const measured = !fit || (data.active && !data.unknown);
+          // A factor with no data was not measured, and one the ICP doesn't set
+          // isn't a criterion: neither is a miss (#006.5 — on the desktop face
+          // both used to render as a red ✗). Scoring is unchanged.
+          const measured = data.active && !data.unknown;
           return (
             <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: fit ? 12 : 10 }}>
               <span style={{ color: measured ? matchColor : T.textFaint, fontWeight: 700, fontSize: 12, lineHeight: 1 }}>
-                {!measured ? '–' : data.match === 100 ? '✓' : data.match === 50 ? '≈' : '✗'}
+                {!data.active ? '–' : data.unknown ? '?' : data.match === 100 ? '✓' : data.match === 50 ? '≈' : '✗'}
               </span>
               <span style={{ color: T.textMuted }}>{label}</span>
               <span style={{ marginLeft: 'auto', color: T.textFaint, fontWeight: 600 }}>
-                {!fit ? `${data.contribution}pt` : measured ? `${data.contribution} of ${data.weight}pt` : 'not measured'}
+                {measured
+                  ? (fit ? `${data.contribution} of ${data.weight}pt` : `${data.contribution}pt`)
+                  : data.unknown ? 'not measured' : 'not in your ICP'}
               </span>
             </div>
           );
@@ -883,10 +836,13 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
           </span>
           <span style={{ fontSize: 13, fontWeight: 600, color: matchInk, whiteSpace: 'nowrap' }}>{scoreLabel}</span>
         </div>
+        {!compact && matchSummary && (
+          <div data-testid="match-summary" style={{ fontSize: 12, fontWeight: 600, color: T.textMuted, marginTop: 6 }}>{matchSummary.text}</div>
+        )}
         {keyFacts && <div title={keyFacts} style={{ fontSize: 13, color: T.textMuted, marginTop: compact ? 6 : 8, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{keyFacts}</div>}
         {reasons.length > 0 && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: compact ? 5 : 6, marginTop: compact ? 8 : 12 }}>
-            {reasons.slice(0, compact ? 2 : 3).map(r => <ReasonLine key={r.key} kind={r.kind} text={r.text} T={T} />)}
+            {reasons.slice(0, compact ? 2 : 3).map(r => <ReasonLine key={r.key} kind={r.kind} text={r.text} T={T} announceState />)}
           </div>
         )}
       </div>

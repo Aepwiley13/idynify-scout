@@ -387,13 +387,11 @@ export default function ICPSettings() {
         throw new Error(data.error || 'Failed to refresh results');
       }
 
-      setRefreshResult({ count: data.companiesAdded || 0, currentQueueSize: data.currentQueueSize || 0 });
-      setTimeout(() => setRefreshResult(null), 6000);
+      setRefreshResult({ count: data.companiesAdded || 0, currentQueueSize: data.currentQueueSize || 0, at: Date.now() });
       setRefreshing(false);
     } catch (error) {
       console.error('Failed to refresh:', error);
-      setRefreshResult({ error: error.message });
-      setTimeout(() => setRefreshResult(null), 6000);
+      setRefreshResult({ error: error.message, at: Date.now() });
       setRefreshing(false);
     }
   }
@@ -639,17 +637,18 @@ export default function ICPSettings() {
         </div>
         <div className="header-actions">
           {refreshResult && !refreshResult.error && (
-            <span className="header-refresh-success">
-              <CheckCircle className="w-4 h-4" />
+            <span className="header-refresh-success" role="status">
+              <CheckCircle className="w-4 h-4" aria-hidden="true" />
               {refreshResult.count > 0
                 ? `${refreshResult.count} new companies added to Daily Discoveries`
                 : refreshResult.currentQueueSize > 0
                   ? 'Queue is already full — review current targets'
                   : 'No new matches found. Try adjusting your ICP criteria.'}
+              {' · '}{new Date(refreshResult.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}
             </span>
           )}
           {refreshResult?.error && (
-            <span className="header-refresh-error">Refresh failed — try again</span>
+            <span className="header-refresh-error" role="alert">Last refresh didn't finish · {new Date(refreshResult.at).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} — try Refresh Results again</span>
           )}
           <button
             onClick={handleRefreshResults}

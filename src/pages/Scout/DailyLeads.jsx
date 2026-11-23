@@ -3222,7 +3222,7 @@ export default function DailyLeads({ onNavigate }) {
               marginBottom: 10,
             }}
           >
-            <MessageCircle size={16} />Talk to Barry
+            <MessageCircle size={16} />Ask Barry
           </button>
           <button
             onClick={() => navigate('/scout?tab=icp-settings')}
@@ -3501,7 +3501,7 @@ export default function DailyLeads({ onNavigate }) {
                           marginBottom: 10,
                         }}
                       >
-                        <MessageCircle size={16} />Talk to Barry
+                        <MessageCircle size={16} />Ask Barry
                       </button>
                       <button
                         onClick={handleNextBatch}
@@ -3873,7 +3873,7 @@ export default function DailyLeads({ onNavigate }) {
               >
                 <BarryAvatar size={28} />
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: BRAND.pink }}>Chat with Barry</div>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: BRAND.pink }}>Ask Barry</div>
                   <div style={{ fontSize: SZ['2xs'], color: T.textFaint }}>Refine your ICP targeting</div>
                 </div>
                 <ArrowRight size={13} color={BRAND.pink} />

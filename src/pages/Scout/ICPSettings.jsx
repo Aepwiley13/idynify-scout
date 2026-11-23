@@ -702,7 +702,7 @@ export default function ICPSettings() {
               className="use-barry-btn"
             >
               <MessageSquare className="w-4 h-4" />
-              <span>Talk to Barry</span>
+              <span>Ask Barry</span>
             </button>
           </div>
         </div>

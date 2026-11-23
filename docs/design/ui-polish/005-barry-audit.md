@@ -1,6 +1,6 @@
 # #005 — Barry's Visual Experience (read-only audit)
 
-**Status: audit, awaiting approval. Nothing implemented.** Audited on `main` at `dcc19e54`.
+**Status: 005.2, 005.3, 005.4, 005.5 and 005.7 implemented (below). 005.1 and 005.6 wait for unified navigation (#003.6).** Audited on `main` at `dcc19e54`.
 Measured from the source; visual findings need a logged-in pass in light and dark themes.
 
 ## Where Barry is
@@ -79,3 +79,30 @@ Barry appears in **223 files** and about **35 Barry-named components** across 14
 
 Sequencing: 005.2 and 005.3 can ship on their own. 005.1 should follow 003.6, because the sidebar
 card's markup moves into the unified sidebar.
+
+## Implemented (one commit each, independently reversible)
+
+Out of scope throughout: Barry's intelligence, prompts, models, credits, billing, entitlements and
+backend; Contact Hub (the contact profile's `components/contacts/Barry*` and `BarryKnowledgeButton`);
+onboarding (`BarryTyping`, `BarryOnboarding`); the shared sidebar.
+
+| # | Change | Files |
+|---|---|---|
+| 005.2 | Barry threads in the workspace, shell panel, Recon coach and ICP panel are `role="log" aria-live="polite"`, labelled "Conversation with Barry". Typing indicators carry visually hidden "Barry is typing…"; the dots are `aria-hidden`. The panel's old `aria-label` on a plain div, which screen readers ignored, is gone. The Recon Guide's indicator is a `role="status"` | 5 components + `barryAnnouncements.test.js` (11) |
+| 005.3 | `theme/barryColors.js`: Barry text is the brand hue mixed into the theme's `--text-primary` (pink / purple 60%, cyan 45%). Applied to Barry text in the result set, resolution preview, panel pills, Recon coach and guide. The recommendation card's dark-only greys and -300 badges became tokens and mixes, with its dismiss overlay on the theme card. Reply / insights / session-history CSS: light-only surfaces, greys and badges became tokens and tints; the reply card's pink button became `#d1176f` / hover `#be185d` | 10 files + `barryThemeContrast.test.js` (14), which recomputes all seven themes from `index.css` |
+| 005.4 | "Talk to Barry" (Daily Discoveries ×2, ICP Settings) and "Chat with Barry" became **Ask Barry**. Output headings keep their meaning ("Barry's Playbook / Read / Intel / Proposed Orchestration", "Barry suggests") | 2 pages + `barryNaming.test.js` (8) |
+| 005.5 | Barry's panel has **Open the full Barry workspace** (→ `/barry`) beside Close. It exists only inside the panel, which mounts only for accounts with Barry access, so access is unchanged; `/barry` keeps its payment gate. Sidebar untouched | `MainLayout.jsx/.css` + `barryWorkspaceDiscoverable.test.jsx` (3, real shell, paid vs Free) |
+| 005.7 | Labelled `role="region"` on Barry's Playbook, drafted reply, recommendation, warning, morning brief, Recon coaching and ICP conversation | 7 components + `barryLandmarks.test.js` (7) |
+
+**Verified in Chrome** with the compiled CSS on card, page and secondary backgrounds in all seven themes,
+using the browser's own `color-mix` resolution. Worst cases: pink 5.58:1, purple 5.38:1, cyan 4.72:1,
+amber badge 4.79:1, secondary text 4.69:1, all at least 4.5:1.
+
+**Found while verifying:** `BarryReplyCard` and `BarryInsightsCard` are reachable only through
+`HunterContactDrawer` → `ContactSnapshot`, which nothing imports, so they aren't in the build.
+Their 005.3 / 005.7 changes are correct but have no visible effect until they're wired back in.
+`BarryRecommendationCard` does ship, via the contact profile's Barry panel.
+
+**Follow-ups:** the Recon coaching and ICP conversation drawers should become modal dialogs with
+focus handling. Onboarding's `BarryTyping` needs `role="status"`; the onboarding team owns it.
+

@@ -88,10 +88,12 @@ describe('Scout sub-nav panel', () => {
     // section labels themselves.
     for (const section of [
       'Daily Discoveries', 'People', 'Saved Companies', 'Scout+',
-      'Cadences', 'Total Market', 'ICP Settings', 'Game Mode',
+      'Total Market', 'ICP Settings', 'Game Mode',
     ]) {
       expect(labels.some(l => l.startsWith(section))).toBe(true);
     }
+    // Cadences moved to Hunter (#003.5); Scout no longer lists a duplicate.
+    expect(labels.some(l => l.startsWith('Cadences'))).toBe(false);
   });
 
   it('shows a short description under each section, as the other modules do', () => {

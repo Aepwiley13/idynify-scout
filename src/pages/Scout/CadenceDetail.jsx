@@ -296,7 +296,7 @@ export default function CadenceDetail() {
       }}>
         <div style={{ fontSize: 15, fontWeight: 600, color: T.text }}>Cadence not found</div>
         <button
-          onClick={() => navigate('/scout/cadences')}
+          onClick={() => navigate('/hunter?tab=cadences')}
           style={{
             padding: '8px 16px', borderRadius: 8,
             background: T.cardBg, border: `1px solid ${T.border}`,
@@ -342,7 +342,7 @@ export default function CadenceDetail() {
 
         {/* Back button */}
         <button
-          onClick={() => navigate('/scout/cadences')}
+          onClick={() => navigate('/hunter?tab=cadences')}
           style={{
             display: 'flex', alignItems: 'center', gap: 6,
             background: 'none', border: 'none', cursor: 'pointer',

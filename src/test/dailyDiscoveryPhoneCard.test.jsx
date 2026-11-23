@@ -163,9 +163,10 @@ describe('the phone company card: the company first, then why it might fit', () 
     const { container } = renderCompany();
     const reasons = [...container.querySelectorAll('[data-reason]')];
     expect(reasons.map(r => [r.dataset.reason, r.textContent])).toEqual([
-      ['matched', '✓In your target region: Utah'],
-      ['partial', '≈Related to your target industry'],
-      ['missed', '✗Size outside your range'],
+      // #006.5: each line also states its result in words for screen readers.
+      ['matched', '✓Matches: In your target region: Utah'],
+      ['partial', '≈Close match: Related to your target industry'],
+      ['missed', "✗Doesn't match: Size outside your range"],
     ]);
   });
 

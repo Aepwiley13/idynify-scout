@@ -506,7 +506,8 @@
 
 /* Host close button — pinned top-right, above Barry content, ≥44px touch
    target on mobile. Not rendered while the host is closed. */
-.barry-host-close {
+.barry-host-close,
+.barry-host-expand {
   position: absolute;
   top: 12px;
   right: 12px;
@@ -526,11 +527,22 @@
   cursor: pointer;
 }
 
-.barry-host-close:hover {
+.barry-host-close:hover,
+.barry-host-expand:hover {
   border-color: rgba(0, 196, 212, 0.6);
 }
 
-.barry-panel-host[inert] .barry-host-close {
+/* Sits left of Close, in the same reserved top zone. */
+.barry-host-expand { right: 64px; }
+
+.barry-host-close:focus-visible,
+.barry-host-expand:focus-visible {
+  outline: 2px solid #00c4d4;
+  outline-offset: 2px;
+}
+
+.barry-panel-host[inert] .barry-host-close,
+.barry-panel-host[inert] .barry-host-expand {
   display: none;
 }
 

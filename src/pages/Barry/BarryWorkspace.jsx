@@ -932,7 +932,13 @@ export default function BarryWorkspace() {
         </div>
       </div>
 
-      <div className="barry-workspace-thread" ref={threadRef}>
+      <div
+        className="barry-workspace-thread"
+        ref={threadRef}
+        role="log"
+        aria-live="polite"
+        aria-label="Conversation with Barry"
+      >
         {conversationTurns.length === 0 ? (
           <div className="barry-workspace-empty">
             <img
@@ -1033,9 +1039,10 @@ export default function BarryWorkspace() {
               className="barry-workspace-msg-bubble barry-workspace-typing"
               style={{ background: T.cardBg, borderColor: T.border }}
             >
-              <span className="barry-typing-dot" />
-              <span className="barry-typing-dot" />
-              <span className="barry-typing-dot" />
+              <span className="sr-only">Barry is typing…</span>
+              <span className="barry-typing-dot" aria-hidden="true" />
+              <span className="barry-typing-dot" aria-hidden="true" />
+              <span className="barry-typing-dot" aria-hidden="true" />
             </div>
           </div>
         )}

@@ -19,7 +19,8 @@ import { getEffectiveUser } from '../../context/ImpersonationContext';
 // ─── Barry typing indicator ───────────────────────────────────────────────────
 function BarryTyping() {
   return (
-    <div style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '4px 2px' }}>
+    <div role="status" style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '4px 2px' }}>
+      <span className="sr-only">Barry is typing…</span>
       {[0, 1, 2].map(i => (
         <div key={i} style={{
           width: 6, height: 6, borderRadius: '50%',

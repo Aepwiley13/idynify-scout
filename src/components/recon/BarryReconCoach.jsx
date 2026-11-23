@@ -232,7 +232,7 @@ export default function BarryReconCoach({ sectionId, sectionLabel, existingAnswe
         </div>
 
         {/* Messages */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 10 }} role="log" aria-live="polite" aria-label="Conversation with Barry">
           {messages.map((msg, i) => (
             msg.role === 'system' ? (
               <div key={i} style={{ textAlign: 'center', fontSize: 11, color: T.textFaint, padding: '2px 0' }}>
@@ -261,7 +261,8 @@ export default function BarryReconCoach({ sectionId, sectionLabel, existingAnswe
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <BarryAvatar size={24} />
               <div style={{ padding: '9px 13px', borderRadius: '16px 16px 16px 4px', background: T.surface, border: `1px solid ${T.border2}` }}>
-                <Loader size={14} color={BRAND.pink} style={{ animation: 'reconSpin 1s linear infinite' }} />
+                <Loader size={14} color={BRAND.pink} style={{ animation: 'reconSpin 1s linear infinite' }} aria-hidden="true" />
+                <span className="sr-only">Barry is typing…</span>
               </div>
             </div>
           )}

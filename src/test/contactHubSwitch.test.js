@@ -141,6 +141,7 @@ describe('App.jsx takes its Contact Hub routes from the switch-guarded function 
   // contactHubRoutes.test.jsx. This pins the one thing that test cannot see:
   // that App.jsx has no second, unguarded way in.
   const app = readFileSync(resolve(process.cwd(), 'src/App.jsx'), 'utf8');
+  const netlify = readFileSync(resolve(process.cwd(), 'netlify.toml'), 'utf8');
 
   it('calls contactHubRoutes() exactly once and names no Contact Hub component itself', () => {
     expect(app.match(/\{contactHubRoutes\(\)\}/g)).toHaveLength(1);
@@ -162,5 +163,13 @@ describe('App.jsx takes its Contact Hub routes from the switch-guarded function 
   it('has no hand-written route or redirect to /contact-hub', () => {
     expect(app).not.toMatch(/path="\/contact-hub/);
     expect(app).not.toMatch(/to="\/contact-hub/);
+  });
+
+  it('enables Contact Hub only for production builds while keeping Free signup and non-production contexts off', () => {
+    expect(netlify).toMatch(/\[context\.production\.environment\][\s\S]*?VITE_CONTACT_HUB\s*=\s*"on"[\s\S]*?VITE_FREE_PLAN\s*=\s*"off"/);
+    for (const context of ['branch-deploy', 'deploy-preview']) {
+      const block = netlify.match(new RegExp(`\\[context\\.${context}\\.environment\\]([\\s\\S]*?)(?=\\n\\[|$)`))?.[1] ?? '';
+      expect(block).not.toMatch(/VITE_CONTACT_HUB|VITE_FREE_PLAN/);
+    }
   });
 });

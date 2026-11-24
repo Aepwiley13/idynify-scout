@@ -12,7 +12,7 @@ const env = {
   BILLING_LEDGER_EPOCH_UNIX: '1794632515',
 };
 
-function stripeFixture({ missingEvents = [], portalActive = true } = {}) {
+function stripeFixture({ missingEvents = [], portalActive = true, planChanges = false } = {}) {
   const expected = [
     'checkout.session.completed', 'customer.subscription.created', 'customer.subscription.updated',
     'customer.subscription.deleted', 'invoice.paid',
@@ -24,11 +24,10 @@ function stripeFixture({ missingEvents = [], portalActive = true } = {}) {
     billingPortal: { configurations: { retrieve: vi.fn(async () => ({
       active: portalActive,
       features: {
+        payment_method_update: { enabled: true },
+        invoice_history: { enabled: true },
         subscription_update: {
-          enabled: true,
-          default_allowed_updates: ['price'],
-          products: [{ prices: [env.STRIPE_PRICE_STARTER, env.STRIPE_PRICE_PRO] }],
-          schedule_at_period_end: { conditions: [{ type: 'decreasing_item_amount' }] },
+          enabled: planChanges,
         },
         subscription_cancel: { enabled: true, mode: 'at_period_end' },
       },
@@ -48,6 +47,13 @@ describe('read-only production billing readiness', () => {
       liveSecretFormat: true, webhookSecretFormat: true, ledgerEpochUnchanged: true,
       starterPrice: { ready: true }, proPrice: { ready: true }, portal: { ready: true }, webhook: { ready: true },
     });
+    expect(result.checks.portal).toMatchObject({
+      paymentMethods: true,
+      invoices: true,
+      planChanges: false,
+      planChangesDisabled: true,
+      cancelAtPeriodEnd: true,
+    });
     expect(JSON.stringify(result)).not.toContain(env.STRIPE_SECRET_KEY);
     expect(JSON.stringify(result)).not.toContain(env.STRIPE_WEBHOOK_SECRET);
   });
@@ -62,16 +68,23 @@ describe('read-only production billing readiness', () => {
     expect(result.checks.portal.configured).toBe(false);
   });
 
-  it('requires the portal to support both plans and schedule downgrades at renewal', async () => {
-    const stripe = stripeFixture();
-    stripe.billingPortal.configurations.retrieve.mockResolvedValue({ active: true, features: {
-      subscription_update: { enabled: true, default_allowed_updates: ['price'], products: [{ prices: [env.STRIPE_PRICE_STARTER] }] },
-      subscription_cancel: { enabled: true, mode: 'at_period_end' },
-    } });
+  it('rejects portal plan switching and requires payment methods, invoices, and end-of-period cancellation', async () => {
+    const stripe = stripeFixture({ planChanges: true });
     const result = await inspectBillingReadiness({ stripe, env });
     expect(result.ready).toBe(false);
-    expect(result.checks.portal.planChanges).toBe(false);
-    expect(result.checks.portal.safeDowngrades).toBe(false);
+    expect(result.checks.portal.planChanges).toBe(true);
+    expect(result.checks.portal.planChangesDisabled).toBe(false);
+
+    stripe.billingPortal.configurations.retrieve.mockResolvedValue({ active: true, features: {
+      payment_method_update: { enabled: false },
+      invoice_history: { enabled: true },
+      subscription_update: { enabled: false },
+      subscription_cancel: { enabled: true, mode: 'at_period_end' },
+    } });
+    const missingPaymentMethods = await inspectBillingReadiness({ stripe, env });
+    expect(missingPaymentMethods.ready).toBe(false);
+    expect(missingPaymentMethods.checks.portal.paymentMethods).toBe(false);
+    expect(missingPaymentMethods.checks.portal.planChangesDisabled).toBe(true);
   });
 
   it('does not call Stripe when Netlify has only an unusable masked secret string', async () => {

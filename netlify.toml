@@ -45,6 +45,12 @@
   # See issue #666.
   SECRETS_SCAN_OMIT_KEYS = "FIREBASE_API_KEY,VITE_FIREBASE_API_KEY,VITE_FIREBASE_AUTH_DOMAIN,VITE_FIREBASE_PROJECT_ID,VITE_FIREBASE_STORAGE_BUCKET,VITE_FIREBASE_MESSAGING_SENDER_ID,VITE_FIREBASE_APP_ID,GOOGLE_SEARCH_ENGINE_ID"
 
+# Release Contact Hub to verified paid accounts only. The shell's existing
+# payment gate remains in force; Free signup and Free routes stay disabled.
+[context.production.environment]
+  VITE_CONTACT_HUB = "on"
+  VITE_FREE_PLAN = "off"
+
 # ─── Non-production contexts ─────────────────────────────────────────────────
 #
 # DEFENCE IN DEPTH ONLY. Read the limits before trusting this.

@@ -205,10 +205,12 @@ describe('layout', () => {
     expect(decl('.ph-avatar-wrap')).toMatch(/width:\s*var\(--ph-avatar\)/);
   });
 
-  it('sizes the name 24px, 28px and 32px, and the desktop name is prominent', () => {
-    expect(decl('.ph-name')).toMatch(/font-size:\s*24px/);
-    expect(container('min-width: 540px')).toMatch(/\.ph-name\s*\{\s*font-size:\s*28px/);
-    expect(container('min-width: 820px')).toMatch(/\.ph-name\s*\{\s*font-size:\s*32px/);
+  it('sizes the name 24px, 28px and 32px through the typography scale, and the desktop name is prominent', () => {
+    expect(decl('.ph-name')).toMatch(/font-size:\s*var\(--text-2xl\)/);
+    expect(container('min-width: 540px')).toMatch(/\.ph-name\s*\{\s*font-size:\s*calc\(var\(--text-3xl\) \* 0\.875\)/);
+    expect(container('min-width: 820px')).toMatch(/\.ph-name\s*\{\s*font-size:\s*var\(--text-3xl\)/);
+    expect(indexCss).toMatch(/--text-2xl:\s*1\.5rem/);
+    expect(indexCss).toMatch(/--text-3xl:\s*2rem/);
     expect(decl('.ph-name')).toMatch(/font-weight:\s*800/);
   });
 
@@ -293,7 +295,7 @@ describe('layout', () => {
   it('gives the name a little more room above the subtitle on a tablet (4px) and a desktop (6px), and leaves a phone as it was', () => {
     // The phone's rule (the first, outside any container query) has no margin.
     expect(rules('.ph-name')[0]).not.toMatch(/margin/);
-    expect(rules('.ph-name')[0]).toMatch(/font-size:\s*24px/);
+    expect(rules('.ph-name')[0]).toMatch(/font-size:\s*var\(--text-2xl\)/);
     // Written as `.ph .ph-name`: the reset `.ph h2 { margin: 0 }` has higher specificity than a bare class and would win.
     expect(css).toMatch(/\.ph h1, \.ph h2[^{]*\{\s*margin:\s*0/);
     expect(container('min-width: 540px')).toMatch(/\.ph \.ph-name\s*\{\s*margin-bottom:\s*4px/);

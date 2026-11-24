@@ -159,7 +159,20 @@ function renderApp(url = '/contact-hub') {
   );
 }
 
-const names = () => [...screen.getByRole('list', { name: 'My People' }).querySelectorAll('a.hub-row-link')].map((a) => a.textContent);
+// My People now defaults to the accessible table view on desktop and keeps
+// the list view on mobile. Navigation assertions apply to both presentations.
+const peopleContainer = () => screen.queryByRole('table', { name: 'My People' })
+  ?? screen.getByRole('list', { name: 'My People' });
+const findPeopleContainer = async () => {
+  let container;
+  await waitFor(() => {
+    container = screen.queryByRole('table', { name: 'My People' })
+      ?? screen.queryByRole('list', { name: 'My People' });
+    expect(container).not.toBeNull();
+  });
+  return container;
+};
+const names = () => [...peopleContainer().querySelectorAll('a.hub-row-link')].map((a) => a.textContent);
 const globalNav = () => screen.getByRole('navigation', { name: 'Global navigation' });
 const hubNav = () => within(globalNav()).findByRole('navigation', { name: 'Contact Hub sections' });
 const noHubNav = () => expect(screen.queryByRole('navigation', { name: 'Contact Hub sections' })).toBeNull();
@@ -192,7 +205,7 @@ describe('under Contact Hub, while it is the active module', () => {
     renderApp();
     const nav = await hubNav();
     await within(nav).findByRole('button', { name: 'VIP, 1 person' });
-    await screen.findByRole('list', { name: 'My People' });
+    await findPeopleContainer();
     expect(screen.queryByRole('group', { name: 'Filter by sticker' })).toBeNull();
     expect(document.querySelector('.hub-panel')).toBeNull();
     expect(screen.getAllByRole('button', { name: 'VIP, 1 person' })).toHaveLength(1);
@@ -222,7 +235,7 @@ describe('under Contact Hub, while it is the active module', () => {
     renderApp();
     const nav = await hubNav();
     await within(nav).findByRole('button', { name: 'New sticker' });
-    await screen.findByRole('list', { name: 'My People' });
+    await findPeopleContainer();
     expect(contactsData.loads).toBe(1);
     expect(fake.current.state.subscriptions).toBe(1);
     expect(fake.current.state.configFetches).toBe(1);
@@ -320,7 +333,7 @@ describe('sticker permissions and states', () => {
   ])('stickers %s: My People with its count and nothing else, and nothing is subscribed', async (_label, body) => {
     fake.current.state.config = config(body);
     renderApp();
-    await screen.findByRole('list', { name: 'My People' });
+    await findPeopleContainer();
     await waitFor(() => expect(fake.current.state.configFetches).toBe(1));
     const nav = await hubNav();
     expect(said(nav)).toEqual(['My Card', 'My People']);
@@ -524,7 +537,7 @@ describe('the Sticker Wall in the sidebar: the same destinations as the phone, o
     let answer;
     fake.current.services.fetchStickersConfig = () => new Promise((resolve) => { answer = resolve; });
     renderBoth('/contact-hub');
-    await screen.findByRole('list', { name: 'My People' });
+    await findPeopleContainer();
     expect(labelsOf(barNav())).toEqual(['My Card', 'My People']);
     await user.click(within(barNav()).getByRole('button', { name: 'My Card' }));
     await waitFor(() => expect(router.at).toBe('/contact-hub/my-card'));
@@ -538,7 +551,7 @@ describe('the Sticker Wall in the sidebar: the same destinations as the phone, o
     fake.current.services.fetchStickersConfig = () => new Promise((resolve) => { answer = resolve; });
     renderApp();
     const nav = await hubNav();
-    await screen.findByRole('list', { name: 'My People' });
+    await findPeopleContainer();
     expect(within(nav).queryByRole('button', { name: 'Sticker Wall' })).toBeNull();
     const loadsBefore = contactsData.loads;
     answer(config());
@@ -602,7 +615,7 @@ describe('where there is no room, or it is not Contact Hub', () => {
         </Routes>
       </MemoryRouter>,
     );
-    await screen.findByRole('list', { name: 'My People' });
+    await findPeopleContainer();
     noHubNav();
     expect(names()).toHaveLength(4);
   });
@@ -638,7 +651,7 @@ describe('a phone: the shell\'s bottom bar is My Card · My People · Sticker Wa
 
   it('has two cells and nothing else: no More, no Import, no modules', async () => {
     renderPhone();
-    await screen.findByRole('list', { name: 'My People' });
+    await findPeopleContainer();
     await within(bar()).findByRole('button', { name: 'Sticker Wall' });
     expect(within(bar()).getAllByRole('button').map((b) => b.getAttribute('aria-label'))).toEqual(['My Card', 'My People', 'Sticker Wall']);
     expect(lit()).toEqual(['My People']);
@@ -648,7 +661,7 @@ describe('a phone: the shell\'s bottom bar is My Card · My People · Sticker Wa
   it('Sticker Wall opens the wall under its own name; My People returns to the list', async () => {
     const user = userEvent.setup();
     renderPhone();
-    await screen.findByRole('list', { name: 'My People' });
+    await findPeopleContainer();
     await user.click(cell('Sticker Wall'));
     expect(router.at).toBe('/contact-hub/stickers');
     expect(await screen.findByTestId('stickers-wall')).toBeInTheDocument();

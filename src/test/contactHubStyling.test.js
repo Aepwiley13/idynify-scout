@@ -44,24 +44,30 @@ function contrast(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-describe('the empty strip at the bottom of a phone', () => {
-  // The shell keeps room for its bottom bar under every module. Contact Hub
-  // has no bottom bar yet, so it takes that room back. The two must change
-  // together: with a bar and this rule, the bar would cover the last rows.
-  const hidden = bottomNavFor('contact-hub')?.hidden === true;
+describe('the room for the bottom bar on a phone', () => {
+  // The shell keeps room for its bottom bar under every module. While Contact
+  // Hub had no bar it took that room back with a negative margin. It has a bar
+  // now, so the room is the bar's. The two must stay in step: a bar together
+  // with that margin would cover the last rows of the list.
+  const bar = bottomNavFor('contact-hub');
+  const hasBar = Boolean(bar) && bar.hidden !== true && bar.primary.length > 0;
   const hub = declarations(phoneBlock(), '.hub');
 
   it('the shell still reserves 56px plus the home-indicator inset', () => {
     expect(shellCss).toMatch(/\.page-content\.page-content-full\s*\{\s*padding-bottom:\s*calc\(56px \+ env\(safe-area-inset-bottom, 0px\)\)/);
   });
 
-  it('Contact Hub takes that room back only while it has no bottom bar', () => {
-    const reclaims = /margin-bottom:\s*calc\(-56px - env\(safe-area-inset-bottom, 0px\)\)/.test(hub);
-    expect(reclaims).toBe(hidden);
+  it('Contact Hub has a bottom bar', () => {
+    expect(hasBar).toBe(true);
   });
 
-  it('and keeps the last row clear of the home indicator', () => {
-    if (hidden) expect(hub).toMatch(/padding-bottom:\s*calc\(24px \+ env\(safe-area-inset-bottom, 0px\)\)/);
+  it('so Contact Hub does not take that room back: no negative margin anywhere in its stylesheet', () => {
+    expect(hub).not.toMatch(/margin-bottom:\s*calc\(\s*-/);
+    expect(hubCss).not.toMatch(/margin-bottom:\s*calc\(-56px/);
+  });
+
+  it('and the last row still has breathing space above the bar', () => {
+    expect(hub).toMatch(/padding-bottom:\s*24px/);
   });
 });
 
@@ -126,5 +132,59 @@ describe('controls stay big enough to tap', () => {
   it('search is 52px on a phone and its text is 16px, so iOS does not zoom', () => {
     expect(declarations(hubCss, '.hub-search')).toMatch(/min-height:\s*52px/);
     expect(declarations(hubCss, '.hub-search input')).toMatch(/font-size:\s*16px/);
+  });
+});
+
+describe('the desktop workspace', () => {
+  it('gives Contact Profile a 1080px reading area while preserving My People width', () => {
+    expect(hubCss).toMatch(/\.hub-inner\s*\{\s*max-width:\s*1080px/);
+    expect(hubCss).toMatch(/\.hub-person\s*\{\s*max-width:\s*1080px/);
+    expect(hubCss).toMatch(/\.hub-inner:has\(> \.hub-workspace\)\s*\{\s*max-width:\s*1360px/);
+  });
+
+  it('the table and its rows set no overflow, so the sticker picker is never clipped', () => {
+    for (const selector of ['.hub-table', '.hub-tr', '.hub-td']) {
+      expect(declarations(hubCss, selector)).not.toMatch(/overflow(-x|-y)?\s*:/);
+    }
+  });
+
+  it('a table row is positioned, so the name link can cover it and the picker can layer over later rows', () => {
+    expect(declarations(hubCss, '.hub-tr')).toMatch(/position:\s*relative/);
+    expect(hubCss).toMatch(/\.hub-row-stickers:has\(\.stk-picker--popover\)\s*\{\s*z-index:\s*2/);
+  });
+
+  it('the sticker column keeps its place in the table when a row has no sticker controls', () => {
+    expect(declarations(hubCss, '.hub-table .hub-row-stickers:empty')).toMatch(/display:\s*block/);
+    expect(declarations(hubCss, '.hub-table .hub-row-stickers')).toMatch(/grid-area:\s*auto/);
+  });
+
+  it('email and phone links sit above the row link, and long values wrap instead of being cut', () => {
+    const link = declarations(hubCss, '.hub-td-link');
+    expect(link).toMatch(/z-index:\s*1/);
+    expect(link).toMatch(/overflow-wrap:\s*break-word/);
+    expect(link).not.toMatch(/text-overflow|white-space:\s*nowrap/);
+    // A long sticker name in the sidebar entries wraps too; it is not cut off.
+    const stickerName = declarations(hubCss, '.hub-sidenav-name');
+    expect(stickerName).toMatch(/overflow-wrap:\s*break-word/);
+    expect(stickerName).not.toMatch(/text-overflow|white-space:\s*nowrap/);
+  });
+
+  it('the sidebar entries and the view buttons are comfortable targets', () => {
+    // 36px, the height of the sidebar's own module items they sit under.
+    expect(declarations(hubCss, '.hub-sidenav-item')).toMatch(/min-height:\s*36px/);
+    expect(declarations(hubCss, '.hub-view-btn')).toMatch(/min-height:\s*44px/);
+  });
+
+  it('there is no inner panel left in the stylesheet', () => {
+    expect(hubCss).not.toMatch(/\.hub-panel\b/);
+    expect(hubCss).not.toMatch(/\.hub-workspace--panel\b/);
+  });
+
+  it('a long list of stickers in the sidebar scrolls on its own, so the modules below stay within reach', () => {
+    const list = declarations(hubCss, '.hub-sidenav-list');
+    expect(list).toMatch(/max-height:\s*min\(\s*38vh\s*,\s*300px\s*\)/);
+    expect(list).toMatch(/overflow-y:\s*auto/);
+    // Contact Hub's entries never position themselves: they sit in the sidebar's flow.
+    expect(hubCss).not.toMatch(/\.hub-sidenav[^{]*\{[^}]*position:\s*(fixed|sticky|absolute)/);
   });
 });

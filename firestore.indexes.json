@@ -215,6 +215,16 @@
   ],
   "fieldOverrides": [
     {
+      "collectionGroup": "recovery",
+      "fieldPath": "relationships",
+      "indexes": []
+    },
+    {
+      "collectionGroup": "private",
+      "fieldPath": "jpeg",
+      "indexes": []
+    },
+    {
       "collectionGroup": "integrations",
       "fieldPath": "status",
       "indexes": [

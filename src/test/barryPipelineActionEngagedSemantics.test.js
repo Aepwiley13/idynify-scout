@@ -22,7 +22,7 @@ function contactsQuery(filters = [], cap = null) {
   return {
     where: (field, _op, value) => contactsQuery([...filters, { field, value }], cap),
     limit: (n) => contactsQuery(filters, n),
-    doc: (id) => ({
+    doc: (id = 'new') => ({
       id,
       collection: () => contactsQuery(),
       async get() {
@@ -53,7 +53,10 @@ const userDoc = {
 };
 
 vi.mock('../../netlify/functions/firebase-admin.js', () => ({
-  db: { collection: () => ({ doc: () => userDoc }) },
+  db: {
+    collection: () => ({ doc: () => userDoc }),
+    runTransaction: (work) => work({ get: (ref) => ref.get(), set: (ref, data) => ref.set(data) }),
+  },
   admin: {},
 }));
 vi.mock('../../netlify/functions/utils/logApiUsage.js', () => ({ logApiUsage: async () => {} }));

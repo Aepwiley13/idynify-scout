@@ -137,12 +137,14 @@ function renderHub(url = '/contact-hub') {
   );
 }
 
-const names = () => [...screen.getByRole('list', { name: 'My People' }).querySelectorAll('a.hub-row-link')].map((a) => a.textContent);
+const peopleTableOrList = () => screen.queryByRole('table', { name: 'My People' })
+  ?? screen.queryByRole('list', { name: 'My People' });
+const names = () => [...(peopleTableOrList()?.querySelectorAll('a.hub-row-link') ?? [])].map((a) => a.textContent);
 
 describe('Import in My People', () => {
   it('opens the importer, then reloads the canonical list and reports the counts', async () => {
     renderHub();
-    await screen.findByRole('list', { name: 'My People' });
+    await waitFor(() => expect(peopleTableOrList()).not.toBeNull());
     expect(contactsData.loads).toBe(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Import Contacts' }));
@@ -168,7 +170,7 @@ describe('Import in My People', () => {
 
   it('closing the importer changes nothing', async () => {
     renderHub();
-    await screen.findByRole('list', { name: 'My People' });
+    await waitFor(() => expect(peopleTableOrList()).not.toBeNull());
     fireEvent.click(screen.getByRole('button', { name: 'Import Contacts' }));
     fireEvent.click(screen.getByRole('button', { name: 'close' }));
     expect(screen.queryByRole('dialog', { name: 'Import Contacts' })).toBeNull();

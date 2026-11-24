@@ -88,7 +88,7 @@ describe('the pieces whose removal would broaden permissions are present', () =>
 
   it('every generic grant under users/{uid} excludes the stickers collection and checks membership', () => {
     const generic = block('match /{coll}/{docId} {');
-    const deep = block('match /{coll}/{docId}/{rest=**} {');
+    const deep = block('match /{coll}/{docId}/{sub}/{subId}/{rest=**} {');
     expect(generic.match(/coll != 'stickers'/g)).toHaveLength(2); // create, and update/delete
     expect(generic.match(/contactStickersOk\(coll, userId\)/g)).toHaveLength(2);
     expect(deep.match(/coll != 'stickers'/g)).toHaveLength(1);

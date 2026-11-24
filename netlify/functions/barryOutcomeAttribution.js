@@ -19,6 +19,7 @@
  * No AI calls — pure rule-based attribution from structured timeline data.
  */
 
+import { appendContactChild } from './utils/contactWriteLifecycle.js';
 import { db } from './firebase-admin.js';
 import { logApiUsage } from './utils/logApiUsage.js';
 
@@ -326,11 +327,13 @@ async function runAttribution(userId, contactId, outcome, outcomeTimestamp) {
   }
 
   // Store attribution record
-  await contactRef.collection('barry_attributions').add({
+  const saved = await appendContactChild(db, contactRef, 'barry_attributions', {
     ...attribution,
     dedup_key: dedupKey,
     created_at: new Date().toISOString()
   });
+
+  if (!saved) return { attributed: false, attribution: null, reason: 'missing_contact' };
 
   // Update memory and stats in parallel
   const [memoryUpdated] = await Promise.all([

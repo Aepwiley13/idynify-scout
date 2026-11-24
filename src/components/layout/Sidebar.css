@@ -233,6 +233,15 @@
   color: #ffffff;
 }
 
+/* Under Contact Hub only, wide desktop only: the place Contact Hub draws its
+   own entries (Sidebar.jsx, sidebarSlots.js). Empty until it does. */
+.sidebar-subnav {
+  margin: 2px 0 8px 20px;
+  padding-left: 8px;
+  border-left: 1px solid var(--border);
+}
+.sidebar-subnav:empty { display: none; }
+
 .sidebar-module > svg { flex-shrink: 0; }
 
 .sidebar-module-label {

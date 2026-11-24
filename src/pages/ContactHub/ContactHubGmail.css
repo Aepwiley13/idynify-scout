@@ -1,0 +1,39 @@
+.hub-gmail-dialog {
+  width: min(30rem, calc(100% - 2rem));
+  max-height: 90dvh;
+  padding: 1.25rem;
+  border: 1px solid var(--hub-gmail-border, GrayText);
+  border-radius: 1rem;
+  background: var(--hub-gmail-background, Canvas);
+  color: var(--hub-gmail-text, CanvasText);
+}
+
+.hub-gmail-dialog::backdrop { background: rgb(0 0 0 / 48%); }
+.hub-gmail-dialog h2 { margin: 0; font-size: 1.2rem; }
+.hub-gmail-dialog p { overflow-wrap: anywhere; }
+.hub-gmail-dialog p:empty { display: none; }
+.hub-gmail-dialog fieldset { display: grid; gap: .75rem; border: 0; padding: 0; min-width: 0; }
+.hub-gmail-dialog label { display: grid; gap: .25rem; }
+.hub-gmail-dialog :is(input, textarea, button) {
+  border: 1px solid var(--hub-gmail-border, GrayText);
+  border-radius: .5rem;
+  color: inherit;
+  background: transparent;
+  font: inherit;
+  padding: .5rem .75rem;
+  min-height: 44px;
+}
+.hub-gmail-dialog textarea { resize: vertical; }
+.hub-gmail-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: .5rem; margin-top: 1rem; }
+.hub-gmail-dialog button:last-child { background: var(--hub-gmail-accent, Highlight); color: white; }
+.hub-gmail-dialog button:disabled { opacity: .55; }
+
+@media (max-width: 600px) {
+  .hub-gmail-dialog {
+    width: 100%;
+    max-width: 100%;
+    margin: auto 0 0;
+    border-radius: 1rem 1rem 0 0;
+    padding-bottom: max(1.25rem, env(safe-area-inset-bottom));
+  }
+}

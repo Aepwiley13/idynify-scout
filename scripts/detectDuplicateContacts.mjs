@@ -65,6 +65,7 @@ import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { readFileSync } from 'fs';
 import { pathToFileURL } from 'url';
+import { DUPLICATE_KEYS } from '../src/utils/duplicateEvidence.js';
 import { extractIdentifiers } from '../src/utils/identityNormalization.js';
 
 // ── CLI ──────────────────────────────────────────────────
@@ -94,28 +95,28 @@ const SIGNALS = [
     id: 'email',
     label: 'Email',
     safe: true,
-    key: (ids) => ids.email,
+    key: DUPLICATE_KEYS.email,
     note: 'Exact match after lowercase + trim. The primary dedup signal.',
   },
   {
     id: 'apollo_person_id',
     label: 'Apollo person ID',
     safe: true,
-    key: (ids) => ids.apolloPersonId,
+    key: DUPLICATE_KEYS.apollo_person_id,
     note: 'Exact match. Same Apollo person imported through two paths.',
   },
   {
     id: 'linkedin_url',
     label: 'LinkedIn URL',
     safe: true,
-    key: (ids) => ids.linkedinUrl,
+    key: DUPLICATE_KEYS.linkedin_url,
     note: 'Exact match after stripping scheme, www., query and trailing slash.',
   },
   {
     id: 'phone',
     label: 'Phone',
     safe: true,
-    key: (ids) => ids.phone,
+    key: DUPLICATE_KEYS.phone,
     note: 'Exact match on digits. No country code is inferred.',
   },
   {

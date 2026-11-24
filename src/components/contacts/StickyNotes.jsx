@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
-import { db, auth } from '../../firebase/config';
+import { doc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { db } from '../../firebase/config';
 import { Trash2, Edit2, Check, X, StickyNote as StickyNoteIcon } from 'lucide-react';
 import './StickyNotes.css';
+import { appendContactNote } from '../../services/contactNotes';
 import { getEffectiveUser } from '../../context/ImpersonationContext';
 
 export default function StickyNotes({ contact, onUpdate }) {
@@ -49,16 +50,7 @@ export default function StickyNotes({ contact, onUpdate }) {
         updated_at: new Date().toISOString()
       };
 
-      // Update Firestore
-      const contactRef = doc(db, 'users', user.uid, 'contacts', contact.id);
-      await updateDoc(contactRef, {
-        notes: arrayUnion(note),
-        activity_log: arrayUnion({
-          type: 'note_added',
-          timestamp: new Date().toISOString(),
-          details: 'Added a note'
-        })
-      });
+      await appendContactNote(user.uid, contact.id, note);
 
       // Update local state
       setNotes([...notes, note]);

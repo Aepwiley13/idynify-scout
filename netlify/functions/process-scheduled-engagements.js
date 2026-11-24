@@ -127,7 +127,8 @@ const STATUS_BLOCKS_AUTOMATED_SEND = new Set([
  * sentiment or free-text detection is added here.
  */
 export function isSendSuppressed(contact) {
-  if (!contact) return { reason: 'contact_deleted' };
+  if (!contact || contact.contact_hub_lifecycle?.status === 'retired') return { reason: 'contact_deleted' };
+  if (contact.contact_hub_email_suppressed?.length) return { reason: 'contact_email_suppressed' };
   if (isInConversation(contact)) return { reason: 'contact_replied' };
   if (hasReplied(contact)) return { reason: 'contact_replied' };
   if (STATUS_BLOCKS_AUTOMATED_SEND.has(contact.contact_status)) return { reason: 'relationship_status_advanced' };

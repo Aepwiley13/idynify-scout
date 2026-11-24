@@ -39,6 +39,7 @@ import ScoutDashboardPage from './pages/ScoutDashboardPage';
 import ScoutMain from './pages/Scout/ScoutMain';
 import PeopleMain from './pages/Scout/PeopleMain';
 import { contactHubRoutes } from './pages/ContactHub/contactHubRoutes';
+import { withMyCardDraftClear } from './pages/ContactHub/myCard/state/clearDraftsOnSignOut';
 import AllLeads from './pages/Scout/AllLeads';
 import CompanyDetail from './pages/Scout/CompanyDetail';
 import CompanyLeads from './pages/Scout/CompanyLeads';
@@ -160,7 +161,10 @@ function LoadingScreen() {
 }
 
 // Stable identities: the account hook subscribes once and reads through these.
-const watchSignIn = (callback) => onAuthStateChanged(auth, callback);
+// Every way the account can go away (any sign-out button, a session that ends, another tab) passes
+// through this listener, so it is where My Card's kept drafts are cleared. It changes nothing else:
+// the callback receives every event exactly as before.
+const watchSignIn = withMyCardDraftClear((callback) => onAuthStateChanged(auth, callback));
 const readAccountSnapshot = (uid) => getDoc(doc(db, 'users', uid));
 
 /**
@@ -443,8 +447,8 @@ function App() {
                 When it is off these routes do not exist, so /contact-hub
                 falls through to the catch-all like any unknown URL, and the
                 sidebar has no entry for it either (navigationModel reads the
-                same switch). Inside ShellRoute, so the standard payment gate
-                applies unchanged. */}
+                same switch). Inside the authenticated shell. Contact Hub is
+                available to verified Free accounts through the shell Free-plan gate. */}
             {contactHubRoutes()}
 
             {/* Settings. Not a module and not in the sidebar — reached from

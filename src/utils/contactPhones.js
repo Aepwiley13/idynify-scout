@@ -142,6 +142,13 @@ const firstBy = (list, order, accept = () => true) => {
 /** The number to call: mobile, then direct, main, work, home, other, unknown. Never a fax. */
 export const primaryPhone = list => firstBy(list, CALL_ORDER);
 
+/** Use the selected call number while it still exists in the phone list. */
+export function preferredContactPhone(contact) {
+  const phones = readContactPhones(contact);
+  return phones.find((phone) => phone.label !== 'fax' && phoneDisplay(phone) === contact?.contact_hub_primary_phone)
+    ?? primaryPhone(phones);
+}
+
 /**
  * The number to text: a mobile, else a number whose type isn't set (on most
  * older records that is the only number, and it may well be a mobile; the

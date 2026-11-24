@@ -24,6 +24,7 @@
  * calendar booking — but always returns a typed result and logs on rejection.
  */
 
+import { appendContactChild } from './contactWriteLifecycle.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { TIMELINE_EVENT_TYPES, ACTORS } from '../../../src/constants/timelineEvents.js';
 
@@ -41,11 +42,8 @@ export async function writeTimelineEvent(db, { userId, contactId, type, actor, p
   }
   try {
     const now = FieldValue.serverTimestamp();
-    const ref = await db
-      .collection('users').doc(userId)
-      .collection('contacts').doc(contactId)
-      .collection('timeline')
-      .add({
+    const contact = db.collection('users').doc(userId).collection('contacts').doc(contactId);
+    const ref = await appendContactChild(db, contact, 'timeline', {
         type,
         actor,
         timestamp: now,   // canonical ordering field — always a Timestamp
@@ -53,7 +51,7 @@ export async function writeTimelineEvent(db, { userId, contactId, type, actor, p
         ...(preview ? { preview } : {}),
         ...(metadata ? { metadata } : {}),
       });
-    return { ok: true, id: ref.id, reason: null };
+    return ref ? { ok: true, id: ref.id, reason: null } : { ok: false, id: null, reason: 'missing_contact' };
   } catch (error) {
     console.error('[timeline] write failed', { type, contactId, code: error?.code, message: error?.message });
     return { ok: false, id: null, reason: 'write_failed' };

@@ -25,6 +25,13 @@
  *     owns the one-click light/dark switch
  *   · Barry as a plain nav item — he is the card / icon at the bottom only
  *
+ * ONE EXCEPTION to "no nesting": Contact Hub. While it is the active module,
+ * in the wide desktop sidebar only, an empty element is drawn under its item
+ * and Contact Hub fills it with its own entries (My People, Sticker Wall, its
+ * sticker filters). The sidebar holds none of that: see sidebarSlots.js. With
+ * the Contact Hub switch off, on any other module, in compact mode and in the
+ * mobile drawer, that element does not exist and the list is exactly as it was.
+ *
  * ON MOBILE this same component is the hamburger drawer, and it grows a tail:
  * a close control, Settings, Help, and the account block with Log out. Those
  * are display:none above 768px, where they live in the top bar's user menu
@@ -43,6 +50,7 @@ import {
 } from 'lucide-react';
 import {
   MISSION_CONTROL,
+  CONTACT_HUB_DESTINATION,
   sidebarDestinations,
   mobileDrawerSections,
   resolveModule,
@@ -52,7 +60,12 @@ import { displayNameFor, initialsFor } from '../../utils/userIdentity';
 import { ASSETS } from '../../theme/tokens';
 import { useShell } from '../../context/ShellContext';
 import { useIsMobile } from '../../hooks/useIsMobile';
+import { setSidebarSlot } from './sidebarSlots';
 import './Sidebar.css';
+
+// One function for the life of the app: React calls a ref again whenever its
+// identity changes, which would empty and refill the slot on every render.
+const contactHubSlotRef = (element) => setSidebarSlot(CONTACT_HUB_DESTINATION.id, element);
 
 /** Icons live in the view layer; navigationModel stays presentation-free. */
 const MODULE_ICONS = {
@@ -178,6 +191,7 @@ const Sidebar = ({
   onCloseMobileMenu = () => {},
   onToggleBarry,
   barryOpen = false,
+  hideBarry = false,
   barryButtonRef,
   barryAvailable = true,
   user,
@@ -251,6 +265,10 @@ const Sidebar = ({
                 active={activeModule.id === dest.id}
                 onGo={go}
               />
+              {/* Contact Hub's own entries, drawn by Contact Hub (header above). */}
+              {dest.id === CONTACT_HUB_DESTINATION.id && activeModule.id === dest.id && !compact ? (
+                <div className="sidebar-subnav" ref={contactHubSlotRef} />
+              ) : null}
             </li>
           ))}
         </ul>
@@ -342,7 +360,7 @@ const Sidebar = ({
         </button>
       </div>
 
-      {barryAvailable && (
+      {barryAvailable && !hideBarry && (
         <div className="sidebar-footer">
           <BarryControl
             compact={compact}

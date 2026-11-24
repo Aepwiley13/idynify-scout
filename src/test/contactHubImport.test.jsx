@@ -70,6 +70,9 @@ vi.mock('../services/companyIdentityService', () => ({
   NAME_SOURCE: { USER: 'user' },
 }));
 
+import { ensureCompanyForContact } from '../services/companyIdentityService';
+import { AccountPlanContext } from '../components/billing/accountPlanContext';
+import { PLAN } from '../utils/accountPlan';
 import { ThemeProvider } from '../theme/ThemeContext';
 import ImportPeopleDialog from '../components/contactImport/ImportPeopleDialog';
 import { importSummary, HUB_IMPORT_COPY } from '../components/contactImport/importPeople';
@@ -85,6 +88,7 @@ const FIVE = [
 ].join('\n');
 
 beforeEach(() => {
+  vi.mocked(ensureCompanyForContact).mockClear();
   store.contacts.clear();
   store.paths.clear();
   store.writes.length = 0;
@@ -93,9 +97,9 @@ beforeEach(() => {
   vi.spyOn(console, 'log').mockImplementation(() => {});
 });
 
-async function importCsv(csv, { name = 'people.csv' } = {}) {
+async function importCsv(csv, { name = 'people.csv', plan = PLAN.FREE } = {}) {
   const onImported = vi.fn();
-  render(<ThemeProvider><ImportPeopleDialog onClose={() => {}} onImported={onImported} /></ThemeProvider>);
+  render(<ThemeProvider><AccountPlanContext.Provider value={plan}><ImportPeopleDialog onClose={() => {}} onImported={onImported} /></AccountPlanContext.Provider></ThemeProvider>);
   fireEvent.change(screen.getByTestId('csv-upload'), { target: { files: [new File([csv], name, { type: 'text/csv' })] } });
   await screen.findByText(`Preview: ${name}`);
   return onImported;
@@ -108,6 +112,18 @@ async function confirmImport(count, onImported) {
 }
 
 const records = () => [...store.contacts.entries()].map(([id, d]) => ({ ...d, id }));
+
+it.each([[PLAN.FREE, false], [PLAN.STARTER, true]])(
+  'imports an email-only company signal on %s with the appropriate correction option',
+  async (plan, correctCompanyName) => {
+    const onImported = await importCsv('Name,Email\nJune Lee,june@acme.test', { plan });
+    expect((await confirmImport(1, onImported)).created).toHaveLength(1);
+    expect(ensureCompanyForContact).toHaveBeenCalledWith(
+      'u1', expect.objectContaining({ email: 'june@acme.test' }),
+      expect.objectContaining({ correctCompanyName }),
+    );
+  },
+);
 
 describe('a five-row valid CSV', () => {
   it('becomes exactly five correct people in the canonical contacts collection, listed in My People', async () => {

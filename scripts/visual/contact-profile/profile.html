@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Contact Profile: working demo (isolated)</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <style>
+      body { margin: 0; background: var(--bg-primary); color: var(--text-primary); font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; }
+      .demo { max-width: 1080px; margin: 0 auto; padding: 16px 24px 48px; box-sizing: border-box; }
+      .demo-banner { margin: 0 0 12px; padding: 10px 14px; border: 1px dashed var(--border-2); border-radius: 12px; font-size: 13px; line-height: 1.45; color: var(--text-secondary); }
+      .demo-banner strong { color: var(--text-primary); }
+      .demo-controls { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 0 0 16px; font-size: 13px; }
+      .demo-group { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+      .demo-group > span { font-weight: 700; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--text-secondary); }
+      .demo button.demo-btn, .demo a.demo-btn, .demo select { font: inherit; font-size: 13px; padding: 7px 12px; border: 1px solid var(--border-2); border-radius: 999px; background: var(--bg-card); color: var(--text-primary); cursor: pointer; text-decoration: none; }
+      .demo .demo-btn[aria-pressed="true"], .demo a.demo-btn[aria-current="true"] { background: var(--text-primary); color: var(--bg-card); border-color: var(--text-primary); }
+      .demo-profile { display: flex; flex-direction: column; gap: 14px; }
+      .demo-log { margin-top: 28px; font-size: 12px; color: var(--text-secondary); }
+      .demo-log h2 { margin: 0 0 6px; font-size: 12px; letter-spacing: .04em; text-transform: uppercase; }
+      .demo-log table { width: 100%; border-collapse: collapse; }
+      .demo-log td { padding: 3px 6px; border-top: 1px solid var(--border); vertical-align: top; word-break: break-word; }
+      .demo-log td:first-child { white-space: nowrap; width: 70px; }
+      @media (max-width: 768px) { .demo { padding: 12px 16px 40px; } }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="./profile.jsx"></script>
+  </body>
+</html>

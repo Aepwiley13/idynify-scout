@@ -77,7 +77,7 @@ describe('MainLayout wiring', () => {
 
   it('passes the decision to the sidebar and the More sheet, and mounts Barry\'s panel only when available', () => {
     expect(src).toMatch(/<Sidebar[\s\S]{0,400}barryAvailable=\{barryAvailable\}/);
-    expect(src).toMatch(/<MoreSheet[\s\S]{0,300}barryAvailable=\{barryAvailable\}/);
-    expect(src).toMatch(/\{barryAvailable && \(\(\) => \{[\s\S]{0,2500}<BarryChatPanel/);
+    expect(src).toMatch(/<MoreSheet[\s\S]{0,300}barryAvailable=\{barryAvailable && canOpenBarry\}/);
+    expect(src).toMatch(/\{barryAvailable && canOpenBarry && \(\(\) => \{[\s\S]{0,2500}<BarryChatPanel/);
   });
 });

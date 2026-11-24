@@ -26,7 +26,7 @@ vi.mock('../../netlify/functions/firebase-admin.js', () => ({
       doc: (id) => ({
         get: async () => {
           store.reads.push(`${name}/${id}`);
-          if (store.failReads) throw new Error('firestore unavailable for uid_user_7g5g');
+          if (store.failReads) throw Object.assign(new Error('firestore unavailable for uid_user_7g5g'), { code: 'permission-denied' });
           const data = store.docs.get(`${name}/${id}`);
           return { exists: data !== undefined, data: () => data };
         },
@@ -166,6 +166,8 @@ describe('failures and privacy', () => {
   it('a Firestore failure is a 500 with no detail', async () => {
     store.failReads = true;
     expect(await call(USER, 'tok_SECRET_user')).toEqual({ status: 500, headers: expect.any(Object), body: { error: CODES.INTERNAL_ERROR } });
+    expect(logs.join('\n')).toContain("errorCode: 'permission-denied'");
+    expect(logs.join('\n')).not.toContain('firestore unavailable');
   });
 
   it('logs and bodies carry no token and no user id', async () => {

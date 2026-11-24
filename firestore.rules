@@ -606,6 +606,11 @@ service cloud.firestore {
     match /billingCheckoutOperations/{operationId} {
       allow read, write: if false;
     }
+    // Stripe Customer creation/linking is performed by the trusted billing function. A client
+    // must not be able to create another account's provisioning claim or bind a Stripe ID.
+    match /billingCustomerOperations/{uid} {
+      allow read, write: if false;
+    }
     match /billingAmbiguousAccounts/{docId} {
       allow read, write: if false;
     }

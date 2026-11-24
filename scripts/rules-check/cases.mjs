@@ -339,6 +339,7 @@ await env.withSecurityRulesDisabled(async (ctx) => {
   await setDoc(doc(db, 'stripeWebhookPendingEvents/cus_1/events/evt_2'), { type: 'customer.subscription.created' });
   await setDoc(doc(db, 'billingAllocations/sub_1'), { uid: U, tier: 'pro' });
   await setDoc(doc(db, 'billingCheckoutOperations/op_1'), { uid: U, tier: 'pro', priceId: 'price_pro' });
+  await setDoc(doc(db, `billingCustomerOperations/${U}`), { uid: U, status: 'creating' });
   await setDoc(doc(db, 'billingAmbiguousAccounts/flag_1'), { uid: U, reason: 'customer_mismatch' });
 });
 
@@ -354,6 +355,8 @@ const BILLING_HARDENING_CASES = [
   ['billingCheckoutOperations    read', 'DENY', () => getDoc(doc(me, 'billingCheckoutOperations/op_1'))],
   ['billingCheckoutOperations    forge own proof', 'DENY', () => setDoc(doc(me, 'billingCheckoutOperations/op_forged'), { uid: U, customerId: 'cus_someone_else', priceId: 'price_pro' })],
   ['billingCheckoutOperations    tamper existing', 'DENY', () => updateDoc(doc(me, 'billingCheckoutOperations/op_1'), { priceId: 'price_pro_annual' })],
+  ['billingCustomerOperations   read', 'DENY', () => getDoc(doc(me, `billingCustomerOperations/${U}`))],
+  ['billingCustomerOperations   forge customer binding', 'DENY', () => setDoc(doc(me, `billingCustomerOperations/${U}`), { uid: U, customerId: 'cus_forged' })],
   ['billingAmbiguousAccounts     read', 'DENY', () => getDoc(doc(me, 'billingAmbiguousAccounts/flag_1'))],
   ['billingAmbiguousAccounts     erase a flag', 'DENY', () => deleteDoc(doc(me, 'billingAmbiguousAccounts/flag_1'))],
   // Admin SDK writes go through, same as every other server-only collection above.

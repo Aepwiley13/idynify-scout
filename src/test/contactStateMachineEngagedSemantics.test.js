@@ -8,7 +8,11 @@
  *   - ENGAGE_CLICKED no longer exists as a trigger at all
  *   - MANUAL_INTERACTION_LOGGED -> Engaged, priority-respecting (can't
  *     regress a contact already further along)
- *   - MESSAGE_SENT / POSITIVE_REPLY are unaffected — still always apply
+ *   - POSITIVE_REPLY is unaffected — still always applies. MESSAGE_SENT no
+ *     longer always applies: it still advances a contact forward (New,
+ *     Engaged, a stale Awaiting Reply) but no longer regresses one already
+ *     In Conversation, or holding an advanced relationship status, back to
+ *     Awaiting Reply — see the dedicated describe block below
  *   - the new idempotency guard, including the deterministic repro for
  *     the exact "fired twice" symptom this correction exists to prevent
  *   - record_status promotion still fires for an Engaged-producing
@@ -129,14 +133,48 @@ describe('MANUAL_INTERACTION_LOGGED -> Engaged, priority-respecting', () => {
   });
 });
 
-describe('Confirmed send and reply triggers: byte-for-byte unaffected', () => {
-  it('MESSAGE_SENT still advances from any status, including past Engaged — a real new send legitimately resets the waiting clock', async () => {
+describe('Confirmed send and reply triggers', () => {
+  it('MESSAGE_SENT no longer regresses an established In Conversation relationship back to Awaiting Reply', async () => {
     put('c1', { contact_status: 'In Conversation' });
     const result = await updateContactStatus({
       userId: UID, contactId: 'c1', trigger: STATUS_TRIGGERS.MESSAGE_SENT, currentStatus: 'In Conversation',
     });
-    expect(result).toBe('Awaiting Reply');
+    expect(result).toBeNull();
+    expect(get('c1').contact_status).toBe('In Conversation');
   });
+
+  it('MESSAGE_SENT still advances a contact who was never In Conversation — New and Engaged both legitimately move to Awaiting Reply', async () => {
+    put('c1', { contact_status: 'New' });
+    expect(await updateContactStatus({
+      userId: UID, contactId: 'c1', trigger: STATUS_TRIGGERS.MESSAGE_SENT, currentStatus: 'New',
+    })).toBe('Awaiting Reply');
+
+    put('c2', { contact_status: 'Engaged' });
+    expect(await updateContactStatus({
+      userId: UID, contactId: 'c2', trigger: STATUS_TRIGGERS.MESSAGE_SENT, currentStatus: 'Engaged',
+    })).toBe('Awaiting Reply');
+  });
+
+  it('MESSAGE_SENT at a priority TIE (already Awaiting Reply) is not a status transition — contactStateMachineRepeatSendGuard.test.js covers the timestamp-refresh half of this case', async () => {
+    put('c3', { contact_status: 'Awaiting Reply' });
+    const result = await updateContactStatus({
+      userId: UID, contactId: 'c3', trigger: STATUS_TRIGGERS.MESSAGE_SENT, currentStatus: 'Awaiting Reply',
+    });
+    expect(result).toBeNull(); // same value, not a transition — resolveTransition itself still returns 'Awaiting Reply'
+    expect(get('c3').contact_status).toBe('Awaiting Reply');
+  });
+
+  it.each(['Active Customer', 'Past Customer', 'Partner', 'Network', 'Mission Complete'])(
+    'MESSAGE_SENT never regresses an advanced relationship status (%s) back into the lead lifecycle',
+    async (status) => {
+      put('c1', { contact_status: status });
+      const result = await updateContactStatus({
+        userId: UID, contactId: 'c1', trigger: STATUS_TRIGGERS.MESSAGE_SENT, currentStatus: status,
+      });
+      expect(result).toBeNull();
+      expect(get('c1').contact_status).toBe(status);
+    }
+  );
 
   it('POSITIVE_REPLY still advances straight from New — a real reply never needed Engaged as a waypoint, before or after this change', async () => {
     put('c1', { contact_status: 'New' });

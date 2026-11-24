@@ -31,7 +31,7 @@ import { MESSAGE_CATEGORIES } from '../../../src/types/normalizedMessage.js';
 // browser Firebase client SDK and crashes under Netlify's esbuild-bundled
 // Functions runtime (no import.meta.env there). See
 // src/constants/contactStatuses.js's own header for the full story.
-import { CONTACT_STATUSES } from '../../../src/constants/contactStatuses.js';
+import { CONTACT_STATUSES, ADVANCED_RELATIONSHIP_STATUSES } from '../../../src/constants/contactStatuses.js';
 
 /** Per-user cap on threads checked in one pass — unchanged from the original manual handler. */
 export const MAX_CONTACTS = 50;
@@ -48,25 +48,11 @@ export const REPLY_METADATA_HEADERS = [
   'Auto-Submitted', 'Precedence', 'X-Mailer',
 ];
 
-/**
- * contact_status values a genuine reply must never advance INTO Awaiting
- * Reply's successor from — these are relationship statuses (set by an
- * explicit person-type reclassification, a dimension hunter_status knows
- * nothing about) or a terminal lead status. hunter_status and contact_status
- * are independently writable fields: a contact can sit at
- * hunter_status:'awaiting_reply' (stale, from Hunter's last outreach) while
- * contact_status has long since moved to 'Active Customer' through a
- * completely different path. Writing the transition unconditionally would
- * regress that contact back to a lead stage on literally any reply in the
- * old thread, including an out-of-office. This set is the guard.
- */
-const STATUS_INELIGIBLE_FOR_REPLY_TRANSITION = new Set([
-  CONTACT_STATUSES.ACTIVE_CUSTOMER,
-  CONTACT_STATUSES.PAST_CUSTOMER,
-  CONTACT_STATUSES.PARTNER,
-  CONTACT_STATUSES.NETWORK,
-  CONTACT_STATUSES.MISSION_COMPLETE,
-]);
+// Advanced-status guard moved to src/constants/contactStatuses.js
+// (ADVANCED_RELATIONSHIP_STATUSES) so the outbound send paths
+// (gmail-send-quick.js, gmail-send-wave.js,
+// process-scheduled-engagements.js) can apply the identical rule in the
+// opposite direction without a second, driftable copy of the set.
 
 function headerValue(message, name) {
   return message.payload?.headers?.find(h => h.name === name)?.value || '';
@@ -459,7 +445,24 @@ async function applyOneReply(db, contactRef, contactReplies, message, contact, m
       patch.last_reply_from = fromHeader;
       patch.last_interaction_at = receivedAt;
 
-      if (!STATUS_INELIGIBLE_FOR_REPLY_TRANSITION.has(fresh.contact_status)) {
+      // Canonical reply count (ADR-006), plus the legacy mirror existing
+      // consumers (KeyMetricsGrid's Reply Rate, among others — see
+      // relationshipRead.js) still read directly. Both in the SAME
+      // tx.update as the status/marker fields above, so they can never
+      // land inconsistently with each other on a partial failure.
+      //
+      // Dedup is already structural, not something added here: the
+      // freshMarkerIdx >= thisIdx check above returns false — before this
+      // block ever runs — for a message already processed by an earlier
+      // attempt, a concurrent run, or a retried transaction. A genuine
+      // reply reaches this increment at most once per Gmail message,
+      // however many times the worker, the manual button, or a retry
+      // examines it. Automated and unverified messages never reach here
+      // at all (category check above) — see classifyReply.
+      patch['relationship.reply_count'] = FieldValue.increment(1);
+      patch['engagement_summary.replies_received'] = FieldValue.increment(1);
+
+      if (!ADVANCED_RELATIONSHIP_STATUSES.has(fresh.contact_status)) {
         patch.hunter_status = 'in_conversation';
         patch.contact_status = CONTACT_STATUSES.IN_CONVERSATION;
         patch.contact_status_updated_at = receivedAt;

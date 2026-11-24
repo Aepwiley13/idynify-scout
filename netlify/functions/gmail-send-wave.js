@@ -12,7 +12,7 @@ import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
-import { engagementPromotionPatch } from './utils/engagementPromotion.js';
+import { applySendContactUpdate } from './utils/applySendContactUpdate.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 import { buildPlainTextEmail } from './utils/emailHeaders.js';
 
@@ -206,24 +206,23 @@ export const handler = async (event) => {
         // Update contact in Firestore (non-blocking)
         if (recipient.contactId) {
           try {
-            const contactUpdate = {
+            const contactRef = db.collection('users').doc(userId)
+              .collection('contacts').doc(recipient.contactId);
+
+            const baseUpdate = {
               gmail_last_message_id: gmailMessageId,
-              hunter_status: 'awaiting_reply',
               last_sent_at: sentAt,
               updated_at: sentAt,
             };
             if (!recipient.existingThreadId && gmailThreadId) {
-              contactUpdate.gmail_thread_id = gmailThreadId;
+              baseUpdate.gmail_thread_id = gmailThreadId;
             }
-            const contactRef = db.collection('users').doc(userId)
-              .collection('contacts').doc(recipient.contactId);
-            // Engaging a contact means the user kept it, so it can no longer
-            // be a discovery suggestion. Merged into the send's own write.
-            Object.assign(
-              contactUpdate,
-              await engagementPromotionPatch(contactRef, 'gmail_send_wave'),
-            );
-            await contactRef.update(contactUpdate);
+            // Transactional read-decide-write — recipient.* is
+            // client-supplied request data, not this contact's current
+            // Firestore state, and a plain get()-then-update() leaves a
+            // window for replyPolling.js's own transaction to land in
+            // between; see applySendContactUpdate's docstring.
+            await applySendContactUpdate(contactRef, baseUpdate, 'gmail_send_wave');
           } catch (err) {
             console.warn(`Failed to update contact ${recipient.contactId}:`, err.message);
           }

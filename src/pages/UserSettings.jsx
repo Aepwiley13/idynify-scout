@@ -57,6 +57,7 @@ import { useShell } from '../context/ShellContext';
 import ServiceProfileSetup from '../components/serviceProfiles/ServiceProfileSetup';
 import { classifySnapshot } from '../utils/accountVerification';
 import PlanActions from '../components/billing/PlanActions';
+import { ensureBillingCustomer } from '../services/billingCustomer';
 import { planOf, PLAN, isPaidPlan } from '../utils/accountPlan';
 import { PLAN_DETAILS } from '../constants/plans';
 import { supportMailto } from '../constants/support';
@@ -414,6 +415,8 @@ export default function UserSettings() {
   /* ── billing ── */
   const [billing, setBilling]             = useState(null);
   const [billingLoading, setBillingLoading] = useState(true);
+  const [billingCustomerAction, setBillingCustomerAction] = useState(false);
+  const [billingCustomerError, setBillingCustomerError] = useState('');
 
   /* ── gmail ── */
   const [gmailStatus, setGmailStatus]     = useState(null);
@@ -563,7 +566,7 @@ export default function UserSettings() {
       // the server's own answer, 'unknown' for a cache-only read (accountPlan.js).
       const plan = planOf(classifySnapshot(snap));
       if (!snap.exists() || !isPaidPlan(plan)) {
-        setBilling({ plan });
+        setBilling({ plan, stripeCustomerId: snap.exists() ? snap.data()?.stripeCustomerId || null : null });
       } else {
         const d = snap.data();
         const creditsIsNumber = typeof d.credits === 'number';
@@ -587,6 +590,23 @@ export default function UserSettings() {
       setBilling({ plan: PLAN.UNKNOWN });
     } finally {
       setBillingLoading(false);
+    }
+  }
+
+  async function handleCreateBillingCustomer() {
+    if (!user || billingCustomerAction) return;
+    setBillingCustomerAction(true);
+    setBillingCustomerError('');
+    try {
+      await ensureBillingCustomer(user);
+      await loadBilling();
+    } catch (error) {
+      const code = /^[a-z_]{1,48}$/.test(error?.message || '') ? error.message : 'billing_unavailable';
+      setBillingCustomerError(code === 'billing_identity_needs_review'
+        ? 'We need to review your existing billing record before changing it. Contact support for help.'
+        : 'We could not set up your billing profile. Your Free plan is unchanged. Please try again.');
+    } finally {
+      setBillingCustomerAction(false);
     }
   }
 
@@ -1131,9 +1151,25 @@ export default function UserSettings() {
                     </div>
                   )}
                   {billing?.plan === PLAN.FREE && (
-                    <p className="us-billing-plan-note">
-                      {PLAN_DETAILS.free.summary} Your contacts, stickers and notes are yours to keep on every plan.
-                    </p>
+                    <>
+                      <p className="us-billing-plan-note">
+                        {PLAN_DETAILS.free.summary} Your contacts, stickers and notes are yours to keep on every plan.
+                      </p>
+                      {!billing.stripeCustomerId && (
+                        <div className="us-card us-card--muted" style={{ marginTop: '0.75rem' }}>
+                          <div className="us-card-body">
+                            <span className="us-card-label">Billing profile</span>
+                            <span className="us-card-value us-card-value--muted">
+                              Set up a secure Stripe customer record for future upgrades. Free stays free; no card or subscription is created.
+                            </span>
+                            {billingCustomerError && <span className="us-inline-error" role="alert">{billingCustomerError}</span>}
+                          </div>
+                          <button type="button" className="us-action-btn" onClick={handleCreateBillingCustomer} disabled={billingCustomerAction}>
+                            {billingCustomerAction ? 'Setting up…' : 'Set up billing profile'}
+                          </button>
+                        </div>
+                      )}
+                    </>
                   )}
                 </section>
 

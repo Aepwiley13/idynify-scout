@@ -12,6 +12,8 @@ export default function AdminDashboard() {
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [platformStats, setPlatformStats] = useState(null);
   const [error, setError] = useState(null);
+  const [billingReadiness, setBillingReadiness] = useState(null);
+  const [checkingBillingReadiness, setCheckingBillingReadiness] = useState(false);
 
   // Filters and search
   const [searchTerm, setSearchTerm] = useState('');
@@ -48,6 +50,29 @@ export default function AdminDashboard() {
       console.error('Failed to load users:', err);
       setError(err.message);
       setLoading(false);
+    }
+  };
+
+  const runBillingReadinessCheck = async () => {
+    if (checkingBillingReadiness) return;
+    setCheckingBillingReadiness(true);
+    setBillingReadiness(null);
+    try {
+      const currentUser = auth.currentUser;
+      const token = await currentUser?.getIdToken();
+      const response = await fetch('/.netlify/functions/admin-billing-readiness', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: '{}',
+        cache: 'no-store',
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || 'Billing check unavailable');
+      setBillingReadiness(result);
+    } catch {
+      setBillingReadiness({ ready: false, errorCode: 'billing_check_unavailable' });
+    } finally {
+      setCheckingBillingReadiness(false);
     }
   };
 
@@ -202,8 +227,34 @@ export default function AdminDashboard() {
             <Mail className="w-4 h-4" />
             <span>Email Insights</span>
           </button>
+          <button onClick={runBillingReadinessCheck} className="api-activity-btn" disabled={checkingBillingReadiness}>
+            <Database className="w-4 h-4" />
+            <span>{checkingBillingReadiness ? 'Checking billing…' : 'Check live billing'}</span>
+          </button>
         </div>
       </div>
+
+      {billingReadiness && (
+        <section className="platform-stats" aria-live="polite" aria-label="Live billing readiness">
+          <div className="stat-card">
+            <div className="stat-content">
+              <p className="stat-label">Live Stripe check</p>
+              <p className="stat-value">{billingReadiness.ready ? 'Ready' : 'Needs attention'}</p>
+              {billingReadiness.errorCode && <p className="stat-detail">{billingReadiness.errorCode}</p>}
+            </div>
+          </div>
+          {Object.entries(billingReadiness.checks || {}).filter(([, value]) => typeof value === 'boolean' || value?.ready !== undefined).map(([name, value]) => (
+            <div className="stat-card" key={name}>
+              <div className="stat-content">
+                <p className="stat-label">{name.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase())}</p>
+                <p className="stat-value">{(typeof value === 'boolean' ? value : value.ready) ? 'Pass' : 'Check'}</p>
+                {value?.missingEvents?.length > 0 && <p className="stat-detail">Missing: {value.missingEvents.join(', ')}</p>}
+                {value?.errorCode && <p className="stat-detail">{value.errorCode}</p>}
+              </div>
+            </div>
+          ))}
+        </section>
+      )}
 
       {/* Platform Overview Metrics */}
       {platformStats && (

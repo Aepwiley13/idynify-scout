@@ -231,6 +231,7 @@ async function aggregateUserData(uid) {
   // Fire all reads concurrently
   const [
     authUser,
+    accountDoc,
     usageDoc,
     icpDoc,
     progressDoc,
@@ -242,6 +243,7 @@ async function aggregateUserData(uid) {
     leadsCount
   ] = await Promise.allSettled([
     auth.getUser(uid),
+    userRef.get(),
     userRef.collection('apiUsage').doc('summary').get(),
     userRef.collection('companyProfile').doc('current').get(),
     userRef.collection('scoutProgress').doc('swipes').get(),
@@ -257,6 +259,7 @@ async function aggregateUserData(uid) {
   const val = (settled) => settled.status === 'fulfilled' ? settled.value : null;
 
   const authData = val(authUser);
+  const accountData = val(accountDoc)?.exists ? val(accountDoc).data() : null;
   const usageData = val(usageDoc);
   const icpData = val(icpDoc);
   const progressData = val(progressDoc);
@@ -267,6 +270,18 @@ async function aggregateUserData(uid) {
     email: authData?.email || null,
     signupDate: authData?.metadata?.creationTime || null,
     lastLogin: authData?.metadata?.lastSignInTime || null,
+    billing: accountData ? {
+      plan: accountData.hasCompletedPayment === true
+        ? (accountData.subscriptionTier === 'pro' ? 'pro' : accountData.subscriptionTier === 'starter' ? 'starter' : 'unknown')
+        : accountData.status === 'pending_payment'
+          ? `pending_${accountData.selectedTier || 'unknown'}` : 'free',
+      stripeCustomerId: accountData.stripeCustomerId || null,
+      stripeSubscriptionId: accountData.stripeSubscriptionId || null,
+      subscriptionStatus: accountData.subscriptionStatus || null,
+      hasPaidAccess: accountData.hasCompletedPayment === true,
+      cancelAtPeriodEnd: accountData.cancelAtPeriodEnd === true,
+      currentPeriodEnd: accountData.currentPeriodEnd || null,
+    } : null,
 
     scout: {
       companiesTotal: val(companiesTotal)?.data().count ?? 0,

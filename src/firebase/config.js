@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, enableIndexedDbPersistence } from 'firebase/firestore';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
 
 /**
  * Firebase client config, read from the build environment.
@@ -37,6 +38,12 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+// Optional invisible attestation for public signup and billing Functions. Registration and
+// enforcement are configured separately; no production behavior changes until both are ready.
+const appCheckSiteKey = import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY;
+export const appCheck = appCheckSiteKey
+  ? initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider(appCheckSiteKey), isTokenAutoRefreshEnabled: true })
+  : null;
 
 // Enable offline persistence so Firestore reads are served from the local
 // IndexedDB cache when the device has no network (weak signal, elevator, etc.).

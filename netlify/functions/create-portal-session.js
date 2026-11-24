@@ -17,6 +17,7 @@ import process from 'node:process';
 import Stripe from 'stripe';
 import { admin, db } from './firebase-admin.js';
 import { extractAuthToken } from './utils/extractAuthToken.js';
+import { verifyBillingAppCheck } from './utils/billingAppCheck.js';
 
 function respond(statusCode, body) {
   return { statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
@@ -39,6 +40,7 @@ export async function createPortalSession(event, { stripe: injectedStripe } = {}
   } catch {
     return respond(401, { error: 'unauthorized' });
   }
+  if (!(await verifyBillingAppCheck(event))) return respond(403, { error: 'app_check_required' });
 
   const configuration = process.env.STRIPE_PORTAL_CONFIGURATION_ID;
   if (!/^bpc_[A-Za-z0-9]+$/.test(configuration ?? '')) return respond(503, { error: 'portal_not_configured' });

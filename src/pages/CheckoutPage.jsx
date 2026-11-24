@@ -8,6 +8,7 @@ import { blocksNewSubscription } from '../utils/billingEntitlement';
 import { FREE_PLAN, FREE_PLAN_HOME } from '../constants/freePlan';
 import { supportMailto } from '../constants/support';
 import { rememberCheckoutReturn, safeReturnPath } from '../utils/checkoutReturn';
+import { billingRequestHeaders } from '../services/billingSecurity';
 
 /**
  * Billing Phase 1b. Every purchase goes through the authenticated Checkout
@@ -122,10 +123,10 @@ export default function CheckoutPage({ account = null }) {
       const isStripeConfigured = import.meta.env.VITE_STRIPE_ENABLED === 'true';
 
       if (isStripeConfigured) {
-        const idToken = await user.getIdToken();
+        const headers = await billingRequestHeaders(user);
         const response = await fetch('/.netlify/functions/create-checkout-session', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
+          headers,
           body: JSON.stringify({ tier }),
         });
         const result = await response.json().catch(() => ({}));

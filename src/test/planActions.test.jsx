@@ -18,6 +18,10 @@ const getDocFromServerMock = vi.fn();
 vi.mock('../firebase/config', () => ({
   auth: { currentUser: { uid: 'u1', getIdToken: async () => 'tok-u1' } },
   db: {},
+  appCheck: null,
+}));
+vi.mock('../services/billingSecurity', () => ({
+  billingRequestHeaders: vi.fn(async () => ({ Authorization: 'Bearer tok-u1', 'Content-Type': 'application/json' })),
 }));
 vi.mock('firebase/firestore', () => ({
   doc: (_db, ...path) => ({ path: path.join('/') }),

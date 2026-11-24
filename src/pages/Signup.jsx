@@ -10,6 +10,7 @@ import PasswordField from '../components/auth/PasswordField';
 import PasswordRequirements from '../components/auth/PasswordRequirements';
 import BrandMark from '../components/auth/BrandMark';
 import { signupPlanFor, signupLandingPath, freeSignupDocument } from '../constants/freePlan';
+import { ensureBillingCustomer } from '../services/billingCustomer';
 import {
   SIGNUP_EVENTS,
   beginSignupSession,
@@ -126,6 +127,16 @@ export default function Signup() {
         credits: { total: initialCredits, used: 0, remaining: initialCredits, resetDate: null },
         monthlyCredits: initialCredits
       });
+
+      // Free stays a zero-cost Firebase entitlement. Stripe customer linking is server-owned,
+      // idempotent, and does not collect a card or create a subscription. A Stripe outage does
+      // not prevent a Free user from reaching Contact Hub; Settings → Billing offers a safe retry.
+      if (tier === 'free') {
+        try { await ensureBillingCustomer(userCredential.user); }
+        catch (billingError) {
+          console.warn('[signup] billing profile setup deferred', billingError?.message || 'unavailable');
+        }
+      }
 
       // Genuinely fire-and-forget now. The previous code awaited this despite
       // a comment promising it did not, so a slow Resend call sat between the

@@ -3,6 +3,7 @@ import Stripe from 'stripe';
 import { admin, db } from './firebase-admin.js';
 import { extractAuthToken } from './utils/extractAuthToken.js';
 import { describeSubscription, isBlockingStatus } from '../../src/utils/billingEntitlement.js';
+import { verifyBillingAppCheck } from './utils/billingAppCheck.js';
 
 // Stripe retains idempotency keys for roughly 24h. A margin under that is the bound past which a
 // stuck "creating" claim can no longer be safely recovered by replaying the same key — beyond it,
@@ -166,6 +167,7 @@ export const handler = async (event) => {
   } catch (err) {
     return respond(401, { error: 'Invalid authentication token' });
   }
+  if (!(await verifyBillingAppCheck(event))) return respond(403, { error: 'app_check_required' });
 
   let tier;
   try {

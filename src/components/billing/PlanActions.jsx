@@ -16,6 +16,7 @@ import { useEffect, useState } from 'react';
 import { ArrowUpCircle, CreditCard, Mail } from 'lucide-react';
 import { doc, getDocFromServer } from 'firebase/firestore';
 import { auth, db } from '../../firebase/config';
+import { billingRequestHeaders } from '../../services/billingSecurity';
 import { supportMailto } from '../../constants/support';
 import { PLAN_DETAILS } from '../../constants/plans';
 import { planChangeMessage, formatMoney, PRO_EXTRA_CREDITS } from './planChange';
@@ -26,10 +27,10 @@ export const UPGRADE_TIMEOUT_MS = 60000;
 export const PAYMENT_WAIT_MS = 15 * 60 * 1000;
 
 async function post(path, body) {
-  const token = await auth.currentUser?.getIdToken();
+  const headers = await billingRequestHeaders(auth.currentUser);
   const res = await fetch(`/.netlify/functions/${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    headers,
     body: JSON.stringify(body ?? {}),
   });
   const data = await res.json().catch(() => ({}));

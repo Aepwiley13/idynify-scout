@@ -480,6 +480,40 @@ export default function UserDetail() {
           </div>
         </div>
 
+        {/* A concise support view of the existing Firebase ↔ Stripe binding. */}
+        <div className="detail-section">
+          <div className="section-header">
+            <Database className="section-icon" />
+            <h2>Billing identity</h2>
+          </div>
+          <div className="info-grid">
+            <div className="info-item">
+              <p className="info-label">Plan</p>
+              <p className="info-value">{user.billing?.plan || 'Unknown'}</p>
+            </div>
+            <div className="info-item">
+              <p className="info-label">Stripe Customer</p>
+              <p className="info-value info-value-mono">{user.billing?.stripeCustomerId || 'Not linked'}</p>
+            </div>
+            <div className="info-item">
+              <p className="info-label">Stripe Subscription</p>
+              <p className="info-value info-value-mono">{user.billing?.stripeSubscriptionId || 'No subscription'}</p>
+            </div>
+            <div className="info-item">
+              <p className="info-label">Subscription status</p>
+              <p className="info-value">{user.billing?.subscriptionStatus || (user.billing?.plan === 'free' ? 'Free account' : 'Unknown')}</p>
+            </div>
+            <div className="info-item">
+              <p className="info-label">Paid access</p>
+              <p className="info-value">{user.billing?.hasPaidAccess ? 'Active' : 'No'}</p>
+            </div>
+            <div className="info-item">
+              <p className="info-label">Current period ends</p>
+              <p className="info-value">{user.billing?.currentPeriodEnd ? formatDate(user.billing.currentPeriodEnd) : '—'}</p>
+            </div>
+          </div>
+        </div>
+
         {/* Scout Progress */}
         <div className="detail-section">
           <div className="section-header">

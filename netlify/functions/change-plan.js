@@ -33,6 +33,7 @@ import Stripe from 'stripe';
 import { admin, db } from './firebase-admin.js';
 import { extractAuthToken } from './utils/extractAuthToken.js';
 import { hasActiveAccess } from '../../src/utils/billingEntitlement.js';
+import { verifyBillingAppCheck } from './utils/billingAppCheck.js';
 
 export const PREVIEW_MAX_AGE_SECONDS = 30 * 60;
 const LIVE = new Set(['active', 'trialing']);
@@ -101,6 +102,7 @@ export async function changePlan(event, { stripe: injectedStripe, now = () => Ma
   } catch {
     return respond(401, { error: 'unauthorized' });
   }
+  if (!(await verifyBillingAppCheck(event))) return respond(403, { error: 'app_check_required' });
 
   let body;
   try {

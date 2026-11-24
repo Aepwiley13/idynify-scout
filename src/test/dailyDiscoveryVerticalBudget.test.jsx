@@ -89,7 +89,9 @@ describe('Daily Discoveries chrome — the reclaimed space stays reclaimed', () 
     // phone's card now fills the column between the tabs and the bottom nav
     // instead of being content-sized (dailyDiscoveryPhoneCard.test.jsx), so
     // there is nothing for a floor to hold.
-    expect(src).toMatch(/const COMPANY_STAGE_MIN_H = isDesktop \? 564 : 0;/);
+    // #006.6: the two-column company card (≥1100px) has its own measured
+    // median, 461 (442–574 over sparse-to-dense companies at 1100–1920px).
+    expect(src).toMatch(/const COMPANY_STAGE_MIN_H = isDesktop \? \(isSplit \? 461 : 564\) : 0;/);
     expect(src).toMatch(/const PERSON_STAGE_MIN_H = isDesktop \? 512 : 0;/);
   });
 });

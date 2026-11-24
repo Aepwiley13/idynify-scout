@@ -229,7 +229,9 @@ describe('Daily Discovery card — the stage constrains nothing, and floors only
 
   // jsdom computes no layout, so the stage's own declarations are read from
   // source. Both the Companies and the People tab render one.
-  const stages = src.match(/<div style=\{\{ position: 'relative', width: '100%', maxWidth: isDesktop \? CARD_MAX_W \+ 20 : 440[^}]*\}\}>/g) || [];
+  // The company stage's width is `companyStageW` (#006.6): the single-column
+  // card's CARD_MAX_W + 20, or the split card's CARD_SPLIT_MAX_W + 20.
+  const stages = src.match(/<div style=\{\{ position: 'relative', width: '100%', maxWidth: (?:isDesktop \? CARD_MAX_W \+ 20 : 440|companyStageW)[^}]*\}\}>/g) || [];
 
   it('both tabs render a card stage', () => {
     expect(stages).toHaveLength(2);
@@ -273,7 +275,8 @@ describe('Daily Discovery card — the stage constrains nothing, and floors only
     }
     for (const floor of ['COMPANY_STAGE_MIN_H', 'PERSON_STAGE_MIN_H']) {
       expect(src, `${floor} is not a measured per-breakpoint constant`)
-        .toMatch(new RegExp(`const ${floor} = isDesktop \\? \\d+ : \\d+;`));
+        // The company floor has a second measured median for the split card (#006.6).
+        .toMatch(new RegExp(`const ${floor} = isDesktop \\? (?:\\d+|\\(isSplit \\? \\d+ : \\d+\\)) : \\d+;`));
     }
   });
 

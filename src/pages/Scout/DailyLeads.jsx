@@ -255,6 +255,15 @@ function DetailsSheet({ label, header, footer, onClose, T, children }) {
 // width to trade.
 const CARD_MAX_W = 680;
 
+// #006.6 — at 1100px and wider the company card splits in two: who the company
+// is, its score and the decision on the left; why Barry picked it (the #006.5
+// reasons, Barry Intel, the facts and the links) on the right. Same sections,
+// moved, not repeated. The person card and everything below 1100px keep the
+// single column. Two columns are shorter than one, so the split card is also
+// what keeps the decision above the fold on a 720px-tall laptop.
+const SPLIT_MIN_VW = 1100;
+const CARD_SPLIT_MAX_W = 960;
+
 // ─── Match feedback ───────────────────────────────────────────────────────────
 const MATCH_REASONS = ['Industry fit', 'Right size', 'Good location', 'Revenue match', 'Strong signals', 'Known brand'];
 
@@ -428,7 +437,7 @@ function FeedbackFace({ entityName, reasons, setReasons, note, setNote, score, s
 // Exported for the gesture regression test (src/test/swipeSingleDecision.test.jsx),
 // which drives the real DOM events a drag release produces. The page still ships
 // as the default export; nothing else imports this.
-export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = false, fit = false, skipRef = null, icpProfile, icpWeights }) {
+export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = false, fit = false, split = false, skipRef = null, icpProfile, icpWeights }) {
   const T = useT();
   const [dx, setDx] = useState(0);
   const [dy, setDy] = useState(0);
@@ -650,7 +659,9 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
           // clipping now cuts instead of scrolling sideways.
           <div key={l} style={{ minWidth: 0, padding: wide ? '10px 18px' : '8px 14px', borderRight: `1px solid ${T.border}`, borderBottom: `1px solid ${T.border}` }}>
             <div style={{ fontSize: SZ['2xs'], letterSpacing: 2, color: T.textFaint, marginBottom: 2 }}>{l}</div>
-            <div title={full} style={{ fontSize: wide ? 12 : 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{v}</div>
+            {/* In the split card's narrower column a value wraps instead of
+                being cut: the right column has height to spare, not width. */}
+            <div title={full} style={{ fontSize: wide ? 12 : 11, color: T.textMuted, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: split ? 'normal' : 'nowrap', ...(split ? { overflowWrap: 'anywhere' } : null) }}>{v}</div>
           </div>
         );
       })}
@@ -705,6 +716,20 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
         <div data-testid="match-summary" style={{ fontSize: 12, fontWeight: 600, color: T.text }}>{matchSummary.text}</div>
       )}
       <div role="list" aria-label="Why this company matches your ICP" style={{ display: 'grid', gap: 5 }}>
+        {explainedFactors.map(r => (
+          <div role="listitem" key={r.key}><ReasonLine kind={r.kind} text={r.text} T={T} announceState /></div>
+        ))}
+      </div>
+    </div>
+  );
+  // The split card (#006.6) puts the summary beside the score and the list in
+  // "Why this company": the same two pieces factorPillsRow stacks.
+  const splitSummary = matchSummary && (
+    <div data-testid="match-summary" style={{ padding: '10px 18px 12px', fontSize: 12, fontWeight: 600, color: T.text, borderBottom: `1px solid ${T.border}` }}>{matchSummary.text}</div>
+  );
+  const splitReasons = explainedFactors.length > 0 && (
+    <div data-testid="match-explanation" style={{ padding: '4px 18px 12px', borderBottom: `1px solid ${T.border}` }}>
+      <div role="list" aria-label="Why this company matches your ICP" style={{ display: 'grid', gap: 6 }}>
         {explainedFactors.map(r => (
           <div role="listitem" key={r.key}><ReasonLine kind={r.kind} text={r.text} T={T} announceState /></div>
         ))}
@@ -805,6 +830,91 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
     </>
   );
 
+  const desktopHeader = (
+    <>
+        {/* Header — horizontal: logo left, info right, confidence pill top-right */}
+        <div style={{
+          padding: wide ? '18px 24px' : '14px 18px', display: 'flex', alignItems: 'center', gap: wide ? 16 : 12,
+          background: T.cardBg2, borderBottom: `1px solid ${T.border}`, position: 'relative', flexShrink: 0,
+        }}>
+          <CompanyLogo company={company} size="card" />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {/* Same bargain as the stats cells below: these three lines
+                ellipsize, so each keeps its full value on hover. */}
+            <div title={company.name} style={{ fontSize: wide ? 20 : 18, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 90 }}>{company.name}</div>
+            {getDisplayIndustry(company, '') && getDisplayIndustry(company, '').toLowerCase() !== 'unknown' && (
+              <div title={getDisplayIndustry(company, '')} style={{ fontSize: 11, color: T.textMuted, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {getDisplayIndustry(company, '')}
+              </div>
+            )}
+            {hqLocation && hqLocation.toLowerCase() !== 'unknown' && (
+              <div title={hqLocation} style={{ fontSize: SZ['2xs'], color: T.textFaint, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <MapPin size={10} style={{ flexShrink: 0 }} />{hqLocation}
+              </div>
+            )}
+          </div>
+          <div style={{
+            position: 'absolute', top: 12, right: 14, zIndex: 6,
+            fontSize: SZ['2xs'], color: confColor, fontWeight: TYPE.weights.semibold, letterSpacing: 0.4,
+            padding: '3px 8px', background: `${confColor}18`, borderRadius: 5,
+            border: `1px solid ${confColor}40`,
+          }}>
+            {confidence} confidence
+          </div>
+        </div>
+    </>
+  );
+
+  // ── Split face (#006.6, ≥1100px) ──────────────────────────────────────────
+  // The overview column has the height the reasons beside it take, so the
+  // company gets a stacked identity block: a larger logo, and a name, industry
+  // and HQ that wrap instead of being cut.
+  const splitIndustry = getDisplayIndustry(company, '');
+  const splitIdentity = (
+    <div style={{ padding: '20px 20px 16px', display: 'flex', flexDirection: 'column', gap: 4, background: T.cardBg2, borderBottom: `1px solid ${T.border}` }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+        <div style={{ borderRadius: 22, overflow: 'hidden', flexShrink: 0, boxShadow: `0 10px 26px ${T.isDark ? '#00000066' : '#12082a14'}` }}>
+          <CompanyLogo company={company} size="heroCompact" className="!rounded-none" />
+        </div>
+        <div style={{
+          fontSize: SZ['2xs'], fontWeight: TYPE.weights.semibold, letterSpacing: 0.4, whiteSpace: 'nowrap',
+          color: inkFor(T, confidence === 'High' ? 'matched' : confidence === 'Medium' ? 'partial' : 'missed'),
+          padding: '3px 8px', background: `${confColor}18`, border: `1px solid ${confColor}40`, borderRadius: 5,
+        }}>{confidence} confidence</div>
+      </div>
+      <div style={{ fontSize: 22, fontWeight: TYPE.weights.bold, letterSpacing: -0.2, lineHeight: 1.25, color: T.text, overflowWrap: 'anywhere' }}>{company.name}</div>
+      {splitIndustry && splitIndustry.toLowerCase() !== 'unknown' && (
+        <div style={{ fontSize: 13, color: T.textMuted, overflowWrap: 'anywhere' }}>{splitIndustry}</div>
+      )}
+      {hqLocation && hqLocation.toLowerCase() !== 'unknown' && (
+        <div style={{ fontSize: 12, color: T.textMuted, display: 'flex', alignItems: 'flex-start', gap: 4, overflowWrap: 'anywhere' }}>
+          <MapPin size={12} style={{ flexShrink: 0, marginTop: 2 }} aria-hidden="true" />{hqLocation}
+        </div>
+      )}
+    </div>
+  );
+  const splitFace = (
+    <div data-testid="company-card-split" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1.15fr)', alignItems: 'stretch' }}>
+      <section aria-label="Company overview" style={{ minWidth: 0, display: 'flex', flexDirection: 'column', borderRight: `1px solid ${T.border}` }}>
+        {splitIdentity}
+        {icpRow}
+        {splitSummary}
+        {breakdownPanel}
+        {/* The decision sits at the bottom of the overview, level with the
+            end of the reasons beside it. */}
+        <div style={{ flex: '1 1 auto' }} />
+        {decisionButtons}
+      </section>
+      <section aria-labelledby={`why-${company.id}`} data-testid="why-this-company" style={{ minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+        <h3 id={`why-${company.id}`} style={{ margin: 0, padding: '14px 18px 8px', fontSize: SZ['2xs'], letterSpacing: 2, textTransform: 'uppercase', fontWeight: TYPE.weights.bold, color: T.textMuted }}>Why this company</h3>
+        {splitReasons}
+        {barryIntel}
+        {statsGrid}
+        {actionLinks}
+      </section>
+    </div>
+  );
+
   // ── Phone face (`fit`) ─────────────────────────────────────────────────────
   const whereLine = [knownIndustry, hqLocation].filter(v => v && !isMissingValue(v)).join(' · ');
   const matchKind = !isScored ? 'neutral' : score >= 75 ? 'matched' : score >= 50 ? 'partial' : 'missed';
@@ -859,7 +969,7 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
         // the card's own content decides how tall it is. Nothing above it caps
         // that, and a card taller than the viewport scrolls the column it sits
         // in rather than scrolling inside itself.
-        position: 'relative', width: '100%', maxWidth: wide ? CARD_MAX_W : 420,
+        position: 'relative', width: '100%', maxWidth: wide ? (split ? CARD_SPLIT_MAX_W : CARD_MAX_W) : 420,
         transform: `translateX(${tx}px) translateY(${dy * 0.1}px) rotate(${dx * 0.04}deg)`,
         transition: gone || Math.abs(dx) < 5 ? 'all 0.28s ease' : 'none',
         opacity: gone ? 0 : 1, cursor: 'grab', userSelect: 'none',
@@ -935,39 +1045,9 @@ export function CompanySwipeCard({ company, onAccept, onReject, onSkip, wide = f
           <div style={{ position: 'absolute', inset: 0, zIndex: 5, borderRadius: 22, background: `${STATUS.red}${Math.round(overlayOpacity * 20).toString(16).padStart(2,'0')}`, pointerEvents: 'none' }} />
         )}
 
-        {fit ? phoneFace : (
+        {fit ? phoneFace : split ? splitFace : (
           <>
-        {/* Header — horizontal: logo left, info right, confidence pill top-right */}
-        <div style={{
-          padding: wide ? '18px 24px' : '14px 18px', display: 'flex', alignItems: 'center', gap: wide ? 16 : 12,
-          background: T.cardBg2, borderBottom: `1px solid ${T.border}`, position: 'relative', flexShrink: 0,
-        }}>
-          <CompanyLogo company={company} size="card" />
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {/* Same bargain as the stats cells below: these three lines
-                ellipsize, so each keeps its full value on hover. */}
-            <div title={company.name} style={{ fontSize: wide ? 20 : 18, fontWeight: 700, color: T.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', paddingRight: 90 }}>{company.name}</div>
-            {getDisplayIndustry(company, '') && getDisplayIndustry(company, '').toLowerCase() !== 'unknown' && (
-              <div title={getDisplayIndustry(company, '')} style={{ fontSize: 11, color: T.textMuted, marginTop: 3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                {getDisplayIndustry(company, '')}
-              </div>
-            )}
-            {hqLocation && hqLocation.toLowerCase() !== 'unknown' && (
-              <div title={hqLocation} style={{ fontSize: SZ['2xs'], color: T.textFaint, marginTop: 2, display: 'flex', alignItems: 'center', gap: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                <MapPin size={10} style={{ flexShrink: 0 }} />{hqLocation}
-              </div>
-            )}
-          </div>
-          <div style={{
-            position: 'absolute', top: 12, right: 14, zIndex: 6,
-            fontSize: SZ['2xs'], color: confColor, fontWeight: TYPE.weights.semibold, letterSpacing: 0.4,
-            padding: '3px 8px', background: `${confColor}18`, borderRadius: 5,
-            border: `1px solid ${confColor}40`,
-          }}>
-            {confidence} confidence
-          </div>
-        </div>
-
+        {desktopHeader}
         {statsGrid}
         {icpRow}
         {factorPillsRow}
@@ -2012,10 +2092,13 @@ export default function DailyLeads({ onNavigate }) {
   // 1024 and 1280 the title alone eats the line, and inlined chips end up a
   // one-chip scroll strip — so there they keep a row of their own.
   const [isWide, setIsWide] = useState(() => window.innerWidth >= 1280);
+  // #006.6 — the two-column company card (see SPLIT_MIN_VW).
+  const [isSplit, setIsSplit] = useState(() => window.innerWidth >= SPLIT_MIN_VW);
   useEffect(() => {
     const handler = () => {
       setIsDesktop(window.innerWidth >= 1024);
       setIsWide(window.innerWidth >= 1280);
+      setIsSplit(window.innerWidth >= SPLIT_MIN_VW);
     };
     window.addEventListener('resize', handler);
     return () => window.removeEventListener('resize', handler);
@@ -3107,8 +3190,17 @@ export default function DailyLeads({ onNavigate }) {
   // that was keeping a content-sized item from being shrunk below its content —
   // without it, a card taller than the floor gets squeezed back to the floor and
   // paints over whatever follows.
-  const COMPANY_STAGE_MIN_H = isDesktop ? 564 : 0;
+  //
+  // The split company card (#006.6, ≥1100px) is far shorter than the single
+  // column: measured in Chromium on the real page at 1100/1280/1440/1920 over
+  // sparse-to-dense companies it runs 442–574px (single column: 739–777px for
+  // the same companies), median 461. The 564 floor under it would leave ~100px
+  // of empty stage with the ghost cards stretched below the card, so it gets
+  // its own median.
+  const COMPANY_STAGE_MIN_H = isDesktop ? (isSplit ? 461 : 564) : 0;
   const PERSON_STAGE_MIN_H = isDesktop ? 512 : 0;
+  // The company stage is as wide as the card in it, plus the ghost cards' offsets.
+  const companyStageW = isDesktop ? (isSplit ? CARD_SPLIT_MAX_W : CARD_MAX_W) + 20 : 440;
   // Phones (below 1024px) have no floor: the stage takes the column's
   // remaining height, between the tabs and the bottom navigation, and the card
   // fills it (`fit`) — one discovery, one screen, no page scroll to reach the
@@ -3608,7 +3700,7 @@ export default function DailyLeads({ onNavigate }) {
                       on x only and, unlike `hidden`, makes no scroll box, so
                       the card still sets the stage's height (see above). A
                       browser without `clip` ignores it and behaves as before. */}
-                  <div style={{ position: 'relative', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, minHeight: COMPANY_STAGE_MIN_H, flexShrink: 0, overflowX: isDesktop ? undefined : 'clip', ...PHONE_STAGE }}>
+                  <div style={{ position: 'relative', width: '100%', maxWidth: companyStageW, minHeight: COMPANY_STAGE_MIN_H, flexShrink: 0, overflowX: isDesktop ? undefined : 'clip', ...PHONE_STAGE }}>
                     {visibleCompanies.length > 1 && renderGhostCards(visibleCompanies.length - 1)}
                     {currentCompany && (
                       <CompanySwipeCard
@@ -3619,6 +3711,7 @@ export default function DailyLeads({ onNavigate }) {
                         onSkip={handleSkipCompany}
                         wide={isDesktop}
                         fit={!isDesktop}
+                        split={isDesktop && isSplit}
                         skipRef={companySkipRef}
                         icpProfile={icpProfile}
                         icpWeights={icpWeights}
@@ -3654,7 +3747,7 @@ export default function DailyLeads({ onNavigate }) {
                       <RotateCcw size={13} />Undo last skip
                     </button>
                   )}
-                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: isDesktop ? CARD_MAX_W + 20 : 440, fontSize: SZ['2xs'], color: T.textGhost, ...(isDesktop ? null : { flexShrink: 0, height: 40 }) }}>
+                  <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', maxWidth: companyStageW, fontSize: SZ['2xs'], color: T.textGhost, ...(isDesktop ? null : { flexShrink: 0, height: 40 }) }}>
                     <span>← Sharpens targeting</span>
                     {/* Skip is below the card on a phone; on desktop it is on the card. */}
                     {!isDesktop && (

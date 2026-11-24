@@ -403,7 +403,7 @@ describe('the page gives a phone card the screen', () => {
 
   it('below 1024px each stage takes the column\'s remaining height; desktop gets nothing new', () => {
     expect(src).toMatch(/const PHONE_STAGE = isDesktop \? null : \{ flex: '1 1 0%', minHeight: 0, display: 'flex', flexDirection: 'column' \};/);
-    const stages = src.match(/<div style=\{\{ position: 'relative', width: '100%', maxWidth: isDesktop \? CARD_MAX_W \+ 20 : 440[^}]*\}\}>/g) || [];
+    const stages = src.match(/<div style=\{\{ position: 'relative', width: '100%', maxWidth: (?:isDesktop \? CARD_MAX_W \+ 20 : 440|companyStageW)[^}]*\}\}>/g) || [];
     expect(stages).toHaveLength(2);
     for (const stage of stages) expect(stage).toMatch(/\.\.\.PHONE_STAGE \}\}>$/);
   });

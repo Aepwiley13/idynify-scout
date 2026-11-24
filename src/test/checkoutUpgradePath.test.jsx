@@ -21,6 +21,7 @@ import { ACCOUNT } from '../utils/accountVerification';
 const getDocFromServerMock = vi.fn();
 
 vi.mock('../firebase/config', () => ({
+  appCheck: null,
   auth: { currentUser: { uid: 'u1', email: 'u1@example.test', getIdToken: async () => 'id-token-1' } },
   db: {},
 }));

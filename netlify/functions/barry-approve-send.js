@@ -38,6 +38,7 @@
  * strand the draft permanently.
  */
 
+import { appendContactChild, isWritableContact } from './utils/contactWriteLifecycle.js';
 import { google } from 'googleapis';
 import { FieldValue } from 'firebase-admin/firestore';
 import { db } from './firebase-admin.js';
@@ -82,12 +83,13 @@ function claimStartedMillis(value) {
  * @returns {Promise<
  *   { ok: true, tracked: boolean, priorStatus: string|null } |
  *   { ok: false, reason: 'already_sent', sentMessageId: string|null, sentThreadId: string|null } |
- *   { ok: false, reason: 'send_in_progress' }
+ *   { ok: false, reason: 'send_in_progress' | 'contact_deleted' }
  * >}
  */
-async function claimDraftForSend(draftRef) {
+async function claimDraftForSend(draftRef, contactRef) {
   return db.runTransaction(async (tx) => {
-    const snap = await tx.get(draftRef);
+    const [snap, contact] = await Promise.all([tx.get(draftRef), tx.get(contactRef)]);
+    if (!isWritableContact(contact)) return { ok: false, reason: 'contact_deleted' };
 
     // No stored draft is legitimate — a reply can be composed without one.
     // There is nothing to claim, and nothing that could be sent twice from it.
@@ -285,17 +287,17 @@ export const handler = async (event) => {
 
     // ── Claim the draft before anything irreversible happens ──────────────
     // Everything above this point is a read. Everything below can send mail.
-    draftRef = db
-      .collection('users').doc(userId)
-      .collection('contacts').doc(contactId)
-      .collection('barry_drafts').doc(messageRecordId);
+    const contactRef = db.collection('users').doc(userId).collection('contacts').doc(contactId);
+    draftRef = contactRef.collection('barry_drafts').doc(messageRecordId);
 
     try {
-      claim = await claimDraftForSend(draftRef);
+      claim = await claimDraftForSend(draftRef, contactRef);
     } catch (claimErr) {
       console.error('[barry-approve-send] Draft claim failed:', claimErr.message);
       return json(500, { error: `Could not lock the draft for sending: ${claimErr.message}` });
     }
+
+    if (!claim.ok && claim.reason === 'contact_deleted') return json(404, { error: 'Contact is unavailable' });
 
     if (!claim.ok && claim.reason === 'already_sent') {
       // A duplicate click, not a failure. Report the original send.
@@ -407,10 +409,6 @@ export const handler = async (event) => {
     // ── Record the send ───────────────────────────────────────────────────
     // The Gmail send already happened; a Firestore failure here must not be
     // reported to the user as a failed send, or they will send it twice.
-    const contactRef = db
-      .collection('users').doc(userId)
-      .collection('contacts').doc(contactId);
-
     try {
       await contactRef
         .collection('barry_drafts').doc(messageRecordId)
@@ -435,7 +433,7 @@ export const handler = async (event) => {
       // recognised type and was invisible to every orderBy('timestamp') read.
       // `messageRecordId` MUST stay top-level — process-barry-inbox-queue.js
       // queries the timeline on it directly.
-      await contactRef.collection('timeline').add({
+      await appendContactChild(db, contactRef, 'timeline', {
         type: 'reply_sent',
         actor: 'user',
         timestamp: FieldValue.serverTimestamp(),

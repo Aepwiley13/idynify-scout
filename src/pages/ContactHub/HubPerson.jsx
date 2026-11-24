@@ -1,28 +1,33 @@
 /**
  * HubPerson — one person, in Contact Hub.
  *
- * The existing contact card in its simple form (photo, name, title, company,
- * emails, phones, links, stickers) and their notes. No stages, engagement,
- * outreach or lookups: the full profile at /contact/:id is untouched and is
- * not linked from here.
+ * The approved profile header stays above the relationship workspace.
+ * Edits and late sticker completions are merged by contact ID.
  *
  * The person comes from the list ContactHubMain already loaded. A link opened
  * cold (a refresh, a bookmark) waits for that load; a person who is not in My
  * People, or does not exist, gets a plain "not here" with a way back.
  */
-import { Link, useOutletContext, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useT } from '../../theme/ThemeContext';
-import { CONTACT_HUB_PATH } from '../../constants/contactHub';
-import IdentityCard from '../../components/contacts/IdentityCard';
-import StickyNotes from '../../components/contacts/StickyNotes';
-import { HUB_STATUS, isListedInMyPeople } from './peopleRules';
+import { canUseContactHubScout, contactDeletionEnabled, contactHubPersonPath, CONTACT_HUB_PATH } from '../../constants/contactHub';
+import ContactHubGmailHeader from './ContactHubGmailHeader';
+import ContactActionCenter from './actionCenter/ContactActionCenter';
+import { mergeRequest, mergeReviewEnabled } from './duplicates/mergeApi';
+import DeleteContactsDialog from './DeleteContactsDialog';
+import { useImpersonation } from '../../context/ImpersonationContext';
+import { useShell, useShellEntity } from '../../context/ShellContext';
+import { HUB_STATUS, isListedInMyPeople, personName } from './peopleRules';
 import ScoutOpportunity from '../../components/billing/ScoutOpportunity';
 
 function BackLink() {
   const T = useT();
+  // Back to My People as it was left, sticker filter included.
+  const { listPath } = useOutletContext();
   return (
-    <Link className="hub-back" to={CONTACT_HUB_PATH} style={{ color: T.text }}>
+    <Link className="hub-back" to={listPath || CONTACT_HUB_PATH} style={{ color: T.text }}>
       <ArrowLeft size={18} aria-hidden="true" />
       My People
     </Link>
@@ -31,9 +36,39 @@ function BackLink() {
 
 export default function HubPerson() {
   const T = useT();
+  const navigate = useNavigate();
+  const [deleting, setDeleting] = useState(null);
   const { contactId } = useParams();
-  const { status, contacts, updateContact, reload } = useOutletContext();
+  const { uid, status, contacts, updateContact, applyStickerChange, reload, removeContacts, listPath } = useOutletContext();
+  const { isImpersonating, isReadOnly } = useImpersonation();
+  const { shellUser, openBarry } = useShell();
+  const readOnly = Boolean(isImpersonating || isReadOnly);
+  const scout = !readOnly && canUseContactHubScout(uid, shellUser);
   const contact = contacts.find((c) => c.id === contactId);
+  // updateContact merges what it is given into the contact with that id, so a patch changes only its fields, on that contact.
+  const patchContact = useCallback((id, fields) => updateContact({ id, ...fields }), [updateContact]);
+
+  // Tell the shell who is open, as every other profile does: the top bar then
+  // names the person, and Barry (if opened) knows who is on screen. Only for a
+  // person actually shown here, and with no pipeline stage: Contact Hub has none.
+  const shown = status === HUB_STATUS.READY && contact && isListedInMyPeople(contact) ? contact : null;
+  useShellEntity({
+    type: 'contact',
+    id: shown?.id,
+    stage: null,
+    label: shown ? personName(shown) : null,
+  });
+
+  useEffect(() => {
+    if (readOnly || !uid || !mergeReviewEnabled() || status !== HUB_STATUS.READY
+      || contact?.contact_hub_lifecycle?.status !== 'retired') return undefined;
+    let active = true;
+    mergeRequest(uid, 'redirect', { sourceId: contactId }, () => active)
+      .then(({ survivorId }) => {
+        if (active && survivorId) navigate(contactHubPersonPath(survivorId), { replace: true });
+      }).catch(() => {});
+    return () => { active = false; };
+  }, [contact, contactId, navigate, readOnly, status, uid]);
 
   if (status === HUB_STATUS.LOADING) {
     return (
@@ -68,15 +103,24 @@ export default function HubPerson() {
   }
 
   return (
-    <div className="hub-person">
+    <div className="hub-person hub-person--action">
       <BackLink />
-      {/* Keyed by person: the card and the notes hold edit state of their own. */}
-      <IdentityCard key={`card-${contact.id}`} contact={contact} onUpdate={updateContact} variant="simple" />
-      {/* Billing W1: what Scout could add for this person (no request is made). */}
-      <ScoutOpportunity contact={contact} />
-      <section className="hub-card hub-notes" aria-label="Notes" style={{ background: T.cardBg, borderColor: T.border }}>
-        <StickyNotes key={`notes-${contact.id}`} contact={contact} onUpdate={updateContact} />
-      </section>
+      {/* Keep transient editing state scoped to this person and session. */}
+      <ContactHubGmailHeader key={JSON.stringify([uid, contact.id, readOnly])} uid={uid} readOnly={readOnly} contact={contact}
+        onPatch={patchContact} onLateStickerChange={applyStickerChange} />
+      {contactDeletionEnabled() && !readOnly && removeContacts && (
+        <button type="button" className="hub-link-btn" onClick={() => setDeleting(JSON.stringify([uid, contact.id]))}>Delete contact</button>
+      )}
+      {!readOnly && deleting === JSON.stringify([uid, contact.id]) && (
+        <DeleteContactsDialog key={deleting} uid={uid} ids={[contact.id]} nameFor={() => personName(contact)} onClose={() => setDeleting(null)}
+          onResult={(ids, done) => {
+            removeContacts(ids);
+            if (done) navigate(listPath || CONTACT_HUB_PATH, { replace: true });
+          }} />
+      )}
+      <ScoutOpportunity key={contact.id} contact={contact} />
+      <ContactActionCenter key={JSON.stringify([uid, contact.id, readOnly])} uid={uid} contact={contact}
+        readOnly={readOnly} scout={scout} openBarry={openBarry} onUpdate={updateContact} onLateStickerChange={applyStickerChange} />
     </div>
   );
 }

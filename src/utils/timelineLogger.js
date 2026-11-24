@@ -23,7 +23,7 @@
  *                 break an engagement flow.
  */
 
-import { collection, addDoc, Timestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, runTransaction, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { TIMELINE_EVENT_TYPES, ACTORS } from '../constants/timelineEvents';
 
@@ -57,7 +57,7 @@ function isDev() {
  * @param {Object}  [params.metadata]
  * @returns {Promise<{ok: boolean, id: string|null, reason: string|null}>}
  */
-export async function logTimelineEvent({ userId, contactId, type, actor, preview, metadata } = {}) {
+export async function logTimelineEvent({ userId, contactId, type, actor, preview, metadata, eventId } = {}) {
   if (!userId || !contactId || !type || !actor) {
     // Guards a real historical bug: NextBestStep.jsx called this positionally,
     // so destructuring a string yielded undefined for every field and every
@@ -92,6 +92,13 @@ export async function logTimelineEvent({ userId, contactId, type, actor, preview
       ...(metadata ? { metadata } : {}),
     };
 
+    if (eventId) {
+      const ref = doc(timelineRef, eventId);
+      await runTransaction(db, async (transaction) => {
+        if (!(await transaction.get(ref)).exists()) transaction.set(ref, event);
+      });
+      return { ok: true, id: eventId, reason: null };
+    }
     const docRef = await addDoc(timelineRef, event);
     return { ok: true, id: docRef.id, reason: null };
   } catch (error) {

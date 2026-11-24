@@ -109,18 +109,30 @@ describe('switch ON', () => {
     expect(nav.resolveBarryModule('/contact-hub')).toBe('default');
   });
 
-  it('declares no mobile bottom bar in Phase 1A: hidden, with no cells and no overflow', async () => {
+  it('declares a mobile bottom bar of My Card, My People and Sticker Wall, with no overflow', async () => {
     const { mobile } = await loadWith('on');
     const bar = mobile.bottomNavFor('contact-hub');
-    expect(bar.hidden).toBe(true);
-    expect(bar.primary).toEqual([]);
-    expect(bar.overflow).toBeUndefined();
+    expect(bar.hidden).toBeUndefined();
+    expect(bar.primary.map(({ id, label, to }) => ({ id, label, to }))).toEqual([
+      { id: 'my-card', label: 'My Card', to: '/contact-hub/my-card' },
+      { id: 'people', label: 'My People', to: '/contact-hub' },
+      { id: 'stickers', label: 'Sticker Wall', to: '/contact-hub/stickers' },
+    ]);
+    // No overflow, so the bar has no More and the shell opens no module sheet.
+    expect(bar.overflow).toEqual([]);
   });
 
-  it('is the only module that hides its bar', async () => {
+  it('has no Import cell until the Import screen exists', async () => {
+    const { mobile } = await loadWith('on');
+    const cells = mobile.bottomNavFor('contact-hub').primary;
+    expect(cells).toHaveLength(3);
+    expect(cells.some((c) => /import/i.test(`${c.id} ${c.label} ${c.to}`))).toBe(false);
+  });
+
+  it('no module hides its bar any more', async () => {
     const { mobile } = await loadWith('on');
     const hidden = Object.entries(mobile.MODULE_BOTTOM_NAV).filter(([, config]) => config.hidden).map(([id]) => id);
-    expect(hidden).toEqual(['contact-hub']);
+    expect(hidden).toEqual([]);
   });
 });
 
@@ -133,6 +145,18 @@ describe('App.jsx takes its Contact Hub routes from the switch-guarded function 
   it('calls contactHubRoutes() exactly once and names no Contact Hub component itself', () => {
     expect(app.match(/\{contactHubRoutes\(\)\}/g)).toHaveLength(1);
     expect(app).not.toMatch(/<ContactHubMain|<HubPeople|<HubPerson/);
+  });
+
+  it('scopes free route access to the enabled Contact Hub only', async () => {
+    const { hub } = await loadWith('on');
+    expect(hub.isContactHubPath('/contact-hub')).toBe(true);
+    expect(hub.isContactHubPath('/contact-hub/person/abc')).toBe(true);
+    expect(hub.isContactHubPath('/contact-hub-elsewhere')).toBe(false);
+    expect(hub.isContactHubPath('/scout')).toBe(false);
+    expect(app).toContain('requirePayment={requirePayment}');
+    expect(app).not.toContain('requirePayment={requirePayment && !isContactHubPath(pathname)}');
+    const off = await loadWith('off');
+    expect(off.hub.isContactHubPath('/contact-hub')).toBe(false);
   });
 
   it('has no hand-written route or redirect to /contact-hub', () => {

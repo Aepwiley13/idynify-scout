@@ -380,7 +380,7 @@ const SCOUT_IMPORT_COPY = Object.freeze({
   failedTail: 'Contacts saved before the error are in People with this import\'s tag.',
 });
 
-export function ContactCsvImport({ onContactsAdded, onCancel, onChangeType, copy = SCOUT_IMPORT_COPY }) {
+export function ContactCsvImport({ onContactsAdded, onCancel, onChangeType, copy = SCOUT_IMPORT_COPY, correctCompanyName = true }) {
   const T = useT();
   // select → checking → preview → importing
   const [stage, setStage] = useState('select');
@@ -446,6 +446,7 @@ export function ContactCsvImport({ onContactsAdded, onCancel, onChangeType, copy
       const result = await commitCsvImport(user.uid, rows, {
         importName: importName.trim() || defaultImportName(file?.name),
         fileName: file?.name ?? null,
+        correctCompanyName,
         onProgress: (done, total) => setProgress({ done, total, label: 'Importing' }),
       });
       const items = [...result.created, ...result.updated].map((c) => ({ ...c, _uploadType: 'leads' }));

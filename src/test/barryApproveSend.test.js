@@ -107,6 +107,7 @@ function makeDraftRef() {
 
 function makeContactRef() {
   return {
+    get: async () => ({ exists: true }),
     update: async (patch) => {
       if (state.failWrites || state.failContactWrites) throw new Error('firestore unavailable');
       state.contactUpdates.push(patch);
@@ -116,10 +117,12 @@ function makeContactRef() {
         return { doc: () => makeDraftRef() };
       }
       return {
-        add: async (doc) => {
-          if (state.failWrites || state.failContactWrites) throw new Error('firestore unavailable');
-          state.timelineAdds.push(doc);
-        },
+        doc: () => ({
+          set: async (doc) => {
+            if (state.failWrites || state.failContactWrites) throw new Error('firestore unavailable');
+            state.timelineAdds.push(doc);
+          },
+        }),
       };
     },
   };
@@ -135,9 +138,10 @@ vi.mock('../../netlify/functions/firebase-admin.js', () => ({
       const writes = [];
       const result = await fn({
         get: (ref) => ref.get(),
-        update: (ref, patch) => { writes.push([ref, patch]); },
+        update: (ref, patch) => { writes.push(() => ref.update(patch)); },
+        set: (ref, patch) => { writes.push(() => ref.set(patch)); },
       });
-      for (const [ref, patch] of writes) await ref.update(patch);
+      for (const write of writes) await write();
       return result;
     },
     collection: (name) => {
@@ -525,6 +529,22 @@ describe('send-once guarantee', () => {
 
     expect(res.statusCode).toBe(200);
     expect(sendMock).toHaveBeenCalledTimes(1);
+  });
+
+  // A provider can accept a send even though the client receives a timeout.
+  // This characterization records the current release blocker using a mock.
+  it('audit: retries a draft after provider acceptance with a lost response', async () => {
+    const accepted = [];
+    sendMock.mockImplementationOnce(async () => {
+      accepted.push('first');
+      throw new Error('response timed out after acceptance');
+    }).mockImplementationOnce(async () => {
+      accepted.push('retry');
+      return { data: { id: 'second-provider-id', threadId: 'thr_1' } };
+    });
+    expect((await post(validBody)).statusCode).toBe(502);
+    expect((await post(validBody)).statusCode).toBe(200);
+    expect(accepted).toEqual(['first', 'retry']);
   });
 
   it('hands the claim back when Gmail rejects the send', async () => {

@@ -29,6 +29,7 @@ const GROUP_LABELS = { recent: 'Recent', all: 'All stickers' };
 export default function StickerPicker({
   stickers,
   assignedIds = new Set(),
+  pendingIds,
   recentIds = [],
   atLimit = false,
   allowCreate = true,
@@ -51,8 +52,8 @@ export default function StickerPicker({
   const optionId = (index) => `${listId}-option-${index}`;
 
   const options = useMemo(
-    () => buildPickerOptions({ stickers, assignedIds, recentIds, query, atLimit, allowCreate }),
-    [stickers, assignedIds, recentIds, query, atLimit, allowCreate],
+    () => buildPickerOptions({ stickers, assignedIds, pendingIds, recentIds, query, atLimit, allowCreate }),
+    [stickers, assignedIds, pendingIds, recentIds, query, atLimit, allowCreate],
   );
   const enabled = options.map((o, i) => (o.disabled ? -1 : i)).filter((i) => i >= 0);
 
@@ -147,6 +148,7 @@ export default function StickerPicker({
             id={optionId(index)}
             role="option"
             aria-selected={option.assigned ? 'true' : 'false'}
+            aria-busy={option.pending || undefined}
             aria-disabled={option.disabled ? 'true' : undefined}
             data-active={active ? 'true' : undefined}
             className={`stk-picker-option${option.disabled ? ' stk-picker-option--disabled' : ''}`}
@@ -170,6 +172,7 @@ export default function StickerPicker({
                 <span className="stk-dot" style={{ background: hexOf(option.sticker.color) }} aria-hidden="true" />
                 {option.sticker.emoji ? <span className="stk-picker-emoji" aria-hidden="true">{option.sticker.emoji}</span> : null}
                 <span className="stk-picker-name">{option.sticker.name}</span>
+                {option.pending ? <span aria-hidden="true">Adding…</span> : null}
                 {option.assigned ? <Check size={12} className="stk-picker-check" aria-hidden="true" /> : null}
               </>
             )}

@@ -18,6 +18,7 @@
  *     loads (Apple Mail Privacy Protection, etc.) do not inflate the count.
  */
 
+import { withExistingContact } from './utils/contactWriteLifecycle.js';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { requireProjectId } from './utils/firebaseEnv.js';
@@ -120,8 +121,9 @@ async function recordOpen({ userId, cadenceId, contactId, messageId }) {
     .collection('users').doc(userId)
     .collection('contacts').doc(contactId);
 
-  await Promise.all([
-    contactRef.collection('timeline').add({
+  const activity = contactRef.collection('timeline').doc();
+  await withExistingContact(db, contactRef, (tx) => {
+    tx.set(activity, {
       type: 'email_opened',
       actor: 'contact',
       preview: 'Email opened',
@@ -132,9 +134,9 @@ async function recordOpen({ userId, cadenceId, contactId, messageId }) {
         gmailMessageId: messageId || null,
         openedAt: FieldValue.serverTimestamp(),
       },
-    }),
-    contactRef.update({ last_opened_at: FieldValue.serverTimestamp() }),
-  ]);
+    });
+    tx.update(contactRef, { last_opened_at: FieldValue.serverTimestamp() });
+  });
 }
 
 export const handler = async (event) => {

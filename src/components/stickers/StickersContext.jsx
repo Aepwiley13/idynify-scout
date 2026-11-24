@@ -31,6 +31,20 @@ function StickersRoot({ uid, children }) {
   // right now" stays on screen while the row it came from disappears.
   const [notice, setNotice] = useState(null);
   const notify = useCallback((next) => setNotice({ ...next, id: Date.now() + Math.random() }), []);
+  // The adds in flight on this page, by account, contact and sticker. A row is made fresh when the person leaves a
+  // contact and comes back; the page (this provider, one per account) is what outlives it, so the guard is held here.
+  const [inFlight] = useState(() => new Map());
+  const [pendingAdds, setPendingAdds] = useState([]);
+  const startAdd = useCallback((key, entry) => {
+    if (inFlight.has(key)) return false;
+    inFlight.set(key, entry);
+    setPendingAdds([...inFlight.values()]);
+    return true;
+  }, [inFlight]);
+  const finishAdd = useCallback((key) => {
+    inFlight.delete(key);
+    setPendingAdds([...inFlight.values()]);
+  }, [inFlight]);
   const dismissNotice = useCallback(() => setNotice(null), []);
 
   useEffect(() => {
@@ -71,8 +85,11 @@ function StickersRoot({ uid, children }) {
       archived,
       byId: new Map(all.map((s) => [s.id, s])),
       notify,
+      pendingAdds,
+      startAdd,
+      finishAdd,
     };
-  }, [availability, recheck, listening, uid, registry, notify]);
+  }, [availability, recheck, listening, uid, registry, notify, pendingAdds, startAdd, finishAdd]);
 
   return (
     <StickersContext.Provider value={value}>

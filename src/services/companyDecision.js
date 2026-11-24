@@ -535,7 +535,7 @@ export async function undoCompanyDecision({ userId, companyId }) {
 }
 
 /** Undo, step two (approvals only): retract what people discovery added. */
-export async function undoApprovalSideEffects({ userId, companyId }) {
+export async function undoApprovalSideEffects({ user, userId, companyId }) {
   const companyRef = doc(db, 'users', userId, 'companies', companyId);
   await updateDoc(companyRef, {
     selected_titles: null, titles_updated_at: null, titles_source: null,
@@ -544,7 +544,20 @@ export async function undoApprovalSideEffects({ userId, companyId }) {
   });
   const autoContactsQuery = query(collection(db, 'users', userId, 'contacts'), where('company_id', '==', companyId), where('source', '==', 'icp_auto_discovery'));
   const autoContactDocs = await getDocs(autoContactsQuery);
-  for (const contactDoc of autoContactDocs.docs) await deleteDoc(contactDoc.ref);
+  for (const contactDoc of autoContactDocs.docs) {
+    if (!contactDoc.data().contact_hub_photo) {
+      await deleteDoc(contactDoc.ref);
+      continue;
+    }
+    if (!user || user.uid !== userId) throw new Error('Sign in to undo company approval.');
+    const token = await user.getIdToken();
+    const response = await fetch('/.netlify/functions/contact-photo-write', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'undo_company_approval', uid: userId, contactId: contactDoc.id, companyId }),
+    });
+    if (!response.ok) throw new Error('Could not remove the discovered contact.');
+  }
 }
 
 export default {

@@ -8,6 +8,7 @@
  * Team B writes the structure. Team Alpha fills the content.
  */
 
+import { withExistingContact } from './contactWriteLifecycle.js';
 import { FieldValue } from 'firebase-admin/firestore';
 
 const CONTEXT_VERSION = '1.0.0';
@@ -33,10 +34,8 @@ export async function upsertRelationshipContext(db, {
   receivedAt,
   conversationState,
 }) {
-  const contextRef = db
-    .collection('users').doc(idynifyUserId)
-    .collection('contacts').doc(contactId)
-    .collection('relationship_context').doc(idynifyUserId);
+  const contact = db.collection('users').doc(idynifyUserId).collection('contacts').doc(contactId);
+  const contextRef = contact.collection('relationship_context').doc(idynifyUserId);
 
   const preview = (bodyText || '').slice(0, 200);
 
@@ -52,29 +51,31 @@ export async function upsertRelationshipContext(db, {
     contextVersion: CONTEXT_VERSION,
   };
 
-  const existing = await contextRef.get();
+  return withExistingContact(db, contact, async (tx) => {
+    const existing = await tx.get(contextRef);
 
-  if (existing.exists) {
-    await contextRef.update(contextData);
-  } else {
-    // First time — initialize all Sprint 3 arrays as empty
-    await contextRef.set({
-      ...contextData,
-      openQuestions: [],
-      openCommitments: [],
-      objections: [],
-      positiveSignals: [],
-      informationShared: [],
-      recommendedAction: null,
-      recommendedActionReason: null,
-      suggestedFollowUpDate: null,
-      recommendedAt: null,
-      fieldSuggestions: [],
-      lastAnalyzedAt: null,
-      sourceMessageIds: [messageRecordId],
-      lastUpdatedAt: FieldValue.serverTimestamp(),
-    });
-  }
+    if (existing.exists) {
+      tx.update(contextRef, contextData);
+    } else {
+      // First time — initialize all Sprint 3 arrays as empty
+      tx.set(contextRef, {
+        ...contextData,
+        openQuestions: [],
+        openCommitments: [],
+        objections: [],
+        positiveSignals: [],
+        informationShared: [],
+        recommendedAction: null,
+        recommendedActionReason: null,
+        suggestedFollowUpDate: null,
+        recommendedAt: null,
+        fieldSuggestions: [],
+        lastAnalyzedAt: null,
+        sourceMessageIds: [messageRecordId],
+        lastUpdatedAt: FieldValue.serverTimestamp(),
+      });
+    }
 
-  return contextRef.id;
+    return contextRef.id;
+  });
 }

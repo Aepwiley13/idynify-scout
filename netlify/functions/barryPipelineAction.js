@@ -18,6 +18,7 @@
  * POST /.netlify/functions/barryPipelineAction
  */
 
+import { appendContactChild } from './utils/contactWriteLifecycle.js';
 import { db } from './firebase-admin.js';
 import { FieldValue } from 'firebase-admin/firestore';
 import { logApiUsage } from './utils/logApiUsage.js';
@@ -235,7 +236,7 @@ async function moveStage(userId, contactId, params) {
   await contactRef.update(contactUpdate);
 
   // Write stage history record
-  await contactRef.collection('stageHistory').add({
+  await appendContactChild(db, contactRef, 'stageHistory', {
     from_stage: fromStage,
     to_stage,
     reason: reason || 'barry_chat',
@@ -353,7 +354,7 @@ async function logOutcome(userId, contactId, params) {
   await contactRef.update(contactUpdate);
 
   // Write to outcome log subcollection
-  await contactRef.collection('outcomeLog').add({
+  await appendContactChild(db, contactRef, 'outcomeLog', {
     outcome,
     notes: notes || null,
     logged_at: FieldValue.serverTimestamp(),

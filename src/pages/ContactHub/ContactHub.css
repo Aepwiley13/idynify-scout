@@ -20,6 +20,12 @@
   overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
 }
 .hub-inner { max-width: 960px; margin: 0 auto; }
+/* My People uses the room it is given, now that its navigation is in the
+   application sidebar: the list and the table fill the content area, up to a
+   width that still reads comfortably on a very wide screen. A person's page
+   keeps its own narrower measure. */
+.hub-inner:has(> .hub-workspace) { max-width: 1360px; }
+.hub-workspace { min-width: 0; }
 
 @media (max-width: 768px) {
   /* The shell paints a phone's content area in the card colour. Here the page
@@ -27,14 +33,11 @@
   .hub {
     background: var(--bg-primary);
     /* The shell keeps 56px (plus the home-indicator inset) free at the bottom
-       of every module for its bottom bar (MainLayout.css). Contact Hub has no
-       bottom bar in Phase 1A (mobileNavigation.js: hidden), so that room was
-       an empty strip under the page. Take it back, and keep the inset as
-       padding so the last row clears the home indicator.
-       REMOVE THIS when Contact Hub gets a bottom bar: contactHubStyling.test.js
-       fails if the two fall out of step. */
-    margin-bottom: calc(-56px - env(safe-area-inset-bottom, 0px));
-    padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+       of every module for its bottom bar (MainLayout.css). Contact Hub has a
+       bottom bar now (mobileNavigation.js: My People · Sticker Wall), so that
+       room is the bar's and is left alone: the last row ends above it.
+       contactHubStyling.test.js holds the two in step. */
+    padding-bottom: 24px;
   }
   /* The shell's top bar already says "Contact Hub". The page heading stays
      for screen readers and the document outline, without repeating it. */
@@ -57,11 +60,18 @@
 
 /* ── Toolbar: title, search, Add Person ── */
 .hub-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
-.hub-section-title { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; margin: 0; flex: 1 1 0; min-width: 0; }
+.hub-heading { flex: 1 1 0; min-width: 0; }
+.hub-section-title { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; margin: 0; }
+.hub-subtitle { margin: 4px 0 0; font-size: 14px; }
+/* Search, and on a desktop the List / Table choice, on a row of their own. */
+.hub-tools { flex: 1 1 100%; display: flex; align-items: center; gap: 10px; min-width: 0; }
+.hub-tools-primary { flex: 1 1 260px; min-width: 150px; }
+.hub-tools-primary .hub-search { width: 100%; }
+.hub-tools-actions { display: flex; flex: 0 1 auto; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
 .hub-count { font-weight: 600; }
 
 .hub-search {
-  flex: 1 1 100%; display: flex; align-items: center; gap: 10px;
+  flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 10px;
   min-height: 52px; padding: 0 14px; border: 1px solid; border-radius: 14px; box-sizing: border-box;
 }
 .hub-search input {
@@ -85,7 +95,8 @@
   background: transparent; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
 }
 .hub-primary-btn:focus-visible, .hub-secondary-btn:focus-visible, .hub-chip:focus-visible,
-.hub-icon-btn:focus-visible, .hub-back:focus-visible, .hub-row-link:focus-visible {
+.hub-icon-btn:focus-visible, .hub-back:focus-visible, .hub-row-link:focus-visible,
+.hub-view-btn:focus-visible, .hub-td-link:focus-visible, .hub-link-btn:focus-visible {
   outline: 2px solid #4f46e5; outline-offset: 2px;
 }
 
@@ -199,8 +210,9 @@
   }
   .hub-title { font-size: 32px; }
   .hub-toolbar { gap: 14px; }
-  .hub-section-title { flex: 0 0 auto; margin-right: auto; font-size: 20px; font-weight: 700; letter-spacing: 0; }
-  .hub-search { flex: 1 1 160px; max-width: 280px; min-height: 48px; }
+  .hub-section-title { font-size: 22px; letter-spacing: 0; }
+  /* Full width: the most used control on the page gets the most room. */
+  .hub-search { min-height: 44px; }
   .hub-search input { font-size: 15px; }
   .hub-add-btn { padding: 0 20px; }
   .hub-chips { flex-wrap: wrap; overflow-x: visible; margin-top: 16px; }
@@ -267,3 +279,158 @@
 .hub-row-stickers--readonly .stk-chip--compact .stk-name { max-width: 110px; }
 .hub-row-stickers--readonly .stk-card-row { gap: 6px; flex-wrap: nowrap; }
 .hub-row-stickers--readonly .stk-card-more { font-size: 12px; }
+
+/* ══ Desktop workspace: List / Table, Show more ═══════════════════════════
+   None of this is the application shell. It all sits inside Contact Hub's
+   own content area, and HubPeople decides what to draw from the width that
+   area really has beside the sidebar, not from the size of the window. */
+
+/* ── Stickers could not be loaded ── */
+.hub-stickers-error {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px;
+  margin-top: 12px; padding: 10px 12px; border: 1px dashed; border-radius: 12px; font-size: 13px;
+}
+.hub-link-btn {
+  min-height: 32px; padding: 0; border: none; background: none; cursor: pointer;
+  font: inherit; font-weight: 700; text-decoration: underline;
+}
+
+/* ── The Sticker Wall, under its own name ── */
+.hub-back--wall { margin-bottom: 2px; }
+/* One title, the page's "Sticker Wall". The wall component is shared with
+   People and has a "Stickers" heading of its own; here it would say the same
+   thing twice, so only its New sticker button is kept, on the right. */
+.hub .stk-wall-title { display: none; }
+.hub .stk-wall-head { justify-content: flex-end; }
+
+/* ── On a phone: which sticker the list is filtered by, and how many ── */
+.hub-filter-note {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 12px;
+  margin: 12px 0 0; font-size: 14px;
+}
+.hub-filter-note .hub-link-btn { min-height: 44px; }
+
+/* ── List / Table ── */
+.hub-view { display: inline-flex; flex: none; border: 1px solid; border-radius: 12px; overflow: hidden; }
+.hub-view-btn {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 14px; border: none;
+  font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.hub-view-btn[aria-pressed="true"] { font-weight: 700; }
+
+/* ── Compact table ──
+   No overflow is set on the table or its rows: the sticker picker opens over
+   the rows below and must not be clipped. */
+.hub-table { margin-top: 14px; font-size: 14px; min-width: 0; }
+.hub-tr {
+  position: relative; display: grid; align-items: center; column-gap: 14px;
+  /* Stickers get the widest share: two chips and the add control on one line
+     keep every row one line tall. */
+  grid-template-columns: minmax(120px, 1.3fr) minmax(100px, 1fr) minmax(145px, 1.7fr) minmax(110px, 1.1fr) minmax(130px, 1.6fr);
+  min-height: 48px; padding: 6px 6px; border-top: 1px solid;
+}
+.hub-table--no-stickers .hub-tr { grid-template-columns: minmax(130px, 1.3fr) minmax(110px, 1.2fr) minmax(155px, 2fr) minmax(110px, 1.2fr); }
+.hub-tr--head { min-height: 34px; border-top: none; font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.hub-tr:not(.hub-tr--head):hover { background: rgba(127, 127, 127, 0.06); }
+.hub-td { min-width: 0; }
+.hub-td--name { display: flex; align-items: center; gap: 10px; }
+.hub-td--name .hub-avatar { width: 32px; height: 32px; font-size: 12px; flex: none; }
+/* In the table a long name wraps rather than being shortened: at spaces
+   first, and inside a word only when one word is wider than the column. */
+.hub-td--name .hub-row-link { flex: 1 1 auto; min-width: 0; font-size: 14px; white-space: normal; overflow-wrap: break-word; }
+.hub-td--wrap { overflow-wrap: break-word; }
+.hub-td--company { overflow-wrap: anywhere; }
+/* Above the stretched name link, so these are their own targets. */
+/* max-width: an inline block is otherwise as wide as its longest unbroken run,
+   which pushes a long address out of its column instead of wrapping it. */
+.hub-td-link { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 5px; max-width: 100%; padding: 6px 0; text-decoration: none; overflow-wrap: break-word; }
+.hub-td-link svg { display: none; flex: 0 0 auto; }
+.hub-td-link:hover { text-decoration: underline; }
+.hub-td--added { white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* The list's sticker cell rules assume the list's named grid areas, and hide
+   an empty cell. In the table the cell is a column and must keep its place. */
+.hub-table .hub-row-stickers { grid-area: auto; }
+.hub-table .hub-row-stickers:empty { display: block; }
+.hub-sr { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+@media (max-width: 768px) {
+  .hub-tools { align-items: stretch; flex-direction: column; gap: 8px; }
+  .hub-tools-primary { width: 100%; min-width: 0; flex: 1 1 auto; }
+  .hub-tools-actions { width: 100%; justify-content: flex-start; flex-wrap: wrap; overflow: visible; padding: 2px 1px 5px; }
+  .hub-tools-actions > * { flex: 0 0 auto; }
+  .hub-view { margin-left: auto; }
+  .hub-view-btn { min-height: 44px; padding: 0 11px; }
+  .hub-table { margin: 8px 0 0; }
+  .hub-table [role="rowgroup"]:first-child { display: none; }
+  .hub-table [role="rowgroup"]:last-child { display: grid; gap: 4px; }
+  .hub-table .hub-tr:not(.hub-tr--head) {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "name actions" "company company" "email phone" "stickers stickers";
+    gap: 0 8px; padding: 6px 4px; border: 1px solid var(--hub-border); border-radius: 10px;
+  }
+  .hub-table .hub-td { min-height: 24px; padding-left: 42px; font-size: 12px; line-height: 1.25; }
+  .hub-table .hub-td--name { grid-area: name; padding-left: 0; min-height: 40px; }
+  .hub-table .hub-td--name .hub-avatar { width: 36px; height: 36px; }
+  .hub-table .hub-td--name .hub-row-link { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .hub-table .hub-td--company { grid-area: company; }
+  .hub-table .hub-td--wrap { grid-area: email; }
+  .hub-table .hub-td--company::before { content: "Company · "; color: var(--hub-muted); font-weight: 600; }
+  .hub-table .hub-td--phone { grid-area: phone; }
+  .hub-table .hub-td-link { width: 100%; min-width: 0; white-space: nowrap; }
+  .hub-table .hub-td-link span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .hub-table .hub-td--wrap > span[aria-hidden="true"] { display: inline-block; min-height: 44px; padding-top: 13px; }
+  .hub-table .hub-row-stickers { grid-area: stickers; padding-left: 42px; }
+  .hub-table .hub-row-stickers .stk-card-row { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; scrollbar-width: none; }
+  .hub-table .hub-row-stickers .stk-card-row::-webkit-scrollbar { display: none; }
+  .hub-table .hub-row-actions { grid-area: actions; justify-content: flex-end; }
+  .hub-table .hub-td-link { min-height: 44px; padding: 0; }
+  .hub-table .hub-td-link svg { display: block; }
+}
+
+/* ── Show more (display paging only; see peopleRules.js) ── */
+.hub-more {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px;
+  margin-top: 12px; padding: 4px 2px 8px; font-size: 14px;
+}
+@media (min-width: 769px) {
+  .hub-more { margin-top: 0; padding: 14px 0 12px; border-top: 1px solid; }
+}
+
+/* ── Contact Hub's entries in the application sidebar (HubSidebarNav) ────────
+   Drawn inside the sidebar, so they use the sidebar's own colours. */
+.hub-sidenav { display: flex; flex-direction: column; gap: 1px; }
+/* One account's stickers can be many. Past this height the list scrolls on
+   its own, so the modules below Contact Hub stay within reach in a short
+   window; the sidebar's own scrolling still reaches everything. */
+.hub-sidenav-list {
+  list-style: none; margin: 4px 0 0; padding: 4px 0 0; display: flex; flex-direction: column; gap: 1px;
+  border-top: 1px solid var(--border);
+  max-height: min(38vh, 300px); overflow-y: auto; scrollbar-width: thin; overscroll-behavior: contain;
+}
+.hub-sidenav-item {
+  display: flex; align-items: center; gap: 8px; width: 100%; min-height: 36px;
+  padding: 5px 8px; border: none; border-radius: 8px; background: transparent;
+  color: var(--text-secondary); font-family: inherit; font-size: 0.8125rem; font-weight: 500;
+  text-align: left; cursor: pointer;
+}
+.hub-sidenav-item:hover { background: var(--bg-secondary); color: var(--text-primary); }
+.hub-sidenav-item:focus-visible { outline: 2px solid #7c3aed; outline-offset: -2px; }
+.hub-sidenav-item[aria-current], .hub-sidenav-item[aria-pressed="true"] {
+  background: rgba(124, 58, 237, 0.14); color: var(--text-primary); font-weight: 650;
+}
+.hub-sidenav-item > svg { flex-shrink: 0; }
+.hub-sidenav-item--new { margin-top: 2px; }
+/* A long sticker name wraps: it is never cut off behind a hover. */
+.hub-sidenav-name { flex: 1 1 auto; min-width: 0; overflow-wrap: break-word; }
+.hub-sidenav-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.hub-sidenav-count { flex-shrink: 0; font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.hub-stickers-error--sidenav { margin: 4px 0; padding: 6px 8px; font-size: 12px; flex-direction: column; align-items: flex-start; }
+
+.hub-select-contact {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 44px;
+}

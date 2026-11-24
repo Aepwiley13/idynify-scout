@@ -235,7 +235,7 @@ function logResolution(entry) {
 function single(signal, value, docs) {
   if (!docs || docs.length === 0) return null;
   const unique = [];
-  for (const d of docs) if (!unique.some(u => u.id === d.id)) unique.push(d);
+  for (const d of docs) if (d.contact_hub_lifecycle?.status !== 'retired' && !unique.some(u => u.id === d.id)) unique.push(d);
   if (unique.length === 1) return unique[0];
   throw new IdentityConflictError(signal, value, unique.map(d => d.id));
 }
@@ -407,6 +407,7 @@ export async function resolveContactCore(adapter, candidate, { source = 'unknown
   // 1 — existing Firestore contact ID. Decisive: it IS the canonical identity.
   if (identifiers.contactId) {
     const hit = await adapter.getById(identifiers.contactId);
+    if (hit?.contact_hub_lifecycle?.status === 'retired') throw new IdentityConflictError('firestore_id', identifiers.contactId, [hit.id]);
     if (hit) {
       Object.assign(result, {
         outcome: RESOLUTION.MATCHED,

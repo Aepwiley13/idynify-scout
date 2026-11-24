@@ -15,6 +15,7 @@ const timelineAdd = vi.fn().mockResolvedValue();
 const contactUpdate = vi.fn().mockResolvedValue();
 const txUpdate = vi.fn();
 let txGetResult;
+let contactExists;
 
 const ref = {};
 ref.doc = vi.fn(() => ref);
@@ -22,7 +23,8 @@ ref.update = contactUpdate;
 ref.collection = vi.fn(() => ({ doc: vi.fn(() => ref), add: timelineAdd }));
 
 const runTransaction = vi.fn(async (fn) => fn({
-  get: vi.fn().mockResolvedValue(txGetResult),
+  get: vi.fn().mockResolvedValue(runTransaction.mock.calls.length === 1 ? txGetResult : { exists: contactExists }),
+  set: (_ref, payload) => timelineAdd(payload),
   update: txUpdate,
 }));
 
@@ -53,6 +55,7 @@ function decodeBody(res) {
 }
 
 beforeEach(() => {
+  contactExists = true;
   timelineAdd.mockClear();
   contactUpdate.mockClear();
   txUpdate.mockClear();
@@ -94,7 +97,7 @@ describe('track-open handler', () => {
 
     expect(res.statusCode).toBe(200);
     expect(decodeBody(res).toString('ascii', 0, 6)).toBe(GIF_HEADER);
-    expect(runTransaction).toHaveBeenCalledTimes(1);
+    expect(runTransaction).toHaveBeenCalledTimes(2);
 
     const update = txUpdate.mock.calls[0][1];
     expect(update.openedCount).toEqual({ __increment: 1 });
@@ -105,7 +108,15 @@ describe('track-open handler', () => {
       type: 'email_opened',
       metadata: { cadenceId: 'cad1', gmailMessageId: 'trk-123' },
     });
-    expect(contactUpdate).toHaveBeenCalledWith({ last_opened_at: { __ts: 'server' } });
+    expect(txUpdate).toHaveBeenLastCalledWith(ref, { last_opened_at: { __ts: 'server' } });
+  });
+
+  it('records cadence metrics without creating a timeline for a deleted contact', async () => {
+    contactExists = false;
+    const data = Buffer.from(JSON.stringify({ userId: 'u1', cadenceId: 'cad1', contactId: 'c1' })).toString('base64');
+    expect((await handler({ queryStringParameters: { data } })).statusCode).toBe(200);
+    expect(txUpdate).toHaveBeenCalledTimes(1);
+    expect(timelineAdd).not.toHaveBeenCalled();
   });
 
   it('does not increment or write timeline on a repeat open (already opened)', async () => {

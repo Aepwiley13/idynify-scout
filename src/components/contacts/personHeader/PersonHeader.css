@@ -1,0 +1,415 @@
+/* PersonHeader: a person's identity card.
+
+   Colours are the shell's theme variables (src/index.css, set on html[data-theme])
+   and nothing else, so every theme works without a second sheet. The one exception
+   is the brand: --ph-purple, --ph-indigo and --ph-pink arrive from the design tokens
+   (PersonHeader.jsx). The purple is mixed toward the theme's own text colour, so it is
+   a deep purple on a light theme and a light one on a dark theme, and reads on both.
+
+   Layout follows the header's OWN width (a container query), not the screen's: the
+   same card is right in a 960px page, a narrow column or a phone. With no container
+   query support the base layout, the phone's, is used, which is always safe.
+
+   Every control (a link) is 44px to hit. Nothing here removes a focus outline. */
+
+.ph {
+  container-type: inline-size;
+  container-name: ph;
+  width: 100%;
+  box-sizing: border-box;
+  /* The accent used as text and icon colour. */
+  --ph-ink: #5b21b6;
+  --ph-tint: rgba(124, 58, 237, 0.10);
+  --ph-tint-strong: rgba(124, 58, 237, 0.16);
+  color: var(--text-primary);
+}
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .ph {
+    --ph-ink: color-mix(in srgb, var(--ph-purple) 60%, var(--text-primary));
+    --ph-tint: color-mix(in srgb, var(--ph-purple) 9%, var(--bg-card));
+    --ph-tint-strong: color-mix(in srgb, var(--ph-purple) 16%, var(--bg-card));
+  }
+}
+
+.ph ul { list-style: none; margin: 0; padding: 0; }
+.ph p, .ph h1, .ph h2, .ph h3, .ph h4, .ph h5, .ph h6 { margin: 0; }
+.ph-sr {
+  position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+}
+
+/* ── The card: the phone's layout first ── */
+.ph-card {
+  /* The photo's size: set here, on the card, because a container query styles what is inside the container. */
+  --ph-avatar: 76px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: "avatar identity" "contacts contacts" "stickers stickers";
+  column-gap: 16px;
+  row-gap: 16px;
+  align-items: start;
+  box-sizing: border-box;
+  padding: 18px 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: 22px;
+  background: var(--bg-card);
+  box-shadow: var(--shadow-card), 0 6px 22px rgba(124, 58, 237, 0.04);
+}
+
+/* ── Photo and initials ── */
+.ph-avatar-wrap { grid-area: avatar; align-self: start; position: relative; width: var(--ph-avatar); height: var(--ph-avatar); flex: 0 0 auto; }
+.ph-avatar {
+  display: flex; align-items: center; justify-content: center;
+  width: 100%; height: 100%; box-sizing: border-box;
+  border-radius: 50%; overflow: hidden;
+  background: linear-gradient(135deg, var(--ph-indigo), var(--ph-purple));
+  color: #fff;
+  box-shadow: 0 0 0 3px var(--bg-card), 0 0 0 4px var(--border), 0 6px 18px rgba(124, 58, 237, 0.18);
+}
+.ph-avatar-img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ph-avatar-initials {
+  font-size: calc(var(--ph-avatar) * 0.36); font-weight: 700; letter-spacing: 0.02em; line-height: 1;
+  white-space: nowrap; overflow: hidden; max-width: 100%;
+}
+/* Quiet: small, at the edge of the photo, with a ring in the card colour. */
+.ph-activity {
+  position: absolute; right: 2px; bottom: 2px; box-sizing: border-box;
+  width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid var(--bg-card);
+}
+.ph-activity--on { background: #1d9e75; }
+.ph-activity--off { background: #8a8a98; }
+
+/* ── Identity: name, subtitle, location ── */
+.ph-identity { grid-area: identity; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.ph-name {
+  text-align: left;
+  font-size: 24px; font-weight: 800; line-height: 1.15; letter-spacing: -0.01em; color: var(--text-primary);
+  overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; line-clamp: 3; overflow: hidden;
+}
+.ph-subtitle {
+  text-align: left;
+  font-size: 15px; line-height: 1.35; font-weight: 500; color: var(--text-secondary);
+  overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+.ph-subtitle-part { display: block; }
+.ph-sep { display: none; }
+.ph-location {
+  display: flex; align-items: flex-start; gap: 6px;
+  font-size: 14px; line-height: 1.35; color: var(--text-secondary); min-width: 0;
+}
+.ph-location-icon { flex: 0 0 auto; margin-top: 1px; color: var(--ph-ink); }
+.ph-location-text {
+  text-align: left; min-width: 0; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden;
+}
+
+/* ── Ways to reach them: pills, and a button-sized link for each profile ── */
+.ph-contacts { grid-area: contacts; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; }
+/* On a phone the phone and email are full width: the easiest thing to hit. */
+.ph-contact:not(.ph-contact--social) { flex: 1 1 100%; min-width: 0; }
+.ph-pill, .ph-social {
+  display: inline-flex; align-items: center; box-sizing: border-box;
+  min-height: 44px; border: 1px solid var(--border-2); border-radius: 999px;
+  background: var(--bg-card); color: var(--text-primary); text-decoration: none;
+}
+.ph-pill { gap: 10px; width: 100%; max-width: 100%; padding: 0 18px 0 14px; font-size: 15px; font-weight: 600; }
+/* The phone and email pills' border: the theme's own border colour, a little more lavender (30% of the accent text colour), so the pill reads
+   as a pill on both a light and a dark card. The profile links (.ph-social) keep the plain border. Hover and focus are unchanged: both are
+   more specific than this rule. */
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  .ph-pill { border-color: color-mix(in srgb, var(--ph-ink) 30%, var(--border-2)); }
+}
+.ph-pill-icon { flex: 0 0 auto; color: var(--ph-ink); }
+.ph-pill-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ph-social { justify-content: center; width: 44px; padding: 0; color: var(--ph-ink); }
+.ph-pill:hover, .ph-social:hover { background: var(--ph-tint); border-color: var(--ph-ink); }
+.ph-pill:focus-visible, .ph-social:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 2px; background: var(--ph-tint); }
+@media (prefers-reduced-motion: no-preference) {
+  .ph-pill, .ph-social { transition: background-color 0.15s ease, border-color 0.15s ease; }
+  /* The saving ring turns only for a person who has not asked for less motion; otherwise it stands still. */
+  .ph-spinner { animation: ph-spin 0.9s linear infinite; }
+}
+
+/* ── Stickers: soft pills in their own colours ── */
+.ph-stickers { grid-area: stickers; display: flex; flex-wrap: wrap; gap: 8px; min-width: 0; align-content: flex-start; }
+.ph-sticker {
+  display: inline-flex; align-items: center; gap: 7px; box-sizing: border-box;
+  max-width: 100%; min-width: 0; padding: 6px 13px 6px 11px;
+  border: 1.5px solid var(--ph-sticker-border); border-radius: 999px;
+  background: var(--ph-sticker-tint); color: var(--text-primary);
+  font-size: 14px; font-weight: 600; line-height: 1.25;
+}
+.ph-sticker-dot { flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%; background: var(--ph-sticker-dot); }
+.ph-sticker-emoji { flex: 0 0 auto; font-size: 15px; line-height: 1; }
+.ph-sticker-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* A row that is not there takes no room, and leaves no gap. (c: ways to reach them, s: stickers.) */
+.ph-card[data-layout="c1s0"] { grid-template-areas: "avatar identity" "contacts contacts"; }
+.ph-card[data-layout="c0s1"] { grid-template-areas: "avatar identity" "stickers stickers"; }
+.ph-card[data-layout="c0s0"] { grid-template-areas: "avatar identity"; }
+
+/* ── Tablet: photo and identity side by side, the ways to reach them under the identity,
+      the stickers on a row of their own ── */
+@container ph (min-width: 540px) {
+  .ph-card {
+    --ph-avatar: 96px;
+    grid-template-areas: "avatar identity" "avatar contacts" "stickers stickers";
+    column-gap: 22px;
+    row-gap: 14px;
+    padding: 24px;
+  }
+  .ph-card[data-layout="c1s0"] { grid-template-areas: "avatar identity" "avatar contacts"; }
+  .ph-card[data-layout="c0s1"] { grid-template-areas: "avatar identity" "stickers stickers"; }
+  .ph-card[data-layout="c0s0"] { grid-template-areas: "avatar identity"; }
+  .ph-name { font-size: 28px; }
+  /* .ph .ph-name: the reset above (.ph h2, specificity 0,1,1) would otherwise win over a bare class. */
+  .ph .ph-name { margin-bottom: 4px; }
+  .ph-subtitle { font-size: 16px; }
+  .ph-subtitle-part { display: inline; }
+  .ph-sep { display: inline; }
+  .ph-location { font-size: 15px; }
+  .ph-contact:not(.ph-contact--social) { flex: 0 1 auto; max-width: 100%; }
+  .ph-pill { width: auto; max-width: min(100%, 340px); }
+  .ph-stickers { margin-top: 4px; }
+}
+
+/* ── Desktop: photo, identity and the ways to reach them, the stickers at the top right ── */
+@container ph (min-width: 820px) {
+  .ph-card {
+    --ph-avatar: 112px;
+    /* The sticker column is as wide as its stickers, up to a third of the card: a lone Add sticker chip no longer reserves room the name and subtitle could use, and several stickers still wrap in the same 34%. */
+    grid-template-columns: auto minmax(0, 1fr) fit-content(34%);
+    grid-template-areas: "avatar identity stickers" "avatar contacts contacts";
+    column-gap: 28px;
+    padding: 28px 32px;
+    border-radius: 24px;
+  }
+  .ph-card[data-layout="c1s0"] { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "avatar identity" "avatar contacts"; }
+  .ph-card[data-layout="c0s1"] { grid-template-areas: "avatar identity stickers"; }
+  .ph-card[data-layout="c0s0"] { grid-template-columns: auto minmax(0, 1fr); grid-template-areas: "avatar identity"; }
+  .ph-name { font-size: 32px; }
+  .ph .ph-name { margin-bottom: 6px; }
+  .ph-subtitle { font-size: 17px; }
+  .ph-stickers { margin-top: 6px; }
+}
+
+/* ── Editing (H2-2). Drawn only when the parent makes editing usable; without it none of this is in the page.
+      Every control is 44px to hit. Colours are the theme variables and the accent, as above. ── */
+.ph-line { display: flex; align-items: flex-start; gap: 2px; min-width: 0; }
+.ph-line > .ph-name { flex: 0 1 auto; min-width: 0; align-self: center; }
+
+.ph-edit {
+  flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; padding: 0; border: 0; border-radius: 12px;
+  background: transparent; color: var(--ph-ink); cursor: pointer;
+}
+.ph-edit:hover { background: var(--ph-tint); }
+.ph-edit:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 2px; background: var(--ph-tint); }
+
+/* The title and the organization, each with its own control: one line where there is room, stacked on a phone. */
+.ph-subtitle--edit { display: flex; flex-direction: column; align-items: flex-start; overflow: visible; }
+/* The pencil follows its text and never wraps onto a line of its own; a long value is cut to one line, as the read-only header cuts it (the full text is its title, and the box shows all of it). */
+.ph-edit-part { display: flex; align-items: center; flex-wrap: nowrap; min-width: 0; max-width: 100%; }
+.ph-subtitle-text {
+  flex: 0 1 auto; min-width: 0; overflow-wrap: anywhere;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; line-clamp: 1; overflow: hidden;
+}
+.ph-add-field {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px;
+  border: 1px dashed var(--border-2); border-radius: 12px; background: transparent;
+  color: var(--text-secondary); font: inherit; cursor: pointer;
+}
+.ph-add-field:hover { background: var(--ph-tint); border-color: var(--ph-ink); }
+.ph-add-field:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 2px; background: var(--ph-tint); }
+
+/* The box, and what it says. */
+.ph-editor { display: flex; flex-direction: column; gap: 6px; width: 100%; min-width: 0; }
+/* The box and its Cancel share a row: the box takes what is left. */
+.ph-editor-row { display: flex; align-items: stretch; gap: 8px; min-width: 0; }
+.ph-editor-row > .ph-input { flex: 1 1 auto; width: auto; min-width: 0; }
+.ph-editor-row > .ph-editor-btn { flex: 0 0 auto; }
+.ph-input {
+  width: 100%; box-sizing: border-box; min-height: 44px; padding: 6px 12px;
+  border: 1.5px solid var(--ph-ink); border-radius: 12px;
+  background: var(--bg-card); color: var(--text-primary);
+  font: inherit; font-size: 16px; line-height: 1.3;
+}
+.ph-input--name { font-size: 24px; font-weight: 800; letter-spacing: -0.01em; }
+.ph-input:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 2px; }
+.ph-input[aria-invalid="true"] { border-color: var(--status-error); }
+.ph-input[aria-invalid="true"]:focus-visible { outline-color: var(--status-error); }
+.ph-editor-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; }
+.ph-editor-msg { flex: 1 1 12ch; }
+.ph-editor-msg, .ph-field-msg { margin: 0; font-size: 13px; line-height: 1.35; color: var(--status-error-text); }
+@supports (color: color-mix(in srgb, red 50%, blue)) {
+  /* Mixed toward the theme's own text, so the red reads on a light theme and on a dark one. */
+  .ph-editor-msg, .ph-field-msg { color: color-mix(in srgb, var(--status-error) 50%, var(--text-primary)); }
+}
+.ph-field-msg { flex-basis: 100%; }
+.ph-editor-actions { display: inline-flex; gap: 8px; }
+.ph-editor-btn {
+  min-height: 44px; min-width: 44px; padding: 0 14px; border: 1px solid var(--border-2); border-radius: 12px;
+  background: var(--bg-card); color: var(--ph-ink); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.ph-editor-btn:hover { background: var(--ph-tint); border-color: var(--ph-ink); }
+/* Cancel is the quiet one: muted text, the same outline. */
+.ph-editor-cancel { color: var(--text-secondary); font-weight: 500; }
+.ph-editor-btn:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 2px; background: var(--ph-tint); }
+
+/* Saving: a small ring where the pencil was. The value on the line is already the new one. */
+.ph-spinner {
+  display: inline-block; flex: 0 0 auto; width: 16px; height: 16px; box-sizing: border-box;
+  border: 2px solid var(--ph-tint-strong); border-top-color: var(--ph-ink); border-radius: 50%;
+}
+@keyframes ph-spin { to { transform: rotate(360deg); } }
+
+@container ph (min-width: 540px) {
+  .ph-subtitle--edit { flex-direction: row; flex-wrap: wrap; align-items: center; }
+  .ph-input--name { font-size: 28px; }
+}
+@container ph (min-width: 820px) {
+  .ph-input--name { font-size: 32px; }
+}
+
+/* ── The photo as a control (H2-3) and the sticker controls (H3). Drawn only when the parent supplies the callbacks. ── */
+.ph-avatar-btn {
+  display: block; width: var(--ph-avatar); height: var(--ph-avatar); padding: 0; border: 0; border-radius: 50%;
+  background: transparent; cursor: pointer; font: inherit; color: inherit;
+}
+.ph-avatar-btn:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 4px; }
+/* Change photo: 44px, at the photo's lower left (the activity dot is at the lower right). */
+.ph-photo-edit {
+  position: absolute; left: -6px; bottom: -6px; z-index: 2;
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  width: 44px; height: 44px; padding: 0; border: 1px solid var(--border-2); border-radius: 50%;
+  background: var(--bg-card); color: var(--ph-ink); cursor: pointer;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--ph-ink) 20%, transparent);
+}
+.ph-photo-edit:hover { background: var(--ph-tint); border-color: var(--ph-ink); }
+.ph-photo-edit:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 2px; background: var(--ph-tint); }
+.ph-photo-panel {
+  position: absolute; top: calc(100% + 10px); left: 0; z-index: 40;
+  box-sizing: border-box; width: 320px; max-width: calc(100cqw - 32px);
+  display: flex; flex-direction: column; gap: 8px; padding: 12px;
+  border: 1px solid var(--border-2); border-radius: 16px; background: var(--bg-card); color: var(--text-primary);
+  box-shadow: var(--shadow-card), 0 12px 32px color-mix(in srgb, var(--text-primary) 18%, transparent);
+}
+
+/* Remove: 32px to see, 44px to hit. The row gap grows (14px) so the touch areas of neighbouring rows never overlap. */
+.ph-stickers--editable { row-gap: 14px; }
+.ph-sticker-remove {
+  position: relative; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  width: 32px; height: 32px; margin: -8px -10px -8px -4px; padding: 0; border: 0; border-radius: 50%;
+  background: transparent; color: var(--text-secondary); cursor: pointer;
+}
+.ph-sticker-remove::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; }
+.ph-sticker-remove:hover:not(:disabled) { background: var(--ph-tint); color: var(--text-primary); }
+.ph-sticker-remove:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 0; }
+.ph-sticker-remove:disabled { cursor: default; }
+.ph-sticker[aria-busy="true"] { opacity: 0.75; }
+
+/* Add sticker: a soft dashed chip, 36px to see and 44px to hit. The picker opens against this item. */
+.ph-add-sticker-item { position: relative; display: flex; }
+.ph-add-sticker-item:has(.stk-picker--popover) { z-index: 61; }
+.ph-add-sticker {
+  position: relative; display: inline-flex; align-items: center; gap: 6px; box-sizing: border-box;
+  min-height: 36px; padding: 0 14px 0 10px; border-radius: 999px;
+  border: 1.5px dashed color-mix(in srgb, var(--ph-ink) 70%, transparent);
+  background: transparent; color: var(--ph-ink); cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 600; line-height: 1.25;
+}
+/* The 1.5px border sits outside the box this is measured from, so -5.5px makes the touch area 44px, not 42. */
+.ph-add-sticker::after { content: ""; position: absolute; inset: -5.5px 0; border-radius: 999px; }
+.ph-add-sticker:hover { background: var(--ph-tint); border-color: var(--ph-ink); }
+.ph-add-sticker:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 2px; background: var(--ph-tint); }
+.ph-add-sticker[aria-expanded="true"] { background: var(--ph-tint); border-style: solid; border-color: var(--ph-ink); }
+
+/* From the desktop layout the stickers are at the top right: the picker opens from the right edge of the chip, towards the page. */
+@container ph (min-width: 820px) {
+  .ph-add-sticker-item .stk-picker--popover { right: 0; left: auto; }
+}
+
+/* The photo panel's own rows (PhotoPanel draws them; the panel box is above). */
+.ph-photo-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.ph-editor-btn--primary { background: var(--ph-ink); border-color: var(--ph-ink); color: var(--bg-card); font-weight: 600; }
+.ph-editor-btn--primary:hover:not(:disabled) { background: var(--ph-ink); filter: brightness(1.08); }
+.ph-editor-btn:disabled { opacity: 0.6; cursor: default; }
+.ph-photo-confirm { color: var(--text-secondary); }
+
+.ph-sticker-strip {
+  grid-area: stickers;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.ph .ph-sticker-scroll {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 44px;
+  padding-inline: 2px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.ph-sticker-scroll:focus-visible { outline: 2px solid var(--ph-ink); outline-offset: -2px; border-radius: 8px; }
+.ph-sticker-scroll .ph-sticker { flex: 0 0 auto; max-width: 100%; white-space: nowrap; }
+.ph-sticker-strip .ph-add-sticker-item { flex: 0 0 auto; }
+.ph-sticker-strip .ph-add-sticker { width: 44px; min-height: 44px; justify-content: center; padding: 0; }
+.ph-sticker-strip .ph-add-sticker > span { display: none; }
+.ph-sticker-strip .ph-add-sticker::after { content: none; }
+
+.ph-avatar-btn--add .ph-avatar { flex-direction: column; gap: 3px; }
+.ph-avatar-add-label { font-size: 9px; font-weight: 650; line-height: 1.1; }
+.ph-identity:has(.ph-profile-menu) { position: relative; }
+.ph-profile-menu {
+  position: absolute;
+  inset: 0 0 auto auto;
+  z-index: 4;
+}
+.ph-identity:has(.ph-profile-menu) > :is(.ph-line--name, .ph-editor--name, .ph-name) {
+  margin-inline-end: 48px;
+  min-height: 44px;
+}
+.ph-profile-menu-trigger {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  color: var(--ph-ink);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  list-style: none;
+}
+.ph-profile-menu-trigger::-webkit-details-marker { display: none; }
+.ph-profile-menu :is(button, summary):focus-visible { outline: 2px solid var(--ph-ink); outline-offset: 1px; }
+.ph-profile-menu-actions {
+  position: absolute;
+  inset: calc(100% + 4px) 0 auto auto;
+  display: grid;
+  min-width: 156px;
+  border: 1px solid var(--border-2);
+  border-radius: 12px;
+  padding: 4px;
+  background: var(--bg-card);
+  color: var(--text-primary);
+  box-shadow: var(--shadow-card);
+}
+.ph-profile-menu:not([open]) .ph-profile-menu-actions { display: none; }
+.ph-profile-menu-actions button {
+  min-height: 44px;
+  text-align: start;
+  padding-inline: 10px;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  font: inherit;
+  color: inherit;
+}
+.ph-profile-menu-actions button:hover, .ph-profile-menu-trigger:hover { background: var(--ph-tint); }

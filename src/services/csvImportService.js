@@ -230,7 +230,7 @@ function csvNote(content, batchId, iso) {
  * }>}
  */
 export async function commitCsvImport(userId, previewRows, {
-  importName, fileName = null, now = new Date(), onProgress,
+  importName, fileName = null, correctCompanyName = true, now = new Date(), onProgress,
 } = {}) {
   const iso = now.toISOString();
   const batchId = makeBatchId(now);
@@ -259,6 +259,7 @@ export async function commitCsvImport(userId, previewRows, {
         email: contact.email || null,
       }, {
         source: 'csv_import',
+        correctCompanyName,
         // The user supplied this name in their file. Enrichment may not overwrite it.
         nameSource: NAME_SOURCE.USER,
       }));

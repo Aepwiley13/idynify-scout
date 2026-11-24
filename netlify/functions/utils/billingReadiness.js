@@ -26,8 +26,10 @@ export async function inspectBillingReadiness({ stripe, env, webhookUrl = 'https
     portal: {
       ready: false,
       configured: Boolean(env.STRIPE_PORTAL_CONFIGURATION_ID),
+      paymentMethods: false,
+      invoices: false,
       planChanges: false,
-      safeDowngrades: false,
+      planChangesDisabled: false,
       cancelAtPeriodEnd: false,
     },
     webhook: { ready: false, endpointFound: false, missingEvents: requiredEvents },
@@ -52,17 +54,15 @@ export async function inspectBillingReadiness({ stripe, env, webhookUrl = 'https
       const portal = await stripe.billingPortal.configurations.retrieve(env.STRIPE_PORTAL_CONFIGURATION_ID);
       const update = portal?.features?.subscription_update;
       const cancel = portal?.features?.subscription_cancel;
-      const prices = new Set((update?.products ?? []).flatMap((product) => product.prices ?? []));
-      checks.portal.planChanges = update?.enabled === true
-        && update.default_allowed_updates?.includes('price') === true
-        && prices.has(env.STRIPE_PRICE_STARTER)
-        && prices.has(env.STRIPE_PRICE_PRO);
-      checks.portal.safeDowngrades = checks.portal.planChanges
-        && update.schedule_at_period_end?.conditions?.some((condition) => condition.type === 'decreasing_item_amount') === true;
+      checks.portal.paymentMethods = portal?.features?.payment_method_update?.enabled === true;
+      checks.portal.invoices = portal?.features?.invoice_history?.enabled === true;
+      checks.portal.planChanges = update?.enabled === true;
+      checks.portal.planChangesDisabled = update?.enabled === false;
       checks.portal.cancelAtPeriodEnd = cancel?.enabled === true && cancel.mode === 'at_period_end';
       checks.portal.ready = portal?.active === true
-        && checks.portal.planChanges
-        && checks.portal.safeDowngrades
+        && checks.portal.paymentMethods
+        && checks.portal.invoices
+        && checks.portal.planChangesDisabled
         && checks.portal.cancelAtPeriodEnd;
     } catch (error) {
       checks.portal.errorCode = safeCode(error);

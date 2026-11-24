@@ -21,19 +21,19 @@ export default function StageTabBar({ contact, previewStage, onPreviewChange }) 
   const selectedTab = previewStage || activeStage;
 
   return (
-    // On a narrow screen the five stages can be wider than the page: the row
-    // scrolls on its own rather than widening the page (.page-content scrolls
-    // sideways when anything inside it is wider).
-    <div style={{
+    // On a narrow screen the five stages can be wider than the page. The tabs
+    // wrap onto a second line rather than widening the page (.page-content
+    // scrolls sideways when anything inside it is wider), or scrolling inside
+    // the row, which hid "Reinforcements" past the edge at 375–390px.
+    <div data-testid="stage-tab-bar" style={{
       display: 'flex',
+      flexWrap: 'wrap',
       gap: 4,
       padding: '4px',
       background: T.surface,
       border: `1px solid ${T.border}`,
       borderRadius: 12,
       minWidth: 0,
-      overflowX: 'auto',
-      scrollbarWidth: 'none',
     }}>
       {PIPELINE_STAGES.map((stageId, idx) => {
         const stage = STAGE_MAP[stageId];

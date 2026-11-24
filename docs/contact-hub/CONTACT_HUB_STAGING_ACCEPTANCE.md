@@ -331,6 +331,22 @@ support and deny access to private photo payloads and OAuth credentials.
 Verify expiration, session teardown, cross-target denial, and that every
 mutation remains inaccessible. Keep direct Firestore ownership rules intact.
 
+## Follow-up: stickers configuration and affiliation authentication
+
+On the isolated staging diagnostic candidate, authenticated `stickersConfig`
+requests returned HTTP 500 with sanitized Firestore SDK code `2` (`UNKNOWN`)
+during configuration reads. The affiliation writer returned HTTP 401 with
+`app/invalid-credential` while verifying the ID token with revocation checks.
+These observations identify the failing operations, not a confirmed root
+cause. The diagnostic build logs only normalized error codes; it does not log
+tokens, UIDs, contact data, credential contents or provider messages.
+
+Keep these as separate staging follow-ups. Do not weaken token verification,
+ownership checks or Firestore rules. Keep Contact Hub unavailable in production
+by leaving `VITE_CONTACT_HUB` unset, and keep `CONTACT_HUB_AFFILIATIONS` off
+until the staging failures are corrected and verified. Do not treat the
+sanitized logging as a functional fix.
+
 ## Unified Contact Hub acceptance and rollback
 
 | Coverage | Acceptance evidence |

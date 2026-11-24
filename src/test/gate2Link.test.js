@@ -52,6 +52,7 @@ function makeCollection(name, filters = [], cap = null) {
         async set(data) {
           WRITES.push({ collection: name, id: docId, op: 'set', data });
           rows().push({ ...data, id: docId });
+          if (name === 'timeline') TIMELINE.push(data);
         },
       };
     },
@@ -71,7 +72,14 @@ function makeCollection(name, filters = [], cap = null) {
 }
 
 vi.mock('../../netlify/functions/firebase-admin.js', () => ({
-  db: { collection: (n) => makeCollection(n === 'users' ? 'users' : n) },
+  db: {
+    collection: (n) => makeCollection(n === 'users' ? 'users' : n),
+    runTransaction: async (callback) => callback({
+      get: (ref) => ref.get(),
+      set: (ref, data) => ref.set(data),
+      update: (ref, data) => ref.update(data),
+    }),
+  },
   admin: {},
 }));
 vi.mock('../../netlify/functions/utils/verifyAuthToken.js', () => ({

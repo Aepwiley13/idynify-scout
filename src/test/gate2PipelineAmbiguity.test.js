@@ -57,7 +57,15 @@ const userDoc = {
 };
 
 vi.mock('../../netlify/functions/firebase-admin.js', () => ({
-  db: { collection: () => ({ doc: () => userDoc }) },
+  db: {
+    collection: () => ({ doc: () => userDoc }),
+    doc: () => ({ get: async () => ({ exists: false }) }),
+    runTransaction: async (callback) => callback({
+      get: (ref) => ref.get(),
+      set: (ref, data) => ref.set(data),
+      update: (ref, data) => ref.update(data),
+    }),
+  },
   admin: {},
 }));
 vi.mock('../../netlify/functions/utils/logApiUsage.js', () => ({ logApiUsage: async () => {} }));

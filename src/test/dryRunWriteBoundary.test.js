@@ -107,6 +107,7 @@ function makeDb({ contactExists = true, existingComm = false } = {}) {
     runTransaction: async (fn) => fn({
       get: async (ref) => ref.get(),
       create: (ref, data) => { writes.push({ op: 'create', path: ref._path, data }); },
+      set: (ref, data) => { writes.push({ op: 'set', path: ref._path, data }); },
       update: (ref, data) => { writes.push({ op: 'update', path: ref._path, data }); },
     }),
   };

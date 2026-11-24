@@ -718,7 +718,8 @@ describe('the editing stylesheet', () => {
   });
 
   it('the boxes are 16px or larger, so a phone does not zoom into them', () => {
-    expect(decl('.ph-input')).toMatch(/font-size:\s*(?:1[6-9]|[2-9]\d)px/);
+    expect(decl('.ph-input')).toContain('font-size: var(--text-md)');
+    expect(indexCss).toContain('--text-md:   1rem');
   });
 
   it('a focused control always has a visible outline', () => {
@@ -736,8 +737,8 @@ describe('the editing stylesheet', () => {
 
   const themeVars = (selector) => {
     const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const block = indexCss.match(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`))?.[1] ?? '';
-    return Object.fromEntries([...block.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
+    const blocks = [...indexCss.matchAll(new RegExp(`${escaped}\\s*\\{([^}]*)\\}`, 'g'))].map((match) => match[1]);
+    return Object.fromEntries(blocks.flatMap((block) => [...block.matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()])));
   };
   const rootVars = themeVars(':root');
   const rgb = (hex) => { const h = hex.replace('#', ''); return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16)); };

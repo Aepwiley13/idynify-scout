@@ -600,11 +600,12 @@ describe('the crop dialog', () => {
 
 // ── In the form ────────────────────────────────────────────────────────────────
 
-function Page({ initial = newCard(), preparePhoto = fakePrepare(), disabled = false, onDraft }) {
+function Page({ initial = newCard(), preparePhoto = fakePrepare(), disabled = false, onDraft, editing = true }) {
   const draft = useCardDraft(initial);
   onDraft?.(draft);
   return (
     <MyCardLayout
+      editing={editing}
       editor={(
         <MyCardEditor
           card={draft.card}

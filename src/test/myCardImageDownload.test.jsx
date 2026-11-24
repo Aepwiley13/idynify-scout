@@ -12,7 +12,7 @@
  * and looked at in real Chrome; jsdom has no canvas, so here it is a stand-in.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, renderHook, screen, within, act, waitFor } from '@testing-library/react';
+import { render, renderHook, screen, within, act, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -49,6 +49,7 @@ function installService(card = savedCard()) {
 const open = async (card) => {
   installService(card);
   render(<MemoryRouter><MyCardPage /></MemoryRouter>);
+  fireEvent.click(await screen.findByRole('button', { name: 'Edit Card' }));
   await screen.findByRole('form', { name: 'Edit your card' });
 };
 const imageButton = () => screen.getByRole('button', { name: 'Download card image' });

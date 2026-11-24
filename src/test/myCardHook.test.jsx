@@ -401,7 +401,7 @@ describe('saving', () => {
     await edit(t, 'title', 'Director');
     let result;
     await act(async () => { result = await t.now().actions.save(); });
-    expect(result).toEqual({ status: 'saved' });
+    expect(result).toEqual({ status: 'saved', hasUnsavedChanges: false });
     expect(t.service.saveMyCard).toHaveBeenCalledTimes(1);
     const [sent, options] = t.service.saveMyCard.mock.calls[0];
     expect(sent.title).toBe('Director');

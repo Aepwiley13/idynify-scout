@@ -119,13 +119,13 @@ describe('My Card in the sidebar', () => {
     expect(entries(nav)).toEqual(['My Card', 'My People', 'Sticker Wall']);
     expect(lit(nav)).toEqual(['My Card']);
     expect(within(nav).getByRole('button', { name: 'My People' })).not.toHaveAttribute('aria-current');
-    await screen.findByRole('form', { name: 'Edit your card' });
+    await screen.findByRole('button', { name: 'Edit Card' });
   });
 
   it('opening My Card does not load the user\'s people or the sticker registry: no count, no sticker filters, no New sticker', async () => {
     renderApp('/contact-hub/my-card');
     const nav = await hubNav();
-    await screen.findByRole('form', { name: 'Edit your card' });
+    await screen.findByRole('button', { name: 'Edit Card' });
     await within(nav).findByRole('button', { name: 'Sticker Wall' });
     expect(people.loads).toBe(0);
     // The Sticker Wall needs only the server's answer: nothing is subscribed, and nothing of the people is read.
@@ -151,7 +151,7 @@ describe('My Card in the sidebar', () => {
 
     await user.click(within(nav).getByRole('button', { name: 'My Card' }));
     expect(screen.getByTestId('at')).toHaveTextContent('/contact-hub/my-card');
-    await screen.findByRole('form', { name: 'Edit your card' });
+    await screen.findByRole('button', { name: 'Edit Card' });
     nav = await hubNav();
     expect(lit(nav)).toEqual(['My Card']);
     expect(people.loads).toBe(1);
@@ -167,6 +167,7 @@ describe('My Card in the sidebar', () => {
     const user = userEvent.setup();
     renderApp('/contact-hub/my-card');
     let nav = await hubNav();
+    await user.click(await screen.findByRole('button', { name: 'Edit Card' }));
     const title = await screen.findByLabelText('Title');
     await user.clear(title);
     await user.type(title, 'Director of Mathematics');
@@ -178,6 +179,7 @@ describe('My Card in the sidebar', () => {
     await user.click(within(nav).getByRole('button', { name: 'My Card' }));
 
     expect(await screen.findByText('We restored the changes you hadn\'t saved')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Edit Card' }));
     expect(screen.getByLabelText('Title')).toHaveValue('Director of Mathematics');
     expect(mocks.service.saveMyCard).not.toHaveBeenCalled();
   });
@@ -221,7 +223,7 @@ describe('the Sticker Wall in the sidebar, from My Card', () => {
     fake.current.state.config = answer;
     renderApp('/contact-hub/my-card');
     const nav = await hubNav();
-    await screen.findByRole('form', { name: 'Edit your card' });
+    await screen.findByRole('button', { name: 'Edit Card' });
     await waitFor(() => expect(fake.current.state.configFetches).toBeGreaterThan(0));
     expect(entries(nav)).toEqual(['My Card', 'My People']);
     expect(within(globalNav()).queryByRole('button', { name: /sticker/i })).toBeNull();
@@ -234,7 +236,7 @@ describe('the Sticker Wall in the sidebar, from My Card', () => {
     fake.current.services.fetchStickersConfig = () => new Promise((resolve) => { answer = resolve; });
     renderApp('/contact-hub/my-card');
     const nav = await hubNav();
-    await screen.findByRole('form', { name: 'Edit your card' });
+    await screen.findByRole('button', { name: 'Edit Card' });
     expect(entries(nav)).toEqual(['My Card', 'My People']);
     answer(config());
     expect(await within(nav).findByRole('button', { name: 'Sticker Wall' })).toBeInTheDocument();
@@ -244,6 +246,7 @@ describe('the Sticker Wall in the sidebar, from My Card', () => {
     renderApp('/contact-hub/my-card');
     const nav = await hubNav();
     await within(nav).findByRole('button', { name: 'Sticker Wall' });
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit Card' }));
     await userEvent.type(await screen.findByLabelText('Title'), ' lead');
     expect(fake.current.state.configFetches).toBe(1);
   });

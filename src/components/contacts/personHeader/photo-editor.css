@@ -12,7 +12,7 @@
 .cp-photo-editor form { display: grid; gap: 14px; }
 .cp-photo-editor header, .cp-photo-editor footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .cp-photo-editor footer { justify-content: end; }
-.cp-photo-editor h2 { font-size: 1.2rem; font-weight: 750; }
+.cp-photo-editor h2 { font-size: 1.2rem; font-weight: 700; }
 .cp-photo-editor button, .cp-photo-editor input:not([type="file"]) {
   min-height: 44px; border: 1px solid var(--border-2); border-radius: 10px;
   color: inherit; padding: 8px 12px; background: transparent;

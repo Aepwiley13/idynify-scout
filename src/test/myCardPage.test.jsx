@@ -141,6 +141,14 @@ describe('loading', () => {
     expect(screen.getByRole('button', { name: 'Download contact' })).toBeEnabled();
   });
 
+  it('labels the live card preview when editing has made unsaved changes', async () => {
+    await open();
+    expect(screen.queryByText('Preview includes unsaved changes')).toBeNull();
+    await typeInto(userEvent.setup(), 'Title', 'Community Director');
+    expect(screen.getByText('Preview includes unsaved changes')).toHaveAttribute('role', 'status');
+    expect(screen.getByRole('article', { name: 'Card for Ada Lovelace' })).toHaveTextContent('Community Director');
+  });
+
   it('starts a card that was never saved as a new one, filled in from what the account knows, and saves nothing', async () => {
     const { service } = await open({
       load: missingResult(),

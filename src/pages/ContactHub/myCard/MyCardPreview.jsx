@@ -57,7 +57,7 @@ function Row({ icon, label, children }) {
  * @param {object} props.card  the draft's card
  * @param {boolean} [props.sharing]  whether the card can be seen by anyone yet. It cannot, for now.
  */
-export default function MyCardPreview({ card, sharing = false }) {
+export default function MyCardPreview({ card, sharing = false, hasUnsavedChanges = false }) {
   const view = previewOf(card);
   const hidden = unsharedFields(card);
   const hasDetails = view && (view.email || view.phone || view.linkedinUrl || view.instagram || view.website);
@@ -65,6 +65,7 @@ export default function MyCardPreview({ card, sharing = false }) {
   return (
     <section className="mycard-preview" aria-labelledby="mycard-preview-title">
       <h2 id="mycard-preview-title" className="mycard-preview-title">What people will see</h2>
+      {hasUnsavedChanges ? <p className="mycard-preview-unsaved" role="status">Preview includes unsaved changes</p> : null}
 
       {view ? (
         <article className="mycard-card" aria-label={`Card for ${view.name}`} style={BRAND_SURFACE}>

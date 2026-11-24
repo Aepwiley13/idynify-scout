@@ -19,7 +19,7 @@
   flex: 1 1 auto; min-height: 0;
   overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch;
 }
-.hub-inner { max-width: 960px; margin: 0 auto; }
+.hub-inner { max-width: 1080px; margin: 0 auto; }
 /* My People uses the room it is given, now that its navigation is in the
    application sidebar: the list and the table fill the content area, up to a
    width that still reads comfortably on a very wide screen. A person's page
@@ -191,7 +191,7 @@
 .hub-dialog-title { font-size: 20px; font-weight: 800; margin: 0; }
 
 /* ── One person ── */
-.hub-person { max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+.hub-person { max-width: 1080px; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
 .hub-person .hub-back { margin-bottom: -8px; }
 .hub-back {
   display: inline-flex; align-items: center; gap: 6px; align-self: flex-start;
@@ -241,6 +241,10 @@
     width: min(560px, calc(100vw - 48px)); max-height: calc(100vh - 48px);
     border-width: 1px; border-radius: 18px; padding: 22px 24px; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.28);
   }
+}
+
+@media (max-width: 768px) {
+  .hub-person { gap: 16px; }
 }
 
 /* Beside the sidebar a tablet or a small window leaves about 550 to 850px:

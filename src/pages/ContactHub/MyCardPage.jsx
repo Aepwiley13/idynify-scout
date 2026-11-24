@@ -173,7 +173,7 @@ function MyCardPageAccount({ uid, isImpersonating }) {
       )}
       preview={(
         <>
-          <MyCardPreview card={draft.card} />
+          <MyCardPreview card={draft.card} hasUnsavedChanges={editingCard && draft.dirty} />
           <MyCardDownload
             available={download.available}
             onDownload={handleDownload}

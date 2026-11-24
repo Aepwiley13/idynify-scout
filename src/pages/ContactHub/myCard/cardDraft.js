@@ -37,21 +37,21 @@ export const FIELD_META = Object.freeze({
   photoUrl: {
     // The field is the person's PHOTO, whether they uploaded it or pasted a link: that is what it is called in a
     // conflict or a repair. Only the box under "Advanced" is a "Photo link".
-    label: 'Photo', linkLabel: 'Photo link', shareLabel: 'Photo', type: 'text', inputMode: 'url', autoComplete: 'off', placeholder: 'https://…',
+    label: 'Photo', linkLabel: 'Photo link', shareLabel: 'Photo', type: 'text', inputMode: 'url', autoComplete: 'off', placeholder: 'Add photo URL',
     hint: 'A link to a picture, starting with https://. Your initials are used without one.',
   },
-  firstName: { label: 'First name', type: 'text', inputMode: 'text', autoComplete: 'given-name', placeholder: 'Ada', hint: null },
-  lastName: { label: 'Last name', type: 'text', inputMode: 'text', autoComplete: 'family-name', placeholder: 'Lovelace', hint: null },
-  title: { label: 'Title', type: 'text', inputMode: 'text', autoComplete: 'organization-title', placeholder: 'Founder', hint: null },
-  organization: { label: 'Organization', type: 'text', inputMode: 'text', autoComplete: 'organization', placeholder: 'Analytical Engines', hint: null },
-  email: { label: 'Email', type: 'text', inputMode: 'email', autoComplete: 'email', placeholder: 'you@example.com', hint: null },
-  phone: { label: 'Phone', type: 'text', inputMode: 'tel', autoComplete: 'tel', placeholder: '+1 555 010 2000', hint: null },
+  firstName: { label: 'First name', type: 'text', inputMode: 'text', autoComplete: 'given-name', placeholder: 'Add first name', hint: null },
+  lastName: { label: 'Last name', type: 'text', inputMode: 'text', autoComplete: 'family-name', placeholder: 'Add last name', hint: null },
+  title: { label: 'Title', type: 'text', inputMode: 'text', autoComplete: 'organization-title', placeholder: 'Add job title', hint: null },
+  organization: { label: 'Organization', type: 'text', inputMode: 'text', autoComplete: 'organization', placeholder: 'Add organization', hint: null },
+  email: { label: 'Email', type: 'text', inputMode: 'email', autoComplete: 'email', placeholder: 'Add email address', hint: null },
+  phone: { label: 'Phone', type: 'text', inputMode: 'tel', autoComplete: 'tel', placeholder: 'Add phone number', hint: null },
   linkedinUrl: {
-    label: 'LinkedIn', type: 'text', inputMode: 'url', autoComplete: 'off', placeholder: 'linkedin.com/in/your-name',
+    label: 'LinkedIn', type: 'text', inputMode: 'url', autoComplete: 'off', placeholder: 'Add LinkedIn profile URL',
     hint: 'Your profile link.',
   },
-  instagram: { label: 'Instagram', type: 'text', inputMode: 'text', autoComplete: 'off', placeholder: '@yourname', hint: 'Your name or profile link.' },
-  website: { label: 'Website', type: 'text', inputMode: 'url', autoComplete: 'url', placeholder: 'example.com', hint: null },
+  instagram: { label: 'Instagram', type: 'text', inputMode: 'text', autoComplete: 'off', placeholder: 'Add Instagram handle', hint: 'Your name or profile link.' },
+  website: { label: 'Website', type: 'text', inputMode: 'url', autoComplete: 'url', placeholder: 'Add website URL', hint: null },
 });
 
 /** The text of a field as a person would see it typed: trimmed, runs of space made one. */

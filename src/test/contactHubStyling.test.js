@@ -136,6 +136,12 @@ describe('controls stay big enough to tap', () => {
 });
 
 describe('the desktop workspace', () => {
+  it('gives Contact Profile a 1080px reading area while preserving My People width', () => {
+    expect(hubCss).toMatch(/\.hub-inner\s*\{\s*max-width:\s*1080px/);
+    expect(hubCss).toMatch(/\.hub-person\s*\{\s*max-width:\s*1080px/);
+    expect(hubCss).toMatch(/\.hub-inner:has\(> \.hub-workspace\)\s*\{\s*max-width:\s*1360px/);
+  });
+
   it('the table and its rows set no overflow, so the sticker picker is never clipped', () => {
     for (const selector of ['.hub-table', '.hub-tr', '.hub-td']) {
       expect(declarations(hubCss, selector)).not.toMatch(/overflow(-x|-y)?\s*:/);

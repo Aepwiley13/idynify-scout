@@ -53,6 +53,14 @@ function respond(statusCode, payload) {
   return { statusCode, headers: { ...HEADERS }, body: JSON.stringify(payload) };
 }
 
+// SDK error codes help distinguish a staging credential/configuration failure
+// from a data issue. Never log provider messages, tokens, UIDs or document paths.
+function safeErrorCode(error) {
+  if (Number.isInteger(error?.code)) return String(error.code);
+  return typeof error?.code === 'string' && /^[a-zA-Z0-9._/-]{1,64}$/.test(error.code)
+    ? error.code : 'unknown';
+}
+
 function failure(code) {
   console.warn('stickersConfig', { outcome: code });
   return respond(FAILURES[code], { error: code });
@@ -91,7 +99,11 @@ export const handler = async (event) => {
     const config = await resolveStickersConfig(db, userId);
     return respond(200, { ...config, readOnly: viewingAs });
   } catch (error) {
-    console.error('stickersConfig', { outcome: CODES.INTERNAL_ERROR, errorName: error?.name ?? 'Error' });
+    console.error('stickersConfig', {
+      outcome: CODES.INTERNAL_ERROR,
+      errorName: error?.name ?? 'Error',
+      errorCode: safeErrorCode(error),
+    });
     return respond(500, { error: CODES.INTERNAL_ERROR });
   }
 };

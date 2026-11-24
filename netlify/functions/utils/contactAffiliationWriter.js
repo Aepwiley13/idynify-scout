@@ -7,6 +7,8 @@ const exact = (value, keys) => value && typeof value === 'object' && !Array.isAr
   && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const json = (statusCode, body) => ({ statusCode, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify(body) });
 const versionOf = (snap) => snap.updateTime ? `${snap.updateTime.seconds}:${snap.updateTime.nanoseconds}` : null;
+const safeErrorCode = (error) => Number.isInteger(error?.code) ? String(error.code)
+  : typeof error?.code === 'string' && /^[a-zA-Z0-9._/-]{1,64}$/.test(error.code) ? error.code : 'unknown';
 
 export function createContactAffiliationWriter({ db, verifyToken, enabled, timestamp }) {
   return async (event) => {
@@ -14,7 +16,12 @@ export function createContactAffiliationWriter({ db, verifyToken, enabled, times
     if (event.httpMethod !== 'POST') return json(405, { error: 'method' });
     const bearer = (event.headers?.authorization ?? event.headers?.Authorization ?? '').match(/^Bearer (\S+)$/i)?.[1];
     let actor;
-    try { actor = bearer && await verifyToken(bearer); } catch { return json(401, { error: 'sign_in' }); }
+    try { actor = bearer && await verifyToken(bearer); } catch (error) {
+      // Keep the client response generic, but retain only a normalized SDK code
+      // so staging can distinguish revoked tokens from a runtime IAM failure.
+      console.warn('contactHubAffiliations', { outcome: 'token_verification_failed', errorCode: safeErrorCode(error) });
+      return json(401, { error: 'sign_in' });
+    }
     if (!validId(actor?.uid)) return json(401, { error: 'sign_in' });
     if (actor.firebase?.sign_in_provider === 'custom') return json(403, { error: 'read_only' });
     let input;

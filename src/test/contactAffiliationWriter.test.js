@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createContactAffiliationWriter } from '../../netlify/functions/utils/contactAffiliationWriter.js';
 
 function harness({ owner = true, impersonated = false } = {}) {
@@ -42,6 +42,18 @@ const affiliation = { id: 'role-1', organization_name: 'T-Mobile', company_id: '
   status: 'current', primary: true, provenance: [] };
 
 describe('trusted affiliation writes', () => {
+  it('keeps token failures generic to callers and logs only a safe SDK error code', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const handler = createContactAffiliationWriter({ db: {}, enabled: () => true,
+      timestamp: () => 'now', verifyToken: async () => { throw Object.assign(new Error('secret token and private details'), { code: 'auth/id-token-revoked' }); } });
+    const response = await handler({ httpMethod: 'POST', headers: { authorization: 'Bearer token-not-logged' }, body: '{}' });
+    expect(response.statusCode).toBe(401);
+    expect(JSON.parse(response.body)).toEqual({ error: 'sign_in' });
+    expect(warn).toHaveBeenCalledWith('contactHubAffiliations', { outcome: 'token_verification_failed', errorCode: 'auth/id-token-revoked' });
+    expect(warn.mock.calls.flat().join(' ')).not.toMatch(/secret token|private details|token-not-logged/);
+    warn.mockRestore();
+  });
+
   it('derives legacy affiliation provenance and atomically projects all primary fields', async () => {
     const { request, rows } = harness();
     const result = await request([affiliation]);

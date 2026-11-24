@@ -18,11 +18,12 @@ import { EXIF, fingerprintOf, photoDataUrl } from './helpers/photoFixtures';
 import { buildCardSuggestions } from '../utils/myCardSuggestions';
 
 /** What a page does: holds the draft, and puts the editor and the preview in the layout. */
-function Page({ initial = newCard(), suggestions = null, onSubmit, onDraft, actions = null, disabled = false, preparePhoto }) {
+function Page({ initial = newCard(), suggestions = null, onSubmit, onDraft, actions = null, disabled = false, preparePhoto, editing = true }) {
   const draft = useCardDraft(initial);
   onDraft?.(draft);
   return (
     <MyCardLayout
+      editing={editing}
       actions={actions}
       editor={(
         <MyCardEditor
@@ -59,6 +60,17 @@ describe('the editor', () => {
     expect(screen.getByRole('button', { name: 'Upload photo' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Photo link')).toBeNull();
     expect(screen.getByRole('form', { name: 'Edit your card' })).toBeInTheDocument();
+  });
+
+  it('uses clear empty-field prompts instead of fictional example values', () => {
+    render(<Page />);
+    expect(field('Phone')).toHaveAttribute('placeholder', 'Add phone number');
+    expect(field('Email')).toHaveAttribute('placeholder', 'Add email address');
+    expect(field('First name')).toHaveAttribute('placeholder', 'Add first name');
+    expect(field('Title')).toHaveAttribute('placeholder', 'Add job title');
+    expect(field('Organization')).toHaveAttribute('placeholder', 'Add organization');
+    expect(preview()).not.toHaveTextContent('+1 555 010 2000');
+    expect(preview()).not.toHaveTextContent('Ada Lovelace');
   });
 
   it('groups them under headings', () => {
@@ -716,38 +728,34 @@ describe('the photo', () => {
 });
 
 describe('the layout', () => {
-  it('has both panels in the page, and a switch for a narrow screen that starts on Edit', () => {
+  it('renders the editor and live preview without obsolete Edit / Preview switches', () => {
     const { container } = render(<Page initial={named} />);
     expect(container.querySelector('.mycard')).toHaveAttribute('data-view', 'edit');
-    expect(screen.getByRole('button', { name: 'Edit', pressed: true })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Preview', pressed: false })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Preview' })).toBeNull();
     expect(screen.getByRole('form', { name: 'Edit your card' })).toBeInTheDocument();
     expect(preview()).toBeInTheDocument();
   });
 
-  it('switches between Edit and Preview with the mouse or the keyboard', async () => {
-    const user = userEvent.setup();
+  it('keeps the live preview in sync with changes typed in the editor', async () => {
     const { container } = render(<Page initial={named} />);
-    await user.click(screen.getByRole('button', { name: 'Preview' }));
-    expect(container.querySelector('.mycard')).toHaveAttribute('data-view', 'preview');
-    expect(screen.getByRole('button', { name: 'Preview' })).toHaveAttribute('aria-pressed', 'true');
-    screen.getByRole('button', { name: 'Edit' }).focus();
-    await user.keyboard('{Enter}');
+    await userEvent.clear(field('Title'));
+    await userEvent.type(field('Title'), 'Community Director');
     expect(container.querySelector('.mycard')).toHaveAttribute('data-view', 'edit');
+    expect(screen.getByRole('article', { name: 'Card for Ada Lovelace' })).toHaveTextContent('Community Director');
   });
 
-  it('keeps what was typed when switching panels', async () => {
-    const user = userEvent.setup();
-    render(<Page initial={named} />);
-    await user.type(field('Title'), 'Founder');
-    await user.click(screen.getByRole('button', { name: 'Preview' }));
-    await user.click(screen.getByRole('button', { name: 'Edit' }));
-    expect(field('Title')).toHaveValue('Founder');
+  it('can render the finished card first when requested', () => {
+    const { container } = render(<Page initial={named} editing={false} />);
+    expect(container.querySelector('.mycard')).toHaveAttribute('data-view', 'preview');
+    expect(screen.queryByRole('form', { name: 'Edit your card' })).toBeNull();
+    expect(preview()).toBeInTheDocument();
   });
 
   it('has a page heading, and room for a notice and for actions', () => {
     render(
       <MyCardLayout
+        editing
         editor={<p>editor</p>}
         preview={<p>preview</p>}
         notice={<p role="status">Your card changed in another tab.</p>}

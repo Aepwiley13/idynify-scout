@@ -74,7 +74,11 @@
   .mycard-grid { grid-template-columns: minmax(0, 1fr) 400px; align-items: start; gap: 24px; }
   /* The card stays in view while the form scrolls. */
   .mycard-pane--preview { position: sticky; top: 0; }
-  .mycard[data-editing="false"] .mycard-grid { grid-template-columns: minmax(0, 560px); justify-content: center; }
+  .mycard[data-editing="false"] .mycard-grid { grid-template-columns: minmax(0, 640px); justify-content: center; }
+}
+@media (min-width: 1200px) {
+  /* Give the working form and its live card preview comparable room on wide desktops. */
+  .mycard[data-editing="true"] .mycard-grid { grid-template-columns: minmax(0, 1.05fr) minmax(400px, .95fr); gap: 28px; }
 }
 
 /* ── Editor ── */
@@ -190,6 +194,12 @@
 
 /* ── Preview ── */
 .mycard-preview { display: flex; flex-direction: column; gap: 12px; }
+.mycard-preview-unsaved {
+  align-self: flex-start; margin: -4px 0 0; padding: 5px 10px;
+  border: 1px solid var(--border-2); border-radius: 999px;
+  background: var(--accent-bg); color: var(--text-primary);
+  font-size: 12px; font-weight: 600;
+}
 .mycard-preview-title {
   margin: 0; font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--text-secondary);

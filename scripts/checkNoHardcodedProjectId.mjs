@@ -95,6 +95,18 @@ const ALLOWED = new Map([
  * literal on the same line still fail. The list only shrinks, like ALLOWED.
  */
 const ALLOWED_LITERALS = new Map([
+  ['scripts/rules-check/contact-hub-gmail.mjs', {
+    literals: ['demo-contact-hub-gmail'],
+    why: 'Emulator fixture for the Contact Hub Gmail rules suite. Firebase reserves the "demo-" prefix for projects that cannot reach a real backend; this exact literal is safe by construction.',
+  }],
+  ['scripts/rules-check/contact-hub-merge.mjs', {
+    literals: ['demo-contact-hub-merge'],
+    why: 'Emulator fixture for the Contact Hub merge and affiliation rules suite. Firebase reserves the "demo-" prefix for projects that cannot reach a real backend; this exact literal is safe by construction.',
+  }],
+  ['scripts/rules-check/contact-photo.mjs', {
+    literals: ['demo-contact-photo'],
+    why: 'Emulator fixture for the Contact Hub private-photo rules suite. Firebase reserves the "demo-" prefix for projects that cannot reach a real backend; this exact literal is safe by construction.',
+  }],
   ['scripts/rules-check/my-card.mjs', {
     literals: ['demo-my-card'],
     why: 'Emulator fixture for the My Card rules suite. Firebase reserves the "demo-" prefix for projects that cannot reach a real backend, so this literal is safe by construction; it is allowed here by exact value, so nothing else in the file is excused.',

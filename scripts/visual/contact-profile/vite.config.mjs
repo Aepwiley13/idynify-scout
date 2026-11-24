@@ -25,7 +25,7 @@ const stub = (name) => fileURLToPath(new URL(`./stubs/${name}`, import.meta.url)
 export default defineConfig({
   root: fileURLToPath(new URL('../../..', import.meta.url)),
   envDir: fileURLToPath(new URL('./', import.meta.url)),
-  cacheDir: join(tmpdir(), 'idynify-contact-profile-vite'),
+  cacheDir: join(tmpdir(), 'contact-profile-vite-cache'),
   plugins: [react()],
   resolve: {
     alias: [

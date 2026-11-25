@@ -1,209 +1,102 @@
+/**
+ * Google's redirect back after the Gmail consent screen (CH-GMAIL-001).
+ *
+ * The Idynify user is taken ONLY from the single-use state stored at init and
+ * bound to this browser by cookie; nothing in the query string can name a
+ * user. Every outcome redirects back to the page that started the attempt
+ * with `gmail=<outcome>` (and `connected=true` on success). No page is
+ * rendered here, so nothing from the request is ever reflected into HTML.
+ */
 import { google } from 'googleapis';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { requireProjectId } from './utils/firebaseEnv.js';
+import { db } from './firebase-admin.js';
+import {
+  getGmailOAuthConfig, consumeGmailOAuthState, assertUsableGrant, connectionDocument,
+  integrationPath, readBindingCookie, clearBindingCookie, returnLocation,
+  GmailOAuthError, OUTCOMES, DEFAULT_RETURN_PATH,
+} from './utils/gmailOAuth.js';
 
-// Initialize Firebase Admin (only once)
-if (getApps().length === 0) {
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY
-    ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-    : undefined;
-
-  initializeApp({
-    credential: cert({
-      projectId: requireProjectId(),
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: privateKey
-    })
-  });
+function backTo(returnTo, outcome) {
+  return {
+    statusCode: 302,
+    headers: {
+      Location: returnLocation(returnTo || DEFAULT_RETURN_PATH, outcome),
+      'Set-Cookie': clearBindingCookie(),
+      'Cache-Control': 'no-store',
+      'Referrer-Policy': 'no-referrer',
+    },
+    body: '',
+  };
 }
 
-const db = getFirestore();
+/** Everything external is injected so the flow can be tested end to end. */
+export function createGmailOAuthCallbackHandler({ db: firestore, makeOAuthClient, readUserInfo }) {
+  return async (event) => {
+    if (event.httpMethod !== 'GET') return backTo(null, OUTCOMES.ERROR);
 
-export const handler = async (event) => {
-  // Only allow GET (OAuth callback)
-  if (event.httpMethod !== 'GET') {
-    return {
-      statusCode: 405,
-      body: 'Method not allowed'
-    };
-  }
-
-  // Declared out here on purpose: the catch below renders a Return link with
-  // it, and a `const` inside the try block is not in scope from the catch.
-  let safeReturnTo = null;
-
-  try {
-    // Extract OAuth code and state from query params.
-    // State format: "userId" or "userId|return_to_path" (pipe-delimited).
     const params = event.queryStringParameters || {};
-    const code = params.code;
-    const rawState = params.state || '';
-    const [userId, returnTo] = rawState.split('|');
-    // Sanitize return_to: must start with / and no protocol to prevent open redirect
-    safeReturnTo = (returnTo && returnTo.startsWith('/') && !returnTo.includes('//'))
-      ? returnTo
-      : null;
+    const binding = readBindingCookie(event.headers || {});
+    let uid = null;
+    let returnTo = null;
 
-    if (!code || !userId) {
-      console.error('❌ Missing code or state in OAuth callback');
-      return {
-        statusCode: 400,
-        headers: { 'Content-Type': 'text/html' },
-        body: `
-          <!DOCTYPE html>
-          <html>
-            <head><title>Gmail Connection Failed</title></head>
-            <body style="font-family: sans-serif; text-align: center; padding: 50px;">
-              <h1>❌ Connection Failed</h1>
-              <p>Missing authorization code or user ID.</p>
-              <a href="${safeReturnTo || '/hunter'}">Return</a>
-            </body>
-          </html>
-        `
-      };
+    try {
+      const config = getGmailOAuthConfig();
+
+      // Consume the state first, whatever else the query says, so a state is
+      // spent even when the user declined on Google's screen.
+      let consumed = null;
+      let stateError = null;
+      try {
+        consumed = await consumeGmailOAuthState(firestore, { state: params.state, binding });
+        ({ uid, returnTo } = consumed);
+      } catch (err) {
+        stateError = err;
+        returnTo = err.returnTo || null;
+      }
+
+      if (params.error) {
+        console.log('[gmail-oauth-callback] user declined:', String(params.error).slice(0, 64));
+        return backTo(returnTo, OUTCOMES.DENIED);
+      }
+      if (stateError) throw stateError;
+      if (typeof params.code !== 'string' || !params.code || params.code.length > 2048) {
+        throw new GmailOAuthError(OUTCOMES.MISSING_CODE, 'No authorization code');
+      }
+
+      const client = makeOAuthClient(config);
+      let tokens;
+      try {
+        ({ tokens } = await client.getToken({ code: params.code, codeVerifier: consumed.codeVerifier }));
+      } catch (err) {
+        throw new GmailOAuthError(OUTCOMES.TOKEN_FAILED, `Token exchange failed: ${err?.response?.data?.error || err.message}`);
+      }
+      assertUsableGrant(tokens);
+
+      client.setCredentials(tokens);
+      let info;
+      try {
+        info = await readUserInfo(client);
+      } catch (err) {
+        throw new GmailOAuthError(OUTCOMES.IDENTITY_FAILED, `userinfo failed: ${err.message}`);
+      }
+      const email = typeof info?.email === 'string' ? info.email.trim() : '';
+      if (!email || info.verified_email === false) {
+        throw new GmailOAuthError(OUTCOMES.IDENTITY_FAILED, 'Google returned no verified email address');
+      }
+
+      await firestore.doc(integrationPath(uid)).set(connectionDocument({ tokens, email }));
+
+      console.log('[gmail-oauth-callback] connected for user:', uid);
+      return backTo(returnTo, OUTCOMES.CONNECTED);
+    } catch (err) {
+      const outcome = err instanceof GmailOAuthError ? err.outcome : OUTCOMES.ERROR;
+      console.error('[gmail-oauth-callback] failed:', outcome, uid ? `user: ${uid}` : '', err.message);
+      return backTo(returnTo, outcome);
     }
+  };
+}
 
-    console.log('🔐 Processing Gmail OAuth callback for user:', userId);
-
-    // Validate Google OAuth environment variables
-    const googleClientId = process.env.GOOGLE_CLIENT_ID;
-    const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const googleRedirectUri = process.env.GOOGLE_REDIRECT_URI;
-
-    if (!googleClientId || !googleClientSecret || !googleRedirectUri) {
-      throw new Error('Google OAuth not configured');
-    }
-
-    // Create OAuth2 client
-    const oauth2Client = new google.auth.OAuth2(
-      googleClientId,
-      googleClientSecret,
-      googleRedirectUri
-    );
-
-    // Exchange code for tokens
-    console.log('🔄 Exchanging code for tokens...');
-    const { tokens } = await oauth2Client.getToken(code);
-
-    if (!tokens.access_token) {
-      console.error('❌ Missing access_token in OAuth response');
-      throw new Error('Failed to get access token from Google');
-    }
-
-    if (!tokens.refresh_token) {
-      console.error('❌ Missing refresh_token - user may have already authorized');
-      throw new Error('Failed to get refresh token. Please revoke access and try again.');
-    }
-
-    console.log('✅ Tokens received successfully');
-    console.log('📅 Token expires at:', new Date(tokens.expiry_date).toISOString());
-
-    // Set credentials to get user info
-    oauth2Client.setCredentials(tokens);
-
-    // Get user email via OAuth2 API (not Gmail API - avoids needing Gmail read scope)
-    console.log('🔄 Fetching user email via OAuth2 API...');
-    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
-    const userInfo = await oauth2.userinfo.get();
-    const email = userInfo.data.email;
-
-    if (!email) {
-      console.error('❌ No email returned from OAuth2 userinfo');
-      throw new Error('Failed to retrieve email address from Google');
-    }
-
-    console.log('✅ User email retrieved:', email);
-
-    // Store tokens in Firestore (Hunter-owned path: users/{uid}/integrations/gmail)
-    console.log('💾 Storing tokens in Firestore...');
-    await db
-      .collection('users')
-      .doc(userId)
-      .collection('integrations')
-      .doc('gmail')
-      .set({
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token,
-        expiresAt: tokens.expiry_date || (Date.now() + 3600000), // 1 hour default
-        email: email,
-        connectedAt: new Date().toISOString(),
-        status: 'connected',
-        scopes: tokens.scope
-          ? tokens.scope.split(' ')
-          : [
-            'https://www.googleapis.com/auth/gmail.send',
-            'https://www.googleapis.com/auth/gmail.readonly',
-            'https://www.googleapis.com/auth/userinfo.email',
-          ],
-        updatedAt: new Date().toISOString()
-      });
-
-    console.log('✅ Gmail tokens stored successfully for user:', userId);
-    console.log('📧 Connected email:', email);
-
-    // Redirect to originating module with success message
-    const redirectPath = safeReturnTo || '/hunter';
-    const separator = redirectPath.includes('?') ? '&' : '?';
-    return {
-      statusCode: 302,
-      headers: {
-        'Location': `${redirectPath}${separator}connected=true`
-      },
-      body: ''
-    };
-
-  } catch (error) {
-    console.error('❌ Error in Gmail OAuth callback:', error);
-    console.error('Error details:', {
-      message: error.message,
-      code: error.code,
-      name: error.name
-    });
-
-    // Provide user-friendly error messages without exposing sensitive data
-    let userMessage = error.message;
-
-    if (error.message?.includes('refresh_token')) {
-      userMessage = 'Could not get refresh token. Please disconnect and reconnect Gmail.';
-    } else if (error.message?.includes('access_token')) {
-      userMessage = 'Could not get access token from Google. Please try again.';
-    } else if (error.message?.includes('email')) {
-      userMessage = 'Could not retrieve your email address. Please check your Google account permissions.';
-    } else if (error.code === 403 || error.message?.includes('403')) {
-      userMessage = 'Permission denied. Please make sure you approved all requested permissions.';
-    } else if (error.code === 401 || error.message?.includes('401')) {
-      userMessage = 'Authentication failed. Please try connecting Gmail again.';
-    } else if (error.message?.includes('Firebase') || error.message?.includes('Firestore')) {
-      userMessage = 'Database error. Please contact support.';
-    }
-
-    return {
-      statusCode: 500,
-      headers: { 'Content-Type': 'text/html' },
-      body: `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>Gmail Connection Failed</title>
-            <meta charset="utf-8">
-          </head>
-          <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; text-align: center; padding: 50px; background: #f5f5f5;">
-            <div style="background: white; padding: 40px; border-radius: 8px; max-width: 500px; margin: 0 auto; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-              <h1 style="color: #e53e3e; margin-bottom: 20px;">❌ Connection Failed</h1>
-              <p style="color: #4a5568; font-size: 16px; line-height: 1.6;">${userMessage}</p>
-              <div style="margin-top: 30px;">
-                <a href="${safeReturnTo || '/hunter'}" style="background: #3182ce; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; display: inline-block;">Return</a>
-              </div>
-              <p style="margin-top: 30px; font-size: 12px; color: #a0aec0;">
-                If this problem persists, try revoking Idynify Scout's access in your
-                <a href="https://myaccount.google.com/permissions" target="_blank" style="color: #3182ce;">Google Account Settings</a>
-                and reconnecting.
-              </p>
-            </div>
-          </body>
-        </html>
-      `
-    };
-  }
-};
+export const handler = createGmailOAuthCallbackHandler({
+  db,
+  makeOAuthClient: ({ clientId, clientSecret, redirectUri }) => new google.auth.OAuth2(clientId, clientSecret, redirectUri),
+  readUserInfo: async (client) => (await google.oauth2({ version: 'v2', auth: client }).userinfo.get()).data,
+});

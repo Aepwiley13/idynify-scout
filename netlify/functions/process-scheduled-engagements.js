@@ -55,6 +55,7 @@ import { isInConversation, hasReplied } from '../../src/utils/relationshipRead.j
 // Functions runtime (no import.meta.env there). See
 // src/constants/contactStatuses.js's own header for the full story.
 import { CONTACT_STATUSES } from '../../src/constants/contactStatuses.js';
+import { recordGmailRefreshFailure } from './utils/gmailOAuth.js';
 
 // Initialize Firebase Admin (singleton guard)
 if (getApps().length === 0) {
@@ -383,7 +384,10 @@ async function sendScheduledEmail(userId, docRef, eng, results) {
 
   // Refresh token if expired
   if (expiresAt && Date.now() >= expiresAt - 60000) {
-    const { credentials } = await oauth2Client.refreshAccessToken();
+    const { credentials } = await oauth2Client.refreshAccessToken().catch(async (refreshErr) => {
+      await recordGmailRefreshFailure(gmailDoc.ref, refreshErr);
+      throw refreshErr;
+    });
     accessToken = credentials.access_token;
     await db.collection('users').doc(userId)
       .collection('integrations').doc('gmail')
@@ -643,7 +647,10 @@ async function sendScheduledWave(userId, waveRef, wave, results) {
 
   // Refresh token if expired
   if (gmailData.expiresAt && Date.now() >= gmailData.expiresAt - 60000) {
-    const { credentials } = await oauth2Client.refreshAccessToken();
+    const { credentials } = await oauth2Client.refreshAccessToken().catch(async (refreshErr) => {
+      await recordGmailRefreshFailure(gmailDoc.ref, refreshErr);
+      throw refreshErr;
+    });
     accessToken = credentials.access_token;
     await db.collection('users').doc(userId)
       .collection('integrations').doc('gmail')

@@ -26,6 +26,7 @@ import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { requireProjectId } from './utils/firebaseEnv.js';
 import { pollRepliesForUser } from './utils/replyPolling.js';
+import { recordGmailRefreshFailure } from './utils/gmailOAuth.js';
 
 if (getApps().length === 0) {
   const privateKey = process.env.FIREBASE_PRIVATE_KEY
@@ -112,6 +113,7 @@ export const handler = async (event) => {
         });
         console.log('✅ Token refreshed');
       } catch (refreshErr) {
+        await recordGmailRefreshFailure(gmailDoc.ref, refreshErr);
         console.error('❌ Token refresh failed:', refreshErr);
         return { statusCode: 200, headers: CORS_HEADERS, body: JSON.stringify({ transitioned: [], code: 'NEEDS_RECONNECT' }) };
       }

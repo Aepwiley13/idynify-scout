@@ -1,75 +1,52 @@
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { requireProjectId } from './utils/firebaseEnv.js';
+/**
+ * Disconnects the signed-in user's own Gmail (CH-GMAIL-001).
+ *
+ * POST, Firebase ID token in `Authorization: Bearer` (or `authToken` in the
+ * body). Deletes users/{uid}/integrations/gmail, which holds the tokens, so
+ * nothing in Idynify can use the grant again. Idempotent: disconnecting when
+ * nothing is connected succeeds.
+ *
+ * The grant is deliberately NOT revoked at Google here. A Google grant is per
+ * (Google account, OAuth client), so two Idynify accounts that connected the
+ * same mailbox share one grant, and revoking it from one would silently
+ * disconnect the other. The user can remove Idynify from
+ * https://myaccount.google.com/permissions; see docs/gmail/CH-GMAIL-001.md.
+ */
+import { admin, db } from './firebase-admin.js';
+import { extractAuthToken } from './utils/extractAuthToken.js';
+import { authenticateOwner, integrationPath } from './utils/gmailOAuth.js';
 
-// Initialize Firebase Admin (only once)
-if (getApps().length === 0) {
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY
-    ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-    : undefined;
+const HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
+const respond = (statusCode, body) => ({ statusCode, headers: HEADERS, body: JSON.stringify(body) });
 
-  initializeApp({
-    credential: cert({
-      projectId: requireProjectId(),
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: privateKey
-    })
-  });
+export function createGmailDisconnectHandler({ verifyIdToken, db: firestore }) {
+  return async (event) => {
+    if (event.httpMethod !== 'POST') return respond(405, { error: 'Method not allowed' });
+
+    let body = {};
+    try {
+      body = event.body ? JSON.parse(event.body) : {};
+    } catch {
+      return respond(400, { error: 'Invalid request' });
+    }
+
+    const auth = await authenticateOwner({
+      verifyIdToken, authToken: extractAuthToken(event), bodyUserId: body.userId,
+    });
+    if (auth.error) return respond(auth.status, { error: auth.error });
+
+    try {
+      await firestore.doc(integrationPath(auth.uid)).delete();
+      console.log('[gmail-disconnect] disconnected for user:', auth.uid);
+      return respond(200, { success: true });
+    } catch (err) {
+      console.error('[gmail-disconnect] failed:', err.message);
+      return respond(500, { error: 'Could not disconnect Gmail. Please try again.' });
+    }
+  };
 }
 
-const db = getFirestore();
-
-export const handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
-  }
-
-  try {
-    const { userId, authToken } = JSON.parse(event.body);
-
-    if (!userId || !authToken) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Missing required parameters' }) };
-    }
-
-    // Verify Firebase Auth token
-    const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
-    const verifyResponse = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: authToken })
-      }
-    );
-
-    if (!verifyResponse.ok) {
-      return { statusCode: 401, body: JSON.stringify({ error: 'Invalid authentication token' }) };
-    }
-
-    const verifyData = await verifyResponse.json();
-    const tokenUserId = verifyData.users[0].localId;
-
-    if (tokenUserId !== userId) {
-      return { statusCode: 403, body: JSON.stringify({ error: 'Unauthorized' }) };
-    }
-
-    // Delete Gmail integration doc
-    await db.doc(`users/${userId}/integrations/gmail`).delete();
-
-    console.log('✅ Gmail disconnected for user:', userId);
-
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ success: true })
-    };
-
-  } catch (err) {
-    console.error('❌ gmail-disconnect error:', err);
-    return {
-      statusCode: 500,
-      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-      body: JSON.stringify({ error: err.message })
-    };
-  }
-};
+export const handler = createGmailDisconnectHandler({
+  verifyIdToken: (token) => admin.auth().verifyIdToken(token),
+  db,
+});

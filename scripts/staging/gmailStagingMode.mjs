@@ -21,8 +21,11 @@
  *
  * Pure: no network, no file access, never a value in a message.
  */
+import { STAGING_PROJECT as STAGING_GMAIL_PROJECT } from './billingRehearsal/guard.mjs';
 
-export const STAGING_GMAIL_PROJECT = 'idynify-staging';
+// The one pinned staging project name, shared with the billing rehearsal's allowlist rather than
+// written out again (scripts/checkNoHardcodedProjectId.mjs allows it in that one place).
+export { STAGING_GMAIL_PROJECT };
 export const STAGING_GMAIL_REDIRECT_URI = 'http://localhost:8888/.netlify/functions/gmail-oauth-callback';
 
 /** The only variables a Gmail run adds to what staging allows. */

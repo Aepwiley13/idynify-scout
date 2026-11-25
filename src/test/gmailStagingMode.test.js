@@ -22,7 +22,7 @@ import {
 
 const SCRIPT = resolve(dirname(fileURLToPath(import.meta.url)), '../../scripts/staging/stagingPreflight.mjs');
 const P = STAGING_GMAIL_PROJECT;
-const PROD = 'idynify-scout-dev';
+const PROD = 'acme-production';
 const STAGING_NUMBER = '424242424242';
 const PROD_NUMBER = '111111111111';
 const KEY = '-----BEGIN PRIVATE KEY-----\\nSECRETKEYMATERIAL\\n-----END PRIVATE KEY-----';

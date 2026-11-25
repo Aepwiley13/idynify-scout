@@ -186,12 +186,13 @@ describe('--gmail keeps every unrelated integration prohibited', () => {
     ['Resend', { RESEND_API_KEY: 'x' }, 'no-integrations'],
     ['the env admin list', { ADMIN_USER_IDS: 'u1' }, 'no-integrations'],
     ['real Stripe switched on', { VITE_STRIPE_ENABLED: 'true' }, 'no-integrations'],
-    ['Contact Hub Gmail on', { CONTACT_HUB_GMAIL: 'on' }, 'gmail-ingestion-off'],
-    ['Contact Hub Gmail client', { CONTACT_HUB_GMAIL_CLIENT_ID: STAGING_CLIENT, CONTACT_HUB_GMAIL_CLIENT_SECRET: SECRET }, 'gmail-ingestion-off'],
+    // Refused twice since CH-GMAIL-001.3: by I5 in every run, and by the Gmail run's own check.
+    ['Contact Hub Gmail on', { CONTACT_HUB_GMAIL: 'on' }, ['no-integrations', 'gmail-ingestion-off']],
+    ['Contact Hub Gmail client', { CONTACT_HUB_GMAIL_CLIENT_ID: STAGING_CLIENT, CONTACT_HUB_GMAIL_CLIENT_SECRET: SECRET }, ['no-integrations', 'gmail-ingestion-off']],
     ['scheduled reply sync', { GMAIL_REPLY_SYNC_ENABLED: 'true' }, 'gmail-ingestion-off'],
     ['live inbox ingestion', { GMAIL_IDENTITY_MODE: 'live' }, 'gmail-ingestion-off'],
-  ])('%s', (_label, extra, id) => {
-    expect(failing({ ...firebase(), ...gmailClient(), ...extra }, gmailRun)).toEqual([id]);
+  ])('%s', (_label, extra, ids) => {
+    expect(failing({ ...firebase(), ...gmailClient(), ...extra }, gmailRun)).toEqual([ids].flat());
   });
 
   it('names the variables, never their values', () => {

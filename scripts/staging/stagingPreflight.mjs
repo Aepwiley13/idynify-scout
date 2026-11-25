@@ -64,6 +64,12 @@ export const INTEGRATION_KEYS = Object.freeze([
   'GOOGLE_SEARCH_API_KEY', 'GOOGLE_SEARCH_ENGINE_ID', 'GOOGLE_CUSTOM_SEARCH_API_KEY', 'GOOGLE_CUSTOM_SEARCH_ENGINE_ID',
   'TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'VITE_CRISP_WEBSITE_ID',
   'ADMIN_USER_IDS', 'SUPER_ADMIN_USER_IDS',
+  // Contact Hub's separate Gmail integration (CH-GMAIL-001.3): its switches and its own OAuth
+  // client. Refused in every run, --gmail included, and stripped from the shell by every launcher
+  // that drops INTEGRATION_KEYS, so a production client secret exported in a developer's shell
+  // never reaches a staging process and staging never sends real email through it.
+  'CONTACT_HUB_GMAIL', 'CONTACT_HUB_GMAIL_SEND',
+  'CONTACT_HUB_GMAIL_CLIENT_ID', 'CONTACT_HUB_GMAIL_CLIENT_SECRET', 'CONTACT_HUB_GMAIL_REDIRECT_URI',
 ]);
 
 /** KEY=value lines; quotes stripped; comments and blanks ignored. Values are never printed. */

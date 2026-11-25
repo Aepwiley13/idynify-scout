@@ -25,6 +25,11 @@
  *                          allows Stripe, in TEST MODE ONLY (stripeTestMode.mjs). A
  *                          live key is refused by name. Every other integration key
  *                          must still be empty.
+ *   (optional) --gmail     a Gmail QA run (docs/gmail/STAGING_GMAIL_OAUTH_CLIENT.md): I5
+ *                          then allows GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET and
+ *                          GOOGLE_REDIRECT_URI only, for a dedicated staging client in
+ *                          idynify-staging (gmailStagingMode.mjs). Needs
+ *                          PRODUCTION_GOOGLE_CLIENT_ID in the shell. Not with --billing.
  *
  * The functions' service account can come from the env file
  * (FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY) or, kept out of files, from
@@ -41,6 +46,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import process from 'node:process';
 import { readStagingCredential, withCredential, checkCredential, CredentialRefusal } from './stagingCredentials.mjs';
 import { checkStripeTestMode, STRIPE_TEST_MODE_KEYS } from './stripeTestMode.mjs';
+import { checkGmailStagingMode, GMAIL_STAGING_KEYS, PRODUCTION_CLIENT_VARIABLE } from './gmailStagingMode.mjs';
 
 export const FIREBASE_WEB_KEYS = Object.freeze([
   'VITE_FIREBASE_API_KEY', 'VITE_FIREBASE_AUTH_DOMAIN', 'VITE_FIREBASE_PROJECT_ID',
@@ -87,8 +93,13 @@ const filled = (value) => typeof value === 'string' && value.trim() !== '';
  * @param {boolean} options.linkedSite       true when this checkout is linked to a Netlify site
  * @param {string[]} options.rootEnvFiles     .env files in the checkout root that Vite would load
  * @param {boolean} options.billing           a billing run: Stripe is allowed, test mode only
+ * @param {boolean} options.gmail             a Gmail run: the staging Google OAuth client is allowed
+ * @param {string|null} options.productionGoogleClientId  production's OAuth client id, to rule it out
  */
-export function checkStagingEnv(env, { productionProjectId = null, fileCommittable = false, linkedSite = false, rootEnvFiles = [], billing = false } = {}) {
+export function checkStagingEnv(env, {
+  productionProjectId = null, fileCommittable = false, linkedSite = false, rootEnvFiles = [], billing = false,
+  gmail = false, productionGoogleClientId = null,
+} = {}) {
   const results = [];
   const add = (id, ok, message) => results.push({ id, ok, message });
   const project = env.VITE_FIREBASE_PROJECT_ID ?? '';
@@ -128,13 +139,15 @@ export function checkStagingEnv(env, { productionProjectId = null, fileCommittab
   }
 
   // A billing run may hold Stripe, and only Stripe; stripeTestMode.mjs decides whether what it
-  // holds is test mode. Every other integration stays empty either way.
-  const allowedHere = billing ? STRIPE_TEST_MODE_KEYS : [];
+  // holds is test mode. A Gmail run may hold the staging Google OAuth client, and only that;
+  // gmailStagingMode.mjs decides whether it is staging's own. Every other integration stays empty.
+  const allowedHere = [...(billing ? STRIPE_TEST_MODE_KEYS : []), ...(gmail ? GMAIL_STAGING_KEYS : [])];
   const integrations = INTEGRATION_KEYS.filter((k) => filled(env[k]) && !allowedHere.includes(k));
   if (!billing && env.VITE_STRIPE_ENABLED === 'true') integrations.push('VITE_STRIPE_ENABLED=true');
   add('no-integrations', integrations.length === 0,
     integrations.length ? `Leave these empty for staging: ${integrations.join(', ')}.` : 'No integration keys are set.');
   if (billing) results.push(...checkStripeTestMode(env));
+  if (gmail) results.push(...checkGmailStagingMode(env, { productionClientId: productionGoogleClientId }));
 
   add('file-not-committable', !fileCommittable,
     fileCommittable ? 'This env file is inside the repository and not ignored: git could commit it. Move it outside the repo.' : 'Git would not commit this env file.');
@@ -178,6 +191,11 @@ function main() {
   const arg = process.argv.slice(2).find((a) => a.startsWith('--env='));
   const checkoutArg = process.argv.slice(2).find((a) => a.startsWith('--checkout='));
   const billing = process.argv.slice(2).includes('--billing');
+  const gmail = process.argv.slice(2).includes('--gmail');
+  if (billing && gmail) {
+    console.error('Refused: use --billing or --gmail, not both. Each run allows one integration.');
+    return 1;
+  }
   const checkout = checkoutArg ? resolve(checkoutArg.slice('--checkout='.length)) : repoRoot();
   if (!arg) {
     console.error('Refused: pass --env=<path to the staging env file>.');
@@ -204,6 +222,8 @@ function main() {
       productionProjectId: process.env.PRODUCTION_FIREBASE_PROJECT_ID ?? null,
       fileCommittable: committable(file),
       billing,
+      gmail,
+      productionGoogleClientId: process.env[PRODUCTION_CLIENT_VARIABLE] ?? null,
       ...checkoutInputs(checkout),
     }),
     ...checkCredential(env, credential),
@@ -212,7 +232,7 @@ function main() {
   const failed = results.filter((r) => !r.ok).length;
   console.log(failed
     ? `\nRefused: ${failed} check(s) failed. Do not start the app against this file.`
-    : `\nPreflight passed${billing ? ' for a billing run (Stripe test mode)' : ''}. Start the app with \`node scripts/staging/stagingDev.mjs --env=<this file>${billing ? ' --billing' : ''}\` (it re-runs these checks), or \`npx netlify dev --offline\` with the env file loaded; then run the in-browser checks in runbook §2.`);
+    : `\nPreflight passed${billing ? ' for a billing run (Stripe test mode)' : gmail ? ' for a Gmail run (staging OAuth client)' : ''}. Start the app with \`node scripts/staging/stagingDev.mjs --env=<this file>${billing ? ' --billing' : gmail ? ' --gmail' : ''}\` (it re-runs these checks), or \`npx netlify dev --offline\` with the env file loaded; then run the in-browser checks in runbook §2.`);
   return failed ? 1 : 0;
 }
 

@@ -22,25 +22,8 @@
  */
 
 import { google } from 'googleapis';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { requireProjectId } from './utils/firebaseEnv.js';
+import { db } from './firebase-admin.js'; // shared init: production key or staging short-lived credentials
 import { pollRepliesForUser } from './utils/replyPolling.js';
-
-if (getApps().length === 0) {
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY
-    ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-    : undefined;
-  initializeApp({
-    credential: cert({
-      projectId: requireProjectId(),
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey,
-    }),
-  });
-}
-
-const db = getFirestore();
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',

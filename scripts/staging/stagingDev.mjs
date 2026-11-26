@@ -54,7 +54,14 @@
  *                       in the shell so production's client is refused. Port 8888 is claimed
  *                       first, because Google returns to exactly
  *                       http://localhost:8888/.netlify/functions/gmail-oauth-callback. Every
- *                       function is served. Not with --billing or --only-billing-functions.
+ *                       function is served unless --only-gmail-functions is also given.
+ *                       Not with --billing or --only-billing-functions.
+ *   (optional) --only-gmail-functions
+ *                       with --gmail only: serve just GMAIL_QA_FUNCTIONS (the Gmail QA
+ *                       checklist's functions and the few the screens call while testing),
+ *                       the same way as --only-sticker-functions, and skip the edge runtime
+ *                       (as --no-edge-functions). Bundling all ~130 functions can take most of
+ *                       an hour on a busy machine, and every page waits for it.
  *   (optional) --no-edge-functions
  *                       skip the CLI's edge-function runtime, which it downloads
  *                       (Deno) on the first request even when a project has no
@@ -111,6 +118,22 @@ export const BILLING_JOURNEY_FUNCTIONS = Object.freeze([
   'create-portal-session', // Manage billing
   'barryEnrich', // Enrich contact in Scout (Apollo stand-in)
   'barryGenerateContext', // asked for when a Scout person opens; staging has no Claude key
+]);
+
+/**
+ * The functions Gmail QA (CH-GMAIL-001) calls with --gmail --only-gmail-functions: connect,
+ * callback and disconnect; every send path on the checklist; thread view and reply checks; Barry's
+ * approve-and-send; and the few that the signup, Contact Hub, shell and template screens call
+ * while testing. Everything else answers 404.
+ */
+export const GMAIL_QA_FUNCTIONS = Object.freeze([
+  'gmail-oauth-init', 'gmail-oauth-callback', 'gmail-disconnect',
+  'gmail-send-quick', 'gmail-send', 'gmail-send-wave',
+  'gmail-get-thread', 'gmail-poll-replies', 'check-replies', 'barry-approve-send',
+  'send-welcome-email', // sign up (staging has no email key, so nothing is sent)
+  'stickersConfig', // Contact Hub asks for sticker availability on load
+  'adminGetImpersonationSession', // the app shell checks for a "view as" session
+  'get-templates', 'save-template', // template send regression
 ]);
 
 /** A private temporary folder (0700) of links to the named functions. Call remove() on exit. */
@@ -263,6 +286,11 @@ async function main() {
     console.error('Refused: --gmail runs alone. Do not combine it with --billing, --only-billing-functions or --only-sticker-functions.');
     return 1;
   }
+  const onlyGmail = argv.includes('--only-gmail-functions');
+  if (onlyGmail && !gmail) {
+    console.error('Refused: --only-gmail-functions is for a Gmail run; add --gmail.');
+    return 1;
+  }
   const checks = [
     ...checkStagingEnv(withCredential(fileEnv, credential), {
       productionProjectId: process.env.PRODUCTION_FIREBASE_PROJECT_ID ?? null,
@@ -279,7 +307,7 @@ async function main() {
     console.error('Refused: use --only-billing-functions or --only-sticker-functions, not both.');
     return 1;
   }
-  const noEdgeFunctions = onlyBilling || argv.includes('--no-edge-functions');
+  const noEdgeFunctions = onlyBilling || onlyGmail || argv.includes('--no-edge-functions');
   const wantsMock = argv.includes('--apollo-mock');
   if (onlyBilling) {
     // Refuse on the preflight before stopping anything; then make the ports this run's own.
@@ -296,7 +324,7 @@ async function main() {
   }
   if (gmail) {
     // Google returns to :8888 and nowhere else, so this launcher must be what answers there.
-    const early = planDevRun({ fileEnv, credential, checks, gmail });
+    const early = planDevRun({ fileEnv, credential, checks, gmail, noEdgeFunctions, edgeFunctionsDeclared: hasEdgeFunctions(repoRoot()) });
     if (early.ok) {
       const ports = await claimPorts([8888], repoRoot());
       for (const line of ports.stopped) console.log(`  · ${line}`);
@@ -318,7 +346,9 @@ async function main() {
     console.error('\nRefused: the app was not started.');
     return 1;
   }
-  const served = onlyBilling ? BILLING_JOURNEY_FUNCTIONS : argv.includes('--only-sticker-functions') ? STICKER_QA_FUNCTIONS : null;
+  const served = onlyBilling ? BILLING_JOURNEY_FUNCTIONS
+    : onlyGmail ? GMAIL_QA_FUNCTIONS
+      : argv.includes('--only-sticker-functions') ? STICKER_QA_FUNCTIONS : null;
   let functions = null;
   try {
     functions = served ? functionsFolder(repoRoot(), served) : null;

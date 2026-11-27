@@ -165,8 +165,8 @@ describe('App.jsx takes its Contact Hub routes from the switch-guarded function 
     expect(app).not.toMatch(/to="\/contact-hub/);
   });
 
-  it('enables Contact Hub only for production builds while keeping Free signup and non-production contexts off', () => {
-    expect(netlify).toMatch(/\[context\.production\.environment\][\s\S]*?VITE_CONTACT_HUB\s*=\s*"on"[\s\S]*?VITE_FREE_PLAN\s*=\s*"off"/);
+  it('enables Contact Hub only for production builds with Free signup on, and non-production contexts off', () => {
+    expect(netlify).toMatch(/\[context\.production\.environment\][\s\S]*?VITE_CONTACT_HUB\s*=\s*"on"[\s\S]*?VITE_FREE_PLAN\s*=\s*"on"/);
     for (const context of ['branch-deploy', 'deploy-preview']) {
       const block = netlify.match(new RegExp(`\\[context\\.${context}\\.environment\\]([\\s\\S]*?)(?=\\n\\[|$)`))?.[1] ?? '';
       expect(block).not.toMatch(/VITE_CONTACT_HUB|VITE_FREE_PLAN/);

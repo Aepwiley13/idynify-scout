@@ -45,11 +45,16 @@
   # See issue #666.
   SECRETS_SCAN_OMIT_KEYS = "FIREBASE_API_KEY,VITE_FIREBASE_API_KEY,VITE_FIREBASE_AUTH_DOMAIN,VITE_FIREBASE_PROJECT_ID,VITE_FIREBASE_STORAGE_BUCKET,VITE_FIREBASE_MESSAGING_SENDER_ID,VITE_FIREBASE_APP_ID,GOOGLE_SEARCH_ENGINE_ID"
 
-# Release Contact Hub to verified paid accounts only. The shell's existing
-# payment gate remains in force; Free signup and Free routes stay disabled.
+# Contact Hub is free for every registered user (product strategy, 2026-11-27).
+# VITE_FREE_PLAN = "on": a signup with no tier creates a Free account (no card),
+# and an account with no paid access (never paid, or cancelled) keeps Contact Hub
+# and Settings. Scout and every other paid feature stay behind the shell's
+# payment gate. ?tier=starter|pro signups and checkout are unchanged.
+# Rollback: "existing" (no new Free signups; current Free accounts keep access).
+# Never "off" once Free accounts exist: it would send them to checkout.
 [context.production.environment]
   VITE_CONTACT_HUB = "on"
-  VITE_FREE_PLAN = "off"
+  VITE_FREE_PLAN = "on"
 
 # ─── Non-production contexts ─────────────────────────────────────────────────
 #

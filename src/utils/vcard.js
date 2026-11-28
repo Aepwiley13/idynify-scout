@@ -1,4 +1,4 @@
-import { isPhotoData, publicCardView } from './myCardRules';
+import { LINK_SLOTS, isPhotoData, publicCardView } from './myCardRules';
 import { PHOTO } from './photoPrep';
 
 /**
@@ -187,6 +187,12 @@ export function buildMyCardVCard(card) {
   if (view.website) lines.push(`URL:${uriValue(view.website)}`);
   if (view.linkedinUrl) lines.push(`URL;TYPE=LinkedIn:${uriValue(view.linkedinUrl)}`);
   if (view.instagram) lines.push(`URL;TYPE=Instagram:https://www.instagram.com/${uriValue(view.instagram)}`);
+  // Shared additional links: a labelled web address each, as Apple and Google Contacts both keep it
+  // (a grouped URL with an X-ABLabel). Only what publicCardView allows, so a Private link is never here.
+  LINK_SLOTS.filter((slot) => view[slot]).forEach((slot, index) => {
+    lines.push(`item${index + 1}.URL:${uriValue(view[slot].url)}`);
+    lines.push(`item${index + 1}.X-ABLabel:${escapeVCardText(view[slot].label)}`);
+  });
   if (view.photoUrl) lines.push(photoLine(view.photoUrl));
   return assemble(lines);
 }

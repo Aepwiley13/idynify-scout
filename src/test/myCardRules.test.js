@@ -5,7 +5,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-  CARD_FIELDS, NAME_FIELDS, SHAREABLE_FIELDS, DEFAULT_SHARE, CARD_LIMITS,
+  CARD_FIELDS, NAME_FIELDS, SHAREABLE_FIELDS, DEFAULT_SHARE, DEFAULT_LINK_SHARE, ALL_SHARE_KEYS, CARD_LIMITS,
   CARD_SCHEMA_VERSION, CARD_DOC_SEGMENTS, PUBLIC_VIEW_KEYS,
   normalizeCardField, normalizeShare, normalizeCard, newCard,
   cardDisplayName, cardInitials, publicCardView, publishedCardView,
@@ -59,7 +59,7 @@ describe('privacy defaults', () => {
 
   it('gives a new card the default switches and sharing off', () => {
     const card = newCard();
-    expect(card.share).toEqual(DEFAULT_SHARE);
+    expect(card.share).toEqual({ ...DEFAULT_SHARE, ...DEFAULT_LINK_SHARE });
     expect(card.share).not.toBe(DEFAULT_SHARE);
     expect(card.sharingEnabled).toBe(false);
     expect(card.schemaVersion).toBe(CARD_SCHEMA_VERSION);
@@ -76,7 +76,7 @@ describe('privacy defaults', () => {
 
   it('does not let suggestions turn on a switch or sharing', () => {
     const card = newCard({ firstName: 'Ada', share: { email: true, phone: true }, sharingEnabled: true });
-    expect(card.share).toEqual(DEFAULT_SHARE);
+    expect(card.share).toEqual({ ...DEFAULT_SHARE, ...DEFAULT_LINK_SHARE });
     expect(card.sharingEnabled).toBe(false);
   });
 
@@ -96,11 +96,11 @@ describe('privacy defaults', () => {
 describe('the switches', () => {
   it('counts only an exact true as on', () => {
     const share = normalizeShare({ email: 'true', phone: 1, title: 'yes', organization: {}, website: [], photoUrl: true });
-    expect(share).toEqual({ ...Object.fromEntries(SHAREABLE_FIELDS.map((f) => [f, false])), photoUrl: true });
+    expect(share).toEqual({ ...Object.fromEntries(ALL_SHARE_KEYS.map((f) => [f, false])), photoUrl: true });
   });
 
   it('is all off for anything that is not a set of switches', () => {
-    const allOff = Object.fromEntries(SHAREABLE_FIELDS.map((f) => [f, false]));
+    const allOff = Object.fromEntries(ALL_SHARE_KEYS.map((f) => [f, false]));
     for (const bad of [null, undefined, 'all', 7, true, [], [true, true]]) {
       expect(normalizeShare(bad)).toEqual(allOff);
     }
@@ -108,7 +108,7 @@ describe('the switches', () => {
 
   it('keeps only known fields, and never a switch for the name', () => {
     const share = normalizeShare({ firstName: true, lastName: true, ssn: true, email: true });
-    expect(Object.keys(share).sort()).toEqual([...SHAREABLE_FIELDS].sort());
+    expect(Object.keys(share).sort()).toEqual([...ALL_SHARE_KEYS].sort());
     expect(share.email).toBe(true);
   });
 

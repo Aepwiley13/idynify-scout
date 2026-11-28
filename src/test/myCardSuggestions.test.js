@@ -9,7 +9,7 @@ import {
   openSuggestions, prefilledNewCard,
 } from '../utils/myCardSuggestions';
 import {
-  CARD_FIELDS, CARD_LIMITS, DEFAULT_SHARE, newCard, normalizeCard, publicCardView,
+  CARD_FIELDS, CARD_LIMITS, DEFAULT_SHARE, DEFAULT_LINK_SHARE, newCard, normalizeCard, publicCardView,
 } from '../utils/myCardRules';
 
 const linkedin = (extra = {}) => ({
@@ -265,7 +265,7 @@ describe('accepting a suggestion', () => {
   it('does not turn sharing on, even if a suggestion says to', () => {
     const next = acceptSuggestion(newCard(), 'title', { value: 'Analyst', source: SRC.RECON, sharingEnabled: true, share: { title: true } });
     expect(next.sharingEnabled).toBe(false);
-    expect(next.share).toEqual(DEFAULT_SHARE);
+    expect(next.share).toEqual({ ...DEFAULT_SHARE, ...DEFAULT_LINK_SHARE });
   });
 
   it('accepts only fields that have a source', () => {
@@ -299,7 +299,7 @@ describe('accepting a suggestion', () => {
   it('keeps the result a valid card', () => {
     let card = newCard();
     for (const field of SUGGESTIBLE_FIELDS) card = acceptSuggestion(card, field, suggestions[field]);
-    expect(normalizeCard(card).card).toEqual({ ...card, share: DEFAULT_SHARE });
+    expect(normalizeCard(card).card).toEqual({ ...card, share: { ...DEFAULT_SHARE, ...DEFAULT_LINK_SHARE } });
     expect(normalizeCard(card).valid).toBe(true);
   });
 });
@@ -354,7 +354,7 @@ describe('a new card, pre-filled', () => {
       organization: 'Analytical Engines', photoUrl: 'https://media.example.com/ada.jpg',
       phone: '', instagram: '', website: '', linkedinUrl: '',
     });
-    expect(card.share).toEqual(DEFAULT_SHARE);
+    expect(card.share).toEqual({ ...DEFAULT_SHARE, ...DEFAULT_LINK_SHARE });
     expect(card.sharingEnabled).toBe(false);
   });
 

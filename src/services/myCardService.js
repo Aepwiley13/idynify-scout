@@ -9,8 +9,8 @@
  * impersonated one: this deliberately does not use getEffectiveUser or
  * getActiveUserId.
  *
- * Storage only. No screen, no public page, no sharing: the card is private to
- * its owner and `sharingEnabled` is always saved false.
+ * The card is private to its owner. Publishing (publishMyCard, unpublishMyCard, resetMyCardLink) writes
+ * the private card, the public copy and the ID registry in one transaction; firestore.rules checks it.
  */
 import { doc, getDoc, runTransaction } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
@@ -22,6 +22,8 @@ export const myCardService = createMyCardService({
   getSignedInUid: () => auth.currentUser?.uid || null,
 });
 
-export const { loadMyCard, saveMyCard, loadCardSuggestions } = myCardService;
+export const {
+  loadMyCard, saveMyCard, publishMyCard, unpublishMyCard, resetMyCardLink, loadCardSuggestions,
+} = myCardService;
 
 export { MY_CARD_STATUS, MY_CARD_ERRORS } from './myCard/myCardCore';

@@ -71,6 +71,7 @@ function fakeFirestore() {
   return { fs, docs, log, hooks, put: write, read: (path) => (docs.has(path) ? structuredClone(docs.get(path)) : undefined) };
 }
 
+const NOT_SHARED = { live: false, publicId: null, publishedAt: null };
 const FIXED_TIME = '2026-11-17T10:00:00.000Z';
 
 function setup({ uid = 'A', now = FIXED_TIME } = {}) {
@@ -108,7 +109,7 @@ describe('loading the card', () => {
   it('says "missing" only for a card that was read and is not there', async () => {
     const t = setup();
     const result = await t.service.loadMyCard();
-    expect(result).toEqual({ status: S.MISSING, card: newCard(), revision: null });
+    expect(result).toEqual({ status: S.MISSING, card: newCard(), revision: null, sharing: NOT_SHARED });
     expect(t.log.reads).toEqual([CARD_PATH('A')]);
   });
 
@@ -357,7 +358,7 @@ describe('a second tab cannot silently overwrite a newer card', () => {
     const t = setup();
     const result = await t.service.saveMyCard(goodCard(), { expectedRevision: 2 });
     expect(result.status).toBe(S.CONFLICT);
-    expect(result.current).toEqual({ status: S.MISSING, card: newCard(), revision: null });
+    expect(result.current).toEqual({ status: S.MISSING, card: newCard(), revision: null, sharing: NOT_SHARED });
     expect(t.log.writes).toEqual([]);
   });
 

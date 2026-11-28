@@ -48,7 +48,12 @@ export const CARD_COLLECTION = 'card';
 export const CARD_DOC_ID = 'main';
 export const CARD_DOC_SEGMENTS = (uid) => ['users', uid, CARD_COLLECTION, CARD_DOC_ID];
 
-export const CARD_SCHEMA_VERSION = 1;
+/**
+ * 2 is the schema that can be shared (MY-CARD-SHARE-001): a public ID, five additional links with their own
+ * switches, and `sharingEnabled` that may be true. A card saved before it (1) loads unchanged and is upgraded
+ * by its next save. An older build refuses to overwrite a version 2 card (see isNewerVersion in the service).
+ */
+export const CARD_SCHEMA_VERSION = 2;
 
 /** Every field a card holds, in the order the editor and the card show them. */
 export const CARD_FIELDS = Object.freeze([
@@ -63,6 +68,21 @@ export const NAME_FIELDS = Object.freeze(['firstName', 'lastName']);
 export const SHAREABLE_FIELDS = Object.freeze([
   'photoUrl', 'title', 'organization', 'email', 'phone', 'linkedinUrl', 'instagram', 'website',
 ]);
+
+/** The five additional links (Facebook, a booking page, an event and so on), in display order. */
+export const LINK_SLOTS = Object.freeze(['link1', 'link2', 'link3', 'link4', 'link5']);
+
+/** Longest label and address of an additional link, and how many a card may hold. */
+export const LINK_LIMITS = Object.freeze({ label: 40, url: 500, count: LINK_SLOTS.length });
+
+/** Every switch a version 2 card holds: the eight fields and the five link slots. */
+export const ALL_SHARE_KEYS = Object.freeze([...SHAREABLE_FIELDS, ...LINK_SLOTS]);
+
+/** The contact methods that satisfy the publish gate. Additional links do not count. */
+export const CONTACT_METHOD_FIELDS = Object.freeze(['email', 'phone', 'linkedinUrl', 'instagram', 'website']);
+
+/** What a NEW card's link switches start as: Private, like email and phone. */
+export const DEFAULT_LINK_SHARE = Object.freeze({ link1: false, link2: false, link3: false, link4: false, link5: false });
 
 /** What a NEW card's switches start as. Email and phone are private. */
 export const DEFAULT_SHARE = Object.freeze({
@@ -250,6 +270,36 @@ function normalizeInstagram(raw) {
   return { value: handle, error: null };
 }
 
+const LINK_NAME_ERROR = 'Add a name for this link, like "Book a meeting".';
+const LINK_ADDRESS_ERROR = 'Links must start with https://';
+
+/**
+ * An additional link: { label, url }, or none. A link needs both a name and an address, and the address
+ * must be an https:// web address with no spaces and no user name or password in it, so what is stored is
+ * what the rules accept and what a recipient is shown. Both empty is no link at all, and is not an error.
+ * @returns {{ value: { label: string, url: string }|null, error: string|null }}
+ */
+export function normalizeLink(raw) {
+  const source = isPlainObject(raw) ? raw : {};
+  const label = cleanText(typeof source.label === 'string' ? source.label : '');
+  const text = cleanText(typeof source.url === 'string' ? source.url : '');
+  if (!label && !text) return { value: null, error: null };
+  if (!label) return { value: null, error: LINK_NAME_ERROR };
+  if (label.length > LINK_LIMITS.label) return { value: null, error: `Keep the name to ${LINK_LIMITS.label} characters or fewer.` };
+  if (!text) return { value: null, error: LINK_ADDRESS_ERROR };
+  if (!/^https:\/\//i.test(text)) return { value: null, error: LINK_ADDRESS_ERROR };
+  if (text.length > LINK_LIMITS.url) return { value: null, error: `Keep the address to ${LINK_LIMITS.url} characters or fewer.` };
+  const url = parseWebUrl(text);
+  if (!url || url.protocol !== 'https:') return { value: null, error: 'Enter a web address like https://example.com.' };
+  if (url.href.length > LINK_LIMITS.url) return { value: null, error: `Keep the address to ${LINK_LIMITS.url} characters or fewer.` };
+  return { value: { label, url: url.href }, error: null };
+}
+
+/** Whether `url` is an address a link may point to: https, no credentials, no spaces. */
+export function isSafeLinkUrl(url) {
+  return typeof url === 'string' && normalizeLink({ label: 'x', url }).value !== null;
+}
+
 const NORMALIZERS = Object.freeze({
   firstName: (raw) => normalizeLine('firstName', raw),
   lastName: (raw) => normalizeLine('lastName', raw),
@@ -281,7 +331,7 @@ export function normalizeCardField(field, raw) {
 export function normalizeShare(raw) {
   const source = isPlainObject(raw) ? raw : {};
   const share = {};
-  for (const field of SHAREABLE_FIELDS) share[field] = own(source, field) && source[field] === true;
+  for (const field of ALL_SHARE_KEYS) share[field] = own(source, field) && source[field] === true;
   return share;
 }
 
@@ -303,7 +353,23 @@ export function normalizeCard(input) {
     card[field] = value;
     if (error) errors[field] = error;
   }
-  card.share = normalizeShare(own(source, 'share') ? source.share : null);
+  const share = normalizeShare(own(source, 'share') ? source.share : null);
+  // The additional links. A link keeps its own switch wherever it lands, so the slots are closed up
+  // in order (a gap is filled by the next link, taking its switch with it): the editor and the
+  // stored card never hold a link in one slot and its switch in another. An error is reported
+  // against the slot the person typed it in.
+  const links = [];
+  for (const slot of LINK_SLOTS) {
+    const { value, error } = normalizeLink(own(source, slot) ? source[slot] : null);
+    if (error) errors[slot] = error;
+    if (value) links.push({ value, shared: share[slot] === true });
+  }
+  LINK_SLOTS.forEach((slot, index) => {
+    const link = links[index];
+    if (link) card[slot] = link.value;
+    share[slot] = Boolean(link && link.shared);
+  });
+  card.share = share;
   // Sharing the card at all. Off unless it is exactly `true`.
   card.sharingEnabled = own(source, 'sharingEnabled') && source.sharingEnabled === true;
   card.schemaVersion = CARD_SCHEMA_VERSION;
@@ -320,7 +386,7 @@ export function normalizeCard(input) {
  */
 export function newCard(suggestions = null) {
   const { card } = normalizeCard({ ...(isPlainObject(suggestions) ? pickCardFields(suggestions) : {}) });
-  return { ...card, share: { ...DEFAULT_SHARE }, sharingEnabled: false };
+  return { ...card, share: { ...DEFAULT_SHARE, ...DEFAULT_LINK_SHARE }, sharingEnabled: false };
 }
 
 function pickCardFields(source) {
@@ -379,6 +445,9 @@ export function publicCardView(card) {
   for (const field of SHAREABLE_FIELDS) {
     if (clean.share[field] === true && clean[field]) view[field] = clean[field];
   }
+  for (const slot of LINK_SLOTS) {
+    if (clean.share[slot] === true && clean[slot]) view[slot] = Object.freeze({ label: clean[slot].label, url: clean[slot].url });
+  }
   return Object.freeze(view);
 }
 
@@ -395,4 +464,58 @@ export function publishedCardView(card) {
 }
 
 /** The fields a view can hold, for anything that needs to check it took no others. */
-export const PUBLIC_VIEW_KEYS = Object.freeze(['name', 'firstName', 'lastName', 'initials', ...SHAREABLE_FIELDS]);
+export const PUBLIC_VIEW_KEYS = Object.freeze(['name', 'firstName', 'lastName', 'initials', ...SHAREABLE_FIELDS, ...LINK_SLOTS]);
+
+// ── Publishing (MY-CARD-SHARE-001) ──────────────────────────────────────────
+
+/** The public ID of a card: 22 characters of base64url (128 random bits). */
+const PUBLIC_ID_PATTERN = /^[A-Za-z0-9_-]{22}$/;
+export const isValidPublicId = (value) => typeof value === 'string' && PUBLIC_ID_PATTERN.test(value);
+
+/**
+ * A new public ID: 128 random bits from the browser's (or Node's) secure random source, as 22 characters
+ * of base64url. It is never derived from anything about the person. `random` is for tests.
+ */
+export function newPublicId(random = globalThis.crypto) {
+  if (!random || typeof random.getRandomValues !== 'function') throw new Error('No secure random source is available.');
+  const bytes = random.getRandomValues(new Uint8Array(16));
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/**
+ * Whether a card may be live, and if not what would fix it with one tap: a name and at least one Shared
+ * contact method (email, phone, LinkedIn, Instagram or website). Additional links do not count. The gate
+ * applies only while the card is live; information never has to stay public.
+ * @returns {{ ok: boolean, fixes: Array<{ action: 'share'|'add', field: string }> }}
+ */
+export function publishGate(card) {
+  const { card: clean } = normalizeCard(card);
+  const fixes = [];
+  const named = Boolean(cardDisplayName(clean));
+  if (!named) fixes.push({ action: 'add', field: 'firstName' });
+  const hasContact = CONTACT_METHOD_FIELDS.some((field) => clean.share[field] === true && clean[field]);
+  if (!hasContact) {
+    const held = CONTACT_METHOD_FIELDS.filter((field) => clean[field]);
+    if (held.length) for (const field of held) fixes.push({ action: 'share', field });
+    else fixes.push({ action: 'add', field: 'email' }, { action: 'add', field: 'phone' });
+  }
+  return { ok: named && hasContact, fixes };
+}
+
+/**
+ * The public copy of a card, as publicCards/{publicId} stores it: the name, the revision it belongs to,
+ * and exactly the fields publicCardView allows. Firestore's rules compare it with the private card field
+ * by field, so it is built from the same view and from nothing else. Null when the card has no name.
+ */
+export function publicCardDoc(card, { revision, updatedAt }) {
+  const view = publicCardView(card);
+  if (!view) return null;
+  const copy = {
+    firstName: view.firstName, lastName: view.lastName, revision, schemaVersion: CARD_SCHEMA_VERSION, updatedAt,
+  };
+  for (const field of SHAREABLE_FIELDS) if (view[field]) copy[field] = view[field];
+  for (const slot of LINK_SLOTS) if (view[slot]) copy[slot] = { label: view[slot].label, url: view[slot].url };
+  return copy;
+}

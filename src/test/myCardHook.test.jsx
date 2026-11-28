@@ -13,7 +13,7 @@ import { clearAllMyCardDrafts, draftKey, readDraft, saveDraft } from '../pages/C
 import { DRAFT_MAX_AGE_MS, DRAFT_PHOTO_KEY_PREFIX } from '../pages/ContactHub/myCard/state/myCardDraftStorage';
 import { fingerprintOf, photoDataUrl } from './helpers/photoFixtures';
 import { CONFLICT_CHOICE } from '../pages/ContactHub/myCard/state/myCardState';
-import { DEFAULT_SHARE, newCard, normalizeCard } from '../utils/myCardRules';
+import { DEFAULT_SHARE, DEFAULT_LINK_SHARE, newCard, normalizeCard } from '../utils/myCardRules';
 import { FakeSessionStorage } from './helpers/fakeSessionStorage';
 
 const NOW = 1_800_000_000_000;
@@ -90,7 +90,7 @@ describe('loading', () => {
     });
     const t = await mount({ service });
     expect(t.draft().card).toMatchObject({ firstName: 'Ada', lastName: 'Lovelace', email: 'ada@example.com', sharingEnabled: false });
-    expect(t.draft().card.share).toEqual(DEFAULT_SHARE);
+    expect(t.draft().card.share).toEqual({ ...DEFAULT_SHARE, ...DEFAULT_LINK_SHARE });
     expect(t.state()).toMatchObject({ isNew: true, revision: null, unavailable: ['linkedin'] });
     expect(t.now().status).toBe('new');
     // Untouched, it is not unsaved work; but it can be saved as it is.

@@ -27,7 +27,7 @@ vi.mock('../utils/photoPrep', async (importOriginal) => ({ ...(await importOrigi
 
 import MyCardPage from '../pages/ContactHub/MyCardPage';
 import { saveDraft, readDraft, draftKey } from '../pages/ContactHub/myCard/state/myCardDraftStorage';
-import { DEFAULT_SHARE, newCard, normalizeCard } from '../utils/myCardRules';
+import { DEFAULT_SHARE, DEFAULT_LINK_SHARE, newCard, normalizeCard } from '../utils/myCardRules';
 import { fingerprintOf, photoDataUrl } from './helpers/photoFixtures';
 import { prepareProfilePhoto } from '../utils/photoPrep';
 
@@ -401,7 +401,7 @@ describe('Shared / Private and sharing', () => {
     await user.click(toggle('Email'));
     await user.click(saveButton());
     await finishSave();
-    expect(service.saveMyCard.mock.calls[0][0].share).toEqual({ ...DEFAULT_SHARE, email: true });
+    expect(service.saveMyCard.mock.calls[0][0].share).toEqual({ ...DEFAULT_SHARE, ...DEFAULT_LINK_SHARE, email: true });
     await ensureEditing();
     expect(toggle('Email')).toHaveAttribute('aria-checked', 'true');
   });

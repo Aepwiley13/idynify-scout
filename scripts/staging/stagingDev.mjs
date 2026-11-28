@@ -47,6 +47,14 @@
  *                       file may hold Stripe in TEST MODE ONLY, checked by
  *                       stripeTestMode.mjs. Stripe variables are still never
  *                       taken from the shell, so the env file is the only source.
+ *   (optional) --gmail
+ *                       a Gmail QA run (docs/gmail/STAGING_GMAIL_OAUTH_CLIENT.md): the env
+ *                       file may hold the dedicated staging Google OAuth client and nothing
+ *                       else new (gmailStagingMode.mjs). PRODUCTION_GOOGLE_CLIENT_ID must be
+ *                       in the shell so production's client is refused. Port 8888 is claimed
+ *                       first, because Google returns to exactly
+ *                       http://localhost:8888/.netlify/functions/gmail-oauth-callback. Every
+ *                       function is served. Not with --billing or --only-billing-functions.
  *   (optional) --no-edge-functions
  *                       skip the CLI's edge-function runtime, which it downloads
  *                       (Deno) on the first request even when a project has no
@@ -66,6 +74,7 @@ import { browserCheck } from './stagingBrowser.mjs';
 import {
   readStagingCredential, withCredential, checkCredential, CredentialRefusal, KEY_VARIABLE, FILE_VARIABLE,
 } from './stagingCredentials.mjs';
+import { dropFromShellForGmail, PRODUCTION_CLIENT_VARIABLE } from './gmailStagingMode.mjs';
 
 /** Shell variables the app must never inherit. */
 export const dropFromShell = (name) => name.startsWith('VITE_') || name.startsWith('FIREBASE_')
@@ -205,13 +214,17 @@ export function devArgs({ noEdgeFunctions = false, functionsDir = null, vitePort
  * { ok, problems, childEnv }. Pure: the checks' results come in, the app's
  * environment comes out.
  */
-export function planDevRun({ fileEnv, credential, shellEnv = {}, checks = [], rest = false, noEdgeFunctions = false, edgeFunctionsDeclared = false, apolloMockUrl = null }) {
+export function planDevRun({ fileEnv, credential, shellEnv = {}, checks = [], rest = false, noEdgeFunctions = false, edgeFunctionsDeclared = false, apolloMockUrl = null, gmail = false }) {
   const problems = checks.filter((r) => !r.ok).map((r) => `${r.id}: ${r.message}`);
   if (!credential) problems.push(`credential: set ${KEY_VARIABLE} or ${FILE_VARIABLE} to the staging service-account key.`);
   if (noEdgeFunctions && edgeFunctionsDeclared) problems.push('edge-functions: this project declares edge functions; run without --no-edge-functions.');
   if (problems.length) return { ok: false, problems };
   const childEnv = {};
-  for (const [name, value] of Object.entries(shellEnv)) if (!dropFromShell(name)) childEnv[name] = value;
+  // A Gmail run also drops the shell's Gmail switches, so the Google client, the ingestion mode
+  // and Contact Hub's Gmail client can only come from the checked env file.
+  for (const [name, value] of Object.entries(shellEnv)) {
+    if (!dropFromShell(name) && !(gmail && dropFromShellForGmail(name))) childEnv[name] = value;
+  }
   Object.assign(childEnv, withCredential(fileEnv, credential));
   if (rest) childEnv.FIRESTORE_PREFER_REST = 'true';
   // --apollo-mock: the functions talk to the local stand-in (apolloMock.mjs) with its fixed,
@@ -245,11 +258,18 @@ async function main() {
     return 1;
   }
   const billing = argv.includes('--billing');
+  const gmail = argv.includes('--gmail');
+  if (gmail && (billing || argv.includes('--only-billing-functions') || argv.includes('--only-sticker-functions'))) {
+    console.error('Refused: --gmail runs alone. Do not combine it with --billing, --only-billing-functions or --only-sticker-functions.');
+    return 1;
+  }
   const checks = [
     ...checkStagingEnv(withCredential(fileEnv, credential), {
       productionProjectId: process.env.PRODUCTION_FIREBASE_PROJECT_ID ?? null,
       fileCommittable: committable(file),
       billing,
+      gmail,
+      productionGoogleClientId: process.env[PRODUCTION_CLIENT_VARIABLE] ?? null,
       ...checkoutInputs(repoRoot()),
     }),
     ...checkCredential(fileEnv, credential),
@@ -274,10 +294,23 @@ async function main() {
       }
     }
   }
+  if (gmail) {
+    // Google returns to :8888 and nowhere else, so this launcher must be what answers there.
+    const early = planDevRun({ fileEnv, credential, checks, gmail });
+    if (early.ok) {
+      const ports = await claimPorts([8888], repoRoot());
+      for (const line of ports.stopped) console.log(`  · ${line}`);
+      if (!ports.ok) {
+        for (const p of ports.problems) console.error(`  ✗ ${p}`);
+        console.error('\nRefused: port 8888 is not free, and Google would return the Gmail callback to whatever holds it.');
+        return 1;
+      }
+    }
+  }
   const apolloMock = wantsMock ? await startApolloMock({ port: DEFAULT_APOLLO_MOCK_PORT }) : null;
   const plan = planDevRun({
     fileEnv, credential, shellEnv: process.env, checks, rest: argv.includes('--rest'),
-    noEdgeFunctions, edgeFunctionsDeclared: hasEdgeFunctions(repoRoot()), apolloMockUrl: apolloMock?.url ?? null,
+    noEdgeFunctions, edgeFunctionsDeclared: hasEdgeFunctions(repoRoot()), apolloMockUrl: apolloMock?.url ?? null, gmail,
   });
   if (!plan.ok) {
     await apolloMock?.close();
@@ -294,7 +327,7 @@ async function main() {
     console.error(`Refused: ${err.message} This mode needs the integration branch (STAGING_VALIDATION_RUNBOOK.md Part 1).`);
     return 1;
   }
-  console.log(`Preflight passed. Starting the app against ${fileEnv.VITE_FIREBASE_PROJECT_ID} (browser, functions and sign-in)${billing ? ', Stripe in test mode' : ''}${apolloMock ? `, Apollo stand-in at ${apolloMock.url}` : ''}, credential from ${credential.source}${served ? `, serving only: ${served.join(', ')}` : ''}${noEdgeFunctions ? ', edge runtime off' : ''}.`);
+  console.log(`Preflight passed. Starting the app against ${fileEnv.VITE_FIREBASE_PROJECT_ID} (browser, functions and sign-in)${billing ? ', Stripe in test mode' : ''}${gmail ? ', Gmail OAuth with the staging client (open http://localhost:8888)' : ''}${apolloMock ? `, Apollo stand-in at ${apolloMock.url}` : ''}, credential from ${credential.source}${served ? `, serving only: ${served.join(', ')}` : ''}${noEdgeFunctions ? ', edge runtime off' : ''}.`);
   // Billing runs: the CLI, npm and Vite in a process group of their own, stopped together, so no
   // Vite or netlify is left holding a port for the next run. No stdin: a background group that
   // reads the terminal is suspended.

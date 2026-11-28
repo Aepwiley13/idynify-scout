@@ -45,6 +45,7 @@ import {
   isKnownIdynifyThread,
 } from './utils/gmailMessageService.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
+import { isInboxIngestionEnabled, INBOX_INGESTION_ENV } from './utils/inboxIngestionFlag.js';
 
 if (getApps().length === 0) {
   const privateKey = process.env.FIREBASE_PRIVATE_KEY
@@ -293,6 +294,13 @@ async function ingestMessage(db, gmail, messageId, userId, gmailAccountId, threa
  */
 export async function syncUserInbox(db, user) {
   const { userId, docRef, data } = user;
+  if (!isInboxIngestionEnabled()) {
+    // Default off: no status write, no OAuth, no Gmail call.
+    return {
+      userId, processed: 0, skipped: 0, deleted: 0, invalid: 0, failed: 0, quarantined: 0,
+      mode: null, status: SYNC_STATUS.IDLE, error: null, disabled: true,
+    };
+  }
   const summary = {
     userId,
     processed: 0,
@@ -553,6 +561,20 @@ export async function runGmailSync(db, options = {}) {
   const startedAt = options.now ?? Date.now();
   const budgetMs = options.budgetMs ?? RUN_BUDGET_MS;
 
+  if (!isInboxIngestionEnabled()) {
+    // Default off: do not even discover connected users (no Firestore query).
+    return {
+      disabled: true,
+      reason: `${INBOX_INGESTION_ENV} is not 'true'`,
+      usersConsidered: 0,
+      usersSynced: 0,
+      usersDeferred: 0,
+      totals: { processed: 0, skipped: 0, deleted: 0, invalid: 0, failed: 0, quarantined: 0 },
+      results: [],
+      durationMs: Date.now() - startedAt,
+    };
+  }
+
   const users = await findConnectedGmailUsers(db);
   log(`starting run — ${users.length} connected account(s)`);
 
@@ -611,6 +633,15 @@ function safeFirestore() {
 }
 
 export const syncHandler = async () => {
+  if (!isInboxIngestionEnabled()) {
+    // Checked before getFirestore() so a disabled run touches nothing and
+    // never alerts ops.
+    console.log('gmail.sync.disabled', { env: INBOX_INGESTION_ENV });
+    return {
+      statusCode: 200,
+      body: JSON.stringify({ success: true, disabled: true, reason: `${INBOX_INGESTION_ENV} is not 'true'` }),
+    };
+  }
   try {
     const summary = await runGmailSync(getFirestore());
 

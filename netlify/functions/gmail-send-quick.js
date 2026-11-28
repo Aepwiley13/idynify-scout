@@ -16,6 +16,7 @@ import { getGmailSignatureHtml, appendSignatureHtml, resolveFallbackSignOff } fr
 import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 import { encodeHeaderValue, formatAddress } from './utils/emailHeaders.js';
 import { displayNameFor } from '../../src/utils/userIdentity.js';
+import { recordGmailRefreshFailure } from './utils/gmailOAuth.js';
 
 /**
  * Syntax check only — `local@domain.tld` shape. This does NOT verify the
@@ -371,6 +372,7 @@ export const handler = async (event) => {
 
         console.log('✅ Access token refreshed');
       } catch (refreshError) {
+        await recordGmailRefreshFailure(gmailDoc.ref, refreshError);
         console.error('❌ Failed to refresh token:', refreshError);
         return {
           statusCode: 400,

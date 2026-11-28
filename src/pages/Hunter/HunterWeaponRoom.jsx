@@ -3,6 +3,7 @@ import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { collection, getDocs, query, orderBy, doc, getDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useActiveUserId, useImpersonation } from '../../context/ImpersonationContext';
+import { startGmailConnect } from '../../utils/gmailConnect';
 import { Target, Crosshair, Archive, BarChart3, CheckCircle, Mail, LayoutDashboard, Users, Home } from 'lucide-react';
 import DashboardSection from './sections/DashboardSection';
 import WeaponsSection from './sections/WeaponsSection';
@@ -113,16 +114,14 @@ export default function HunterWeaponRoom() {
   }
 
   async function handleConnectGmail() {
-    const user = getEffectiveUser();
-    const authToken = await user.getIdToken();
-
-    const response = await fetch('/.netlify/functions/gmail-oauth-init', {
-      method: 'POST',
-      body: JSON.stringify({ userId: user.uid, authToken })
-    });
-
-    const data = await response.json();
-    window.location.href = data.authUrl;
+    try {
+      // getEffectiveUser() names the impersonated account under "View as
+      // user"; the server refuses that, so an admin never connects their own
+      // mailbox to someone else's account.
+      await startGmailConnect({ user: getEffectiveUser(), returnTo: '/hunter' });
+    } catch (err) {
+      console.error('Error connecting Gmail:', err);
+    }
   }
 
   // Get badge counts

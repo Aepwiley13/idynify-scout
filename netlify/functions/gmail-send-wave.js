@@ -14,6 +14,7 @@ import { FieldValue } from 'firebase-admin/firestore';
 import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
 import { engagementPromotionPatch } from './utils/engagementPromotion.js';
 import { buildPlainTextEmail } from './utils/emailHeaders.js';
+import { recordGmailRefreshFailure } from './utils/gmailOAuth.js';
 
 export const handler = async (event) => {
   const headers = {
@@ -122,6 +123,7 @@ export const handler = async (event) => {
             updatedAt: new Date().toISOString()
           });
       } catch (refreshError) {
+        await recordGmailRefreshFailure(gmailDoc.ref, refreshError);
         return {
           statusCode: 400,
           headers,

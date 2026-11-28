@@ -167,8 +167,12 @@ service cloud.firestore {
     }
 
     // Integration documents only the server may write (see the users block).
+    // gmail (CH-GMAIL-001): holds the OAuth tokens and the connection state
+    // every sender trusts. Only gmail-oauth-callback, gmail-disconnect and the
+    // server's own refresh and sync code write it, all through the Admin SDK;
+    // no client code does. The owner may still read it for status.
     function serverOwnedIntegration(coll, docId) {
-      return coll == 'integrations' && docId == 'linkedin';
+      return coll == 'integrations' && (docId == 'linkedin' || docId == 'gmail');
     }
 
     // Billing W4: the credit log, per-request charge records and daily search
@@ -417,6 +421,9 @@ service cloud.firestore {
       // integrations/linkedin is read-only to its owner: only the Connect
       // LinkedIn functions write it, after LinkedIn confirms the identity. A
       // client that could write it could mark any LinkedIn member as its own.
+      // integrations/gmail is read-only to its owner for the same reason: a
+      // client that could write it could swap in another grant or mark a
+      // revoked connection as connected.
       // Only the trusted writer publishes this small Contact Hub display state.
       function contactPhotoCreateOk(coll) {
         return coll != 'contacts' || !request.resource.data.keys().hasAny(['contact_hub_photo', 'contact_hub_lifecycle', 'contact_hub_merge_origin', 'contact_hub_primary_phone', 'contact_hub_email_suppressed', 'contact_affiliations']);

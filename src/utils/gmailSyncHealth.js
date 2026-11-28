@@ -54,6 +54,20 @@ export function deriveSyncHealth(integration, now = Date.now()) {
 
   const base = { minutesSinceSync: null, quarantinedCount, actionable: false };
 
+  // Google revoked or expired the grant (CH-GMAIL-001): the server sets
+  // status itself, so this is no longer "connected" but is not "never
+  // connected" either — the user needs to reconnect, not connect.
+  if (integration?.status === 'needs_reconnect') {
+    return {
+      ...base,
+      status: SYNC_HEALTH.NEEDS_RECONNECT,
+      message:
+        'Google stopped Idynify’s access to your Gmail. Reconnect it to keep ' +
+        'sending, and so Barry can see replies.',
+      actionable: true,
+    };
+  }
+
   if (!integration || integration.status !== 'connected') {
     return {
       ...base,

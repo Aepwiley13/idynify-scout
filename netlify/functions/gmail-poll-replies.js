@@ -24,6 +24,7 @@
 import { google } from 'googleapis';
 import { db } from './firebase-admin.js'; // shared init: production key or staging short-lived credentials
 import { pollRepliesForUser } from './utils/replyPolling.js';
+import { recordGmailRefreshFailure } from './utils/gmailOAuth.js';
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -95,6 +96,7 @@ export const handler = async (event) => {
         });
         console.log('✅ Token refreshed');
       } catch (refreshErr) {
+        await recordGmailRefreshFailure(gmailDoc.ref, refreshErr);
         console.error('❌ Token refresh failed:', refreshErr);
         return { statusCode: 200, headers: CORS_HEADERS, body: JSON.stringify({ transitioned: [], code: 'NEEDS_RECONNECT' }) };
       }

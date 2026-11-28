@@ -47,6 +47,7 @@ import { extractAuthToken } from './utils/extractAuthToken.js';
 import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
 import { CONVERSATION_STATES } from '../../src/types/conversationState.js';
 import { encodeHeaderValue } from './utils/emailHeaders.js';
+import { recordGmailRefreshFailure } from './utils/gmailOAuth.js';
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -362,6 +363,7 @@ export const handler = async (event) => {
           updatedAt: new Date().toISOString(),
         });
       } catch (refreshErr) {
+        await recordGmailRefreshFailure(gmailDoc.ref, refreshErr);
         console.error('[barry-approve-send] Token refresh failed:', refreshErr.message);
         return abandonSend(400, {
           error: 'Gmail connection expired. Please reconnect Gmail.',

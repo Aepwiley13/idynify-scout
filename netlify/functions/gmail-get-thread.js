@@ -16,6 +16,7 @@ import { db } from './firebase-admin.js'; // shared init: production key or stag
 // right after this line) merge in either order. Remove once both are on main.
 // eslint-disable-next-line no-unused-vars
 import { requireProjectId } from './utils/firebaseEnv.js';
+import { recordGmailRefreshFailure } from './utils/gmailOAuth.js';
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -107,6 +108,7 @@ export const handler = async (event) => {
           updatedAt: new Date().toISOString(),
         });
       } catch (refreshErr) {
+        await recordGmailRefreshFailure(gmailDoc.ref, refreshErr);
         return { statusCode: 200, headers: CORS_HEADERS, body: JSON.stringify({ messages: [], code: 'NEEDS_RECONNECT' }) };
       }
     }

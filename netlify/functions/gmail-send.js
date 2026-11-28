@@ -2,6 +2,7 @@ import { google } from 'googleapis';
 import { db } from './firebase-admin.js'; // shared init: production key or staging short-lived credentials
 import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
 import { buildPlainTextEmail } from './utils/emailHeaders.js';
+import { recordGmailRefreshFailure } from './utils/gmailOAuth.js';
 
 export const handler = async (event) => {
   // Only allow POST
@@ -117,6 +118,7 @@ export const handler = async (event) => {
 
         console.log('✅ Access token refreshed');
       } catch (refreshError) {
+        await recordGmailRefreshFailure(gmailDoc.ref, refreshError);
         console.error('❌ Failed to refresh token:', refreshError);
         throw new Error('Gmail connection expired. Please reconnect Gmail.');
       }

@@ -296,8 +296,8 @@ CASES.push(...CAPTURE_CASES.map(([name, expect, run], i) => [`${firstCaptureCase
 // ── Connect LinkedIn: server-written ──────────────────────────────────────
 // integrations/linkedin is written only by the linkedin-oauth-* functions
 // after LinkedIn confirms the identity; its owner may read it, nothing more.
-// oauth_states and linkedin_member_claims are server-only. Other integration
-// documents (gmail, googleCalendar) keep their existing owner access.
+// oauth_states and linkedin_member_claims are server-only. integrations/gmail
+// is server-written too (CH-GMAIL-001); googleCalendar keeps owner access.
 await env.withSecurityRulesDisabled(async (ctx) => {
   const db = ctx.firestore();
   await setDoc(doc(db, `users/${U}/integrations/linkedin`), { provider: 'linkedin', status: 'connected', linkedinMemberId: 'm1' });
@@ -313,7 +313,15 @@ const LINKEDIN_CASES = [
   ['integrations/linkedin  owner writes beneath', 'DENY', () => setDoc(doc(me, `users/${U}/integrations/linkedin/x/y`), { a: 1 })],
   ['integrations/linkedin  OTHER reads', 'DENY', () => getDoc(doc(other, `users/${U}/integrations/linkedin`))],
   ['integrations/linkedin  new user creates one', 'DENY', () => setDoc(doc(other, 'users/OTHER/integrations/linkedin'), { status: 'connected' })],
-  ['integrations/gmail     owner update still allowed', 'ALLOW', () => updateDoc(doc(me, `users/${U}/integrations/gmail`), { status: 'connected' })],
+  ['integrations/gmail     owner reads status', 'ALLOW', () => getDoc(doc(me, `users/${U}/integrations/gmail`))],
+  ['integrations/gmail     owner marks itself connected', 'DENY', () => updateDoc(doc(me, `users/${U}/integrations/gmail`), { status: 'connected', refreshToken: 'forged' })],
+  ['integrations/gmail     owner creates one', 'DENY', () => setDoc(doc(other, 'users/OTHER/integrations/gmail'), { status: 'connected', refreshToken: 'forged' })],
+  ['integrations/gmail     owner deletes', 'DENY', () => deleteDoc(doc(me, `users/${U}/integrations/gmail`))],
+  ['integrations/gmail     owner writes beneath', 'DENY', () => setDoc(doc(me, `users/${U}/integrations/gmail/x/y`), { a: 1 })],
+  ['integrations/gmail     OTHER reads', 'DENY', () => getDoc(doc(other, `users/${U}/integrations/gmail`))],
+  ['integrations/googleCalendar owner update still allowed', 'ALLOW', () => setDoc(doc(me, `users/${U}/integrations/googleCalendar`), { status: 'connected' })],
+  ['oauth_states           forges a gmail state', 'DENY', () => setDoc(doc(me, 'oauth_states/g1'), { provider: 'gmail', uid: 'OTHER' })],
+  ['admin sdk  writes integrations/gmail', 'ALLOW', asAdminSdk(db => setDoc(doc(db, `users/${U}/integrations/gmail`), { status: 'connected' }))],
   ['oauth_states           reads one', 'DENY', () => getDoc(doc(me, 'oauth_states/h1'))],
   ['oauth_states           forges one', 'DENY', () => setDoc(doc(me, 'oauth_states/h2'), { provider: 'linkedin', uid: 'OTHER' })],
   ['oauth_states           deletes one', 'DENY', () => deleteDoc(doc(me, 'oauth_states/h1'))],

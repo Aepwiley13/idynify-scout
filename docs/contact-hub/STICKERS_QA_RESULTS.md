@@ -117,7 +117,7 @@ Known, not blocking: bulk "Add sticker" exists only on Scout People (`/people`, 
 | Production smoke test, dedicated Free test account (owner) | contact creation; sticker create and assign; sticker on the profile; filter by sticker; persistence after refresh; Scout shows the paid upgrade: **all PASS** |
 
 Rollback, still ready: Stickers `07-prod-rollback-off.sh ROLLBACK` (mode `off`, data kept); Free plan: a build with `VITE_FREE_PLAN="existing"`, or republish `6b062bfd…` in an emergency.
-Not recorded in the logs: re-enabling the Netlify auto-publish lock after publishing, and a separate Stickers check on the owner's own account.
+Netlify production confirmed **Published & Locked** by the owner (2026-11-27). Owner's own-account Stickers check: owner to verify; any problem is tracked separately. **Workstream closed.**
 
 ## 5. Follow-ups after launch
 1. **Signup monitoring and protection — reCAPTCHA bot protection for email/password** (Identity Platform): audit mode in week one, enforce after a few days of clean traffic. Free up to 10,000 assessments a month.

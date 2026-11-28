@@ -64,3 +64,21 @@ Deploy rules to `idynify-scout-dev`, turn on `VITE_MY_CARD_SHARING` and `MY_CARD
 
 ## Later (not in scope)
 Report-abuse flow; per-link icons and click counts; wallet passes; NFC.
+
+## Staging verification (2026-11-28)
+
+Target: Netlify site `idynify-staging` (no repo, no custom domain), alias `my-card-share`, Firebase `idynify-staging`.
+Production: untouched (not deployed, rules not deployed, flags off).
+
+- Rules deployed to `idynify-staging` only, with the guarded `stagingRulesDeploy.mjs` (validate, then apply).
+- Site variables added: `MY_CARD_SHARING_ENABLED=true`, `MY_CARD_FIREBASE_PROJECT_ID=idynify-staging`. Nothing else changed.
+- Alias deploy (draft, not published): `https://my-card-share--idynify-staging.netlify.app`.
+- Demo account (fictional data) published a card through the app's own service against the staging rules.
+- `/c/<id>`: 200, page title and preview tags built from the public copy, links on the alias origin.
+- `/c/<id>/contact.vcf`: 200, `text/vcard`, attachment, fictional data only.
+- Unknown ID and malformed ID: the same 404 page.
+- Headers on the page: edge CSP (`default-src 'none'`) is NOT overridden by the site-wide policy; `no-store`, `no-referrer`, `nosniff`, `noindex`, HSTS.
+- Built bundle names `idynify-staging`, not the production project.
+- Finding: an account with no `users/{uid}` document cannot publish (rules deny; real signups have the document).
+- Finding: `netlify dev` hands edge functions only UI/account/add-on/`.env` variables, so `/c/` cannot be exercised through the local launcher.
+- Still to do: add the alias host to Firebase Authorized domains (owner), phone and preview-matrix checks, screenshots.

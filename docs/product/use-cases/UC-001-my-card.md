@@ -7,7 +7,7 @@
 | Platform | Free Contact Hub |
 | Pricing | Free. No credits. |
 | Initiative | MY-CARD-SHARE-001 (branch `feature/my-card-share`) |
-| Release status | Built and tested in the emulator; **awaiting staging device verification**. Production is off. |
+| Release status | Engineering-verified on staging (2026-11-28). **Customer acceptance: PENDING owner approval.** Production is off. |
 
 **Website headline:** "One card. One scan. All your connections."
 **Call to action:** "Create Your Free Card" (links to `/signup?ref=card`)
@@ -22,11 +22,11 @@ Each is **Supported** only after its checks pass on staging. Until then it is *B
 
 | # | Story | Depends on | Status |
 |---|---|---|---|
-| 1 | Meet someone and exchange contact information with a QR code | QR, public page, Save to Contacts | Built; staging device check pending |
-| 2 | Share contact information and social profiles through a single link | Share sheet, public page, LinkedIn and Instagram | Built; staging device check pending |
-| 3 | Update contact information without replacing the link or QR | Synced saves, stable ID | Built; verified against the real rules in the emulator; staging pending |
-| 4 | Turn introductions into meetings through a booking link | Additional links | Built; staging device check pending |
-| 5 | Invite people to upcoming events through selected event links | Additional links | Built; staging device check pending |
+| 1 | Meet someone and exchange contact information with a QR code | QR, public page, Save to Contacts | Engineering-verified on staging (browser, phone-size): QR opens, the public page loads with no sign-in, Save to Contacts downloads a vCard. A real phone-camera scan and Add Contact on a device: pending. Customer acceptance: pending |
+| 2 | Share contact information and social profiles through a single link | Share sheet, public page, LinkedIn and Instagram | Public page and link verified on staging with email, phone and website. LinkedIn and Instagram: covered by rules and unit tests, not exercised in the staging run. Share sheet and previews on a device: pending. Customer acceptance: pending |
+| 3 | Update contact information without replacing the link or QR | Synced saves, stable ID | Engineering-verified on staging: an edit appeared on the same link; turning sharing off made the link unavailable; turning it on again restored the same link. Customer acceptance: pending |
+| 4 | Turn introductions into meetings through a booking link | Additional links | Built; verified in the emulator and unit tests; not exercised on staging. Customer acceptance: pending |
+| 5 | Invite people to upcoming events through selected event links | Additional links | Built; verified in the emulator and unit tests; not exercised on staging. Customer acceptance: pending |
 
 ## Capabilities (as built)
 - Share My Card (the phone's share sheet; Copy Link where there is none), Copy Link, full-screen QR code (PNG download).

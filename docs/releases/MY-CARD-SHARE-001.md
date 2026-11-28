@@ -82,3 +82,14 @@ Production: untouched (not deployed, rules not deployed, flags off).
 - Finding: an account with no `users/{uid}` document cannot publish (rules deny; real signups have the document).
 - Finding: `netlify dev` hands edge functions only UI/account/add-on/`.env` variables, so `/c/` cannot be exercised through the local launcher.
 - Still to do: add the alias host to Firebase Authorized domains (owner), phone and preview-matrix checks, screenshots.
+
+### Signed-in acceptance run (staging alias, demo account, fictional data)
+13 of 13 automated checks passed: sign in, owner screen live, full-screen QR, QR on the staging address (not production),
+public page with no sign-in showing only shared fields, vCard, Save to Contacts download, an edit on the same link,
+turn off (link unavailable, QR and Copy Link withdrawn), turn on again (same link).
+Evidence (screenshots at desktop and phone size, frames of the phone flow): `~/idynify-staging/my-card-evidence/20261128-1119/`.
+Script: `scripts/staging/myCardAcceptance.mjs`. Not recorded as video (Playwright needs an ffmpeg download that was not approved).
+Alias build note: the alias was built with `VITE_CONTACT_HUB=on VITE_FREE_PLAN=on` for this build only, because those two
+flags are set only in the production context in `netlify.toml`; without them a free account is sent to checkout.
+Customer acceptance: PENDING owner approval. Not exercised: LinkedIn/Instagram/additional links on staging, Reset link on
+staging, preview matrix, real-phone camera scan.

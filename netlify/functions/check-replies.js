@@ -21,10 +21,6 @@ import { appendContactChild } from './utils/contactWriteLifecycle.js';
 import { google } from 'googleapis';
 import { db } from './firebase-admin.js'; // shared init: production key or staging short-lived credentials
 import { FieldValue } from 'firebase-admin/firestore';
-// Unused here since the shared init; kept so this change and PR #856 (which adds an import
-// right after this line) merge in either order. Remove once both are on main.
-// eslint-disable-next-line no-unused-vars
-import { requireProjectId } from './utils/firebaseEnv.js';
 import { recordGmailRefreshFailure } from './utils/gmailOAuth.js';
 
 const CORS_HEADERS = {

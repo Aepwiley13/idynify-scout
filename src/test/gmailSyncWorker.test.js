@@ -10,7 +10,7 @@
  *   - one user's failure never stops the loop for the others
  *   - Section 4 filtering keeps outbound and automated noise out of Team B
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 vi.mock('@netlify/functions', () => ({ schedule: (_cron, handler) => handler }));
 vi.mock('firebase-admin/app', () => ({
@@ -154,6 +154,7 @@ const finalState = (user) => Object.assign({}, ...user.updates);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  vi.stubEnv('GMAIL_INBOX_INGESTION_ENABLED', 'true');
   processNormalizedMessage.mockImplementation(async () => ({ success: true, messageRecordId: 'r' }));
   getOAuthClient.mockImplementation(async () => ({
     oauth2Client: {},
@@ -163,6 +164,8 @@ beforeEach(() => {
   isKnownContact.mockImplementation(async () => true);
   isKnownIdynifyThread.mockImplementation(async () => false);
 });
+
+afterEach(() => { vi.unstubAllEnvs(); });
 
 // ─────────────────────────────────────────────────────────────────────────────
 describe('worker configuration', () => {

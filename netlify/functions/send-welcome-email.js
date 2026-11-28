@@ -1,6 +1,37 @@
 // Welcome Email for New Signups
 // Sends personal welcome email from Aaron with getting started guide
 
+import { admin } from './firebase-admin.js';
+import { extractAuthToken } from './utils/extractAuthToken.js';
+
+/**
+ * Who may trigger a welcome email: only the account that was just created, for its own address.
+ * Without this the function sent Aaron's welcome email to any address anyone posted, an open
+ * relay for a fixed message. The caller must present its Firebase ID token; the token's uid must
+ * be `userId`, its email must be `email`, and the account must be under WELCOME_WINDOW_MS old,
+ * so a repeat call later cannot resend it. The email goes to the token's address.
+ */
+export const WELCOME_WINDOW_MS = 15 * 60 * 1000;
+
+export async function authorizeWelcome(event, { email, userId }, {
+  verifyIdToken = (token) => admin.auth().verifyIdToken(token),
+  getUser = (uid) => admin.auth().getUser(uid),
+  now = Date.now(),
+} = {}) {
+  const token = extractAuthToken(event);
+  if (!token) return { ok: false, statusCode: 401, error: 'unauthorized' };
+  let decoded;
+  try { decoded = await verifyIdToken(token); } catch { return { ok: false, statusCode: 401, error: 'unauthorized' }; }
+  const tokenEmail = typeof decoded?.email === 'string' ? decoded.email.toLowerCase() : null;
+  if (decoded?.uid !== userId || !tokenEmail || tokenEmail !== String(email).trim().toLowerCase()) {
+    return { ok: false, statusCode: 403, error: 'forbidden' };
+  }
+  let created;
+  try { created = Date.parse((await getUser(userId))?.metadata?.creationTime ?? ''); } catch { created = NaN; }
+  if (!Number.isFinite(created) || now - created > WELCOME_WINDOW_MS) return { ok: false, statusCode: 403, error: 'forbidden' };
+  return { ok: true, email: decoded.email };
+}
+
 /**
  * The Free plan's welcome (billing Phase 1a). A Free signup has no Scout access, so the Scout
  * walkthrough below would send them to a paid page; theirs points to their Contact Hub instead.
@@ -51,6 +82,12 @@ export const handler = async (event) => {
       throw new Error('Email and userId are required');
     }
 
+    const auth = await authorizeWelcome(event, { email, userId });
+    if (!auth.ok) {
+      console.warn('send-welcome-email', { outcome: auth.error });
+      return { statusCode: auth.statusCode, body: JSON.stringify({ error: auth.error }) };
+    }
+
     const resendApiKey = process.env.RESEND_API_KEY;
 
     if (!resendApiKey) {
@@ -58,7 +95,7 @@ export const handler = async (event) => {
       throw new Error('Email service not configured');
     }
 
-    console.log(`📧 Sending welcome email to: ${email}`);
+    console.log('📧 Sending welcome email');
 
     // Send welcome email via Resend
     const emailResponse = await fetch('https://api.resend.com/emails', {
@@ -69,11 +106,11 @@ export const handler = async (event) => {
       },
       body: JSON.stringify(plan === 'free' ? {
         from: 'Aaron Wiley <aaron@idynify.com>',
-        to: email,
+        to: auth.email,
         ...freeWelcomeEmail(process.env.URL),
       } : {
         from: 'Aaron Wiley <aaron@idynify.com>',
-        to: email,
+        to: auth.email,
         subject: 'Hi — I\'m Aaron, the founder of Idynify 👋',
         html: `
           <!DOCTYPE html>

@@ -43,6 +43,7 @@ import { composeDraftReply } from './utils/barryDraftComposer.js';
 import { CONVERSATION_STATES } from '../../src/types/conversationState.js';
 import { getConversationState } from '../../src/utils/relationshipRead.js';
 import { isPaidApiEligible } from './utils/paidApiAccess.js';
+import { isInboxIngestionEnabled, INBOX_INGESTION_ENV } from './utils/inboxIngestionFlag.js';
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -89,6 +90,15 @@ export const processInboxQueue = async (event = {}) => {
       statusCode: 405,
       headers: CORS_HEADERS,
       body: JSON.stringify({ error: 'Method not allowed' }),
+    };
+  }
+
+  // Default off, before any queue query. Applies to scheduled and manual POST alike.
+  if (!isInboxIngestionEnabled()) {
+    return {
+      statusCode: 200,
+      headers: CORS_HEADERS,
+      body: JSON.stringify({ success: true, disabled: true, reason: `${INBOX_INGESTION_ENV} is not 'true'` }),
     };
   }
 

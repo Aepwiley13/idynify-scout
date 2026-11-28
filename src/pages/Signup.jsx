@@ -142,11 +142,12 @@ export default function Signup() {
       // a comment promising it did not, so a slow Resend call sat between the
       // user pressing the button and reaching checkout. Failures still surface
       // in logs; they just no longer cost the user time.
-      fetch('/.netlify/functions/send-welcome-email', {
+      // Signed in as the new account: the function sends only to its own address.
+      Promise.resolve().then(() => userCredential.user.getIdToken()).then((idToken) => fetch('/.netlify/functions/send-welcome-email', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
         body: JSON.stringify({ email: email, userId: userCredential.user.uid, plan: tier }),
-      }).catch((emailError) => {
+      })).catch((emailError) => {
         console.error('[signup] welcome email failed to send', emailError);
       });
 

@@ -163,17 +163,26 @@ export function photoBytes(card) {
 
 // ── Rendering ────────────────────────────────────────────────────────────────
 
+/**
+ * Done: goes back where the person came from (history.back), or closes the tab when a script opened it,
+ * or, with no history at all (a QR scan opens a fresh tab), goes to the IDYNIFY home page.
+ * Its SHA-256 is in the Content-Security-Policy below; a test keeps the two together.
+ */
+export const BACK_SCRIPT = "(function(){var b=document.getElementById('back');if(!b)return;b.hidden=false;b.addEventListener('click',function(){if(history.length>1){history.back();return}if(window.opener){window.close();return}location.href='/'})})()";
+export const BACK_SCRIPT_HASH = "UgI9C15wyyyBx/kF+oofcKNCrxVyiN+JWwBgKdl7M1M=";
+
 export const SECURITY_HEADERS = Object.freeze({
   'Cache-Control': 'no-store',
   'Netlify-CDN-Cache-Control': 'no-store',
   'X-Robots-Tag': 'noindex',
   'Referrer-Policy': 'no-referrer',
   'X-Content-Type-Options': 'nosniff',
-  'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'; img-src 'self' https:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+  // The one inline script (the Done button) is allowed by its hash; nothing else may run.
+'Content-Security-Policy': `default-src 'none'; script-src 'sha256-${BACK_SCRIPT_HASH}'; style-src 'unsafe-inline'; img-src 'self' https:; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
 });
 
-const DEFAULT_DESCRIPTION = 'Digital business card on IDYNIFY';
-const FOOTER = 'Made with IDYNIFY · Create your free digital business card';
+const FOOTER = 'Create your free digital business card';
+const DESCRIPTION_TAIL = 'Save contact info and connect instantly';
 
 const CSS = `*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
 body{margin:0;min-height:100vh;background:#f4f4f8;color:#14122b;font:16px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
@@ -189,17 +198,18 @@ h1{margin:0;font-size:28px;line-height:1.15;font-weight:800;overflow-wrap:anywhe
 .actions li{margin:0}.actions a{display:block;min-height:48px;padding:8px 6px;color:#14122b;text-decoration:none;overflow-wrap:anywhere}
 .actions a:focus-visible,.save:focus-visible,.foot a:focus-visible{outline:3px solid #4f46e5;outline-offset:2px}
 .k{display:block;font-size:12px;color:#55537a;letter-spacing:.02em}.v{font-size:16px;font-weight:600}
-.foot{margin:18px 0 0;text-align:center;font-size:13px}.foot a{color:#4f46e5}
+.bar{margin:0 0 12px}.back{min-height:44px;padding:8px 18px 8px 12px;border:1px solid #e4e4ee;border-radius:22px;background:#fff;color:#14122b;font-weight:600;font-size:16px;font-family:inherit;cursor:pointer}.back:focus-visible{outline:3px solid #4f46e5;outline-offset:2px}
+.foot{margin:22px 0 0;text-align:center;font-size:14px}.foot a{display:inline-flex;flex-direction:column;align-items:center;gap:6px;color:#4f46e5;text-decoration:none;font-weight:600}.logo{display:block;width:120px;height:auto}
 .na{padding:48px 24px;text-align:center}.na h1{font-size:22px}
-@media (prefers-color-scheme:dark){body{background:#0d0a1f;color:#f1f0fb}.card{background:#17133a;border-color:#2c2760}.avatar{box-shadow:0 0 0 5px #17133a}.actions{border-color:#2c2760}.actions a{color:#f1f0fb}.k,.org{color:#b7b4de}.foot a{color:#a5a0ff}}`;
+@media (prefers-color-scheme:dark){body{background:#0d0a1f;color:#f1f0fb}.card{background:#17133a;border-color:#2c2760}.avatar{box-shadow:0 0 0 5px #17133a}.actions{border-color:#2c2760}.actions a{color:#f1f0fb}.k,.org{color:#b7b4de}.foot a{color:#a5a0ff}.back{background:#17133a;border-color:#2c2760;color:#f1f0fb}}`;
 
 function shell({ title, head = '', body }) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">`
     + `<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer"><title>${escapeText(title)}</title>${head}`
-    + `<style>${CSS}</style></head><body><main>${body}</main></body></html>`;
+    + `<style>${CSS}</style></head><body><main><div class="bar"><button type="button" id="back" class="back" hidden aria-label="Go back">\u2039 Done</button></div>${body}</main><script>${BACK_SCRIPT}</script></body></html>`;
 }
 
-const footer = `<p class="foot"><a href="/signup?ref=card">${escapeText(FOOTER)}</a></p>`;
+const footer = `<div class="foot"><a href="/signup?ref=card"><img class="logo" src="/assets/Idynify_logo1.png" alt="IDYNIFY" width="120" height="40"><span>${escapeText(FOOTER)}</span></a></div>`;
 
 /** One body for every miss: unknown, malformed, retired, taken down, flag off, unreadable. */
 export function renderUnavailable() {
@@ -213,9 +223,13 @@ const initials = (card) => Array.from([card.firstName, card.lastName].filter(Boo
 
 /** What the preview tags may say: name, and "Title · Organization" only when they are in the copy. */
 export function previewOf(card) {
-  const description = [card.title, card.organization].filter(Boolean).join(' · ') || DEFAULT_DESCRIPTION;
-  return { title: card.name, description };
+  const role = card.title && card.organization ? `${card.title} at ${card.organization}` : (card.title || card.organization || '');
+  const description = role ? `${role} · ${DESCRIPTION_TAIL}` : `${DESCRIPTION_TAIL[0].toUpperCase()}${DESCRIPTION_TAIL.slice(1)}`;
+  return { title: `${card.name} \u2014 Digital Card`, description };
 }
+
+/** A booking link reads as an invitation. Only the plain default names are reworded; anything the person typed stays as typed. */
+const friendlyLabel = (label) => (/^(my )?(calendar|schedule)$/i.test(label) ? 'Book time with me' : label);
 
 const row = (href, label, value, external) => `<li><a href="${escapeAttr(href)}"${external ? ' target="_blank" rel="noopener noreferrer nofollow ugc"' : ''}><span class="k">${escapeText(label)}</span><span class="v">${escapeText(value)}</span></a></li>`;
 
@@ -223,11 +237,12 @@ export function renderCard(card, { origin, id }) {
   const { title, description } = previewOf(card);
   const pageUrl = `${origin}/c/${id}`;
   const photoPath = hasPhotoData(card) ? `/c/${id}/photo.jpg` : null;
-  const image = photoPath ? `${origin}${photoPath}` : (card.photoUrl || `${origin}/card-og-default.png`);
+  // The preview image is the IDYNIFY branded card image, never the person's photo.
+  const image = `${origin}/card-og-default.png`;
   const head = [
-    ['og:title', title], ['og:description', description], ['og:image', image], ['og:url', pageUrl], ['og:type', 'profile'], ['og:site_name', 'IDYNIFY'],
+    ['og:title', title], ['og:description', description], ['og:image', image], ['og:image:width', '1200'], ['og:image:height', '630'], ['og:image:alt', `${card.name}'s digital business card on IDYNIFY`], ['og:url', pageUrl], ['og:type', 'profile'], ['og:site_name', 'IDYNIFY'],
   ].map(([p, c]) => `<meta property="${p}" content="${escapeAttr(c)}">`).join('')
-    + `<meta name="twitter:card" content="summary"><meta name="twitter:title" content="${escapeAttr(title)}">`
+    + `<meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="${escapeAttr(title)}">`
     + `<meta name="twitter:description" content="${escapeAttr(description)}"><meta name="twitter:image" content="${escapeAttr(image)}">`
     + `<meta name="description" content="${escapeAttr(description)}"><link rel="canonical" href="${escapeAttr(pageUrl)}">`;
 
@@ -241,10 +256,10 @@ export function renderCard(card, { origin, id }) {
     rows.push(row(`tel:${dial}`, 'Call', card.phone), row(`sms:${dial}`, 'Text', card.phone));
   }
   if (card.email) rows.push(row(`mailto:${card.email}`, 'Email', card.email));
-  if (card.linkedinUrl) rows.push(row(card.linkedinUrl, 'LinkedIn', 'View profile', true));
+  if (card.linkedinUrl) rows.push(row(card.linkedinUrl, 'LinkedIn', 'View LinkedIn', true));
   if (card.instagram) rows.push(row(`https://www.instagram.com/${card.instagram}`, 'Instagram', `@${card.instagram}`, true));
-  if (card.website) rows.push(row(card.website, 'Website', new URL(card.website).hostname, true));
-  for (const link of card.links) rows.push(row(link.url, link.label, link.host, true));
+  if (card.website) rows.push(row(card.website, new URL(card.website).hostname, 'Visit website', true));
+  for (const link of card.links) rows.push(row(link.url, link.host, friendlyLabel(link.label), true));
 
   const body = `<div class="card"><div class="banner"></div><div class="body">${avatar}<h1>${escapeText(card.name)}</h1>`
     + (card.title ? `<p class="title">${escapeText(card.title)}</p>` : '')

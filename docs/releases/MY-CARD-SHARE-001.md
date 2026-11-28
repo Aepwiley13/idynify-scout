@@ -93,3 +93,10 @@ Alias build note: the alias was built with `VITE_CONTACT_HUB=on VITE_FREE_PLAN=o
 flags are set only in the production context in `netlify.toml`; without them a free account is sent to checkout.
 Customer acceptance: PENDING owner approval. Not exercised: LinkedIn/Instagram/additional links on staging, Reset link on
 staging, preview matrix, real-phone camera scan.
+
+## Polish pass (2026-11-28, staging alias)
+- Public card: a **Done** button at the top (history.back(); closes a script-opened tab; with no history goes to the home page). Its one inline script is allowed by a SHA-256 in the page's CSP; a test keeps the two together.
+- Share preview: title "<Name> — Digital Card", description "<Title> at <Organization> · Save contact info and connect instantly", and one branded 1200x630 image (IDYNIFY logo, "Digital Business Card"). The person's photo is never the preview image. The image is the same for every card (a per-person image needs server-side image rendering, not added).
+- Footer: the IDYNIFY logo and "Create your free digital business card" (links to signup with `?ref=card`); "Made with IDYNIFY" removed. The logo also sits above the name on the QR screen (QR itself unchanged).
+- Wording: "View LinkedIn", "Visit website", and a link labelled "My Calendar" or "Calendar" reads "Book time with me". Labels people typed are left as typed.
+- Verified on staging: 7 of 7 browser checks (Done button on a phone, goes back, falls back with no history, no CSP errors, logo loads, old footer gone, QR logo). The message-bubble screenshot is simulated from the live tags; real iMessage rendering needs a device.

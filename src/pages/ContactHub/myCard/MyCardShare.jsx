@@ -108,6 +108,7 @@ function QrScreen({ url, name, onClose }) {
         <X size={18} aria-hidden="true" /><span>Close</span>
       </button>
       <div className="mycard-qr-body">
+        <img className="mycard-qr-logo" src="/assets/Idynify_logo1.png" alt="IDYNIFY" width="120" height="40" />
         {name ? <p className="mycard-qr-name">{name}</p> : null}
         {png ? <img className="mycard-qr-img" src={png} alt={`QR code that opens ${name ? `${name}'s` : 'your'} card`} /> : null}
         {!png && !failed ? <p className="mycard-qr-note" role="status">Making your QR code…</p> : null}

@@ -465,6 +465,7 @@
 .mycard-qr .mycard-btn--secondary { background: var(--mycard-qr-bg); border-color: var(--mycard-qr-fg); color: var(--mycard-qr-fg); }
 .mycard-qr-close { align-self: flex-end; }
 .mycard-qr-body { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; }
+.mycard-qr-logo { display: block; width: 120px; height: auto; margin: 0 auto; }
 .mycard-qr-name { margin: 0; font-size: 26px; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
 .mycard-qr-img { display: block; width: min(86vw, 70vh, 520px); height: auto; aspect-ratio: 1 / 1; image-rendering: pixelated; background: var(--mycard-qr-bg); }
 .mycard-qr-note { margin: 0; font-size: 15px; color: var(--mycard-qr-note); }

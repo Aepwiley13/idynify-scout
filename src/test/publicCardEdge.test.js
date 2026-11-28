@@ -1,10 +1,11 @@
 // The public card edge function (netlify/edge-functions/public-card.js): page, .vcf, photo, previews,
 // escaping, headers, flag. Plain Request/Response with a mocked fetch; no network, no emulator.
+import { createHash } from 'node:crypto';
 import { describe, it, expect } from 'vitest';
 import { handle } from '../../netlify/edge-functions/public-card.js';
 import { escapeAttr, escapeText } from '../../netlify/edge-functions/lib/escape.js';
 import { buildPublicVCard } from '../../netlify/edge-functions/lib/vcard.js';
-import { parsePublicCard, safeHttpsUrl } from '../../netlify/edge-functions/lib/publicCard.js';
+import { parsePublicCard, safeHttpsUrl, BACK_SCRIPT, BACK_SCRIPT_HASH } from '../../netlify/edge-functions/lib/publicCard.js';
 import { buildMyCardVCard } from '../utils/vcard.js';
 import { photoDataUrl } from './helpers/photoFixtures.js';
 
@@ -57,8 +58,11 @@ describe('the recipient page', () => {
     expect(html).toContain('Book a meeting');
     expect(html).toContain('calendly.com');
     expect(html).toContain('href="/signup?ref=card"');
-    expect(html).toContain('Made with IDYNIFY · Create your free digital business card');
-    expect(html).not.toMatch(/<script/i);
+    expect(html).toContain('Create your free digital business card');
+    expect(html).toContain('src="/assets/Idynify_logo1.png" alt="IDYNIFY"');
+    expect(html).not.toContain('Made with IDYNIFY');
+    expect(html.match(/<script/gi)).toHaveLength(1);
+    expect(html).toContain(`<script>${BACK_SCRIPT}</script>`);
   });
 
   it('a card with only a name and one method shows only those', async () => {
@@ -72,7 +76,7 @@ describe('the recipient page', () => {
   it('external links open safely and carry the destination host under the label', async () => {
     const { html } = await page({ ...base, email: 'a@b.co', link1: { label: 'Talk', url: 'https://cal.example.org/me' }, website: 'https://example.com/x' });
     for (const m of html.match(/<a [^>]*target="_blank"[^>]*>/g)) expect(m).toContain('rel="noopener noreferrer nofollow ugc"');
-    expect(html).toMatch(/Talk<\/span><span class="v">cal\.example\.org/);
+    expect(html).toMatch(/cal\.example\.org<\/span><span class="v">Talk/);
   });
 
   it('uses initials with no photo, and the embedded photo through /photo.jpg', async () => {
@@ -83,11 +87,31 @@ describe('the recipient page', () => {
     expect(html).not.toContain('base64');
   });
 
-  it('sends a strict CSP: no scripts, styles inline only', async () => {
+  it('has a Done button that is hidden until its script runs, and goes back, closes or goes home', async () => {
+    const { html } = await page({ ...base, email: 'a@b.co' });
+    expect(html).toMatch(/<button type="button" id="back" class="back" hidden[^>]*>\u2039 Done<\/button>/);
+    expect(BACK_SCRIPT).toContain('history.back()');
+    expect(BACK_SCRIPT).toContain('window.close()');
+    expect(BACK_SCRIPT).toContain("location.href='/'");
+    expect(BACK_SCRIPT).not.toMatch(/fetch|XMLHttp|eval|document\.write|innerHTML/);
+  });
+
+  it('wording: View LinkedIn, Visit website, and a calendar link reads Book time with me', async () => {
+    const { html } = await page({ ...base, linkedinUrl: 'https://www.linkedin.com/in/ada', website: 'https://example.com/', link1: { label: 'My Calendar', url: 'https://cal.example.org/ada' }, link2: { label: 'Book a meeting', url: 'https://cal.example.org/b' } });
+    expect(html).toContain('View LinkedIn');
+    expect(html).toContain('Visit website');
+    expect(html).toContain('Book time with me');
+    expect(html).toContain('Book a meeting');
+    expect(html).not.toContain('My Calendar');
+  });
+
+  it('sends a strict CSP: styles inline only, and the one script allowed by its hash', async () => {
     const { r } = await page({ ...base, email: 'a@b.co' });
     const csp = r.headers.get('content-security-policy');
     expect(csp).toContain("default-src 'none'");
-    expect(csp).not.toMatch(/script-src/);
+    expect(csp).toContain(`script-src 'sha256-${BACK_SCRIPT_HASH}'`);
+    expect(csp).not.toMatch(/script-src[^;]*unsafe/);
+    expect(BACK_SCRIPT_HASH).toBe(createHash('sha256').update(BACK_SCRIPT).digest('base64'));
     expect(csp).toContain("frame-ancestors 'none'");
   });
 });
@@ -95,26 +119,31 @@ describe('the recipient page', () => {
 describe('preview tags', () => {
   const tags = (html) => html.match(/<meta [^>]*>/g).join('\n');
 
-  it('name, "Title · Organization", the photo path, canonical url, profile and summary', async () => {
+  it('name and role in a clean title and description, the branded image, canonical url and profile', async () => {
     const { html } = await page({ ...base, title: 'Analyst', organization: 'Engines', email: 'ada@example.com', photoUrl: photoDataUrl() });
     const t = tags(html);
-    expect(t).toContain('property="og:title" content="Ada Lovelace"');
-    expect(t).toContain('property="og:description" content="Analyst · Engines"');
-    expect(t).toContain(`property="og:image" content="${ORIGIN}/c/${ID}/photo.jpg"`);
+    expect(t).toContain('property="og:title" content="Ada Lovelace \u2014 Digital Card"');
+    expect(t).toContain('property="og:description" content="Analyst at Engines · Save contact info and connect instantly"');
+    expect(t).toContain(`property="og:image" content="${ORIGIN}/card-og-default.png"`);
+    expect(t).not.toContain('photo.jpg');
+    expect(t).toContain('property="og:image:width" content="1200"');
     expect(t).toContain(`property="og:url" content="${ORIGIN}/c/${ID}"`);
     expect(t).toContain('property="og:type" content="profile"');
-    expect(t).toContain('name="twitter:card" content="summary"');
+    expect(t).toContain('name="twitter:card" content="summary_large_image"');
   });
 
-  it('falls back to the generic description and image', async () => {
+  it('with no title or organization the description is just the invitation; one of them reads alone', async () => {
     const t = tags((await page({ ...base, email: 'ada@example.com' })).html);
-    expect(t).toContain('content="Digital business card on IDYNIFY"');
+    expect(t).toContain('property="og:description" content="Save contact info and connect instantly"');
+    expect(tags((await page({ ...base, title: 'CEO', email: 'a@b.co' })).html)).toContain('content="CEO · Save contact info and connect instantly"');
+    expect(tags((await page({ ...base, organization: 'Doggy Entertainment', email: 'a@b.co' })).html)).toContain('content="Doggy Entertainment · Save contact info and connect instantly"');
     expect(t).toContain(`content="${ORIGIN}/card-og-default.png"`);
   });
 
-  it('an external https photo is used as it is', async () => {
+  it('a photo, embedded or external, is never the preview image', async () => {
     const t = tags((await page({ ...base, email: 'a@b.co', photoUrl: 'https://img.example.com/a.jpg' })).html);
-    expect(t).toContain('property="og:image" content="https://img.example.com/a.jpg"');
+    expect(t).toContain(`property="og:image" content="${ORIGIN}/card-og-default.png"`);
+    expect(t).not.toContain('img.example.com');
   });
 
   it('never carries email, phone, handles or links, even when shared', async () => {
@@ -136,7 +165,8 @@ describe('escaping', () => {
 
   it('no value can start a tag or break out of an attribute, anywhere in the page', async () => {
     const { html } = await page(doc);
-    expect(html).not.toMatch(/<script/i);
+    expect(html.match(/<script/gi)).toHaveLength(1);
+    expect(html).toContain(`<script>${BACK_SCRIPT}</script>`);
     expect(html).not.toMatch(/<img[^>]*onerror/i);
     expect(html).toContain('&lt;script&gt;');
     // Every attribute value in the output is quoted and holds no raw quote, angle bracket or backtick.

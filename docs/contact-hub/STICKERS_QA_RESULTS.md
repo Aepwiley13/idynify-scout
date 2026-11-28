@@ -1,7 +1,7 @@
-# Stickers: QA results and release tracker (S11 owner-only pilot)
+# Stickers: QA results and release tracker (general release, mode `on`)
 
 Results sheet for `STICKERS_QA_PLAN.md` and the gate and approval record for `STICKERS_PILOT_RUNBOOK.md` (draft PR #778).
-Scope of this release: **mode `internal` in production, owner only.** Widening to `beta` or `on` is a separate decision.
+Scope of this release (owner decision, 2026-11-27): **mode `on` in production for every signed-in user**, shipped together with **Free Contact Hub for every registered user** (#862, #863). The owner-only `internal` pilot was superseded before activation; production was never set to `internal`.
 
 | | |
 |---|---|
@@ -32,38 +32,71 @@ Only artifact left in staging: one sticker "QA gate (internal)" on QA-Admin (the
 
 UI surfaces in §1 were verified at the decision layer (`stickersConfig` and the rules). The UI renders sticker surfaces only from `stickersConfig` (`useStickersAvailability`), and the parity suite ties the two together.
 
-## 2. Exceptions (accepted only for the owner-only `internal` pilot)
+### 1.3 General-release checks, mode `on` (`08-general-release.mjs`, 2026-11-28T00:22Z UTC, 33/33 passed)
+Hosted build, live staging rules, synthetic accounts labelled the way the app does (`hasCompletedPayment`, `subscriptionTier`): 2 Free, 3 Starter (one admin). Staging has no Pro synthetic account; see §1.5.
 
-| Check | Not run | Why acceptable for this pilot |
+| Check | Result | Evidence |
 |---|---|---|
-| Q1.4 | mode `on` | Not used in this release |
-| Q1.5 in `off`/`beta`/`on` | view-as tested in `internal` only | Same server code path in every mode; `off` has no surfaces at all |
-| Q2.7, Q4.7 | keyboard-only flows | Owner is the only user; fix before widening |
-| Q2.8, Q3.9, Q4.7 | phone layouts | Owner is the only user; fix before widening |
-| Q3.7 | bulk add during concurrent archive | Single user; data-safe by rules |
-| Q5.3, Q5.4 | lockdown rules drill on staging | Level-3 rollback prepared (G6, one line) but not rehearsed; levels 1–2 need no deploy |
-| Q6.2 (email part) | `email_normalized` stays in step | Not Stickers code; unchanged since before S2 |
-| Q6.3 | Add Manually / CSV import | Not Stickers code |
+| R1 decision in `on` | PASS | `stickersConfig` → `enabled:true, readOnly:false` for every account, Free and Starter |
+| R2 per plan | PASS | Free and Starter create own stickers; add to and remove from own contacts, stored and restored |
+| R3 isolation | PASS | another account's stickers unreadable (403); create, edit and membership on another account **denied** |
+| R4 signed out | PASS | `stickersConfig` 401; Firestore write 403 |
+| R5 bulk with archive (Q3.7) | PASS | 10-contact bulk: adds 1–5 allowed; archived after 5; adds 6–10 **denied**; earlier 5 kept; then removed, every contact back to original |
+| R6 import shape (Q6.3) | PASS | a new contact carrying stickers **denied** |
+| R7 rollback on → off → on (Q5.1–5.2) | PASS | everyone disabled; writes denied; 12 stickers and 6 memberships identical throughout |
+| R8 lockdown drill (Q5.3–5.4) | PASS | lockdown ruleset released: sticker writes **denied** in `on`; original ruleset `66bf0de4…` re-released by name; writes allowed again |
+| restore | PASS | staging back to `beta`, both enrollments untouched; only new data: 5 QA-named stickers |
 
-**Required before widening to `beta`:** close Q2.7, Q2.8, Q3.7, Q3.9, Q4.7, Q5.3–Q5.4.
+CI emulator suite (runs in mode `on`, green on `fc780ee` and `e89e9dc`): isolation, signed-out, archived, create-with-stickers, concurrent tabs, off and missing flag. 490 sticker component tests pass: keyboard flows for picker, row, wall, People (Q2.7, Q4.7 keyboard) and the picker's phone bottom sheet.
+
+### 1.4 Production final preflight (`05-prod-preflight.sh`, 2026-11-28T00:21Z UTC, read only, passed)
+Live rules sha `23978f71fd78` (ruleset `a76e110f…`, unchanged since 2026-11-25); one admin (owner, super_admin); flag absent; 0 enrollments; 0 stickers; `stickersConfig` live on idynify.com, 401 to anonymous callers.
+
+### 1.5 Plan coverage
+Sticker access never reads plan, tier or payment (`src/constants/stickersAccess.js`, `stickersConfig`, `firestore.rules`). Pro and Starter differ only in credit allotment (1,250 vs 400) and checkout upgrade; route access treats both as paid (`isPaidPlan`), and the shell-gate suite uses a Pro account as its paid fixture. Live staging coverage: Free and Starter. Pro: verified by code and tests, plus the owner's own production account after launch.
+
+### 1.6 Open before launch
+- Phone layouts in a real browser: Sticker Wall (Q4.7), People bulk bar (Q3.9), picker (Q2.8): `11-mobile-shots.mjs`.
+- Production App Check and signup protections: `11-prod-signup-protection.sh`.
+- Free welcome email copy: owner approval.
+
+## 2. Exceptions
+
+| Check | Status |
+|---|---|
+| Q1.4 mode `on` | **closed** by §1.3 |
+| Q1.5 view-as outside `internal` | accepted: same server path in every mode (tested in `internal`, §1.2) |
+| Q2.7, Q4.7 keyboard | **closed** by component tests (§1.3) |
+| Q2.8, Q3.9, Q4.7 phone layouts | open: §1.6 |
+| Q3.7 bulk during archive | **closed** by R5 |
+| Q5.3, Q5.4 lockdown drill | **closed** by R8 |
+| Q6.2 email part | accepted: not Stickers code |
+| Q6.3 import | **closed** by R6 and CI |
+| Pro on live staging | accepted: plan-independent (§1.5) |
+
+Known, not blocking: bulk "Add sticker" exists only on Scout People (`/people`, paid); Contact Hub People offers single-contact stickering. Scout's bulk-select checkboxes are `div`s without keyboard access (pre-existing, Scout).
 
 ## 3. Runbook entry gates
 
 | Gate | Status | Evidence |
 |---|---|---|
-| G1 staging QA | PASS with §2 exceptions | §1 |
+| G1 staging QA | PASS (phone layouts pending, §1.6) | §1.1–§1.3 |
 | G2 QA fixes (#777) merged, CI green | PASS | S1–S7 and #777 merged 2026-11-05 |
 | G3 production build | PASS | Netlify production `e89e9dc` contains S1–S7 and #777; Stickers code identical to the tested build |
 | G4 rules diff | PASS | live ruleset `a76e110f…` == `main` `fc780ee` (629 lines, sha `23978f71fd78`); no rules deploy needed (runbook §2 not required) |
-| G5 admin list | PASS | exactly one: `super_admin` `7g5gbYiwLOdIRdCTtogZ7Wn3hG23` (owner) |
+| G5 admin list | PASS | exactly one: `super_admin` `7g5gbYiwLOdIRdCTtogZ7Wn3hG23` (owner); rechecked 2026-11-28 (§1.4) |
 | G6 lockdown variant | PASS | prepared locally, one-line diff, not deployed |
-| G7 rollback owner | Aaron | rollback level 2 = `feature_flags/stickers.mode = "off"` (script `07-prod-rollback-off.sh`) |
+| G7 rollback owner | Aaron | level 2 = `mode "off"` (`07-prod-rollback-off.sh ROLLBACK`); level 3 lockdown rehearsed (R8) |
 
 ## 4. Approval record (runbook §8)
 
 | Step | Approved by | Date | Evidence / notes |
 |---|---|---|---|
+| Release scope: Free Contact Hub for all + Stickers `on` | Aaron | 2026-11-27 | supersedes the owner-only pilot |
+| Free plan in production (`VITE_FREE_PLAN=on`, #862) | Aaron | 2026-11-27 | merge and publish still need release approval |
+| Production Free test account (live verification) | Aaron | 2026-11-27 | create at launch |
 | G1–G7 entry gates | | | §3 |
-| §2 production rules deploy | n/a | | live rules already == `main` |
-| §3 mode `internal` | | | final preflight log, activation log |
-| §2 exceptions (owner-only scope) | | | |
+| §2 exceptions | | | |
+| Free welcome email copy | | | |
+| Publish production build (#862 + #863) | | | |
+| `feature_flags/stickers.mode = "on"` | | | `12-prod-activate-on.sh` log |

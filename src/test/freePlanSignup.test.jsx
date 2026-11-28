@@ -58,7 +58,7 @@ async function fill() {
 }
 
 beforeEach(() => {
-  createUser.mockReset().mockResolvedValue({ user: { uid: 'uid-1' } });
+  createUser.mockReset().mockResolvedValue({ user: { uid: 'uid-1', getIdToken: async () => 'id-token' } });
   setDocMock.mockReset().mockResolvedValue(undefined);
   globalThis.fetch = vi.fn(() => Promise.resolve({ ok: true }));
 });

@@ -55,10 +55,14 @@ Live rules sha `23978f71fd78` (ruleset `a76e110f…`, unchanged since 2026-11-25
 ### 1.5 Plan coverage
 Sticker access never reads plan, tier or payment (`src/constants/stickersAccess.js`, `stickersConfig`, `firestore.rules`). Pro and Starter differ only in credit allotment (1,250 vs 400) and checkout upgrade; route access treats both as paid (`isPaidPlan`), and the shell-gate suite uses a Pro account as its paid fixture. Live staging coverage: Free and Starter. Pro: verified by code and tests, plus the owner's own production account after launch.
 
-### 1.6 Open before launch
-- Phone layouts in a real browser: Sticker Wall (Q4.7), People bulk bar (Q3.9), picker (Q2.8): `11-mobile-shots.mjs`.
-- Production App Check and signup protections: `11-prod-signup-protection.sh`.
-- Free welcome email copy: owner approval.
+### 1.6 Phone widths (`11-mobile-shots.mjs`, hosted staging as QA-Beta, 390 and 360 px, 12/12, no horizontal overflow)
+Reviewed by eye:
+- Contact Hub People (filter chips, sticker chips, add), Sticker Wall (2 columns, names truncate cleanly, New sticker), person sticker row, and the picker as a bottom sheet (search focused, assigned stickers checked): **usable at both widths.**
+- Scout People (`/people`, paid) bulk bar: "2 selected" and **Add sticker** visible and reachable at both widths. Not Stickers, pre-existing, follow-up: the bar's second row (Export, cadence) sits under the bottom navigation; at 360 px the cards render shifted left and clipped after selection.
+- The "bulk picker" screenshot captured a card's own picker (first "Add sticker" on the page); the bulk picker is the same component (`StickerPicker`) and is covered by component tests.
+
+### 1.7 Production signup protection (`11-prod-signup-protection.sh`, read only)
+App Check not initialized (no site key in the live bundle), so not enforced. Firebase Auth: email/password on; email link also on (`passwordRequired:false`, unused by the app); anonymous off; duplicate emails refused; email enumeration protection on; default per-IP sign-up quota; reCAPTCHA off; password policy not enforced (6-character default). Free accounts reach no paid cost (AI and Apollo are paid-gated server-side); #863 limits the welcome email to the new account's own address. Owner accepted for launch with monitoring, cost alerts and the reCAPTCHA follow-up (§5).
 
 ## 2. Exceptions
 
@@ -67,7 +71,7 @@ Sticker access never reads plan, tier or payment (`src/constants/stickersAccess.
 | Q1.4 mode `on` | **closed** by §1.3 |
 | Q1.5 view-as outside `internal` | accepted: same server path in every mode (tested in `internal`, §1.2) |
 | Q2.7, Q4.7 keyboard | **closed** by component tests (§1.3) |
-| Q2.8, Q3.9, Q4.7 phone layouts | open: §1.6 |
+| Q2.8, Q3.9, Q4.7 phone layouts | **closed** by §1.6 (Scout bulk bar follow-up noted) |
 | Q3.7 bulk during archive | **closed** by R5 |
 | Q5.3, Q5.4 lockdown drill | **closed** by R8 |
 | Q6.2 email part | accepted: not Stickers code |
@@ -80,7 +84,7 @@ Known, not blocking: bulk "Add sticker" exists only on Scout People (`/people`, 
 
 | Gate | Status | Evidence |
 |---|---|---|
-| G1 staging QA | PASS (phone layouts pending, §1.6) | §1.1–§1.3 |
+| G1 staging QA | PASS | §1.1–§1.6 |
 | G2 QA fixes (#777) merged, CI green | PASS | S1–S7 and #777 merged 2026-11-05 |
 | G3 production build | PASS | Netlify production `e89e9dc` contains S1–S7 and #777; Stickers code identical to the tested build |
 | G4 rules diff | PASS | live ruleset `a76e110f…` == `main` `fc780ee` (629 lines, sha `23978f71fd78`); no rules deploy needed (runbook §2 not required) |
@@ -97,6 +101,16 @@ Known, not blocking: bulk "Add sticker" exists only on Scout People (`/people`, 
 | Production Free test account (live verification) | Aaron | 2026-11-27 | create at launch |
 | G1–G7 entry gates | | | §3 |
 | §2 exceptions | | | |
-| Free welcome email copy | | | |
+| Free welcome email copy | Aaron | 2026-11-27 | approved as in `freeWelcomeEmail` |
+| Signup-protection risk for launch (§1.7) | Aaron | 2026-11-27 | conditional on monitoring, cost alerts, reCAPTCHA follow-up |
 | Publish production build (#862 + #863) | | | |
 | `feature_flags/stickers.mode = "on"` | | | `12-prod-activate-on.sh` log |
+
+## 5. Follow-ups after launch
+1. **reCAPTCHA bot protection for email/password** (Identity Platform): audit mode in week one, enforce after a few days of clean traffic. Free up to 10,000 assessments a month.
+2. **Turn off email-link sign-in** (Authentication → Sign-in method → Email/Password): unused by the app.
+3. **Cost and abuse monitoring:** Cloud Billing budget alert on `idynify-scout-dev`; watch daily Auth sign-ups, Firestore writes and Resend volume for the first two weeks.
+4. App Check with a reCAPTCHA Enterprise site key (Firestore), then enforcement once the client sends tokens.
+5. Scout People bulk bar on phones (§1.6); Scout bulk checkboxes keyboard access.
+6. PR #807 (stale draft overlapping #863): close or rebase.
+

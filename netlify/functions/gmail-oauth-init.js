@@ -1,101 +1,85 @@
+/**
+ * Starts a Gmail connection for the signed-in user (CH-GMAIL-001).
+ *
+ * POST, Firebase ID token in `Authorization: Bearer` (or `authToken` in the
+ * body, for older clients). Optional body `returnTo`: a same-site path to come
+ * back to. Returns { authUrl } and sets the browser-binding cookie. The OAuth
+ * `state` is random and single-use; see utils/gmailOAuth.js.
+ *
+ * Available to every signed-in account, Free (Contact Hub) included: nothing
+ * here checks a plan.
+ */
 import { google } from 'googleapis';
+import { admin, db } from './firebase-admin.js';
+import { extractAuthToken } from './utils/extractAuthToken.js';
+import {
+  getGmailOAuthConfig, createGmailOAuthState, bindingCookie, authenticateOwner,
+  GmailOAuthError, OUTCOMES, GMAIL_SCOPES,
+} from './utils/gmailOAuth.js';
 
-export const handler = async (event) => {
-  // Only allow POST
-  if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      body: JSON.stringify({ error: 'Method not allowed' })
-    };
-  }
+const JSON_HEADERS = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' };
 
+function respond(statusCode, body, extraHeaders = {}) {
+  return { statusCode, headers: { ...JSON_HEADERS, ...extraHeaders }, body: JSON.stringify(body) };
+}
+
+function parseBody(event) {
   try {
-    const { userId, authToken } = JSON.parse(event.body);
-
-    if (!userId || !authToken) {
-      throw new Error('Missing required parameters');
-    }
-
-    console.log('🔐 Initializing Gmail OAuth for user:', userId);
-
-    // Verify Firebase Auth token
-    const firebaseApiKey = process.env.FIREBASE_API_KEY || process.env.VITE_FIREBASE_API_KEY;
-    if (!firebaseApiKey) {
-      console.error('❌ FIREBASE_API_KEY not configured');
-      throw new Error('Firebase API key not configured');
-    }
-
-    const verifyResponse = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${firebaseApiKey}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ idToken: authToken })
-      }
-    );
-
-    if (!verifyResponse.ok) {
-      throw new Error('Invalid authentication token');
-    }
-
-    const verifyData = await verifyResponse.json();
-    const tokenUserId = verifyData.users[0].localId;
-
-    if (tokenUserId !== userId) {
-      throw new Error('Token does not match user ID');
-    }
-
-    console.log('✅ Auth token verified for user:', userId);
-
-    // Validate Google OAuth environment variables
-    const googleClientId = process.env.GOOGLE_CLIENT_ID;
-    const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
-    const googleRedirectUri = process.env.GOOGLE_REDIRECT_URI;
-
-    if (!googleClientId || !googleClientSecret || !googleRedirectUri) {
-      console.error('❌ Google OAuth credentials not configured');
-      throw new Error('Google OAuth not configured. Please contact support.');
-    }
-
-    // Create OAuth2 client
-    const oauth2Client = new google.auth.OAuth2(
-      googleClientId,
-      googleClientSecret,
-      googleRedirectUri
-    );
-
-    // Generate authorization URL with correct scopes
-    const authUrl = oauth2Client.generateAuthUrl({
-      access_type: 'offline', // Get refresh token
-      scope: [
-        'https://www.googleapis.com/auth/gmail.send',      // Send emails
-        'https://www.googleapis.com/auth/gmail.readonly',  // Read threads for reply detection (Sprint 3)
-        'https://www.googleapis.com/auth/userinfo.email'   // Get user email address
-      ],
-      state: userId, // Pass userId in state for callback
-      prompt: 'consent' // Force consent screen to get refresh token
-    });
-
-    console.log('✅ OAuth URL generated for user:', userId);
-
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      },
-      body: JSON.stringify({ authUrl })
-    };
-
-  } catch (error) {
-    console.error('❌ Error initializing Gmail OAuth:', error);
-    return {
-      statusCode: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      },
-      body: JSON.stringify({ error: error.message })
-    };
+    return event.body ? JSON.parse(event.body) : {};
+  } catch {
+    return null;
   }
-};
+}
+
+/** Pure enough to test: everything external is injected. */
+export function createGmailOAuthInitHandler({ verifyIdToken, db: firestore, makeOAuthClient }) {
+  return async (event) => {
+    if (event.httpMethod !== 'POST') return respond(405, { error: 'Method not allowed' });
+
+    const body = parseBody(event);
+    if (body === null) return respond(400, { error: 'Invalid request' });
+
+    const auth = await authenticateOwner({
+      verifyIdToken, authToken: extractAuthToken(event), bodyUserId: body.userId,
+    });
+    if (auth.error) return respond(auth.status, { error: auth.error });
+    const { uid } = auth;
+
+    try {
+      const config = getGmailOAuthConfig();
+      const { state, binding, codeChallenge } = await createGmailOAuthState(firestore, { uid, returnTo: body.returnTo });
+      const authUrl = makeOAuthClient(config).generateAuthUrl({
+        access_type: 'offline', // refresh token
+        prompt: 'consent',      // always return a refresh token, also on reconnect
+        scope: [...GMAIL_SCOPES],
+        state,
+        code_challenge_method: 'S256',
+        code_challenge: codeChallenge,
+      });
+
+      // The binding cookie is __Host-, so it only comes back if the callback
+      // runs on the host that started the attempt.
+      const requestHost = event.headers?.host;
+      const callbackHost = new URL(config.redirectUri).host;
+      if (requestHost && requestHost !== callbackHost) {
+        console.warn(`[gmail-oauth-init] started on ${requestHost} but GOOGLE_REDIRECT_URI is on ${callbackHost}; the callback will reject this attempt`);
+      }
+
+      console.log('[gmail-oauth-init] started for user:', uid);
+      return respond(200, { authUrl }, { 'Set-Cookie': bindingCookie(binding) });
+    } catch (err) {
+      if (err instanceof GmailOAuthError && err.outcome === OUTCOMES.NOT_CONFIGURED) {
+        console.error('[gmail-oauth-init] GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REDIRECT_URI not set');
+        return respond(503, { error: 'Gmail is not set up yet. Please contact support.' });
+      }
+      console.error('[gmail-oauth-init] failed:', err.message);
+      return respond(500, { error: 'Could not start the Gmail connection. Please try again.' });
+    }
+  };
+}
+
+export const handler = createGmailOAuthInitHandler({
+  verifyIdToken: (token) => admin.auth().verifyIdToken(token),
+  db,
+  makeOAuthClient: ({ clientId, clientSecret, redirectUri }) => new google.auth.OAuth2(clientId, clientSecret, redirectUri),
+});

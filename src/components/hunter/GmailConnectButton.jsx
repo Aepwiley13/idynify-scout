@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { auth } from '../../firebase/config';
+import { startGmailConnect } from '../../utils/gmailConnect';
 import { Mail, Loader } from 'lucide-react';
 
 export default function GmailConnectButton({ onSuccess }) {
@@ -11,31 +11,8 @@ export default function GmailConnectButton({ onSuccess }) {
     setError(null);
 
     try {
-      const user = auth.currentUser;
-      if (!user) {
-        throw new Error('Not authenticated');
-      }
-
-      const authToken = await user.getIdToken();
-
-      const response = await fetch('/.netlify/functions/gmail-oauth-init', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          authToken
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to initialize Gmail OAuth');
-      }
-
-      const data = await response.json();
-
-      // Redirect to Google OAuth
-      window.location.href = data.authUrl;
-
+      // Redirects to Google; comes back to this page with ?gmail=<outcome>.
+      await startGmailConnect();
     } catch (err) {
       console.error('Error connecting Gmail:', err);
       setError(err.message);

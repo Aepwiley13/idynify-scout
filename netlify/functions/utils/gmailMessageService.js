@@ -27,6 +27,7 @@
 
 import { google } from 'googleapis';
 import { MESSAGE_CATEGORIES, MESSAGE_DIRECTIONS } from '../../../src/types/normalizedMessage.js';
+import { recordGmailRefreshFailure } from './gmailOAuth.js';
 
 export const INGESTION_VERSION = '1.0.0';
 
@@ -748,6 +749,9 @@ export async function getOAuthClient(userId, db) {
       });
     } catch (err) {
       console.warn(`[gmailMessageService] Token refresh failed for ${userId}:`, err.message);
+      // A revoked grant also flips `status`, so the account stops reading as
+      // connected everywhere; a transient failure only marks the sync.
+      if (await recordGmailRefreshFailure(gmailDoc.ref, err)) return null;
       await gmailDoc.ref.update({
         syncStatus: 'needs_reconnect',
         lastSyncError: `Token refresh failed: ${err.message}`,

@@ -4,6 +4,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 import { getGmailSignature, appendSignature } from './utils/gmailSignature.js';
 import { requireProjectId } from './utils/firebaseEnv.js';
 import { buildPlainTextEmail } from './utils/emailHeaders.js';
+import { recordGmailRefreshFailure } from './utils/gmailOAuth.js';
 
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {
@@ -136,6 +137,7 @@ export const handler = async (event) => {
 
         console.log('✅ Access token refreshed');
       } catch (refreshError) {
+        await recordGmailRefreshFailure(gmailDoc.ref, refreshError);
         console.error('❌ Failed to refresh token:', refreshError);
         throw new Error('Gmail connection expired. Please reconnect Gmail.');
       }

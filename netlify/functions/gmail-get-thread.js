@@ -14,6 +14,7 @@ import { google } from 'googleapis';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { requireProjectId } from './utils/firebaseEnv.js';
+import { recordGmailRefreshFailure } from './utils/gmailOAuth.js';
 
 if (getApps().length === 0) {
   const privateKey = process.env.FIREBASE_PRIVATE_KEY
@@ -120,6 +121,7 @@ export const handler = async (event) => {
           updatedAt: new Date().toISOString(),
         });
       } catch (refreshErr) {
+        await recordGmailRefreshFailure(gmailDoc.ref, refreshErr);
         return { statusCode: 200, headers: CORS_HEADERS, body: JSON.stringify({ messages: [], code: 'NEEDS_RECONNECT' }) };
       }
     }

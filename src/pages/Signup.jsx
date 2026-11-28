@@ -117,7 +117,12 @@ export default function Signup() {
       // any already-open tab still running the previous bundle).
       const initialCredits = tier === 'pro' ? 1250 : 400;
 
-      await setDoc(doc(db, 'users', userCredential.user.uid), tier === 'free' ? freeSignupDocument(email) : {
+      // Attribution (MY-CARD-SHARE-001): a signup from a My Card footer link (?ref=card) is marked
+      // on the new user record. This is the only thing recorded: no other tracking.
+      const fromCard = searchParams.get('ref') === 'card' ? { signupSource: 'card' } : {};
+
+      await setDoc(doc(db, 'users', userCredential.user.uid), tier === 'free' ? { ...freeSignupDocument(email), ...fromCard } : {
+        ...fromCard,
         email: email,
         createdAt: new Date(),
         selectedTier: tier,

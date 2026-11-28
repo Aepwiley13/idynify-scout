@@ -77,6 +77,22 @@ describe('signup with the Free plan on', () => {
     expect(JSON.parse(welcome[1].body).plan).toBe('free');
   });
 
+  it('?ref=card marks signupSource "card" on the new record and adds nothing else', async () => {
+    await renderSignup('?ref=card');
+    await fill();
+    await waitFor(() => expect(setDocMock).toHaveBeenCalledTimes(1));
+    const payload = setDocMock.mock.calls[0][1];
+    expect(payload.signupSource).toBe('card');
+    expect(Object.keys(payload).sort()).toEqual(['createdAt', 'email', 'signupSource']);
+  });
+
+  it('any other ref value records nothing', async () => {
+    await renderSignup('?ref=other');
+    await fill();
+    await waitFor(() => expect(setDocMock).toHaveBeenCalledTimes(1));
+    expect('signupSource' in setDocMock.mock.calls[0][1]).toBe(false);
+  });
+
   it('?tier=pro: a Pro account, then its checkout, as before', async () => {
     await renderSignup('?tier=pro');
     await fill();

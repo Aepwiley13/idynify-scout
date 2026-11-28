@@ -11,6 +11,7 @@
 
 import { db, admin } from './firebase-admin.js';
 import { checkAdminAccess } from './utils/adminAuth.js';
+import { takeDownMyCard } from './utils/myCardTakedown.js';
 import { extractAuthToken } from './utils/extractAuthToken.js';
 import { logAuditEvent, getIpAddress, getUserAgent, AUDIT_ACTIONS } from './utils/auditLog.js';
 
@@ -194,6 +195,10 @@ export const handler = async (event) => {
         disabled: true
       });
 
+      // Take the public My Card down too. Best effort: the suspension above is the primary action
+      // and stands whatever happens here; the outcome is reported in the response.
+      const myCard = await takeDownMyCard(targetUserId);
+
       console.log(`✅ Account suspended: ${targetUserEmail} by admin ${adminEmail}`);
 
       // Log successful audit event
@@ -211,7 +216,9 @@ export const handler = async (event) => {
         metadata: {
           reason: reason.trim(),
           suspendedAt: now.toISOString(),
-          sessionsRevoked: true
+          sessionsRevoked: true,
+          myCardTakenDown: myCard.takenDown,
+          ...(myCard.error ? { myCardError: myCard.error } : {})
         }
       });
 
@@ -221,6 +228,7 @@ export const handler = async (event) => {
         body: JSON.stringify({
           success: true,
           message: 'Account suspended successfully',
+          myCard,
           data: {
             userEmail: targetUserEmail,
             suspendedAt: now.toISOString(),

@@ -8,7 +8,7 @@ import {
   readableLink, unsharedFields, visibleErrors,
 } from '../pages/ContactHub/myCard/cardDraft';
 import {
-  CARD_FIELDS, DEFAULT_SHARE, SHAREABLE_FIELDS, newCard, publicCardView,
+  CARD_FIELDS, DEFAULT_LINK_SHARE, DEFAULT_SHARE, SHAREABLE_FIELDS, newCard, publicCardView,
 } from '../utils/myCardRules';
 import { buildCardSuggestions } from '../utils/myCardSuggestions';
 
@@ -28,7 +28,7 @@ describe('starting a draft', () => {
   it('holds every field as text, with the switches complete and sharing off', () => {
     const { card } = createDraft(null);
     for (const field of CARD_FIELDS) expect(card[field]).toBe('');
-    expect(card.share).toEqual(DEFAULT_SHARE);
+    expect(card.share).toEqual({ ...DEFAULT_SHARE, ...DEFAULT_LINK_SHARE });
     expect(card.sharingEnabled).toBe(false);
   });
 

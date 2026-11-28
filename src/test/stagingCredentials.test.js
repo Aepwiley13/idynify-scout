@@ -187,8 +187,8 @@ describe('the launcher’s edge-function switch', () => {
     expect(plan.problems.join(' ')).toContain('edge-functions');
   });
 
-  it('this project declares none (so the switch changes nothing it serves)', () => {
-    expect(hasEdgeFunctions(REPO)).toBe(false);
+  it('this project declares the My Card public page (an edge function), so the launcher refuses to skip it', () => {
+    expect(hasEdgeFunctions(REPO)).toBe(true);
     const dir = mkdtempSync(join(tmpdir(), 'edge-'));
     writeFileSync(join(dir, 'netlify.toml'), '[[edge_functions]]\n  path = "/x"\n  function = "x"\n');
     expect(hasEdgeFunctions(dir)).toBe(true);

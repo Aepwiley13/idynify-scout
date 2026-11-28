@@ -21,8 +21,9 @@ import { DOWNLOAD_IMAGE } from './cardImageDownload';
  * @param {null | { status: 'downloaded'|'failed'|'unavailable', message: string|null }} [props.feedback]
  *   the answer to the last click, while the card is still as it was then
  * @param {object} [props.image]  the card image: { available, busy, onDownload, feedback, pictureUrl, onClosePicture }
+ * @param {boolean} [props.merged]  one line of help for both buttons (with sharing, where the card on screen is the one downloaded)
  */
-export default function MyCardDownload({ available, onDownload, feedback = null, image = null }) {
+export default function MyCardDownload({ available, onDownload, feedback = null, image = null, merged = false }) {
   // The answer can land below the Save bar's edge on a phone: bring it into view as it appears.
   const bringIntoView = useCallback((element) => { element?.scrollIntoView?.({ block: 'nearest' }); }, []);
   return (
@@ -33,7 +34,7 @@ export default function MyCardDownload({ available, onDownload, feedback = null,
           type="button"
           className="mycard-btn mycard-btn--secondary"
           disabled={!available}
-          aria-describedby="mycard-download-note mycard-download-hint"
+          aria-describedby={merged ? 'mycard-download-merged mycard-download-hint' : 'mycard-download-note mycard-download-hint'}
           onClick={onDownload}
         >
           <Download size={18} aria-hidden="true" />
@@ -45,7 +46,7 @@ export default function MyCardDownload({ available, onDownload, feedback = null,
             className="mycard-btn mycard-btn--secondary"
             disabled={!image.available || image.busy}
             aria-busy={image.busy ? 'true' : undefined}
-            aria-describedby="mycard-download-image-note mycard-download-hint"
+            aria-describedby={merged ? 'mycard-download-merged mycard-download-hint' : 'mycard-download-image-note mycard-download-hint'}
             onClick={image.onDownload}
           >
             <ImageIcon size={18} aria-hidden="true" />
@@ -53,8 +54,14 @@ export default function MyCardDownload({ available, onDownload, feedback = null,
           </button>
         ) : null}
       </div>
-      <p id="mycard-download-note" className="mycard-download-note">{DOWNLOAD_CONTACT.note}</p>
-      {image ? <p id="mycard-download-image-note" className="mycard-download-note">{DOWNLOAD_IMAGE.note}</p> : null}
+      {merged ? (
+        <p id="mycard-download-merged" className="mycard-download-note">Downloads use the card shown above. They don&apos;t save your edits.</p>
+      ) : (
+        <>
+          <p id="mycard-download-note" className="mycard-download-note">{DOWNLOAD_CONTACT.note}</p>
+          {image ? <p id="mycard-download-image-note" className="mycard-download-note">{DOWNLOAD_IMAGE.note}</p> : null}
+        </>
+      )}
       <p id="mycard-download-hint" className="mycard-download-note" hidden={available}>{available ? '' : DOWNLOAD_CONTACT.noName}</p>
       {feedback && feedback.status === 'downloaded' ? (
         <p ref={bringIntoView} className="mycard-download-feedback" role="status">

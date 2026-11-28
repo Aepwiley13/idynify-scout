@@ -12,9 +12,10 @@
  *
  * WHAT IS SAVED: only what the person saves, with Save, against the revision
  * the card was loaded at; a newer saved version is a conflict they settle.
- * Sharing is not touched: there is no public-card sharing control on this page, the card is
- * private, and the service writes `sharingEnabled: false` every time. The
- * Shared / Private switches only say what a shared card WILL show.
+ * Sharing (MY-CARD-SHARE-001) is behind the myCardSharing flag (config/featureFlags.js): with it off this
+ * page is exactly as it was, the card is private and the switches only say what a shared card WILL show.
+ * With it on, Share My Card / Copy Link / Show QR appear under the card once it is turned on, additional
+ * links join the editor, and publishing is always an explicit tap: nothing is published automatically.
  *
  * WHAT IS DOWNLOADED: the draft as it is now, and only what the preview shows.
  * Downloading saves nothing and calls nothing.
@@ -46,6 +47,8 @@ import { contactDownloadState, downloadContact } from './myCard/downloadContact'
 import { imageDownloadState } from './myCard/cardImageDownload';
 import { useCardImageDownload } from './myCard/useCardImageDownload';
 import { useMyCard } from './myCard/state/useMyCard';
+import MyCardShare from './myCard/MyCardShare';
+import { myCardSharingEnabled } from '../../config/featureFlags';
 import { describeChanges } from './myCard/state/myCardDiff';
 
 const NO_PEOPLE = Object.freeze([]);
@@ -67,9 +70,10 @@ export default function MyCardPage() {
 }
 
 function MyCardPageAccount({ uid, isImpersonating }) {
-  const { draft, state, status, availability, choices, actions } = useMyCard({
+  const { draft, state, status, availability, choices, actions, sharing } = useMyCard({
     uid, impersonating: isImpersonating, service: myCardService, currentUid,
   });
+  const sharingOn = myCardSharingEnabled();
 
   // Where Save leaves a card that is not valid, the first thing to fix is focused.
   const [focusTick, setFocusTick] = useState(0);
@@ -88,6 +92,18 @@ function MyCardPageAccount({ uid, isImpersonating }) {
     return settleSavedView(await save());
   }, [save, settleSavedView]);
   const handleConfirmSaveOver = useCallback(async () => settleSavedView(await actions.confirmSaveOver()), [actions, settleSavedView]);
+  const handleSaveAndTurnOff = useCallback(async () => settleSavedView(await actions.saveAndTurnOff()), [actions, settleSavedView]);
+
+  // Publishing publishes what is SAVED: with unsaved changes they are saved first, then published.
+  const handlePublish = useCallback(async () => {
+    let revision = null;
+    if (draft.dirty) {
+      const saved = await handleSave();
+      if (saved.status !== 'saved') return { status: saved.status };
+      revision = saved.revision;
+    }
+    return actions.publish({ revision });
+  }, [actions, draft.dirty, handleSave]);
 
   const handleCancelEdit = useCallback(() => {
     if (status === 'saving') return;
@@ -146,6 +162,16 @@ function MyCardPageAccount({ uid, isImpersonating }) {
       onCancelEdit={handleCancelEdit}
       back={back}
       notice={(
+        <>
+        {sharingOn && sharing.gate ? (
+          <div className="mycard-notice mycard-notice--error" role="alert">
+            <p className="mycard-notice-title">This would turn off your link</p>
+            <p className="mycard-notice-text">Your card is live, so it needs your name and at least one shared way to reach you (email, phone, LinkedIn, Instagram or website). Keep one shared, or save and turn sharing off.</p>
+            <div className="mycard-notice-actions">
+              <button type="button" className="mycard-btn mycard-btn--primary" onClick={handleSaveAndTurnOff}>Save and turn off sharing</button>
+            </div>
+          </div>
+        ) : null}
         <MyCardNotices
           state={state}
           choices={choices}
@@ -158,6 +184,7 @@ function MyCardPageAccount({ uid, isImpersonating }) {
           onConfirmLoadLatest={actions.confirmLoadLatest}
           onConfirmSaveOver={handleConfirmSaveOver}
         />
+        </>
       )}
       editor={(
         <MyCardEditor
@@ -169,12 +196,32 @@ function MyCardPageAccount({ uid, isImpersonating }) {
           onShare={draft.setShare}
           onUseSuggestion={draft.useSuggestion}
           onSubmit={availability.enabled ? handleSave : undefined}
+          links={sharingOn ? {
+            onEditLink: draft.editLink, onBlurLink: draft.blurLink, onAddLink: draft.addLink, onRemoveLink: draft.removeLink,
+          } : null}
         />
       )}
       preview={(
         <>
-          <MyCardPreview card={draft.card} hasUnsavedChanges={editingCard && draft.dirty} />
+          <MyCardPreview card={draft.card} sharing={sharingOn && sharing.live} hasUnsavedChanges={editingCard && draft.dirty} />
+          {sharingOn ? (
+            <MyCardShare
+              card={draft.card}
+              sharing={sharing}
+              busy={sharing.busy}
+              error={sharing.error}
+              dirty={draft.dirty}
+              onPublish={handlePublish}
+              onUnpublish={actions.unpublish}
+              onReset={actions.resetLink}
+              onTurnOn={(field) => draft.setShare(field, true)}
+              onEditCard={() => setEditingCard(true)}
+              onReload={actions.retryLoad}
+              onDismissError={actions.dismissSharingError}
+            />
+          ) : null}
           <MyCardDownload
+            merged={sharingOn}
             available={download.available}
             onDownload={handleDownload}
             feedback={feedback}

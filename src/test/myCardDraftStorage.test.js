@@ -9,7 +9,7 @@ import {
   buildDraftPayload, clearAllMyCardDrafts, clearDraft, draftKey, draftPhotoKey, draftPhotoOf, purgeOtherAccounts, readDraft, saveDraft,
 } from '../pages/ContactHub/myCard/state/myCardDraftStorage';
 import { EXIF, fingerprintOf, photoDataUrl } from './helpers/photoFixtures';
-import { CARD_FIELDS, DEFAULT_SHARE, SHAREABLE_FIELDS, newCard } from '../utils/myCardRules';
+import { ALL_SHARE_KEYS, CARD_FIELDS, DEFAULT_LINK_SHARE, DEFAULT_SHARE, SHAREABLE_FIELDS, newCard } from '../utils/myCardRules';
 
 /** The parts of sessionStorage this module uses, with ways to make each fail. */
 class FakeStorage {
@@ -52,7 +52,7 @@ describe('keeping a draft', () => {
     expect(result.status).toBe('ok');
     expect(result.draft).toMatchObject({ baseRevision: 3, savedAt: NOW });
     expect(result.draft.card).toMatchObject({ firstName: 'Ada', lastName: 'Lovelace', title: 'Analyst', email: 'ada@example.com', sharingEnabled: false });
-    expect(result.draft.card.share).toEqual({ ...DEFAULT_SHARE, email: true });
+    expect(result.draft.card.share).toEqual({ ...DEFAULT_SHARE, ...DEFAULT_LINK_SHARE, email: true });
   });
 
   it('keeps text as it was typed, including text the card would refuse', () => {
@@ -83,7 +83,7 @@ describe('keeping a draft', () => {
     const parsed = JSON.parse(raw);
     expect(Object.keys(parsed).sort()).toEqual(['baseRevision', 'fields', 'savedAt', 'share', 'uid', 'v']);
     expect(Object.keys(parsed.fields).sort()).toEqual([...CARD_FIELDS].sort());
-    expect(Object.keys(parsed.share).sort()).toEqual([...SHAREABLE_FIELDS].sort());
+    expect(Object.keys(parsed.share).sort()).toEqual([...ALL_SHARE_KEYS].sort());
     expect(raw).not.toMatch(/sharingEnabled|suggest|source|accountEmail|login@|token|tok_secret|idToken|jwt|OTHER|revision":99|createdAt|notes|schemaVersion|sub-123/);
     expect(parsed.v).toBe(DRAFT_VERSION);
     expect(parsed.uid).toBe('U');
@@ -92,7 +92,7 @@ describe('keeping a draft', () => {
   it('keeps a switch as on only when it is exactly true', () => {
     const storage = new FakeStorage();
     saveDraft(draft({ card: { ...card(), share: { email: 'true', phone: 1, title: {}, website: [], instagram: null, photoUrl: true, organization: false, linkedinUrl: undefined } } }), { storage, now: NOW });
-    expect(stored(storage).share).toEqual({ photoUrl: true, title: false, organization: false, email: false, phone: false, linkedinUrl: false, instagram: false, website: false });
+    expect(stored(storage).share).toEqual({ photoUrl: true, title: false, organization: false, email: false, phone: false, linkedinUrl: false, instagram: false, website: false, ...DEFAULT_LINK_SHARE });
   });
 
   it('keeps a field that is not text as empty, and ignores inherited properties', () => {

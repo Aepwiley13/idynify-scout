@@ -20,7 +20,8 @@ import { isValidPublicId, publicCardDoc, publicCardView } from '../../src/utils/
 import { photoDataUrl } from '../../src/test/helpers/photoFixtures.js';
 
 const env = await initializeTestEnvironment({
-  projectId: 'demo-my-card-share-service',
+  // The emulator run names a throwaway demo- project (`emulators:exec --project`); there is no fallback.
+  projectId: process.env.GCLOUD_PROJECT,
   firestore: { rules: readFileSync(new URL('../../firestore.rules', import.meta.url), 'utf8'), host: '127.0.0.1', port: 8080 },
 });
 await env.clearFirestore();

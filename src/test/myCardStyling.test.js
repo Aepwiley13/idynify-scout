@@ -74,7 +74,7 @@ describe('colours come from the theme, and only from the theme', () => {
 
   it('gets the card\'s brand colours from the design tokens, and every one it uses is set', () => {
     const preview = readFileSync(root('src/pages/ContactHub/myCard/MyCardPreview.jsx'), 'utf8');
-    const brandVars = [...new Set([...css.matchAll(/var\((--mycard-[\w-]+)\)/g)].map((m) => m[1]))];
+    const brandVars = [...new Set([...css.matchAll(/var\((--mycard-(?!qr-)[\w-]+)\)/g)].map((m) => m[1]))];
     expect(brandVars.length).toBeGreaterThanOrEqual(5);
     for (const variable of brandVars) expect(preview, variable).toContain(`'${variable}'`);
     expect(preview).toMatch(/from '\.\.\/\.\.\/\.\.\/theme\/tokens'/);
@@ -486,7 +486,9 @@ describe('the components stand alone', () => {
         // The extras: the file that downloads a contact needs the vCard maker; the photo part draws its dialog on the page
         // (react-dom's portal); the photo files use the photo utility, which is pure and local-only (photoPrep.test.js).
         // The card image takes its file name from the contact file's naming rule (one rule for both downloads).
-        const allowedHere = (name === 'downloadContact.js' || name === 'cardImage.js') && from === '../../../utils/vcard';
+        const allowedHere = ((name === 'downloadContact.js' || name === 'cardImage.js') && from === '../../../utils/vcard')
+          // The QR code is made in the browser by the open-source qrcode package (MY-CARD-SHARE-001).
+          || (name === 'cardQr.js' && from === 'qrcode');
         expect(allowedHere || /^(?:react|lucide-react|\.\/[\w.]+|\.\.\/\.\.\/\.\.\/utils\/(?:myCardRules|myCardSuggestions|photoPrep)|\.\.\/\.\.\/\.\.\/theme\/tokens)$/.test(from) || (from === 'react-dom' && name === 'MyCardPhoto.jsx'), `${name} imports ${from}`).toBe(true);
       }
     }

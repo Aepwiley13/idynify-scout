@@ -10,7 +10,7 @@
  * and the same email saved in lower case are not a difference, nor are spaces
  * the card would not keep. Text the rules refuse is compared as typed.
  */
-import { CARD_FIELDS, SHAREABLE_FIELDS, normalizeCardField } from '../../../../utils/myCardRules';
+import { CARD_FIELDS, LINK_SLOTS, SHAREABLE_FIELDS, normalizeCardField, normalizeLink } from '../../../../utils/myCardRules';
 import { FIELD_META } from '../cardDraft';
 
 const own = (object, key) => object !== null && typeof object === 'object' && Object.prototype.hasOwnProperty.call(object, key);
@@ -24,6 +24,15 @@ function comparable(field, raw) {
 
 const valueOf = (card, field) => comparable(field, own(card, field) ? card[field] : '');
 const switchOf = (card, field) => own(card, 'share') && own(card.share, field) && card.share[field] === true;
+
+/** A link as the card would keep it ('' for none); as typed (tidied) when the card's rules refuse it. */
+function linkOf(card, slot) {
+  const raw = own(card, slot) ? card[slot] : null;
+  if (!raw || typeof raw !== 'object') return '';
+  const { value, error } = normalizeLink(raw);
+  return JSON.stringify(error || !value ? [tidy(raw.label), tidy(raw.url)] : [value.label, value.url]);
+}
+const linkName = (mine, theirs, slot) => (own(mine, slot) && mine[slot]?.label) || (own(theirs, slot) && theirs[slot]?.label) || 'Additional link';
 
 /**
  * @param {object} mine    a card (the draft)
@@ -39,9 +48,17 @@ export function diffCards(mine, theirs) {
       changes.push({ kind: 'value', field, label: FIELD_META[field].label });
     }
   }
+  for (const slot of LINK_SLOTS) {
+    if (linkOf(mine, slot) !== linkOf(theirs, slot)) changes.push({ kind: 'value', field: slot, label: linkName(mine, theirs, slot) });
+  }
   for (const field of SHAREABLE_FIELDS) {
     if (switchOf(mine, field) !== switchOf(theirs, field)) {
       changes.push({ kind: 'switch', field, label: FIELD_META[field].shareLabel ?? FIELD_META[field].label });
+    }
+  }
+  for (const slot of LINK_SLOTS) {
+    if (switchOf(mine, slot) !== switchOf(theirs, slot) && (own(mine, slot) || own(theirs, slot))) {
+      changes.push({ kind: 'switch', field: slot, label: linkName(mine, theirs, slot) });
     }
   }
   return { changes };

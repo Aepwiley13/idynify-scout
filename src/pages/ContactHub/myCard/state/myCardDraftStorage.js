@@ -53,7 +53,7 @@
  * Everything takes the storage and the clock as options, so this is tested with
  * a fake and a fixed time.
  */
-import { CARD_FIELDS, SHAREABLE_FIELDS, isPhotoPicture } from '../../../../utils/myCardRules';
+import { ALL_SHARE_KEYS, CARD_FIELDS, LINK_SLOTS, SHAREABLE_FIELDS, isPhotoPicture } from '../../../../utils/myCardRules';
 import { PHOTO, inspectPhotoDataUrl } from '../../../../utils/photoPrep';
 
 export const DRAFT_KEY_PREFIX = 'idynify.myCardDraft.v1:';
@@ -72,6 +72,9 @@ const UID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/;
 const TOP_LEVEL_KEYS = Object.freeze(['baseRevision', 'fields', 'savedAt', 'share', 'uid', 'v']);
 // A draft written before the photo field existed has no `photo`: that is 'none'.
 const TOP_LEVEL_KEYS_WITH_PHOTO = Object.freeze([...TOP_LEVEL_KEYS, 'photo']);
+// Additional links are kept as typed, and only when the draft has some: a draft from before them has no `links`.
+const TOP_LEVEL_OPTIONAL = Object.freeze(['links', 'photo']);
+const LINK_TEXT_MAX = 1000;
 const PHOTO_STATES = Object.freeze(['none', 'separate', 'lost']);
 const PHOTO_KEYS = Object.freeze(['dataUrl', 'savedAt', 'uid', 'v']);
 
@@ -143,7 +146,17 @@ export function buildDraftPayload({ uid, card, baseRevision, now, photo = null }
   const fields = {};
   for (const field of CARD_FIELDS) fields[field] = own(source, field) && typeof source[field] === 'string' ? source[field] : '';
   const share = {};
-  for (const field of SHAREABLE_FIELDS) share[field] = own(sourceShare, field) && sourceShare[field] === true;
+  for (const field of ALL_SHARE_KEYS) share[field] = own(sourceShare, field) && sourceShare[field] === true;
+  // The links as typed, in order, with their switches (already in `share`). Never an ID or anything else.
+  const links = {};
+  for (const slot of LINK_SLOTS) {
+    if (isPlainObject(source[slot])) {
+      links[slot] = {
+        label: typeof source[slot].label === 'string' ? source[slot].label.slice(0, LINK_TEXT_MAX) : '',
+        url: typeof source[slot].url === 'string' ? source[slot].url.slice(0, LINK_TEXT_MAX) : '',
+      };
+    }
+  }
 
   // The picture never goes in `fields`: it is kept under its own key, or it is said to be lost.
   const picture = draftPhotoOf(source);
@@ -151,7 +164,11 @@ export function buildDraftPayload({ uid, card, baseRevision, now, photo = null }
   if (picture) where = photo === 'lost' ? 'lost' : 'separate';
   // A picture is never kept in the text fields. A long one that is not a finished photo is not kept at all.
   if (isPhotoPicture(fields.photoUrl)) fields.photoUrl = '';
-  return { v: DRAFT_VERSION, uid, savedAt: now, baseRevision, fields, share, ...(where === 'none' ? {} : { photo: where }) };
+  return {
+    v: DRAFT_VERSION, uid, savedAt: now, baseRevision, fields, share,
+    ...(Object.keys(links).length ? { links } : {}),
+    ...(where === 'none' ? {} : { photo: where }),
+  };
 }
 
 /**
@@ -250,7 +267,7 @@ export function readDraft(uid, { storage = browserSessionStorage(), now = Date.n
   }
   if (!isPlainObject(data)) return discard('malformed');
   if (data.v !== DRAFT_VERSION) return discard('version');
-  if (!sameKeys(data, TOP_LEVEL_KEYS) && !sameKeys(data, TOP_LEVEL_KEYS_WITH_PHOTO)) return discard('malformed');
+  if (!TOP_LEVEL_KEYS.every((key) => own(data, key)) || !Object.keys(data).every((key) => TOP_LEVEL_KEYS.includes(key) || TOP_LEVEL_OPTIONAL.includes(key))) return discard('malformed');
   if (own(data, 'photo') && !PHOTO_STATES.includes(data.photo)) return discard('malformed');
   if (data.uid !== uid) return discard('uid');
 
@@ -259,7 +276,12 @@ export function readDraft(uid, { storage = browserSessionStorage(), now = Date.n
   if (savedAt > now + FUTURE_SLACK_MS || now - savedAt > DRAFT_MAX_AGE_MS) return discard('expired');
   if (!(baseRevision === null || (Number.isInteger(baseRevision) && baseRevision >= 0))) return discard('malformed');
   if (!isPlainObject(fields) || !sameKeys(fields, CARD_FIELDS) || !CARD_FIELDS.every((field) => typeof fields[field] === 'string')) return discard('malformed');
-  if (!isPlainObject(share) || !sameKeys(share, SHAREABLE_FIELDS) || !SHAREABLE_FIELDS.every((field) => typeof share[field] === 'boolean')) return discard('malformed');
+  // The eight switches of a draft from before additional links, or all thirteen.
+  const shareKeys = isPlainObject(share) && sameKeys(share, ALL_SHARE_KEYS) ? ALL_SHARE_KEYS : SHAREABLE_FIELDS;
+  if (!isPlainObject(share) || !sameKeys(share, shareKeys) || !shareKeys.every((field) => typeof share[field] === 'boolean')) return discard('malformed');
+  const links = own(data, 'links') ? data.links : {};
+  if (!isPlainObject(links) || !Object.keys(links).every((slot) => LINK_SLOTS.includes(slot)
+    && isPlainObject(links[slot]) && sameKeys(links[slot], ['label', 'url']) && typeof links[slot].label === 'string' && typeof links[slot].url === 'string')) return discard('malformed');
 
   // The picture, if the draft has one: from its own key, and only if it is exactly what was written with this draft.
   let photoUrl = fields.photoUrl;
@@ -281,7 +303,7 @@ export function readDraft(uid, { storage = browserSessionStorage(), now = Date.n
     status: 'ok',
     draft: {
       // The draft's own shape: the fields, the switches, and sharing off.
-      card: { ...fields, photoUrl, share: { ...share }, sharingEnabled: false },
+      card: { ...fields, ...Object.fromEntries(Object.entries(links).map(([slot, row]) => [slot, { ...row }])), photoUrl, share: { ...Object.fromEntries(ALL_SHARE_KEYS.map((key) => [key, false])), ...share }, sharingEnabled: false },
       baseRevision,
       savedAt,
       photoLost,

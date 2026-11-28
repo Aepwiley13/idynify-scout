@@ -16,6 +16,7 @@
 import { useId } from 'react';
 import { Sparkles } from 'lucide-react';
 import MyCardPhoto from './MyCardPhoto';
+import MyCardLinks from './MyCardLinks';
 import ShareToggle from './ShareToggle';
 import { EDITOR_SECTIONS, FIELD_META } from './cardDraft';
 import { SHAREABLE_FIELDS } from '../../../utils/myCardRules';
@@ -45,9 +46,12 @@ function suggestionText(field, { value, source }) {
  * @param {() => void} [props.onSubmit]  Enter in a field
  * @param {boolean} [props.disabled]
  * @param {typeof prepareProfilePhoto} [props.preparePhoto]  makes the photo from a picked file; replaceable for tests
+ * @param {object} [props.links]  { onEditLink, onBlurLink, onAddLink, onRemoveLink }: the additional-links
+ *   editor, shown only when this is passed (the sharing flag, see config/featureFlags.js)
  */
 export default function MyCardEditor({
   card, errors = {}, suggestions = null, onEdit, onBlur, onShare, onUseSuggestion, onSubmit, disabled = false, preparePhoto = prepareProfilePhoto,
+  links = null,
 }) {
   const uid = useId();
   const open = openSuggestions(card, suggestions);
@@ -173,6 +177,18 @@ export default function MyCardEditor({
           ) : section.fields.map(renderField)}
         </section>
       ))}
+      {links ? (
+        <MyCardLinks
+          card={card}
+          errors={errors}
+          onEditLink={links.onEditLink}
+          onBlurLink={links.onBlurLink}
+          onShare={onShare}
+          onAddLink={links.onAddLink}
+          onRemoveLink={links.onRemoveLink}
+          disabled={disabled}
+        />
+      ) : null}
     </form>
   );
 }

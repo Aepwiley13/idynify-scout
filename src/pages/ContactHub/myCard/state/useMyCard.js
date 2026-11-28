@@ -33,6 +33,11 @@
  *   Save      Always against a revision (revisionToSaveAgainst). A card that is
  *             not valid is not sent: its messages are shown. Typing during a save
  *             is kept, as unsaved changes on top of what was saved.
+ *   Sharing   publish / unpublish / resetLink act on the SAVED card, against the revision the draft is
+ *             based on (the draft is never published: the page saves first when there are unsaved
+ *             changes). The result moves the revision and `sharing`; a card that changed elsewhere is a
+ *             conflict to reload. A save that would leave a live card with no shared contact method comes
+ *             back as `gate` with its fixes, and saveAndTurnOff saves it and turns sharing off.
  *   Conflict  The draft is never touched. The person chooses, and confirms:
  *             Load latest (replaces the draft) or Save my version over it (saves
  *             against the revision just seen; if the card changed again it stops
@@ -51,6 +56,24 @@ import {
 
 export const PERSIST_DEBOUNCE_MS = 500;
 
+const NOT_SHARED = Object.freeze({ live: false, publicId: null, publishedAt: null });
+const INITIAL_SHARING = Object.freeze({ sharing: NOT_SHARED, busy: null, error: null, gate: null });
+
+function sharingReducer(state, action) {
+  switch (action.type) {
+    case 'reset': return INITIAL_SHARING;
+    case 'live': return { ...state, sharing: action.sharing ?? NOT_SHARED };
+    case 'busy': return { ...state, busy: action.kind, error: null };
+    case 'idle': return { ...state, busy: null };
+    case 'error': return { ...state, error: action.error };
+    case 'gate': return { ...state, gate: action.gate };
+    default: return state;
+  }
+}
+
+const GATE_MESSAGE = 'Your card is live, so it needs a name and at least one shared way to reach you: email, phone, LinkedIn, Instagram or website.';
+const CONFLICT_MESSAGE = 'Your card was changed somewhere else. Reload it to see the latest, then try again.';
+
 const UNREADABLE = Object.freeze({ code: 'failed', message: 'Something went wrong with your card. Try again.', retryable: true });
 
 /**
@@ -62,6 +85,9 @@ export function useMyCard({
   const draft = useCardDraft(newCard());
   const [state, dispatch] = useReducer(myCardReducer, initialMyCardState);
   const [reloadToken, setReloadToken] = useState(0);
+  // Whether the card is live, under which public ID. Never kept in the draft or in the tab's storage.
+  const [sharingState, sharingDispatch] = useReducer(sharingReducer, INITIAL_SHARING);
+  const sharingBusyRef = useRef(null);
 
   // Latest values, for code that runs later (timers, listeners, answers that arrive late).
   const stateRef = useRef(state);
@@ -107,6 +133,8 @@ export function useMyCard({
 
     // Whatever was on screen belongs to the account or mode that has just ended.
     draft.reset(newCard());
+    sharingDispatch({ type: 'reset' });
+    sharingBusyRef.current = null;
 
     if (impersonating) {
       // Read-only, and nothing touches the tab's storage, not even to forget.
@@ -151,6 +179,7 @@ export function useMyCard({
       if (plan.action === 'discard') clearDraft(uid, options);
 
       hydrated.current = true;
+      sharingDispatch({ type: 'live', sharing: loaded.sharing });
       dispatch({ type: A.LOAD_SUCCEEDED, loadId, uid, result: loaded, suggestions, unavailable });
       if (plan.action === 'restore' || plan.action === 'conflict') {
         dispatch({ type: A.RECOVERY_RESTORED, savedAt: plan.savedAt, baseRevision: plan.baseRevision, photoLost: plan.photoLost });
@@ -203,7 +232,7 @@ export function useMyCard({
   }, [warn, impersonating]);
 
   // ── Saving ─────────────────────────────────────────────────────────────────
-  const performSave = useCallback(async ({ over }) => {
+  const performSave = useCallback(async ({ over, turnOff = false }) => {
     const s = stateRef.current;
     const d = draftRef.current;
     if (over) {
@@ -223,10 +252,12 @@ export function useMyCard({
     const cardAtSave = d.card;
     const expectedRevision = revisionToSaveAgainst(s);
     dispatch({ type: over ? A.SAVE_OVER_STARTED : A.SAVE_STARTED, saveId });
+    sharingDispatch({ type: 'gate', gate: null });
 
     let result;
     try {
-      result = await service.saveMyCard(cardAtSave, { expectedRevision });
+      // The option is passed only when it is asked for, so an ordinary save is called exactly as it always was.
+      result = await service.saveMyCard(cardAtSave, turnOff ? { expectedRevision, turnOffIfGateFails: true } : { expectedRevision });
     } catch {
       result = { status: 'error', ...UNREADABLE };
     }
@@ -235,19 +266,26 @@ export function useMyCard({
 
     if (result?.status === 'saved') {
       dispatch({ type: A.SAVE_SUCCEEDED, saveId, revision: result.revision });
+      if (result.sharing) sharingDispatch({ type: 'live', sharing: result.sharing });
       cancelTimer();
       clearDraft(account, options);
       // The saved card is the new starting point. Typing done while it was saving stays, as unsaved changes.
       const hasUnsavedChanges = draftRef.current.card !== cardAtSave;
       if (!hasUnsavedChanges) draftRef.current.reset(result.card);
       else draftRef.current.reset(result.card, draftRef.current.card);
-      return { status: 'saved', hasUnsavedChanges };
+      return { status: 'saved', hasUnsavedChanges, revision: result.revision };
     }
     if (result?.status === 'conflict') {
       const current = result.current;
       const changes = current?.card ? diffCards(cardAtSave, current.card).changes : [];
       dispatch({ type: A.SAVE_CONFLICTED, saveId, current, changes });
       return { status: 'conflict' };
+    }
+    if (result?.status === 'gate') {
+      // Nothing was written. The person chooses: keep the contact method, or save and turn sharing off.
+      sharingDispatch({ type: 'gate', gate: { fixes: result.fixes ?? [] } });
+      dispatch({ type: A.SAVE_FAILED, saveId, error: { code: 'gate', message: GATE_MESSAGE, retryable: false } });
+      return { status: 'gate' };
     }
     if (result?.status === 'invalid') {
       draftRef.current.showAllErrors();
@@ -260,6 +298,47 @@ export function useMyCard({
 
   const save = useCallback(() => performSave({ over: false }), [performSave]);
   const confirmSaveOver = useCallback(() => performSave({ over: true }), [performSave]);
+  const saveAndTurnOff = useCallback(() => performSave({ over: false, turnOff: true }), [performSave]);
+
+  // ── Sharing ────────────────────────────────────────────────────────────────
+  const sharingCall = useCallback(async (kind, method, revision = null) => {
+    const s = stateRef.current;
+    // `revision` is for a save that has just landed: the state follows it on the next render, this does not wait.
+    const expectedRevision = revision ?? s.revision;
+    if (sharingBusyRef.current || s.load !== 'ready' || expectedRevision === null || impersonating) return { status: 'blocked' };
+    sharingBusyRef.current = kind;
+    sharingDispatch({ type: 'busy', kind });
+    const mine = generation.current;
+    let result;
+    try {
+      result = await service[method]({ expectedRevision });
+    } catch {
+      result = { status: 'error', ...UNREADABLE };
+    }
+    if (generation.current !== mine) return { status: 'stale' };
+    sharingBusyRef.current = null;
+    sharingDispatch({ type: 'idle' });
+    if (result?.status === 'saved') {
+      dispatch({ type: A.REVISION_ADVANCED, revision: result.revision });
+      sharingDispatch({ type: 'live', sharing: result.sharing });
+      return { status: 'saved', sharing: result.sharing };
+    }
+    if (result?.status === 'conflict') {
+      sharingDispatch({ type: 'error', error: { code: 'conflict', message: CONFLICT_MESSAGE, reload: true } });
+      return { status: 'conflict' };
+    }
+    if (result?.status === 'gate') {
+      sharingDispatch({ type: 'error', error: { code: 'gate', message: GATE_MESSAGE } });
+      return { status: 'gate', fixes: result.fixes };
+    }
+    sharingDispatch({ type: 'error', error: result?.status === 'error' ? result : UNREADABLE });
+    return { status: 'error' };
+  }, [service, impersonating]);
+
+  const publish = useCallback((options = {}) => sharingCall('publish', 'publishMyCard', options.revision ?? null), [sharingCall]);
+  const unpublish = useCallback(() => sharingCall('unpublish', 'unpublishMyCard'), [sharingCall]);
+  const resetLink = useCallback(() => sharingCall('reset', 'resetMyCardLink'), [sharingCall]);
+  const dismissSharingError = useCallback(() => sharingDispatch({ type: 'error', error: null }), []);
 
   // ── Conflict, and a recovered draft ────────────────────────────────────────
   const chooseConflict = useCallback((choice) => dispatch({ type: A.CONFLICT_CHOSEN, choice }), []);
@@ -272,6 +351,7 @@ export function useMyCard({
     const { current } = s.conflict;
     dispatch({ type: A.LOAD_LATEST_CONFIRMED });
     draftRef.current.reset(current.status === 'missing' ? prefilledNewCard(s.suggestions) : current.card);
+    sharingDispatch({ type: 'live', sharing: current.sharing });
     if (uid) clearDraft(uid, options);
     cancelTimer();
     return true;
@@ -301,7 +381,9 @@ export function useMyCard({
 
   const actions = useMemo(() => ({
     save, confirmSaveOver, chooseConflict, cancelConflict, confirmLoadLatest, discardRecovered, dismissRecovered, retryLoad,
-  }), [save, confirmSaveOver, chooseConflict, cancelConflict, confirmLoadLatest, discardRecovered, dismissRecovered, retryLoad]);
+    saveAndTurnOff, publish, unpublish, resetLink, dismissSharingError,
+  }), [save, confirmSaveOver, chooseConflict, cancelConflict, confirmLoadLatest, discardRecovered, dismissRecovered, retryLoad,
+    saveAndTurnOff, publish, unpublish, resetLink, dismissSharingError]);
 
   return {
     draft,
@@ -310,6 +392,8 @@ export function useMyCard({
     availability: saveAvailability(state, { dirty: draft.dirty }),
     choices: conflictChoices(state),
     actions,
+    // Whether the card is live and what a person may do about it; see Sharing in the header.
+    sharing: { ...sharingState.sharing, busy: sharingState.busy, error: sharingState.error, gate: sharingState.gate },
   };
 }
 

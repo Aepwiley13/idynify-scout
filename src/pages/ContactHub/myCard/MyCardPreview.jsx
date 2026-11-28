@@ -16,7 +16,8 @@
  * Display only: no links, no actions, nothing written.
  */
 import { Fragment } from 'react';
-import { Globe, Info, Instagram, Linkedin, Lock, Mail, Phone } from 'lucide-react';
+import { Globe, Info, Instagram, Linkedin, Link2, Lock, Mail, Phone } from 'lucide-react';
+import { LINK_SLOTS } from '../../../utils/myCardRules';
 import CardAvatar from './CardAvatar';
 import { previewOf, readableLink, unsharedFields } from './cardDraft';
 import { BRAND, THEMES } from '../../../theme/tokens';
@@ -42,6 +43,11 @@ function softBreaks(text) {
   ));
 }
 
+/** The place a link goes, so a label cannot disguise it: "calendly.com". */
+function hostOf(url) {
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return ''; }
+}
+
 function Row({ icon, label, children }) {
   return (
     <li className="mycard-row">
@@ -60,7 +66,8 @@ function Row({ icon, label, children }) {
 export default function MyCardPreview({ card, sharing = false, hasUnsavedChanges = false }) {
   const view = previewOf(card);
   const hidden = unsharedFields(card);
-  const hasDetails = view && (view.email || view.phone || view.linkedinUrl || view.instagram || view.website);
+  const links = view ? LINK_SLOTS.filter((slot) => view[slot]).map((slot) => view[slot]) : [];
+  const hasDetails = view && (view.email || view.phone || view.linkedinUrl || view.instagram || view.website || links.length);
 
   return (
     <section className="mycard-preview" aria-labelledby="mycard-preview-title">
@@ -85,6 +92,7 @@ export default function MyCardPreview({ card, sharing = false, hasUnsavedChanges
                 {view.linkedinUrl ? <Row icon={<Linkedin size={16} />} label="LinkedIn">{softBreaks(readableLink(view.linkedinUrl))}</Row> : null}
                 {view.instagram ? <Row icon={<Instagram size={16} />} label="Instagram">@{view.instagram}</Row> : null}
                 {view.website ? <Row icon={<Globe size={16} />} label="Website">{softBreaks(readableLink(view.website))}</Row> : null}
+                {links.map((link) => <Row key={link.url + link.label} icon={<Link2 size={16} />} label={link.label}>{link.label}<span className="mycard-row-host"> {hostOf(link.url)}</span></Row>)}
               </ul>
             ) : null}
             <p className="mycard-card-made">Made with IDYNIFY</p>

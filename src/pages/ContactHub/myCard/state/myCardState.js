@@ -47,6 +47,7 @@ export const MY_CARD_ACTION = Object.freeze({
   CONFLICT_CHOSEN: 'conflict/chosen',
   CONFLICT_CANCELLED: 'conflict/cancelled',
   LOAD_LATEST_CONFIRMED: 'conflict/load-latest-confirmed',
+  REVISION_ADVANCED: 'revision/advanced',
 });
 
 /** The two ways out of a conflict. */
@@ -188,6 +189,14 @@ export function myCardReducer(state = initialMyCardState, action = {}) {
         repaired: null,
         photoKept: true,
       };
+    }
+
+    // Publishing, turning sharing off and Reset Link each write the card at its next revision. The draft is
+    // untouched (they publish what is saved), so only the revision the draft is based on moves with it.
+    case MY_CARD_ACTION.REVISION_ADVANCED: {
+      if (state.load !== 'ready' || !Number.isInteger(action.revision) || action.revision < 0) return state;
+      if (state.revision !== null && action.revision <= state.revision) return state;
+      return { ...state, revision: action.revision, isNew: false };
     }
 
     case MY_CARD_ACTION.SAVE_FAILED: {

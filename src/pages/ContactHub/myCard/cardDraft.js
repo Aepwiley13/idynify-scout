@@ -16,8 +16,8 @@
  *   left out, so the preview can never show more than a shared card would.
  */
 import {
-  CARD_FIELDS, SHAREABLE_FIELDS, DEFAULT_SHARE, normalizeCard, normalizeCardField, normalizeShare,
-  publicCardView,
+  CARD_FIELDS, SHAREABLE_FIELDS, ALL_SHARE_KEYS, LINK_SLOTS, DEFAULT_SHARE, DEFAULT_LINK_SHARE, normalizeCard, normalizeCardField, normalizeLink,
+  normalizeShare, publicCardView,
 } from '../../../utils/myCardRules';
 import { acceptSuggestion } from '../../../utils/myCardSuggestions';
 
@@ -57,18 +57,37 @@ export const FIELD_META = Object.freeze({
 /** The text of a field as a person would see it typed: trimmed, runs of space made one. */
 const tidy = (value) => (typeof value === 'string' ? value.replace(/\s+/g, ' ').trim() : '');
 
-/** A draft's card from anything: every field a string, the switches complete, sharing off. */
+const isRow = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
+const textOf = (value) => (typeof value === 'string' ? value : '');
+
+/**
+ * A draft's card from anything: every field a string, the switches complete, sharing off, and the additional
+ * links as the rows the person has, in order (a row may be half typed). A link and its switch always move
+ * together: the rows are closed up and each keeps its own switch.
+ */
 function draftCard(card) {
   const source = card !== null && typeof card === 'object' && !Array.isArray(card) ? card : {};
   const out = {};
   for (const field of CARD_FIELDS) out[field] = own(source, field) && typeof source[field] === 'string' ? source[field] : '';
-  out.share = own(source, 'share') ? normalizeShare(source.share) : { ...DEFAULT_SHARE };
+  const share = own(source, 'share') ? normalizeShare(source.share) : { ...DEFAULT_SHARE, ...DEFAULT_LINK_SHARE };
+  const rows = LINK_SLOTS.filter((slot) => isRow(source[slot])).map((slot) => ({
+    row: { label: textOf(source[slot].label), url: textOf(source[slot].url) }, shared: share[slot] === true,
+  }));
+  LINK_SLOTS.forEach((slot, index) => {
+    if (rows[index]) out[slot] = rows[index].row;
+    share[slot] = Boolean(rows[index]?.shared);
+  });
+  out.share = share;
   out.sharingEnabled = false;
   return out;
 }
 
-/** The comparable form of a draft: tidy text and the switches. */
-const comparable = (card) => JSON.stringify([CARD_FIELDS.map((field) => tidy(card[field])), SHAREABLE_FIELDS.map((field) => card.share[field] === true)]);
+/** The comparable form of a draft: tidy text, the links and the switches. */
+const comparable = (card) => JSON.stringify([
+  CARD_FIELDS.map((field) => tidy(card[field])),
+  LINK_SLOTS.map((slot) => (card[slot] ? [tidy(card[slot].label), tidy(card[slot].url)] : null)),
+  ALL_SHARE_KEYS.map((field) => card.share[field] === true),
+]);
 
 /** A draft that starts from `card`. Nothing is touched, and nothing differs from it. */
 export function createDraft(card) {
@@ -106,8 +125,42 @@ export function cardDraftReducer(state, action) {
         : state.card;
       return { ...state, card, touched };
     }
+    case 'editLink': {
+      if (!LINK_SLOTS.includes(action.slot) || !state.card[action.slot] || !['label', 'url'].includes(action.part)) return state;
+      const value = typeof action.value === 'string' ? action.value : '';
+      if (state.card[action.slot][action.part] === value) return state;
+      return { ...state, card: { ...state.card, [action.slot]: { ...state.card[action.slot], [action.part]: value } } };
+    }
+    case 'blurLink': {
+      if (!LINK_SLOTS.includes(action.slot) || !state.card[action.slot]) return state;
+      const touched = { ...state.touched, [action.slot]: true };
+      // A link that is valid is shown as it will be kept.
+      const { value, error } = normalizeLink(state.card[action.slot]);
+      const card = !error && value ? { ...state.card, [action.slot]: { ...value } } : state.card;
+      return { ...state, card, touched };
+    }
+    case 'addLink': {
+      const slot = LINK_SLOTS.find((name) => !state.card[name]);
+      if (!slot) return state;
+      return { ...state, card: { ...state.card, [slot]: { label: '', url: '' }, share: { ...state.card.share, [slot]: false } } };
+    }
+    case 'removeLink': {
+      // The rest move up, each with its own switch: a Private link can never land on a Shared one's switch.
+      const at = LINK_SLOTS.indexOf(action.slot);
+      if (at < 0 || !state.card[action.slot]) return state;
+      const card = { ...state.card, share: { ...state.card.share } };
+      LINK_SLOTS.forEach((slot, index) => {
+        if (index < at) return;
+        const next = LINK_SLOTS[index + 1];
+        if (next && state.card[next]) { card[slot] = state.card[next]; card.share[slot] = state.card.share[next] === true; } else { delete card[slot]; card.share[slot] = false; }
+      });
+      const touched = { ...state.touched };
+      for (const slot of LINK_SLOTS) delete touched[slot];
+      return { ...state, card, touched };
+    }
     case 'share': {
-      if (!SHAREABLE_FIELDS.includes(action.field) || typeof action.value !== 'boolean') return state;
+      if (!ALL_SHARE_KEYS.includes(action.field) || typeof action.value !== 'boolean') return state;
+      if (LINK_SLOTS.includes(action.field) && !state.card[action.field]) return state;
       if (state.card.share[action.field] === action.value) return state;
       return { ...state, card: { ...state.card, share: { ...state.card.share, [action.field]: action.value } } };
     }
@@ -166,9 +219,13 @@ export const previewOf = (card) => publicCardView(card);
  */
 export function unsharedFields(card) {
   const { card: clean } = normalizeCard(card);
-  return SHAREABLE_FIELDS
+  const fields = SHAREABLE_FIELDS
     .filter((field) => clean[field] && clean.share[field] !== true)
     .map((field) => ({ field, label: FIELD_META[field].shareLabel ?? FIELD_META[field].label }));
+  const links = LINK_SLOTS
+    .filter((slot) => clean[slot] && clean.share[slot] !== true)
+    .map((slot) => ({ field: slot, label: clean[slot].label }));
+  return [...fields, ...links];
 }
 
 /** A link as a person reads it: no scheme, no www, no trailing slash. */

@@ -430,3 +430,41 @@
 .mycard-crop-viewport:focus-visible {
   outline: 2px solid var(--accent); outline-offset: 2px;
 }
+
+/* ── Share, Scan, Save (MY-CARD-SHARE-001) ── */
+.mycard-share-area { display: flex; flex-direction: column; gap: 12px; margin: 16px 0; }
+.mycard-live { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 14px; font-weight: 700; color: var(--text-primary); }
+.mycard-live-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--status-success, currentColor); flex: 0 0 auto; }
+/* The one big action: full width, the brand pink, and a label that stays large. */
+.mycard-share-primary { width: 100%; min-height: 52px; }
+.mycard-share-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; }
+.mycard-share-row .mycard-btn { min-width: 0; padding: 0 12px; }
+.mycard-viewlink {
+  display: inline-flex; align-items: center; gap: 6px; align-self: flex-start; min-height: 44px; box-sizing: border-box;
+  color: var(--text-secondary); font-size: 14px; font-weight: 600; text-decoration: underline;
+}
+.mycard-manage { border: 1px solid var(--border); border-radius: 12px; background: var(--bg-card); }
+.mycard-manage > summary { display: flex; align-items: center; min-height: 44px; padding: 0 14px; font-size: 15px; font-weight: 700; cursor: pointer; }
+.mycard-manage-body { display: flex; flex-direction: column; gap: 10px; padding: 0 14px 14px; }
+.mycard-recall { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.45; color: var(--text-secondary); }
+.mycard-recall li + li { margin-top: 4px; }
+.mycard-sheet-list { display: flex; flex-direction: column; gap: 8px; }
+.mycard-sheet-line { margin: 0; font-size: 14px; line-height: 1.45; overflow-wrap: anywhere; }
+.mycard-sheet-fixes { display: flex; flex-direction: column; align-items: stretch; gap: 8px; }
+.mycard-dialog-backdrop--sheet { z-index: 1000; }
+.mycard-row-host { color: var(--text-secondary); font-size: 12px; overflow-wrap: anywhere; }
+.mycard-link-row { padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.mycard-add-link { align-self: flex-start; }
+
+/* The QR code, full screen: white, a black code, the owner's name above it. The screen's brightness is left to the device. */
+.mycard-qr {
+  position: fixed; inset: 0; z-index: 1100; display: flex; flex-direction: column; box-sizing: border-box;
+  padding: max(12px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
+  background: var(--mycard-qr-bg); color: var(--mycard-qr-fg); overflow-y: auto;
+}
+.mycard-qr .mycard-btn--secondary { background: var(--mycard-qr-bg); border-color: var(--mycard-qr-fg); color: var(--mycard-qr-fg); }
+.mycard-qr-close { align-self: flex-end; }
+.mycard-qr-body { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; text-align: center; }
+.mycard-qr-name { margin: 0; font-size: 26px; font-weight: 800; line-height: 1.2; overflow-wrap: anywhere; }
+.mycard-qr-img { display: block; width: min(86vw, 70vh, 520px); height: auto; aspect-ratio: 1 / 1; image-rendering: pixelated; background: var(--mycard-qr-bg); }
+.mycard-qr-note { margin: 0; font-size: 15px; color: var(--mycard-qr-note); }

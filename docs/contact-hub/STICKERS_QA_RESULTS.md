@@ -1,7 +1,7 @@
-# Stickers: QA results and release tracker (general release, mode `on`)
+# Stickers: QA results and release tracker (general release, mode `on`) — LAUNCHED 2026-11-28
 
 Results sheet for `STICKERS_QA_PLAN.md` and the gate and approval record for `STICKERS_PILOT_RUNBOOK.md` (draft PR #778).
-Scope of this release (owner decision, 2026-11-27): **mode `on` in production for every signed-in user**, shipped together with **Free Contact Hub for every registered user** (#862, #863). The owner-only `internal` pilot was superseded before activation; production was never set to `internal`.
+**Status: live in production since 2026-11-28 04:06 UTC** (§6). Scope of this release (owner decision, 2026-11-27): **mode `on` in production for every signed-in user**, shipped together with **Free Contact Hub for every registered user** (#862, #863). The owner-only `internal` pilot was superseded before activation; production was never set to `internal`.
 
 | | |
 |---|---|
@@ -99,18 +99,32 @@ Known, not blocking: bulk "Add sticker" exists only on Scout People (`/people`, 
 | Release scope: Free Contact Hub for all + Stickers `on` | Aaron | 2026-11-27 | supersedes the owner-only pilot |
 | Free plan in production (`VITE_FREE_PLAN=on`, #862) | Aaron | 2026-11-27 | merge and publish still need release approval |
 | Production Free test account (live verification) | Aaron | 2026-11-27 | create at launch |
-| G1–G7 entry gates | | | §3 |
-| §2 exceptions | | | |
+| G1–G7 entry gates | Aaron | 2026-11-27 | §3, all PASS |
+| §2 exceptions | Aaron | 2026-11-27 | all closed or accepted |
 | Free welcome email copy | Aaron | 2026-11-27 | approved as in `freeWelcomeEmail` |
 | Signup-protection risk for launch (§1.7) | Aaron | 2026-11-27 | conditional on monitoring, cost alerts, reCAPTCHA follow-up |
-| Publish production build (#862 + #863) | | | |
-| `feature_flags/stickers.mode = "on"` | | | `12-prod-activate-on.sh` log |
+| Publish production build (#862 + #863) | Aaron | 2026-11-27 | release authorized; deploy `6b0a29c991b204051465c973` (§6) |
+| `feature_flags/stickers.mode = "on"` | Aaron | 2026-11-27 | written 2026-11-28T04:06:54Z (§6) |
+
+## 6. Production launch record (2026-11-28 UTC; 2026-11-27 America/Denver)
+
+| Step | Result |
+|---|---|
+| Merge #863 (welcome-email security) | `49d75574` |
+| Merge #862 (Free Contact Hub, `VITE_FREE_PLAN=on`) | `2a8aee62`; CI green (test, rules, billing-emulator). Customer-facing changes since `e89e9dc`: `netlify.toml`, `send-welcome-email.js`, `Signup.jsx` |
+| Netlify production deploy | `6b0a29c991b204051465c973` (commit `2a8aee62`, ready 01:09Z) published by the owner, replacing `6b062bfd…` (`e89e9dc`) |
+| Stickers activation (`12-prod-activate-on.sh`) | prerequisites all PASS (rules sha `23978f71fd78` unchanged, one admin, flag absent, 0 enrollments, `stickersConfig` 401 to anonymous); wrote `feature_flags/stickers = {mode:"on"}` at 04:06:54Z; read-back PASS (only field `mode`), rules and admin list unchanged |
+| Production smoke test, dedicated Free test account (owner) | contact creation; sticker create and assign; sticker on the profile; filter by sticker; persistence after refresh; Scout shows the paid upgrade: **all PASS** |
+
+Rollback, still ready: Stickers `07-prod-rollback-off.sh ROLLBACK` (mode `off`, data kept); Free plan: a build with `VITE_FREE_PLAN="existing"`, or republish `6b062bfd…` in an emergency.
+Not recorded in the logs: re-enabling the Netlify auto-publish lock after publishing, and a separate Stickers check on the owner's own account.
 
 ## 5. Follow-ups after launch
-1. **reCAPTCHA bot protection for email/password** (Identity Platform): audit mode in week one, enforce after a few days of clean traffic. Free up to 10,000 assessments a month.
+1. **Signup monitoring and protection — reCAPTCHA bot protection for email/password** (Identity Platform): audit mode in week one, enforce after a few days of clean traffic. Free up to 10,000 assessments a month.
 2. **Turn off email-link sign-in** (Authentication → Sign-in method → Email/Password): unused by the app.
-3. **Cost and abuse monitoring:** Cloud Billing budget alert on `idynify-scout-dev`; watch daily Auth sign-ups, Firestore writes and Resend volume for the first two weeks.
+3. **Billing alerts and abuse monitoring:** Cloud Billing budget alert on `idynify-scout-dev`; watch daily Auth sign-ups, Firestore writes and Resend volume for the first two weeks.
 4. App Check with a reCAPTCHA Enterprise site key (Firestore), then enforcement once the client sends tokens.
 5. Scout People bulk bar on phones (§1.6); Scout bulk checkboxes keyboard access.
 6. PR #807 (stale draft overlapping #863): close or rebase.
+7. **Onboarding:** make Contact Hub compelling for new Free users (first-run experience, first contacts, first stickers).
 

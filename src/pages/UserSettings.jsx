@@ -39,6 +39,7 @@ import {
   Palette, Check, Clock,
 } from 'lucide-react';
 import { db, auth } from '../firebase/config';
+import { startGmailConnect, gmailOutcomeMessage } from '../utils/gmailConnect';
 import { useMissionSounds } from '../hooks/useMissionSounds';
 import { useGmailSyncHealth } from '../hooks/useGmailSyncHealth';
 import LinkedInIntegrationCard from '../components/settings/LinkedInIntegrationCard';
@@ -459,6 +460,12 @@ export default function UserSettings() {
     if (params.get('calendar_connected') === 'true' && !params.get('tab')) {
       setActiveTab('integrations');
     }
+    // Back from Google's Gmail consent screen (CH-GMAIL-001).
+    const gmailOutcome = params.get('gmail');
+    if (gmailOutcome) {
+      setActiveTab('integrations');
+      setGmailError(gmailOutcomeMessage(gmailOutcome));
+    }
   }, []);
 
   useEffect(() => {
@@ -621,7 +628,9 @@ export default function UserSettings() {
       const snap = await getDoc(doc(db, 'users', user.uid, 'integrations', 'gmail'));
       if (snap.exists()) {
         const d = snap.data();
-        setGmailStatus(d.status === 'connected' ? 'connected' : 'disconnected');
+        // needs_reconnect: Google revoked or expired the grant (CH-GMAIL-001).
+        setGmailStatus(d.status === 'connected' ? 'connected'
+          : d.status === 'needs_reconnect' ? 'needs_reconnect' : 'disconnected');
         setGmailEmail(d.email || '');
       } else {
         setGmailStatus('disconnected');
@@ -715,15 +724,7 @@ export default function UserSettings() {
     setGmailAction('connecting');
     setGmailError(null);
     try {
-      const token = await user.getIdToken();
-      const res = await fetch('/.netlify/functions/gmail-oauth-init', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, authToken: token }),
-      });
-      if (!res.ok) throw new Error('Failed to initialize Gmail OAuth');
-      const data = await res.json();
-      window.location.href = data.authUrl;
+      await startGmailConnect({ user, returnTo: '/settings?tab=integrations' });
     } catch (err) {
       setGmailError(err.message);
       setGmailAction(null);
@@ -737,8 +738,8 @@ export default function UserSettings() {
       const token = await user.getIdToken();
       const res = await fetch('/.netlify/functions/gmail-disconnect', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, authToken: token }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ userId: user.uid }),
       });
       if (!res.ok) throw new Error('Failed to disconnect Gmail');
       setGmailStatus('disconnected');
@@ -1286,9 +1287,15 @@ export default function UserSettings() {
                     {!gmailLoading && gmailStatus === 'disconnected' && (
                       <span className="us-status-chip us-status-chip--gray">Not connected</span>
                     )}
+                    {!gmailLoading && gmailStatus === 'needs_reconnect' && (
+                      <span className="us-status-chip us-status-chip--gray"><AlertTriangle className="w-3 h-3" /> Reconnect needed</span>
+                    )}
                   </div>
                   <span className="us-card-value us-card-value--muted">
-                    {gmailLoading ? 'Loading…' : gmailStatus === 'connected' && gmailEmail ? gmailEmail : 'Send outreach directly from your Gmail account'}
+                    {gmailLoading ? 'Loading…'
+                      : gmailStatus === 'connected' && gmailEmail ? gmailEmail
+                      : gmailStatus === 'needs_reconnect' ? `Google stopped Idynify's access${gmailEmail ? ` to ${gmailEmail}` : ''}. Reconnect to keep sending.`
+                      : 'Send outreach directly from your Gmail account'}
                   </span>
                   {gmailError && (
                     <span className="us-inline-error"><AlertTriangle className="w-3 h-3" />{gmailError}</span>
@@ -1307,7 +1314,7 @@ export default function UserSettings() {
                 <div className="us-gmail-actions">
                   {gmailLoading ? (
                     <Loader className="w-4 h-4 animate-spin" style={{ color: '#6b7280' }} />
-                  ) : gmailStatus === 'connected' ? (
+                  ) : gmailStatus === 'connected' || gmailStatus === 'needs_reconnect' ? (
                     <>
                       <button className="us-action-btn" onClick={handleConnectGmail} disabled={gmailAction !== null} title="Re-authorize Gmail">
                         {gmailAction === 'connecting' ? <Loader className="w-3.5 h-3.5 animate-spin" /> : null}

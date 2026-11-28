@@ -18,6 +18,10 @@ import { describe, it, expect, vi } from 'vitest';
 
 // The send function's side-effectful imports, mocked exactly as gmailSendQuick.test.js does.
 vi.mock('googleapis', () => ({ google: { auth: { OAuth2: class {} }, gmail: vi.fn() } }));
+// The function now takes db from the shared netlify/functions/firebase-admin.js, which also
+// sets up Auth; with the app layer stubbed above, stub Auth too (CH-GMAIL-001.5).
+vi.mock('firebase-admin/auth', () => ({ getAuth: () => ({}) }));
+
 vi.mock('firebase-admin/app', () => ({ initializeApp: vi.fn(), getApps: () => [{}], cert: vi.fn() }));
 vi.mock('firebase-admin/firestore', () => ({ getFirestore: () => ({}), FieldValue: {} }));
 vi.mock('../../netlify/functions/utils/gmailSignature.js', () => ({

@@ -19,24 +19,13 @@
 
 import { appendContactChild } from './utils/contactWriteLifecycle.js';
 import { google } from 'googleapis';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { db } from './firebase-admin.js'; // shared init: production key or staging short-lived credentials
+import { FieldValue } from 'firebase-admin/firestore';
+// Unused here since the shared init; kept so this change and PR #856 (which adds an import
+// right after this line) merge in either order. Remove once both are on main.
+// eslint-disable-next-line no-unused-vars
 import { requireProjectId } from './utils/firebaseEnv.js';
-
-if (getApps().length === 0) {
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY
-    ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-    : undefined;
-  initializeApp({
-    credential: cert({
-      projectId: requireProjectId(),
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey,
-    }),
-  });
-}
-
-const db = getFirestore();
+import { recordGmailRefreshFailure } from './utils/gmailOAuth.js';
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -120,6 +109,7 @@ export const handler = async (event) => {
           updatedAt: new Date().toISOString(),
         });
       } catch (refreshErr) {
+        await recordGmailRefreshFailure(gmailDoc.ref, refreshErr);
         return { statusCode: 200, headers: CORS_HEADERS, body: JSON.stringify({ checked: 0, repliesFound: 0, code: 'NEEDS_RECONNECT' }) };
       }
     }

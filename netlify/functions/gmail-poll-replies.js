@@ -22,25 +22,9 @@
  */
 
 import { google } from 'googleapis';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
-import { requireProjectId } from './utils/firebaseEnv.js';
+import { db } from './firebase-admin.js'; // shared init: production key or staging short-lived credentials
 import { pollRepliesForUser } from './utils/replyPolling.js';
-
-if (getApps().length === 0) {
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY
-    ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-    : undefined;
-  initializeApp({
-    credential: cert({
-      projectId: requireProjectId(),
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey,
-    }),
-  });
-}
-
-const db = getFirestore();
+import { recordGmailRefreshFailure } from './utils/gmailOAuth.js';
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',
@@ -112,6 +96,7 @@ export const handler = async (event) => {
         });
         console.log('✅ Token refreshed');
       } catch (refreshErr) {
+        await recordGmailRefreshFailure(gmailDoc.ref, refreshErr);
         console.error('❌ Token refresh failed:', refreshErr);
         return { statusCode: 200, headers: CORS_HEADERS, body: JSON.stringify({ transitioned: [], code: 'NEEDS_RECONNECT' }) };
       }

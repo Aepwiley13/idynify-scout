@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db, auth } from '../../firebase/config';
 import { useActiveUser } from '../../context/ImpersonationContext';
+import { startGmailConnect } from '../../utils/gmailConnect';
 import { useT } from '../../theme/ThemeContext';
 import { BRAND, STATUS } from '../../theme/tokens';
 import {
@@ -195,14 +196,11 @@ export default function CadenceDetail() {
     try {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) return;
-      const authToken = await firebaseUser.getIdToken();
-      const res = await fetch('/.netlify/functions/gmail-oauth-init', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.uid, authToken }),
+      // Acting for user.uid; the server refuses it when that is not the
+      // signed-in account (impersonation). Comes back to this cadence.
+      await startGmailConnect({
+        user: { uid: user.uid, getIdToken: () => firebaseUser.getIdToken() },
       });
-      const data = await res.json();
-      if (data.authUrl) window.location.href = data.authUrl;
     } catch (err) {
       showToast('Failed to start Gmail reconnection');
     }

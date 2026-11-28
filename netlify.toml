@@ -55,6 +55,11 @@
 [context.production.environment]
   VITE_CONTACT_HUB = "on"
   VITE_FREE_PLAN = "on"
+  # My Card sharing (MY-CARD-SHARE-001): the public page /c/<id> is served by
+  # netlify/edge-functions/public-card.js (its path and rate limit are in that file's `config`).
+  # OFF in production: every /c/* path returns the same "isn't available" page until the
+  # release is approved. Turn on only at release, together with VITE_MY_CARD_SHARING.
+  MY_CARD_SHARING_ENABLED = "false"
 
 # ─── Non-production contexts ─────────────────────────────────────────────────
 #
@@ -94,11 +99,15 @@
 # context only.
 
 [context.branch-deploy.environment]
+  # My Card sharing public page: on in staging and previews (see the production context).
+  MY_CARD_SHARING_ENABLED = "true"
   DISCOVERY_CRON_ENABLED = "false"
   GMAIL_IDENTITY_MODE = "dry_run"
   CAPTURE_MODE = "off"
 
 [context.deploy-preview.environment]
+  # My Card sharing public page: on in staging and previews (see the production context).
+  MY_CARD_SHARING_ENABLED = "true"
   DISCOVERY_CRON_ENABLED = "false"
   GMAIL_IDENTITY_MODE = "dry_run"
   CAPTURE_MODE = "off"

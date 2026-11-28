@@ -11,25 +11,12 @@
  */
 
 import { google } from 'googleapis';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import { db } from './firebase-admin.js'; // shared init: production key or staging short-lived credentials
+// Unused here since the shared init; kept so this change and PR #856 (which adds an import
+// right after this line) merge in either order. Remove once both are on main.
+// eslint-disable-next-line no-unused-vars
 import { requireProjectId } from './utils/firebaseEnv.js';
 import { recordGmailRefreshFailure } from './utils/gmailOAuth.js';
-
-if (getApps().length === 0) {
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY
-    ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-    : undefined;
-  initializeApp({
-    credential: cert({
-      projectId: requireProjectId(),
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey,
-    }),
-  });
-}
-
-const db = getFirestore();
 
 const CORS_HEADERS = {
   'Content-Type': 'application/json',

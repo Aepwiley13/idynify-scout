@@ -22,6 +22,10 @@ const h = vi.hoisted(() => {
   return { docs, sent };
 });
 
+// The function now takes db from the shared netlify/functions/firebase-admin.js, which also
+// sets up Auth; with the app layer stubbed above, stub Auth too (CH-GMAIL-001.5).
+vi.mock('firebase-admin/auth', () => ({ getAuth: () => ({}) }));
+
 vi.mock('firebase-admin/app', () => ({
   initializeApp: vi.fn(),
   getApps: () => [{}], // non-empty: skips the requireProjectId()-gated init block entirely

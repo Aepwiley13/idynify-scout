@@ -10,11 +10,10 @@
 
 import { randomUUID } from 'node:crypto';
 import { google } from 'googleapis';
-import { initializeApp, getApps, cert } from 'firebase-admin/app';
-import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+import { db } from './firebase-admin.js'; // shared init: production key or staging short-lived credentials
+import { FieldValue } from 'firebase-admin/firestore';
 import { getGmailSignatureHtml, appendSignatureHtml, resolveFallbackSignOff } from './utils/gmailSignature.js';
 import { engagementPromotionPatch } from './utils/engagementPromotion.js';
-import { requireProjectId } from './utils/firebaseEnv.js';
 import { encodeHeaderValue, formatAddress } from './utils/emailHeaders.js';
 import { displayNameFor } from '../../src/utils/userIdentity.js';
 import { recordGmailRefreshFailure } from './utils/gmailOAuth.js';
@@ -33,23 +32,6 @@ const EMAIL_FORMAT = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // Re-exported: existing tests and callers import these from here.
 export { encodeHeaderValue, formatAddress };
-
-// Initialize Firebase Admin (only once)
-if (getApps().length === 0) {
-  const privateKey = process.env.FIREBASE_PRIVATE_KEY
-    ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n')
-    : undefined;
-
-  initializeApp({
-    credential: cert({
-      projectId: requireProjectId(),
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-      privateKey: privateKey
-    })
-  });
-}
-
-const db = getFirestore();
 
 // Phase 1.5: attachment cap enforced server-side. NOTE: Netlify synchronous
 // functions cap the request payload at ~6MB, so base64-encoded PDFs larger

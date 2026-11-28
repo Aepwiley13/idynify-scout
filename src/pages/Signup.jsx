@@ -142,11 +142,21 @@ export default function Signup() {
       // a comment promising it did not, so a slow Resend call sat between the
       // user pressing the button and reaching checkout. Failures still surface
       // in logs; they just no longer cost the user time.
-      fetch('/.netlify/functions/send-welcome-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email, userId: userCredential.user.uid, plan: tier }),
-      }).catch((emailError) => {
+      // Fire-and-forget: a welcome email must never block registration.
+      // The server derives the recipient and plan from the Firebase account,
+      // never from the request body. Use the newly created user's ID token.
+      void (async () => {
+        const idToken = await userCredential.user.getIdToken();
+        const response = await fetch('/.netlify/functions/send-welcome-email', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: 'Bearer ' + idToken,
+          },
+          body: JSON.stringify({}),
+        });
+        if (!response.ok) console.warn('[signup] welcome email could not be sent');
+      })().catch((emailError) => {
         console.error('[signup] welcome email failed to send', emailError);
       });
 

@@ -199,9 +199,12 @@ export function readyLine(result, browser = null, base = 'http://localhost:8888'
 }
 
 /** The CLI arguments: `netlify dev --offline`, plus the switches asked for. */
-export function devArgs({ noEdgeFunctions = false, functionsDir = null, vitePort = null } = {}) {
+export function devArgs({ noEdgeFunctions = false, functionsDir = null, vitePort = null, port = null } = {}) {
   return [
     'netlify', 'dev', '--offline',
+    // Another session may already hold :8888 (Gmail QA needs it for its OAuth callback): --port=N
+    // runs this one beside it, with Vite on N+1000, strict, never on a port it did not ask for.
+    ...(port ? ['--port', String(port)] : []),
     ...(noEdgeFunctions ? ['--internal-disable-edge-functions'] : []),
     ...(functionsDir ? ['--functions', functionsDir] : []),
     // Vite on a port of its own, strict: if it cannot have it, it stops instead of moving to the
@@ -331,7 +334,18 @@ async function main() {
   // Billing runs: the CLI, npm and Vite in a process group of their own, stopped together, so no
   // Vite or netlify is left holding a port for the next run. No stdin: a background group that
   // reads the terminal is suspended.
-  const child = spawn('npx', devArgs({ noEdgeFunctions, functionsDir: functions?.path, vitePort: onlyBilling ? BILLING_VITE_PORT : null }), {
+  const portArg = argv.find((a) => /^--port=\d{4,5}$/.test(a));
+  const ownPort = portArg ? Number(portArg.split('=')[1]) : null;
+  if (ownPort) {
+    const ports = await claimPorts([ownPort, ownPort + 1000], repoRoot());
+    for (const line of ports.stopped) console.log(`  · ${line}`);
+    if (!ports.ok) {
+      for (const p of ports.problems) console.error(`  ✗ ${p}`);
+      console.error('\nRefused: those ports are not free, and nothing outside this checkout is stopped.');
+      return 1;
+    }
+  }
+  const child = spawn('npx', devArgs({ noEdgeFunctions, functionsDir: functions?.path, vitePort: onlyBilling ? BILLING_VITE_PORT : ownPort ? ownPort + 1000 : null, port: ownPort }), {
     cwd: repoRoot(), env: plan.childEnv, ...(onlyBilling ? { stdio: ['ignore', 'inherit', 'inherit'], detached: true } : { stdio: 'inherit' }),
   });
   let exited = false;

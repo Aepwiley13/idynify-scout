@@ -111,7 +111,7 @@ function fakeFetch(url, init = {}) {
 
 const ENV = {
   ANTHROPIC_API_KEY: 'anthropic-test-key', FIREBASE_API_KEY: 'web-key', FIREBASE_PROJECT_ID: 'demo-paid-ai',
-  URL: 'https://idynify.test', CAPTURE_MODE: 'on', ADMIN_USER_IDS: 'u_env_admin', SUPER_ADMIN_USER_IDS: '',
+  URL: 'https://idynify.test', GMAIL_INBOX_INGESTION_ENABLED: 'true', CAPTURE_MODE: 'on', ADMIN_USER_IDS: 'u_env_admin', SUPER_ADMIN_USER_IDS: '',
 };
 
 beforeEach(() => {
